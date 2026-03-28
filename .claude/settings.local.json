@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "WebSearch",
+      "Bash(npx create-next-app@latest maxxed --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm)",
+      "Bash(npx create-next-app@latest maxxed --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm --yes)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const Stripe = require\\(''''stripe''''\\); const s = new Stripe\\(''''sk_test_123''''\\); const sub = {}; console.log\\(''''stripe version check''''\\)\")",
+      "Bash(ls /Users/suleimannajem/looksmaxing/maxxed/src/app/\\\\\\(app\\\\\\)/)",
+      "Bash(ls /Users/suleimannajem/looksmaxing/maxxed/src/app/\\\\\\(app\\\\\\)/dashboard/)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s -X POST http://localhost:3001/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Test User\"\",\"\"email\"\":\"\"test@test.com\"\",\"\"password\"\":\"\"password123\"\"}')",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
