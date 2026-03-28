@@ -1,0 +1,351 @@
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Check, X, ChevronLeft, Loader2, Lock } from 'lucide-react'
+import useStore from '../store/useStore'
+import { api } from '../utils/api'
+
+// ─── Gold tokens ───────────────────────────────────────────────────────────────
+const GOLD = '#C6A85C'
+const GOLD_LIGHT = '#D4B96A'
+const GOLD_DARK = '#A8893A'
+const SURFACE = '#0D0D0D'
+const SURFACE_2 = '#141414'
+const SURFACE_3 = '#1C1C1C'
+const BORDER = 'rgba(255,255,255,0.06)'
+const GOLD_BORDER = 'rgba(198,168,92,0.25)'
+const TEXT = '#F0EDE8'
+const TEXT_DIM = '#4A4642'
+
+const FEATURES = [
+  { name: 'Face + Body Scan', free: true, premium: true },
+  { name: 'Glow Score + Sub-Scores', free: true, premium: true },
+  { name: 'Basic Recommendations', free: true, premium: true },
+  { name: 'Full 12-Week Action Plan', free: 'First only', premium: true },
+  { name: 'Progress Timeline', free: 'Last 4 scans', premium: 'Full history' },
+  { name: 'Before & After Comparison', free: false, premium: true },
+  { name: 'HairMaxx AI Simulator', free: false, premium: true },
+  { name: 'Product Recommendations', free: 'Generic', premium: 'Personalized' },
+  { name: 'Daily Check-In (full)', free: 'Posture only', premium: true },
+  { name: 'Priority Support', free: false, premium: true },
+]
+
+const TESTIMONIALS = [
+  { name: 'Marcus T.', handle: '@marcust', score: '+18 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
+  { name: 'Sarah K.', handle: '@sarahk', score: '+22 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
+  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $7.99 I spend every month. Shoulder exercises alone changed my frame.', initial: 'J' },
+]
+
+export default function Premium() {
+  const navigate = useNavigate()
+  const { setIsPremium, isPremium } = useStore()
+  const [plan, setPlan] = useState('annual')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('success') === '1') {
+      api.payments.status()
+        .then(({ isPremium: active }) => { if (active) setIsPremium(true) })
+        .catch(() => {})
+    }
+  }, [searchParams, setIsPremium])
+
+  async function handleSubscribe() {
+    setLoading(true)
+    setError('')
+    try {
+      const { url } = await api.payments.createCheckout(plan)
+      window.location.href = url
+    } catch (err) {
+      if (err.message?.includes('placeholder') || err.message?.includes('Invalid API Key') || err.message?.includes('No such price')) {
+        setError('Stripe not configured yet. Add your keys to activate real payments.')
+      } else {
+        setError(err.message || 'Payment failed. Please try again.')
+      }
+      setLoading(false)
+    }
+  }
+
+  if (isPremium) {
+    return (
+      <div
+        className="page-scroll-full flex flex-col items-center justify-center px-8 text-center"
+        style={{ background: SURFACE }}
+      >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <div
+            className="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+            style={{ background: `${GOLD}18`, border: `1px solid ${GOLD_BORDER}` }}
+          >
+            <span className="text-2xl font-mono font-bold" style={{ color: GOLD }}>✦</span>
+          </div>
+          <h1
+            className="font-heading font-bold text-2xl mb-2"
+            style={{ color: TEXT, letterSpacing: '-0.02em' }}
+          >
+            Premium Access
+          </h1>
+          <p className="font-body text-sm mb-8" style={{ color: TEXT_DIM }}>
+            All features unlocked. Go make it happen.
+          </p>
+          <button onClick={() => navigate(-1)} className="btn-primary max-w-xs">
+            Back to Dashboard
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="page-scroll-full" style={{ background: SURFACE }}>
+
+      {/* ── Hero Header ─────────────────────────────────────────────── */}
+      <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden">
+        {/* Subtle gold radial bg */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse at 50% -20%, ${GOLD}12 0%, transparent 70%)` }}
+        />
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute left-4 top-14 w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
+        >
+          <ChevronLeft size={18} style={{ color: TEXT }} />
+        </button>
+
+        <div className="relative z-10">
+          {/* Gold badge */}
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5"
+            style={{ background: `${GOLD}12`, border: `1px solid ${GOLD_BORDER}` }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
+            <span className="text-[11px] font-heading font-bold uppercase tracking-widest" style={{ color: GOLD }}>
+              GlowSync Premium
+            </span>
+          </div>
+
+          <h1
+            className="font-heading font-bold text-[32px] leading-[1.1] mb-3"
+            style={{ color: TEXT, letterSpacing: '-0.025em' }}
+          >
+            Unlock Your<br />Full Potential
+          </h1>
+          <p className="font-body text-[14px]" style={{ color: TEXT_DIM }}>
+            Everything you need to maximize your glow-up.
+          </p>
+        </div>
+      </div>
+
+      <div className="px-4">
+
+        {/* ── Plan Toggle ─────────────────────────────────────────────── */}
+        <div
+          className="rounded-2xl p-1.5 mb-4"
+          style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
+        >
+          <div className="grid grid-cols-2 gap-1">
+            {[
+              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
+              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'Save 48%' },
+            ].map(({ key, label, price, save }) => {
+              const isActive = plan === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setPlan(key)}
+                  className="py-3.5 rounded-xl text-center transition-all duration-200"
+                  style={{
+                    background: isActive ? `${GOLD}18` : 'transparent',
+                    border: `1px solid ${isActive ? GOLD_BORDER : 'transparent'}`,
+                  }}
+                >
+                  <p
+                    className="text-[11px] font-heading font-bold"
+                    style={{ color: isActive ? GOLD : TEXT_DIM }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className="text-sm font-mono font-bold mt-0.5"
+                    style={{ color: isActive ? TEXT : TEXT_DIM }}
+                  >
+                    {price}
+                  </p>
+                  {save && (
+                    <span
+                      className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full mt-1 inline-block"
+                      style={{
+                        background: isActive ? `${GOLD}22` : 'rgba(255,255,255,0.05)',
+                        color: isActive ? GOLD : TEXT_DIM,
+                      }}
+                    >
+                      {save}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Primary CTA ─────────────────────────────────────────────── */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSubscribe}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-2 flex items-center justify-center gap-2 transition-all duration-200"
+          style={{
+            background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
+            color: '#0A0A0A',
+            boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
+            letterSpacing: '0.01em',
+          }}
+        >
+          {loading
+            ? <><Loader2 size={16} className="animate-spin" />Redirecting…</>
+            : plan === 'annual'
+              ? 'Start for $49.99/year'
+              : 'Start for $7.99/month'
+          }
+        </motion.button>
+
+        <AnimatePresence>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="text-center text-xs font-body mt-1 mb-1"
+              style={{ color: '#EF4444' }}
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <p className="text-center text-[10px] font-body mb-7" style={{ color: TEXT_DIM }}>
+          Cancel anytime · No commitment · 7-day free trial
+        </p>
+
+        {/* ── Feature Comparison ──────────────────────────────────────── */}
+        <div
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{ border: `1px solid ${GOLD_BORDER}` }}
+        >
+          {/* Header */}
+          <div
+            className="grid grid-cols-3 text-center py-3 px-3"
+            style={{ background: SURFACE_2, borderBottom: `1px solid ${BORDER}` }}
+          >
+            <span className="text-[10px] font-heading font-bold text-left uppercase tracking-wide" style={{ color: TEXT_DIM }}>
+              Feature
+            </span>
+            <span className="text-[10px] font-heading font-bold uppercase tracking-wide" style={{ color: TEXT_DIM }}>
+              Free
+            </span>
+            <div className="flex items-center justify-center gap-1">
+              <div className="w-1 h-1 rounded-full" style={{ background: GOLD }} />
+              <span className="text-[10px] font-heading font-bold uppercase tracking-wide" style={{ color: GOLD }}>
+                Premium
+              </span>
+            </div>
+          </div>
+
+          {FEATURES.map(({ name, free, premium }, i) => (
+            <div
+              key={name}
+              className="grid grid-cols-3 text-center py-3 px-3 items-center"
+              style={{
+                background: i % 2 === 0 ? SURFACE : SURFACE_2,
+                borderTop: `1px solid ${BORDER}`,
+              }}
+            >
+              <p className="text-[11px] font-body text-left" style={{ color: TEXT }}>{name}</p>
+              <div className="flex justify-center">
+                {free === true ? (
+                  <Check size={13} style={{ color: '#4A4642' }} />
+                ) : free === false ? (
+                  <Lock size={11} style={{ color: '#2A2A2A' }} />
+                ) : (
+                  <span className="text-[9px] font-body" style={{ color: TEXT_DIM }}>{free}</span>
+                )}
+              </div>
+              <div className="flex justify-center">
+                {premium === true ? (
+                  <Check size={13} style={{ color: GOLD }} />
+                ) : (
+                  <span className="text-[9px] font-body font-semibold" style={{ color: GOLD }}>{premium}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Testimonials ────────────────────────────────────────────── */}
+        <p
+          className="font-heading font-bold text-[13px] uppercase tracking-widest mb-4"
+          style={{ color: TEXT_DIM }}
+        >
+          Real Results
+        </p>
+
+        {TESTIMONIALS.map((t, i) => (
+          <motion.div
+            key={t.handle}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="rounded-2xl p-4 mb-3"
+            style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${GOLD}15`, border: `1px solid ${GOLD_BORDER}` }}
+              >
+                <span className="text-sm font-bold font-heading" style={{ color: GOLD }}>
+                  {t.initial}
+                </span>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-heading font-bold" style={{ color: TEXT }}>{t.name}</p>
+                <p className="text-[10px] font-body" style={{ color: TEXT_DIM }}>{t.handle}</p>
+              </div>
+              <span
+                className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold"
+                style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}
+              >
+                {t.score}
+              </span>
+            </div>
+            <p className="text-[13px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
+              "{t.quote}"
+            </p>
+          </motion.div>
+        ))}
+
+        {/* ── Final CTA ───────────────────────────────────────────────── */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSubscribe}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-3 transition-all duration-200"
+          style={{
+            background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
+            color: '#0A0A0A',
+            boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
+          }}
+        >
+          Start My Free Trial →
+        </motion.button>
+        <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
+          Billed {plan === 'annual' ? '$49.99/year' : '$7.99/month'} after 7-day trial. Cancel anytime.
+        </p>
+      </div>
+    </div>
+  )
+}
