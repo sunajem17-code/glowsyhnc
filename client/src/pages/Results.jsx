@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
-import logo from '../assets/ascendus-logo.png'
+import logo from '../assets/ascendus-icon.png'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
@@ -733,7 +733,7 @@ function PaywallSheet({ glowScore, onClose }) {
       <div className="flex-1 px-5 pt-10 pb-10 flex flex-col">
         {/* Header */}
         <div className="text-center mb-6">
-          <img src={logo} alt="Ascendus" style={{ height: 44, mixBlendMode: 'lighten', margin: '0 auto 12px' }} />
+          <img src={logo} alt="Ascendus" style={{ height: 36, mixBlendMode: 'lighten', margin: '0 auto 12px' }} />
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4"
             style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.25)' }}>
             <span style={{ color: '#C6A85C', fontSize: 11 }}>✦</span>
