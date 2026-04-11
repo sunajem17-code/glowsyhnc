@@ -1,6 +1,5 @@
-const BASE = (import.meta.env.VITE_API_URL
-  ? `https://${import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')}`
-  : '') + '/api'
+const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
+const BASE = `https://${API_URL.replace(/^https?:\/\//, '')}/api`
 
 async function request(path, options = {}) {
   const token = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token
