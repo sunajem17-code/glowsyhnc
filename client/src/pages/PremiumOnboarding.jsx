@@ -1225,110 +1225,133 @@ function StepPhaseResult({ data, onFinish }) {
 // Steps: 0=welcome, 1=signup, 2=age, 3=consent, 4=gender, 5=goal,
 //        6=height, 7=weight, 8=bmi, 9=experience, 10=phase
 
-// ── Intro Slides (shown before the quiz) ─────────────────────────────────────
-const INTRO_SLIDES = [
-  {
-    tag: 'LOOKS MATTER',
-    headline: 'Attractive men get\n3x more callbacks.',
-    sub: 'Studies show men in the top tier of appearance receive 36% job callbacks vs 12% for average — that\'s a 3x gap before they say a word.',
-    visual: () => (
-      <div className="flex items-end justify-center gap-6 mb-2">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-16 rounded-xl flex items-end justify-center pb-2" style={{ height: 72, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <span className="font-heading font-bold text-[22px]" style={{ color: 'rgba(255,255,255,0.4)' }}>12%</span>
-          </div>
-          <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Average</span>
+// ── Intro Slides ─────────────────────────────────────────────────────────────
+const G = '#C9A84C'
+const G_DIM = 'rgba(201,168,76,0.12)'
+const G_BORDER = 'rgba(201,168,76,0.28)'
+
+function Slide1() {
+  return (
+    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
+      <h1 className="font-heading font-bold text-center mb-8" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        Your Face Is<br />Costing You
+      </h1>
+
+      {/* Two stat cards */}
+      <div className="flex gap-3 mb-8">
+        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
+          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: G }}>38%</span>
+          <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>of people form opinions before you speak</p>
         </div>
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-16 rounded-xl flex items-end justify-center pb-2 relative" style={{ height: 140, background: 'linear-gradient(180deg, rgba(198,168,92,0.25) 0%, rgba(198,168,92,0.12) 100%)', border: '1px solid rgba(198,168,92,0.4)' }}>
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg" style={{ background: 'rgba(198,168,92,0.2)', border: '1px solid rgba(198,168,92,0.4)' }}>
-              <span className="font-heading font-bold text-[11px]" style={{ color: '#C9A84C' }}>3x</span>
-            </div>
-            <span className="font-heading font-bold text-[22px]" style={{ color: '#C9A84C' }}>36%</span>
-          </div>
-          <span className="font-body text-[11px]" style={{ color: '#C9A84C' }}>Top Tier</span>
+        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
+          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: G }}>7 sec</span>
+          <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>to make a first impression. That's it.</p>
         </div>
       </div>
-    ),
-  },
-  {
-    tag: 'THE TRUTH',
-    headline: '55% of first impressions\nare about appearance.',
-    sub: 'Research from Princeton shows people form judgments about competence, trustworthiness, and status within 100ms — all from looks.',
-    visual: () => (
-      <div className="w-full mb-2">
-        <div className="relative h-10 rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+      <p className="font-heading font-bold text-center text-[18px] mb-2" style={{ color: '#F0EDE8' }}>
+        Attractiveness isn't luck. It's a system.
+      </p>
+      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        Harvard Business Review, 2021
+      </p>
+    </div>
+  )
+}
+
+function Slide2() {
+  const rows = [
+    { icon: '✦', text: 'Skin alone accounts for 31% of perceived attractiveness' },
+    { icon: '✦', text: 'Grooming can shift your rating by up to 1.8 points' },
+    { icon: '✦', text: 'Posture correction adds 1–2 inches of visible height' },
+  ]
+  return (
+    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
+      <h1 className="font-heading font-bold text-center mb-8" style={{ fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        The Gap Is Smaller<br />Than You Think
+      </h1>
+
+      <div className="flex flex-col gap-3 mb-8">
+        {rows.map(({ icon, text }, i) => (
           <motion.div
-            className="absolute inset-y-0 left-0 rounded-2xl flex items-center justify-end pr-4"
-            style={{ background: 'linear-gradient(90deg, rgba(198,168,92,0.4), rgba(198,168,92,0.6))' }}
-            initial={{ width: '0%' }}
-            animate={{ width: '55%' }}
-            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+            key={i}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
+            style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}
           >
-            <span className="font-heading font-bold text-[13px]" style={{ color: '#C9A84C' }}>55%</span>
+            <span className="text-[14px] flex-shrink-0" style={{ color: G }}>{icon}</span>
+            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
           </motion.div>
-        </div>
-        <div className="flex justify-between mt-2 px-1">
-          <span className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Appearance</span>
-          <span className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Communication · Credentials</span>
-        </div>
+        ))}
       </div>
-    ),
-  },
-  {
-    tag: 'YOUR POTENTIAL',
-    headline: 'Users gain +1.2pts\nin just 90 days.',
-    sub: 'With a personalized plan from your scan, our users average a 1.2 point improvement in 90 days. The protocol works — if you follow it.',
-    visual: () => (
-      <div className="w-full mb-2">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1">
-            <div className="flex justify-between mb-1.5">
-              <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Before</span>
-              <span className="font-heading font-bold text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>5.8/10</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <div className="h-full rounded-full" style={{ width: '58%', background: 'rgba(255,255,255,0.2)' }} />
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <div className="flex justify-between mb-1.5">
-              <span className="font-body text-[11px]" style={{ color: '#C9A84C' }}>After 90 days</span>
-              <span className="font-heading font-bold text-[13px]" style={{ color: '#C9A84C' }}>7.0/10</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, #A8893A, #C9A84C)' }}
-                initial={{ width: '58%' }}
-                animate={{ width: '70%' }}
-                transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-              />
-            </div>
-          </div>
-        </div>
+
+      <p className="font-heading font-bold text-center text-[18px] mb-2" style={{ color: '#F0EDE8' }}>
+        Small changes. Massive difference.
+      </p>
+      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        *Based on facial attractiveness research studies
+      </p>
+    </div>
+  )
+}
+
+function Slide3() {
+  const features = [
+    { icon: '⚡', text: 'AI scans your face + body in seconds' },
+    { icon: '🎯', text: 'Tells you exactly what to fix first' },
+    { icon: '📈', text: 'Tracks your improvement over time' },
+    { icon: '🏆', text: 'Gives you a personalized 12-week plan' },
+  ]
+  return (
+    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
+      <h1 className="font-heading font-bold text-center mb-7" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        Built Different
+      </h1>
+
+      <div className="flex flex-col gap-2.5 mb-8">
+        {features.map(({ icon, text }, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
+            style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}
+          >
+            <span className="text-[20px] flex-shrink-0">{icon}</span>
+            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</p>
+          </motion.div>
+        ))}
       </div>
-    ),
-  },
-]
+
+      {/* Big stat */}
+      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
+        <p className="font-heading font-bold text-[28px]" style={{ color: G }}>+1.4 points</p>
+        <p className="font-body text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>average improvement in 90 days</p>
+        <p className="font-body text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Based on Ascendus user data</p>
+      </div>
+    </div>
+  )
+}
+
+const SLIDE_COMPONENTS = [Slide1, Slide2, Slide3]
 
 function IntroSlides({ onDone }) {
   const [slide, setSlide] = useState(0)
   const [dir, setDir] = useState(1)
-  const total = INTRO_SLIDES.length
+  const total = SLIDE_COMPONENTS.length
 
   function next() {
     if (slide < total - 1) { setDir(1); setSlide(s => s + 1) }
     else onDone()
   }
 
-  const s = INTRO_SLIDES[slide]
-  const Visual = s.visual
+  const SlideContent = SLIDE_COMPONENTS[slide]
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: '#080808' }}>
+    <div className="fixed inset-0 flex flex-col" style={{ background: '#0A0A0A' }}>
       {/* Skip */}
       <button
         onClick={onDone}
@@ -1338,20 +1361,25 @@ function IntroSlides({ onDone }) {
         Skip
       </button>
 
+      {/* Logo */}
+      <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20">
+        <img src="/favicon.svg" alt="Ascendus" style={{ width: 28, height: 28, opacity: 0.9 }} />
+      </div>
+
       {/* Progress dots */}
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-        {INTRO_SLIDES.map((_, i) => (
+      <div className="absolute top-[4.5rem] left-1/2 -translate-x-1/2 flex items-center gap-2 z-20" style={{ marginTop: 32 }}>
+        {SLIDE_COMPONENTS.map((_, i) => (
           <motion.div
             key={i}
             animate={{ width: i === slide ? 20 : 6, opacity: i === slide ? 1 : 0.3 }}
             transition={{ duration: 0.3 }}
             className="h-1.5 rounded-full"
-            style={{ background: '#C9A84C' }}
+            style={{ background: G }}
           />
         ))}
       </div>
 
-      {/* Slide content */}
+      {/* Slide */}
       <AnimatePresence mode="wait" custom={dir}>
         <motion.div
           key={slide}
@@ -1361,35 +1389,9 @@ function IntroSlides({ onDone }) {
           animate="center"
           exit="exit"
           transition={pageTrans}
-          className="flex-1 flex flex-col items-center justify-center px-7 pt-24 pb-8"
+          className="flex flex-col h-full"
         >
-          {/* Tag */}
-          <div
-            className="px-3 py-1 rounded-full mb-7"
-            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.3)' }}
-          >
-            <span className="font-heading font-bold text-[11px] tracking-widest" style={{ color: '#C9A84C' }}>
-              {s.tag}
-            </span>
-          </div>
-
-          {/* Visual */}
-          <div className="w-full mb-8">
-            <Visual />
-          </div>
-
-          {/* Headline */}
-          <h1
-            className="font-heading font-bold text-center mb-4"
-            style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#F0EDE8', whiteSpace: 'pre-line' }}
-          >
-            {s.headline}
-          </h1>
-
-          {/* Sub */}
-          <p className="font-body text-center text-[14px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)', maxWidth: 300 }}>
-            {s.sub}
-          </p>
+          <SlideContent />
         </motion.div>
       </AnimatePresence>
 
@@ -1400,9 +1402,10 @@ function IntroSlides({ onDone }) {
           onClick={next}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
           style={{
-            background: 'linear-gradient(135deg, #D4B96A 0%, #C9A84C 50%, #A8893A 100%)',
+            background: `linear-gradient(135deg, #D4B96A 0%, ${G} 50%, #A8893A 100%)`,
             color: '#0A0A0A',
-            boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+            boxShadow: '0 4px 20px rgba(201,168,76,0.3)',
+            letterSpacing: '0.01em',
           }}
         >
           {slide < total - 1 ? 'Continue' : "Let's Get Started"}
