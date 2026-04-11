@@ -1,7 +1,7 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
-const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
 
 const router = express.Router()
 
@@ -307,7 +307,7 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
 // ── Route ─────────────────────────────────────────────────────────────────────
 // verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
 // resolvePro sets req.isPro so scanLimit can skip the cap for Pro users.
-router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (req, res) => {
+router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey || apiKey.trim() === '') {
