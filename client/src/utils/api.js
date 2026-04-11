@@ -1,4 +1,6 @@
-const BASE = '/api'
+const BASE = (import.meta.env.VITE_API_URL
+  ? `https://${import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')}`
+  : '') + '/api'
 
 async function request(path, options = {}) {
   const token = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token
