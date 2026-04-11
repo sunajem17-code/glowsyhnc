@@ -1226,9 +1226,9 @@ function StepPhaseResult({ data, onFinish }) {
 //        6=height, 7=weight, 8=bmi, 9=experience, 10=phase
 
 // ── Intro Slides ─────────────────────────────────────────────────────────────
-const G = '#C9A84C'
-const G_DIM = 'rgba(201,168,76,0.12)'
-const G_BORDER = 'rgba(201,168,76,0.28)'
+const SLIDE_GOLD = '#C9A84C'
+const SLIDE_GOLD_DIM = 'rgba(201,168,76,0.12)'
+const SLIDE_GOLD_BORDER = 'rgba(201,168,76,0.28)'
 
 function Slide1() {
   return (
@@ -1239,12 +1239,12 @@ function Slide1() {
 
       {/* Two stat cards */}
       <div className="flex gap-3 mb-8">
-        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
-          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: G }}>38%</span>
+        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
+          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>38%</span>
           <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>of people form opinions before you speak</p>
         </div>
-        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
-          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: G }}>7 sec</span>
+        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
+          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>7 sec</span>
           <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>to make a first impression. That's it.</p>
         </div>
       </div>
@@ -1279,9 +1279,9 @@ function Slide2() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
-            style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}
+            style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}
           >
-            <span className="text-[14px] flex-shrink-0" style={{ color: G }}>{icon}</span>
+            <span className="text-[14px] flex-shrink-0" style={{ color: SLIDE_GOLD }}>{icon}</span>
             <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
           </motion.div>
         ))}
@@ -1318,7 +1318,7 @@ function Slide3() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
-            style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}
+            style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}
           >
             <span className="text-[20px] flex-shrink-0">{icon}</span>
             <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</p>
@@ -1327,8 +1327,8 @@ function Slide3() {
       </div>
 
       {/* Big stat */}
-      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: G_DIM, border: `1px solid ${G_BORDER}` }}>
-        <p className="font-heading font-bold text-[28px]" style={{ color: G }}>+1.4 points</p>
+      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
+        <p className="font-heading font-bold text-[28px]" style={{ color: SLIDE_GOLD }}>+1.4 points</p>
         <p className="font-body text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>average improvement in 90 days</p>
         <p className="font-body text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Based on Ascendus user data</p>
       </div>
@@ -1374,7 +1374,7 @@ function IntroSlides({ onDone }) {
             animate={{ width: i === slide ? 20 : 6, opacity: i === slide ? 1 : 0.3 }}
             transition={{ duration: 0.3 }}
             className="h-1.5 rounded-full"
-            style={{ background: G }}
+            style={{ background: SLIDE_GOLD }}
           />
         ))}
       </div>
@@ -1402,7 +1402,7 @@ function IntroSlides({ onDone }) {
           onClick={next}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
           style={{
-            background: `linear-gradient(135deg, #D4B96A 0%, ${G} 50%, #A8893A 100%)`,
+            background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
             color: '#0A0A0A',
             boxShadow: '0 4px 20px rgba(201,168,76,0.3)',
             letterSpacing: '0.01em',
