@@ -1364,11 +1364,6 @@ function IntroSlides({ onDone }) {
         Skip
       </button>
 
-      {/* Logo */}
-      <div className="absolute top-11 left-1/2 -translate-x-1/2 z-20">
-        <img src="/favicon.svg" alt="Ascendus" style={{ width: 36, height: 36, opacity: 0.95 }} />
-      </div>
-
       {/* Progress dots */}
       <div className="absolute top-[5.5rem] left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
         {SLIDE_COMPONENTS.map((_, i) => (
