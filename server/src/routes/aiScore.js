@@ -311,7 +311,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey || apiKey.trim() === '') {
-      return res.status(503).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured' })
+      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
     const { faceImage, bodyImage, gender = 'male', skipBody = false } = req.body
