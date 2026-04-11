@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: require('path').join(__dirname, '../.env'), override: true })
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
@@ -25,6 +25,12 @@ app.use('/api/checkin', require('./routes/checkin'))
 app.use('/api/progress', require('./routes/progress'))
 app.use('/api/products', require('./routes/products'))
 app.use('/api/payments', require('./routes/payments'))
+app.use('/api/ai', require('./routes/aiScore'))
+app.use('/api/leaderboard', require('./routes/leaderboard'))
+app.use('/api/supabase',   require('./routes/supabaseRoutes'))
+app.use('/api/coach',     require('./routes/coach'))
+app.use('/api/hair',      require('./routes/hair'))
+app.use('/api/referral',  require('./routes/referral'))
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))

@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
-import Onboarding from './pages/Onboarding'
+import Splash from './pages/Splash'
+import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
 import Scan from './pages/Scan'
@@ -14,6 +15,12 @@ import DailyCheckin from './pages/DailyCheckin'
 import Profile from './pages/Profile'
 import Premium from './pages/Premium'
 import HairMaxx from './pages/HairMaxx'
+import Leaderboard from './pages/Leaderboard'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import Terms from './pages/Terms'
+import Referral from './pages/Referral'
+import Compare from './pages/Compare'
+import AICoach from './pages/AICoach'
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
@@ -21,35 +28,56 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial } = useStore()
+  const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
+  // Check if pro trial has expired on load
+  useEffect(() => {
+    if (checkProTrial) checkProTrial()
+  }, [])
+
+  if (!splashDone) {
+    return <Splash onDone={() => setSplashDone(true)} />
+  }
+
   return (
     <BrowserRouter>
       <AnimatePresence mode="wait">
         <Routes>
-          {!hasOnboarded && (
-            <Route path="*" element={<Onboarding />} />
+          {/* Legal pages — always accessible */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
+
+          {!hasOnboarded ? (
+            <Route path="*" element={<PremiumOnboarding />} />
+          ) : (
+            <>
+              <Route path="/auth" element={
+                isAuthenticated ? <Navigate to="/" replace /> : <Auth />
+              } />
+              <Route path="/" element={
+                <ProtectedRoute><Layout /></ProtectedRoute>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path="scan" element={<Scan />} />
+                <Route path="results" element={<Results />} />
+                <Route path="plan" element={<ActionPlan />} />
+                <Route path="progress" element={<Progress />} />
+                <Route path="checkin" element={<DailyCheckin />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="premium" element={<Premium />} />
+                <Route path="hairmaxx" element={<HairMaxx />} />
+                <Route path="leaderboard" element={<Leaderboard />} />
+                <Route path="referral" element={<Referral />} />
+                <Route path="compare" element={<Compare />} />
+                <Route path="coach" element={<AICoach />} />
+              </Route>
+            </>
           )}
-          <Route path="/auth" element={
-            isAuthenticated ? <Navigate to="/" replace /> : <Auth />
-          } />
-          <Route path="/" element={
-            <ProtectedRoute><Layout /></ProtectedRoute>
-          }>
-            <Route index element={<Dashboard />} />
-            <Route path="scan" element={<Scan />} />
-            <Route path="results" element={<Results />} />
-            <Route path="plan" element={<ActionPlan />} />
-            <Route path="progress" element={<Progress />} />
-            <Route path="checkin" element={<DailyCheckin />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="premium" element={<Premium />} />
-            <Route path="hairmaxx" element={<HairMaxx />} />
-          </Route>
         </Routes>
       </AnimatePresence>
     </BrowserRouter>

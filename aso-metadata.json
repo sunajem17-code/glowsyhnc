@@ -1,0 +1,49 @@
+{
+  "name": "Ascendus - Looksmax & Glow Up",
+  "subtitle": "AI Appearance Score & Improvement Plan",
+  "bundle_id": "com.ascendus.app",
+  "version": "1.0.0",
+  "categories": ["Lifestyle", "Health & Fitness"],
+  "keywords": [
+    "looksmax",
+    "face rating",
+    "glow up",
+    "appearance score",
+    "jawline",
+    "skincare",
+    "looksmaxxing",
+    "face analyzer",
+    "chad rating",
+    "celebrity lookalike",
+    "body analysis",
+    "self improvement"
+  ],
+  "description": "Ascendus gives you a brutally honest AI-powered appearance score and a personalized 12-week plan to reach your best self.\n\n🔬 BRUTALLY ACCURATE AI SCORING\nGet your Glow Score — a 0–10 rating based on facial harmony, angularity, sexual dimorphism, and feature symmetry. No filters. No flattery. Just real data.\n\n📊 4 PILLARS BREAKDOWN\nSee exactly what's holding you back across the 4 core pillars: Face, Body, Grooming, and Posture. Know your weakest link and attack it first.\n\n🎭 CELEBRITY LOOKALIKE\nDiscover which celebrities share your facial structure and how close you are to their tier. See exactly what traits to develop to close the gap.\n\n📅 12-WEEK PERSONALIZED PLAN\nBased on your phase (Cut / Bulk / Recomp / Maintenance), Ascendus builds a daily protocol covering training, nutrition, skincare, grooming, and posture.\n\n📈 PROGRESS TRACKING\nRescan every 2 weeks and watch your score climb. Side-by-side before/after comparisons show exactly how far you've come.\n\n🤖 AI IMPROVEMENT COACH (Pro)\nAsk your personal AI coach anything — \"How do I improve my jawline score?\" \"What's my fastest path to Chadlite?\" — and get personalized answers based on your actual scan data.\n\n🏆 ACHIEVEMENTS & STREAKS\nUnlock badges, maintain daily streaks, and compete on the global leaderboard. Gamified self-improvement that actually works.\n\nJoin 10,000+ men already looksmaxxing with Ascendus.\n\nPRO FEATURES:\n• Unlimited scans\n• All 3 celebrity matches\n• Full 12-body-metric breakdown\n• Score projection\n• AI Improvement Coach (10 msgs/scan)\n• Streak freezes\n\nSCORES ARE FOR SELF-IMPROVEMENT PURPOSES ONLY AND ARE NOT MEDICAL ASSESSMENTS.",
+  "screenshots": {
+    "iphone_6_5": [
+      "score_reveal",
+      "pillars_breakdown",
+      "celebrity_match",
+      "action_plan",
+      "progress_tracking"
+    ]
+  },
+  "privacy_url": "https://ascendus.app/privacy",
+  "support_url": "https://ascendus.app/support",
+  "marketing_url": "https://ascendus.app",
+  "content_rating": "17+",
+  "in_app_purchases": [
+    {
+      "id": "com.ascendus.pro.monthly",
+      "type": "auto_renewable_subscription",
+      "price": 9.99,
+      "period": "monthly"
+    },
+    {
+      "id": "com.ascendus.pro.annual",
+      "type": "auto_renewable_subscription",
+      "price": 59.99,
+      "period": "annual"
+    }
+  ]
+}

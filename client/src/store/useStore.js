@@ -73,6 +73,38 @@ const useStore = create(
       // Onboarding
       hasOnboarded: false,
       setHasOnboarded: () => set({ hasOnboarded: true }),
+      resetOnboarding: () => set({ hasOnboarded: false }),
+
+      // Legal consent (age gate + AI/biometric consent)
+      legalConsented: false,
+      setLegalConsented: () => set({ legalConsented: true }),
+
+      // Units preference
+      units: 'metric', // 'metric' | 'imperial'
+      setUnits: (u) => set({ units: u }),
+
+      // Scan limiting (free tier: 1 scan/month)
+      lastScanDate: null,
+      setLastScanDate: (d) => set({ lastScanDate: d }),
+
+      // Referral
+      referralCode: null,
+      referralCount: 0,
+      proTrialActive: false,
+      proTrialExpiresAt: null,
+      setReferralCode: (c) => set({ referralCode: c }),
+      setReferralCount: (n) => set({ referralCount: n }),
+      startProTrial: () => {
+        const expires = new Date()
+        expires.setDate(expires.getDate() + 7)
+        set({ proTrialActive: true, proTrialExpiresAt: expires.toISOString(), isPremium: true })
+      },
+      checkProTrial: () => {
+        const { proTrialActive, proTrialExpiresAt } = get()
+        if (proTrialActive && proTrialExpiresAt && new Date() > new Date(proTrialExpiresAt)) {
+          set({ proTrialActive: false, isPremium: false })
+        }
+      },
 
       // UI State
       scanInProgress: false,
@@ -92,12 +124,65 @@ const useStore = create(
       gender: null, // null = not selected yet, 'male' | 'female'
       setGender: (g) => set({ gender: g }),
 
+      // Hair type (detected by AI or selected manually by user)
+      hairType: null, // null = not set, 'straight'|'wavy'|'curly'|'coily'|'locs'|'bald'
+      setHairType: (t) => set({ hairType: t }),
+
       // Premium
       isPremium: false,
       setIsPremium: (v) => set({ isPremium: v }),
+
+      // Phase
+      assignedPhase: null,
+      setAssignedPhase: (phase) => set({ assignedPhase: phase }),
+
+      // Scan count (for paywall)
+      scanCount: 0,
+      incrementScanCount: () => set(state => ({ scanCount: state.scanCount + 1 })),
+
+      // Onboarding profile (collected during setup flow)
+      userProfile: null,
+      setUserProfile: (profile) => set({ userProfile: profile }),
+
+      // Achievements
+      achievements: [], // array of achievement keys that have been unlocked
+      pendingAchievement: null, // key of achievement to celebrate (shown once then cleared)
+      unlockAchievement: (key) => set(state => {
+        if (state.achievements.includes(key)) return state
+        return { achievements: [...state.achievements, key], pendingAchievement: key }
+      }),
+      clearPendingAchievement: () => set({ pendingAchievement: null }),
+
+      // Privacy Settings
+      privacySettings: {
+        savePhotos: true,
+        analytics: true,
+        faceDataRetention: true,
+        personalizedTips: true,
+      },
+      setPrivacySetting: (key, value) => set(state => ({
+        privacySettings: { ...state.privacySettings, [key]: value },
+      })),
+      clearAllScanData: () => set({
+        scans: [],
+        currentScan: null,
+        currentPlan: null,
+        checkins: [],
+        todayCheckin: null,
+        streak: { current: 0, longest: 0, lastDate: null },
+        pendingFacePhoto: null,
+        pendingBodyPhoto: null,
+      }),
     }),
     {
-      name: 'glowsync-storage',
+      name: 'ascendus-storage',
+      // Normalize any glowScore stored in the old 0-100 scale back to 0-10
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const fix = (s) => s && s.glowScore > 10 ? { ...s, glowScore: Math.round(s.glowScore) / 10 } : s
+        if (state.scans) state.scans = state.scans.map(fix)
+        if (state.currentScan) state.currentScan = fix(state.currentScan)
+      },
       partialize: (state) => ({
         user: state.user,
         token: state.token,
@@ -109,8 +194,22 @@ const useStore = create(
         streak: state.streak,
         theme: state.theme,
         hasOnboarded: state.hasOnboarded,
+        legalConsented: state.legalConsented,
+        units: state.units,
+        lastScanDate: state.lastScanDate,
+        referralCode: state.referralCode,
+        referralCount: state.referralCount,
+        proTrialActive: state.proTrialActive,
+        proTrialExpiresAt: state.proTrialExpiresAt,
         isPremium: state.isPremium,
         gender: state.gender,
+        hairType: state.hairType,
+        userProfile: state.userProfile,
+        privacySettings: state.privacySettings,
+        assignedPhase: state.assignedPhase,
+        scanCount: state.scanCount,
+        currentScan: state.currentScan,
+        achievements: state.achievements,
       }),
     }
   )

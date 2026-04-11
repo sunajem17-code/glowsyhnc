@@ -7,7 +7,7 @@ const { signToken } = require('../middleware/auth')
 const router = express.Router()
 
 router.post('/register', async (req, res) => {
-  const { name, email, password } = req.body
+  const { name, email, password, refCode } = req.body
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' })
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
 
@@ -17,8 +17,17 @@ router.post('/register', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10)
     const id = uuid()
-    db.prepare('INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)').run(id, email, name, hash)
+    const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+    db.prepare('INSERT INTO users (id, email, name, password_hash, referral_code) VALUES (?, ?, ?, ?, ?)').run(id, email, name, hash, ownCode)
     db.prepare('INSERT INTO streaks (user_id) VALUES (?)').run(id)
+
+    // Attribute referral: find referrer by code and increment their count
+    if (refCode && typeof refCode === 'string') {
+      const referrer = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(refCode.toUpperCase())
+      if (referrer && referrer.id !== id) {
+        db.prepare('UPDATE users SET referral_count = COALESCE(referral_count, 0) + 1 WHERE id = ?').run(referrer.id)
+      }
+    }
 
     const user = { id, name, email, subscriptionTier: 'free', createdAt: new Date().toISOString() }
     res.json({ user, token: signToken(id) })

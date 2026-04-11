@@ -97,6 +97,26 @@ db.exec(`
     last_checkin_date TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS leaderboard (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    initial_score REAL NOT NULL,
+    current_score REAL NOT NULL,
+    improvement REAL GENERATED ALWAYS AS (current_score - initial_score) STORED,
+    week_start TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `)
+
+// Idempotent migrations — ignore if columns already exist
+const migrations = [
+  "ALTER TABLE users ADD COLUMN referral_code TEXT",
+  "ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0",
+  "ALTER TABLE users ADD COLUMN pro_trial_expires_at TEXT",
+]
+for (const sql of migrations) {
+  try { db.exec(sql) } catch { /* column already exists */ }
+}
 
 module.exports = db

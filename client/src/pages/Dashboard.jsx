@@ -1,12 +1,15 @@
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors, X, Gift, Clock, ArrowLeftRight } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import useStore from '../store/useStore'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
 import { postureGrade } from '../utils/analysis'
+
+const RESCAN_DAYS = 14
 
 function greeting() {
   const h = new Date().getHours()
@@ -23,10 +26,13 @@ const fadeUp = (delay = 0) => ({
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user, scans, currentPlan, streak, todayCheckin } = useStore()
+  const { user, scans, currentPlan, streak, todayCheckin, isPremium, referralCount } = useStore()
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 5
 
   const latestScan = scans[0]
-  const glowScore = latestScan?.glowScore ?? 0
+  const rawGlowScore = latestScan?.glowScore ?? 0
+  const glowScore = rawGlowScore > 10 ? Math.round(rawGlowScore) / 10 : rawGlowScore
   const posture = latestScan?.bodyData?.posture ?? 0
   const skin = latestScan?.faceData?.skinClarity ?? 0
   const umaxScore = latestScan?.umaxScore ?? null
@@ -39,6 +45,12 @@ export default function Dashboard() {
   if (chartData.length === 0) {
     chartData.push(...[62, 65, 67, 70, 68, 72, 74, 78].map((s, i) => ({ week: `W${i + 1}`, score: s })))
   }
+
+  // Rescan countdown
+  const lastScanDate = latestScan ? new Date(latestScan.analyzedAt) : null
+  const daysSinceScan = lastScanDate ? Math.floor((Date.now() - lastScanDate.getTime()) / 86400000) : null
+  const daysUntilRescan = daysSinceScan != null ? Math.max(0, RESCAN_DAYS - daysSinceScan) : null
+  const rescanReady = daysUntilRescan === 0
 
   const pendingTasks = currentPlan?.tasks?.filter(t => !t.completed).slice(0, 3) ?? []
   const completedToday = currentPlan?.tasks?.filter(t => t.completed).length ?? 0
@@ -71,6 +83,55 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Referral Banner */}
+      <AnimatePresence>
+        {showReferralBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-4 overflow-hidden"
+          >
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3"
+              style={{
+                background: 'linear-gradient(135deg, rgba(198,168,92,0.1) 0%, rgba(168,137,58,0.06) 100%)',
+                border: '1px solid rgba(198,168,92,0.22)',
+              }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(198,168,92,0.12)' }}
+              >
+                <Gift size={17} style={{ color: '#C6A85C' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>
+                  Get 7 days Pro free
+                </p>
+                <p className="font-body text-[11px] text-secondary leading-snug">
+                  Refer {5 - (referralCount ?? 0)} more friend{5 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/referral')}
+                className="font-heading font-bold text-xs px-3 py-1.5 rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}
+              >
+                Share
+              </button>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="p-1 flex-shrink-0"
+              >
+                <X size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Glow Score Card */}
       <motion.div {...fadeUp(0.05)} className="mb-4 overflow-hidden rounded-2xl relative">
         <div
@@ -100,7 +161,7 @@ export default function Dashboard() {
                     Last scan · {new Date(latestScan.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </p>
                   <p className="font-heading font-semibold text-sm text-white">
-                    {glowScore >= 70 ? 'You\'re on fire.' : glowScore >= 50 ? 'Progress is real.' : 'Every journey starts here.'}
+                    {glowScore >= 7 ? 'You\'re on fire.' : glowScore >= 5 ? 'Progress is real.' : 'Every journey starts here.'}
                   </p>
                   {scans.length >= 2 && (
                     <p className="text-[12px] mt-1 font-body" style={{ color: 'rgba(255,255,255,0.55)' }}>
@@ -134,6 +195,53 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* Rescan countdown / ready */}
+      {latestScan && daysUntilRescan != null && (
+        <motion.div {...fadeUp(0.08)} className="mb-4">
+          {rescanReady ? (
+            <button
+              onClick={() => navigate('/scan')}
+              className="w-full rounded-2xl px-4 py-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform"
+              style={{ background: 'linear-gradient(135deg, rgba(198,168,92,0.12) 0%, rgba(168,137,58,0.06) 100%)', border: '1px solid rgba(198,168,92,0.35)' }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(198,168,92,0.15)' }}>
+                <Camera size={17} style={{ color: '#C6A85C' }} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>New scan ready</p>
+                <p className="font-body text-[11px] text-secondary">It's been {daysSinceScan} days — track your progress</p>
+              </div>
+              <ChevronRight size={14} style={{ color: '#C6A85C' }} />
+            </button>
+          ) : (
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <Clock size={16} style={{ color: 'rgba(255,255,255,0.35)' }} />
+              </div>
+              <div className="flex-1">
+                <p className="font-heading font-bold text-[13px] text-primary">Next scan in {daysUntilRescan}d</p>
+                <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${((RESCAN_DAYS - daysUntilRescan) / RESCAN_DAYS) * 100}%`, background: 'linear-gradient(90deg, #A8893A, #C6A85C)' }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/compare')}
+                className="flex items-center gap-1 text-[10px] font-heading font-bold px-2.5 py-1.5 rounded-lg flex-shrink-0"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}
+              >
+                <ArrowLeftRight size={11} /> Compare
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Glow tier badge */}
       {umaxScore && tier && (

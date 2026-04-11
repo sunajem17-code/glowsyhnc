@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { scoreColor, scoreLabel } from '../utils/analysis'
 
 const COLOR_MAP = {
-  green: { hex: '#22C55E', barBg: 'rgba(34,197,94,0.1)' },
+  green: { hex: '#C6A85C', barBg: 'rgba(198,168,92,0.1)' },
   amber: { hex: '#E8A000', barBg: 'rgba(232,160,0,0.1)' },
   red:   { hex: '#EF4444', barBg: 'rgba(239,68,68,0.1)' },
 }

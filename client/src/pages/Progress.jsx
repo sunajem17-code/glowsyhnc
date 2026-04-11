@@ -13,9 +13,9 @@ import GlowScoreRing from '../components/GlowScoreRing'
 import { postureGrade } from '../utils/analysis'
 
 const METRIC_TABS = [
-  { key: 'glowScore', label: 'Overall', color: '#1A6B5C' },
+  { key: 'glowScore', label: 'Overall', color: '#C6A85C' },
   { key: 'faceScore', label: 'Face', color: '#F5A623' },
-  { key: 'bodyScore', label: 'Body', color: '#34C759' },
+  { key: 'bodyScore', label: 'Body', color: '#74B9FF' },
   { key: 'posture', label: 'Posture', color: '#E07A5F' },
 ]
 
@@ -46,7 +46,7 @@ function ComparisonSlider({ before, after }) {
       {/* Divider */}
       <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg" style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
-          <ArrowLeftRight size={14} className="text-[#1A6B5C]" />
+          <ArrowLeftRight size={14} className="text-[#C6A85C]" />
         </div>
       </div>
       {/* Labels */}
@@ -117,7 +117,7 @@ export default function Progress() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
           {delta !== null && (
-            <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${delta >= 0 ? 'bg-green-50 text-success dark:bg-green-900/20' : 'bg-red-50 text-warning dark:bg-red-900/20'}`}>
+            <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${delta >= 0 ? 'bg-[#C6A85C]/10 text-[#C6A85C]' : 'bg-red-50 text-warning dark:bg-red-900/20'}`}>
               {delta >= 0 ? '+' : ''}{delta} pts
             </span>
           )}
@@ -187,12 +187,12 @@ export default function Progress() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedScan(selectedScan?.id === scan.id ? null : scan)}
                 className={`flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 transition-colors ${
-                  selectedScan?.id === scan.id ? 'border-[#1A6B5C]' : 'border-transparent'
+                  selectedScan?.id === scan.id ? 'border-[#C6A85C]' : 'border-transparent'
                 }`}
               >
                 <div className="relative">
                   <img
-                    src={scan.facePhotoUrl || 'https://placehold.co/96x96/1A6B5C/white?text=Scan'}
+                    src={scan.facePhotoUrl || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
                     alt={`Scan ${i + 1}`}
                     className="w-24 h-24 object-cover"
                   />
@@ -231,7 +231,7 @@ export default function Progress() {
           {isPremium ? (
             <ComparisonSlider
               before={scans[scans.length - 1]?.facePhotoUrl || 'https://placehold.co/400x400/gray/white?text=Before'}
-              after={scans[0]?.facePhotoUrl || 'https://placehold.co/400x400/1A6B5C/white?text=After'}
+              after={scans[0]?.facePhotoUrl || 'https://placehold.co/400x400/C6A85C/white?text=After'}
             />
           ) : (
             <div
@@ -254,8 +254,8 @@ export default function Progress() {
         onClick={() => !isPremium ? navigate('/premium') : null}
         className={`card mb-4 flex items-center gap-3 ${!isPremium ? 'cursor-pointer' : ''}`}
       >
-        <div className="w-12 h-12 rounded-xl bg-[#1A6B5C]/10 flex items-center justify-center flex-shrink-0">
-          <Video size={22} className="text-[#1A6B5C]" />
+        <div className="w-12 h-12 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
+          <Video size={22} className="text-[#C6A85C]" />
         </div>
         <div className="flex-1">
           <p className="font-heading font-bold text-sm text-primary">Transformation Reel</p>
@@ -266,7 +266,7 @@ export default function Progress() {
             Premium
           </span>
         ) : (
-          <button className="px-3 py-1.5 bg-[#1A6B5C] rounded-xl text-xs font-heading font-bold text-white">
+          <button className="px-3 py-1.5 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white">
             Generate
           </button>
         )}

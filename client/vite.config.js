@@ -8,7 +8,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3002',
         changeOrigin: true,
-      }
-    }
-  }
+      },
+    },
+  },
+  optimizeDeps: {
+    // Don't pre-bundle MediaPipe — it loads WASM files at runtime from /public/mediapipe/
+    exclude: ['@mediapipe/face_mesh'],
+  },
 })

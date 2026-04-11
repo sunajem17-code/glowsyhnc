@@ -1,33 +1,26 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
-import { PSL_TIERS, getTier } from '../utils/analysis'
+import { getTier, getTiersForGender } from '../utils/analysis'
 
-// ─── Full PSL Scale reference ─────────────────────────────────────────────────
+// ─── Full Score Scale reference ───────────────────────────────────────────────
 
 function ScaleReference({ gender }) {
+  const tiers = getTiersForGender(gender)
   return (
     <div className="mt-3 space-y-1">
-      {[...PSL_TIERS].reverse().map(tier => {
-        const label = gender === 'female'
-          ? (tier.femaleShort ?? tier.female)
-          : (tier.maleShort ?? tier.male)
-        return (
-          <div key={tier.min} className="flex items-center gap-2.5 py-1">
-            <div className="w-10 flex-shrink-0">
-              <span className="text-[10px] font-mono font-bold" style={{ color: tier.color }}>
-                {tier.min}–{tier.max === 10 ? '10' : tier.max}
-              </span>
-            </div>
-            <div
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ background: tier.color }}
-            />
-            <span className="text-xs font-heading font-semibold text-primary">{label}</span>
-            <span className="text-[9px] text-secondary font-body ml-auto">{tier.percentile}</span>
+      {tiers.map(tier => (
+        <div key={tier.min} className="flex items-center gap-2.5 py-1">
+          <div className="w-12 flex-shrink-0">
+            <span className="text-[10px] font-mono font-bold" style={{ color: tier.color }}>
+              {tier.min}–{tier.max >= 10 ? '10' : tier.max}
+            </span>
           </div>
-        )
-      })}
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tier.color }} />
+          <span className="text-xs font-heading font-semibold text-primary">{tier.label}</span>
+          <span className="text-[9px] text-secondary font-body ml-auto">{tier.percentile}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -55,11 +48,26 @@ function AnimatedNumber({ target }) {
 export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale = false, size = 'large' }) {
   const [scaleOpen, setScaleOpen] = useState(false)
   const tier = getTier(umaxScore, gender)
+
+  // If score is invalid or tier could not be determined, show a safe fallback card
+  const isValidScore = umaxScore !== null && umaxScore !== undefined && !isNaN(umaxScore)
+  if (!isValidScore || !tier) {
+    return (
+      <div
+        className="rounded-2xl border-2 px-4 py-4 flex flex-col items-center text-center"
+        style={{ background: 'rgba(255,71,87,0.08)', borderColor: 'rgba(255,71,87,0.25)' }}
+      >
+        <p className="text-2xl mb-2">⚠️</p>
+        <p className="font-heading font-bold text-sm text-primary">Analysis incomplete</p>
+        <p className="text-[11px] text-secondary font-body mt-1 leading-relaxed">
+          Unable to calculate score. Please retake your scan with a clearer, well-lit photo.
+        </p>
+      </div>
+    )
+  }
+
   const isFemale = gender === 'female'
 
-  // Which tier index for progress bar fill
-  const tiersSorted = [...PSL_TIERS].reverse()
-  const tierIndex = tiersSorted.findIndex(t => umaxScore >= t.min && umaxScore < t.max)
   const pct = (umaxScore / 10) * 100
 
   if (size === 'small') {
@@ -99,7 +107,7 @@ export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale =
                 <span className="text-2xl">{tier.emoji}</span>
                 <div>
                   <p className="text-[10px] font-body text-secondary uppercase tracking-widest">
-                    Glow Score
+                    Overall Rating
                   </p>
                   <motion.p
                     initial={{ opacity: 0, x: -10 }}
@@ -146,9 +154,12 @@ export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale =
                 transition={{ duration: 1.4, ease: [0.4, 0, 0.2, 1] }}
               />
             </div>
-            {/* Tier tick marks */}
+            {/* Tier tick marks — boundaries per gender */}
             <div className="relative h-3 mt-0.5">
-              {[2, 3, 4, 5, 6, 6.5, 7.5, 8.5, 9.5].map(mark => (
+              {(gender === 'female'
+                ? [4, 5, 6, 7, 8.5, 9.5]
+                : [4, 5, 6, 7, 7.5, 8.5, 9.5]
+              ).map(mark => (
                 <div
                   key={mark}
                   className="absolute top-0 w-px h-2 bg-black/15 dark:bg-white/15"
