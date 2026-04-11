@@ -7,16 +7,20 @@ const app = express()
 const PORT = process.env.PORT || 3002
 
 // Middleware
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://glowsyhnc.vercel.app',
-  'https://glowsyhnc-git-main-sunajem17-2402s-projects.vercel.app',
-  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
-]
-app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true)
+    // Allow all localhost ports in dev
+    if (origin.startsWith('http://localhost:')) return callback(null, true)
+    // Allow all Vercel preview and production domains
+    if (origin.endsWith('.vercel.app')) return callback(null, true)
+    // Allow custom CLIENT_URL if set
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true)
+    callback(new Error(`CORS blocked: ${origin}`))
+  },
+  credentials: true,
+}))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
