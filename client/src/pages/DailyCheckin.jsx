@@ -13,12 +13,12 @@ function ToggleButton({ checked, onToggle, label, icon: Icon, color }) {
     <button
       onClick={onToggle}
       className={`flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 transition-all duration-200 ${
-        checked ? 'border-[#1A6B5C] bg-[#1A6B5C]/8' : 'border-gray-200 dark:border-gray-700 bg-card'
+        checked ? 'border-[#C6A85C] bg-[#C6A85C]/8' : 'border-gray-200 dark:border-gray-700 bg-card'
       }`}
     >
-      <Icon size={22} className={checked ? 'text-[#1A6B5C]' : 'text-secondary'} />
-      <span className={`text-xs font-heading font-bold ${checked ? 'text-[#1A6B5C]' : 'text-secondary'}`}>{label}</span>
-      {checked && <CheckCircle2 size={14} className="text-[#1A6B5C]" />}
+      <Icon size={22} className={checked ? 'text-[#C6A85C]' : 'text-secondary'} />
+      <span className={`text-xs font-heading font-bold ${checked ? 'text-[#C6A85C]' : 'text-secondary'}`}>{label}</span>
+      {checked && <CheckCircle2 size={14} className="text-[#C6A85C]" />}
     </button>
   )
 }
@@ -111,7 +111,7 @@ export default function DailyCheckin() {
             ].map(({ label, value, done }) => (
               <div key={label} className="flex items-center justify-between py-2.5 border-b border-default last:border-0">
                 <span className="text-sm font-body text-secondary">{label}</span>
-                <span className={`text-sm font-heading font-bold ${done ? 'text-success' : 'text-secondary'}`}>{value}</span>
+                <span className={`text-sm font-heading font-bold ${done ? 'text-[#C6A85C]' : 'text-secondary'}`}>{value}</span>
               </div>
             ))}
           </div>
@@ -134,7 +134,7 @@ export default function DailyCheckin() {
             <div className="flex items-center gap-2 mb-3">
               <Droplets size={18} className="text-blue-400" />
               <h3 className="font-heading font-bold text-sm text-primary">Hydration</h3>
-              <span className="ml-auto font-mono font-bold text-[#1A6B5C]">{water}/{WATER_GOAL}</span>
+              <span className="ml-auto font-mono font-bold text-[#C6A85C]">{water}/{WATER_GOAL}</span>
             </div>
             <div className="grid grid-cols-8 gap-1.5 mb-2">
               {Array.from({ length: WATER_GOAL }, (_, i) => (
@@ -192,21 +192,21 @@ export default function DailyCheckin() {
           {/* Exercise */}
           <div className="card mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <Dumbbell size={18} className="text-[#1A6B5C]" />
+              <Dumbbell size={18} className="text-[#C6A85C]" />
               <h3 className="font-heading font-bold text-sm text-primary">Exercise</h3>
             </div>
             <button
               onClick={() => setExerciseDone(v => !v)}
               className={`w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 transition-all ${
-                exerciseDone ? 'border-[#1A6B5C] bg-[#1A6B5C]/8' : 'border-gray-200 dark:border-gray-700'
+                exerciseDone ? 'border-[#C6A85C] bg-[#C6A85C]/8' : 'border-gray-200 dark:border-gray-700'
               }`}
             >
               {exerciseDone ? (
-                <CheckCircle2 size={20} className="text-[#1A6B5C]" />
+                <CheckCircle2 size={20} className="text-[#C6A85C]" />
               ) : (
                 <Circle size={20} className="text-gray-300" />
               )}
-              <span className={`font-heading font-semibold text-sm ${exerciseDone ? 'text-[#1A6B5C]' : 'text-secondary'}`}>
+              <span className={`font-heading font-semibold text-sm ${exerciseDone ? 'text-[#C6A85C]' : 'text-secondary'}`}>
                 {exerciseDone ? "Today's exercises done! 💪" : "Mark today's exercises complete"}
               </span>
             </button>
@@ -248,7 +248,7 @@ export default function DailyCheckin() {
           <div className="flex items-center gap-3 mb-4">
             <div className="flex gap-1.5">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i < completionScore ? 'bg-[#1A6B5C]' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i < completionScore ? 'bg-[#C6A85C]' : 'bg-gray-200 dark:bg-gray-700'}`} />
               ))}
             </div>
             <p className="text-xs text-secondary font-body">{completionScore}/5 habits logged</p>

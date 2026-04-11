@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Camera, ClipboardList, TrendingUp, User } from 'lucide-react'
+import { Home, Camera, ClipboardList, TrendingUp, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 const GOLD = '#C6A85C'
@@ -9,7 +9,7 @@ const navItems = [
   { to: '/scan', icon: Camera, label: 'Scan' },
   { to: '/plan', icon: ClipboardList, label: 'Plan' },
   { to: '/progress', icon: TrendingUp, label: 'Progress' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/coach', icon: Sparkles, label: 'Coach' },
 ]
 
 export default function BottomNav() {

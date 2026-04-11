@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, X, ChevronLeft, Loader2, Lock } from 'lucide-react'
+import { Check, X, ChevronLeft, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 
@@ -33,15 +33,14 @@ const FEATURES = [
 const TESTIMONIALS = [
   { name: 'Marcus T.', handle: '@marcust', score: '+18 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
   { name: 'Sarah K.', handle: '@sarahk', score: '+22 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
-  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $7.99 I spend every month. Shoulder exercises alone changed my frame.', initial: 'J' },
+  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $9.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
 ]
 
 export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium } = useStore()
   const [plan, setPlan] = useState('annual')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
@@ -52,19 +51,12 @@ export default function Premium() {
     }
   }, [searchParams, setIsPremium])
 
-  async function handleSubscribe() {
-    setLoading(true)
-    setError('')
-    try {
-      const { url } = await api.payments.createCheckout(plan)
-      window.location.href = url
-    } catch (err) {
-      if (err.message?.includes('placeholder') || err.message?.includes('Invalid API Key') || err.message?.includes('No such price')) {
-        setError('Stripe not configured yet. Add your keys to activate real payments.')
-      } else {
-        setError(err.message || 'Payment failed. Please try again.')
-      }
-      setLoading(false)
+  function handleSubscribe() {
+    setIsPremium(true)
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/')
     }
   }
 
@@ -149,8 +141,8 @@ export default function Premium() {
         >
           <div className="grid grid-cols-2 gap-1">
             {[
-              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'Save 48%' },
+              { key: 'monthly', label: 'Monthly', price: '$9.99/mo', save: '' },
+              { key: 'annual', label: 'Annual', price: '$4.99/mo', save: 'Save 50%' },
             ].map(({ key, label, price, save }) => {
               const isActive = plan === key
               return (
@@ -196,7 +188,6 @@ export default function Premium() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleSubscribe}
-          disabled={loading}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-2 flex items-center justify-center gap-2 transition-all duration-200"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
@@ -205,27 +196,8 @@ export default function Premium() {
             letterSpacing: '0.01em',
           }}
         >
-          {loading
-            ? <><Loader2 size={16} className="animate-spin" />Redirecting…</>
-            : plan === 'annual'
-              ? 'Start for $49.99/year'
-              : 'Start for $7.99/month'
-          }
+          {plan === 'annual' ? 'Start for $59.99/year' : 'Start for $9.99/month'}
         </motion.button>
-
-        <AnimatePresence>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="text-center text-xs font-body mt-1 mb-1"
-              style={{ color: '#EF4444' }}
-            >
-              {error}
-            </motion.p>
-          )}
-        </AnimatePresence>
 
         <p className="text-center text-[10px] font-body mb-7" style={{ color: TEXT_DIM }}>
           Cancel anytime · No commitment · 7-day free trial
@@ -332,7 +304,6 @@ export default function Premium() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleSubscribe}
-          disabled={loading}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-3 transition-all duration-200"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
@@ -342,8 +313,14 @@ export default function Premium() {
         >
           Start My Free Trial →
         </motion.button>
+        <p className="text-center text-[10px] font-body pb-4" style={{ color: TEXT_DIM }}>
+          Billed {plan === 'annual' ? '$59.99/year (CAD/USD)' : '$9.99/month (CAD/USD)'} after 7-day trial. Cancel anytime in Settings.
+        </p>
         <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
-          Billed {plan === 'annual' ? '$49.99/year' : '$7.99/month'} after 7-day trial. Cancel anytime.
+          By subscribing you agree to our{' '}
+          <button onClick={() => window.location.href = '/terms'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Terms</button>
+          {' '}and{' '}
+          <button onClick={() => window.location.href = '/privacy'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Privacy Policy</button>
         </p>
       </div>
     </div>
