@@ -383,12 +383,12 @@ async function drawCard({ canvas, scan, facePhotoUrl, phase }) {
 
   // Logo image in footer top-right corner
   try {
-    const logoImg = await loadImage('/src/assets/ascendus-logo.png')
-    const logoW = 280
-    const logoH = Math.round(logoW * (logoImg.height / logoImg.width))
+    const logoImg = await loadImage('/src/assets/ascendus-icon.png')
+    const logoW = 52
+    const logoH = 52
     ctx.save()
-    ctx.globalCompositeOperation = 'lighten'
-    ctx.drawImage(logoImg, W - logoW - 48, H - logoH - 40, logoW, logoH)
+    ctx.globalAlpha = 0.7
+    ctx.drawImage(logoImg, W - logoW - 40, H - logoH - 36, logoW, logoH)
     ctx.restore()
   } catch {
     // fallback text if logo fails to load
