@@ -620,7 +620,7 @@ export default function Scan() {
                 stepNum={2}
                 guide="Full silhouette visible. Straight posture, arms slightly out. Front-facing. 6–8 feet from camera."
                 photo={bodyPhoto}
-                onPhoto={(url) => setBodyPhoto(url)}
+                onPhoto={(url) => { setBodyPhoto(url); setError('') }}
               />
             </motion.div>
           )}
@@ -635,9 +635,12 @@ export default function Scan() {
       {/* Error */}
       {error && (
         <div className="px-4 pb-2">
-          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200">
+          <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
             <AlertCircle size={15} className="text-warning flex-shrink-0" />
-            <p className="text-sm text-warning font-body">{error}</p>
+            <p className="text-sm text-warning font-body flex-1">{error}</p>
+            <button onClick={() => setError('')} className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100">
+              <X size={14} className="text-warning" />
+            </button>
           </div>
         </div>
       )}
@@ -656,7 +659,7 @@ export default function Scan() {
           )}
           {step === 1 && (
             <button
-              onClick={() => facePhoto && setStep(2)}
+              onClick={() => facePhoto && (setStep(2), setError(''))}
               disabled={!facePhoto}
               className={`btn-primary ${!facePhoto ? 'opacity-50' : ''}`}
             >
