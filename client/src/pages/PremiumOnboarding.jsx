@@ -1306,9 +1306,12 @@ function Slide3() {
   ]
   return (
     <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
-      <h1 className="font-heading font-bold text-center mb-7" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+      <h1 className="font-heading font-bold text-center mb-1" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
         Built Different
       </h1>
+      <p className="font-body text-center text-[13px] mb-7" style={{ color: SLIDE_GOLD }}>
+        No fluff. No guesswork. Just results.
+      </p>
 
       <div className="flex flex-col gap-2.5 mb-8">
         {features.map(({ icon, text }, i) => (
@@ -1318,17 +1321,17 @@ function Slide3() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
-            style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}
+            style={{ background: '#0A0A0A', border: `0.5px solid rgba(201,168,76,0.3)` }}
           >
             <span className="text-[20px] flex-shrink-0">{icon}</span>
-            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</p>
+            <p className="font-body text-[13px] leading-snug" style={{ color: '#FFFFFF' }}>{text}</p>
           </motion.div>
         ))}
       </div>
 
       {/* Big stat */}
-      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
-        <p className="font-heading font-bold text-[28px]" style={{ color: SLIDE_GOLD }}>+1.4 points</p>
+      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: '#050505', border: `0.5px solid rgba(201,168,76,0.3)` }}>
+        <p className="font-heading font-bold text-[28px]" style={{ color: '#E8C84A' }}>+1.4 points</p>
         <p className="font-body text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>average improvement in 90 days</p>
         <p className="font-body text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Based on Ascendus user data</p>
       </div>
@@ -1362,19 +1365,18 @@ function IntroSlides({ onDone }) {
       </button>
 
       {/* Logo */}
-      <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20">
-        <img src="/favicon.svg" alt="Ascendus" style={{ width: 28, height: 28, opacity: 0.9 }} />
+      <div className="absolute top-11 left-1/2 -translate-x-1/2 z-20">
+        <img src="/favicon.svg" alt="Ascendus" style={{ width: 36, height: 36, opacity: 0.95 }} />
       </div>
 
       {/* Progress dots */}
-      <div className="absolute top-[4.5rem] left-1/2 -translate-x-1/2 flex items-center gap-2 z-20" style={{ marginTop: 32 }}>
+      <div className="absolute top-[5.5rem] left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
         {SLIDE_COMPONENTS.map((_, i) => (
           <motion.div
             key={i}
-            animate={{ width: i === slide ? 20 : 6, opacity: i === slide ? 1 : 0.3 }}
+            animate={{ width: i === slide ? 20 : 6, opacity: i === slide ? 1 : 0.35 }}
             transition={{ duration: 0.3 }}
-            className="h-1.5 rounded-full"
-            style={{ background: SLIDE_GOLD }}
+            style={{ height: 6, borderRadius: 99, background: SLIDE_GOLD }}
           />
         ))}
       </div>
@@ -1400,12 +1402,17 @@ function IntroSlides({ onDone }) {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={next}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+          className="w-full py-4 font-heading font-bold text-[15px]"
           style={{
-            background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
-            color: '#0A0A0A',
-            boxShadow: '0 4px 20px rgba(201,168,76,0.3)',
-            letterSpacing: '0.01em',
+            background: slide < total - 1
+              ? `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`
+              : SLIDE_GOLD,
+            color: '#000000',
+            borderRadius: slide < total - 1 ? 16 : 12,
+            boxShadow: slide < total - 1
+              ? '0 4px 20px rgba(201,168,76,0.3)'
+              : '0 2px 12px rgba(201,168,76,0.5)',
+            letterSpacing: '0.02em',
           }}
         >
           {slide < total - 1 ? 'Continue' : "Let's Get Started"}
