@@ -1,5 +1,7 @@
 node_modules/
 .env
+server/.env
+server/.env.save
 data/
 dist/
 .DS_Store
