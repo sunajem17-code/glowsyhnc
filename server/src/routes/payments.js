@@ -71,6 +71,25 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
   res.json({ received: true })
 })
 
+// Open Stripe Customer Portal (manage/cancel subscription)
+router.post('/portal', authMiddleware, async (req, res) => {
+  const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+
+  try {
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 })
+    if (!customers.data.length) return res.status(404).json({ error: 'No billing record found' })
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customers.data[0].id,
+      return_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/profile`,
+    })
+    res.json({ url: session.url })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Check premium status (called after redirect back from Stripe)
 router.get('/status', authMiddleware, (req, res) => {
   const user = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)

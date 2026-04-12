@@ -1,6 +1,6 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
-const { verifyToken, claudeLimit } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit, requirePro } = require('../middleware/claudeGate')
 
 const router = express.Router()
 
@@ -123,7 +123,7 @@ Face Score: ${faceScore}/10 | Body Score: ${bodyScore}/10 | Presentation Score: 
 
 // POST /api/coach/message
 // verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
-router.post('/message', verifyToken, claudeLimit, async (req, res) => {
+router.post('/message', verifyToken, requirePro, claudeLimit, async (req, res) => {
   const { messages, scanContext } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {

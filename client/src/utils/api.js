@@ -82,6 +82,7 @@ export const api = {
   },
   payments: {
     createCheckout: (plan) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
   },
   ai: {
