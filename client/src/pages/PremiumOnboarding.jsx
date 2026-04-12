@@ -1413,8 +1413,8 @@ function IntroSlides({ onDone }) {
       {/* Skip */}
       <button
         onClick={onDone}
-        className="absolute top-14 right-5 z-20 font-body text-[13px] px-3 py-1.5 rounded-xl"
-        style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)' }}
+        className="absolute top-14 right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
+        style={{ color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
       >
         Skip
       </button>
