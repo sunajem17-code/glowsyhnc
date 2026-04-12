@@ -543,10 +543,10 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
                     <span>
                       {label.split(' Terms of Service')[0]}
                       {label.includes('Terms of Service') && (
-                        <> <button onClick={e => { e.stopPropagation(); navigate('/terms') }} className="underline" style={{ color: G }}>Terms of Service</button></>
+                        <> <span role="link" onClick={e => { e.stopPropagation(); navigate('/terms') }} className="underline cursor-pointer" style={{ color: G }}>Terms of Service</span></>
                       )}
                       {label.includes('Privacy Policy') && (
-                        <> <button onClick={e => { e.stopPropagation(); navigate('/privacy') }} className="underline" style={{ color: G }}>Privacy Policy</button></>
+                        <> <span role="link" onClick={e => { e.stopPropagation(); navigate('/privacy') }} className="underline cursor-pointer" style={{ color: G }}>Privacy Policy</span></>
                       )}
                     </span>
                   ) : label
