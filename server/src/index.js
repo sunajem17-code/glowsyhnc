@@ -46,7 +46,13 @@ app.use('/api/hair',      require('./routes/hair'))
 app.use('/api/referral',  require('./routes/referral'))
 
 // Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+app.get('/api/health', (req, res) => res.json({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+  hasJwt: !!process.env.JWT_SECRET,
+  keyPrefix: process.env.ANTHROPIC_API_KEY?.slice(0, 12) ?? 'NOT SET',
+}))
 
 // Error handler
 app.use((err, req, res, next) => {
