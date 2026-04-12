@@ -15,6 +15,8 @@ app.use(cors({
     if (origin.startsWith('http://localhost:')) return callback(null, true)
     // Allow all Vercel preview and production domains
     if (origin.endsWith('.vercel.app')) return callback(null, true)
+    // Allow ascendus.store (production custom domain)
+    if (origin === 'https://ascendus.store' || origin === 'https://www.ascendus.store') return callback(null, true)
     // Allow custom CLIENT_URL if set
     if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true)
     callback(new Error(`CORS blocked: ${origin}`))
