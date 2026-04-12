@@ -36,20 +36,32 @@ function barColor(val) {
 function drawBar(ctx, x, y, w, h, val, max = 10) {
   const r   = h / 2
   const pct = Math.max(0, Math.min(1, (val - 1) / (max - 1)))
-  // track
-  rr(ctx, x, y, w, h, r)
-  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  // track — thinner, elegant
+  ctx.beginPath(); ctx.arc(x + r, y + r, r, Math.PI / 2, -Math.PI / 2)
+  ctx.arc(x + w - r, y + r, r, -Math.PI / 2, Math.PI / 2)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(255,255,255,0.07)'
   ctx.fill()
   // fill
   if (pct > 0.01) {
-    const fw  = w * pct
+    const fw  = Math.max(h, w * pct)
     const col = barColor(val)
     const g   = ctx.createLinearGradient(x, 0, x + fw, 0)
-    g.addColorStop(0, col + '99')
+    g.addColorStop(0, col + 'AA')
     g.addColorStop(1, col)
-    rr(ctx, x, y, fw, h, r)
+    ctx.beginPath(); ctx.arc(x + r, y + r, r, Math.PI / 2, -Math.PI / 2)
+    ctx.arc(x + fw - r, y + r, r, -Math.PI / 2, Math.PI / 2)
+    ctx.closePath()
     ctx.fillStyle = g
     ctx.fill()
+    // subtle glow on fill end
+    ctx.save()
+    ctx.globalAlpha = 0.35
+    ctx.shadowColor = col
+    ctx.shadowBlur  = 8
+    ctx.beginPath(); ctx.arc(x + fw - r, y + r, r, 0, Math.PI * 2)
+    ctx.fillStyle = col; ctx.fill()
+    ctx.restore()
   }
 }
 
@@ -61,28 +73,39 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   canvas.width  = W
   canvas.height = H
 
-  const { umaxScore, glowScore, pillars: sp, aiScore, gender } = scan
+  const { umaxScore, glowScore, pillars: sp, aiScore, gender, previousScore } = scan
   const score    = glowScore ?? (umaxScore != null ? umaxScore / 10 : null)
   const pillars  = sp ?? aiScore?.pillars ?? null
   const potential = Math.min(10, (score ?? 5) + 1.4)
+  const scoreDelta = (previousScore != null && score != null) ? +(score - previousScore).toFixed(1) : null
 
   const GOLD   = '#C9A84C'
   const GOLD2  = '#FFE47A'
-  const L      = 60   // left pad
-  const R_PAD  = W - 60  // right pad
-  const COL_W  = (W - L * 2 - 40) / 2  // two-col width
+  const L      = 60
+  const R_PAD  = W - 60
+  const COL_W  = (W - L * 2 - 40) / 2
+  const CR     = 324          // face circle radius (declared early for bg glow)
+  const CX     = W / 2
+  const CY     = 78 + CR      // 402
 
   // ── Background ──────────────────────────────────────────────────────────────
   ctx.fillStyle = '#0A0A0A'
   ctx.fillRect(0, 0, W, H)
 
-  // Radial gold glow behind photo
-  const rad = ctx.createRadialGradient(W / 2, 460, 0, W / 2, 460, 500)
-  rad.addColorStop(0,   'rgba(201,168,76,0.18)')
-  rad.addColorStop(0.6, 'rgba(201,168,76,0.05)')
+  // Radial gold glow — tighter, behind photo only
+  const rad = ctx.createRadialGradient(W / 2, CY, 0, W / 2, CY, CR + 120)
+  rad.addColorStop(0,   'rgba(201,168,76,0.22)')
+  rad.addColorStop(0.55,'rgba(201,168,76,0.06)')
   rad.addColorStop(1,   'rgba(0,0,0,0)')
   ctx.fillStyle = rad
   ctx.fillRect(0, 0, W, H)
+
+  // Subtle gold border around entire card
+  ctx.save()
+  ctx.strokeStyle = 'rgba(201,168,76,0.30)'
+  ctx.lineWidth   = 1
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
+  ctx.restore()
 
   // Fine grid
   ctx.save()
@@ -110,30 +133,34 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.letterSpacing = '0px'
   ctx.restore()
 
-  // ── Face circle — R=324, center y=460 (35% of card height = 672px dia) ──────
-  const CR  = 324
-  const CX  = W / 2
-  const CY  = 78 + CR   // 402
+  // ── Face circle — R=324 (35% card height), cy=402 ───────────────────────────
 
-  // Outer glow rings
-  for (let i = 3; i >= 1; i--) {
+  // Pulse glow rings
+  for (let i = 4; i >= 1; i--) {
     ctx.save()
-    ctx.globalAlpha = 0.05 * i
-    ctx.beginPath(); ctx.arc(CX, CY, CR + 28 + i * 8, 0, Math.PI * 2)
-    ctx.strokeStyle = GOLD; ctx.lineWidth = 1; ctx.stroke()
+    ctx.globalAlpha = 0.04 * i
+    ctx.beginPath(); ctx.arc(CX, CY, CR + 16 + i * 14, 0, Math.PI * 2)
+    ctx.strokeStyle = GOLD; ctx.lineWidth = i === 1 ? 2 : 1; ctx.stroke()
     ctx.restore()
   }
 
-  // Gold ring
+  // Gold ring — thicker with strong glow
   ctx.save()
-  ctx.shadowColor = 'rgba(201,168,76,0.5)'
-  ctx.shadowBlur  = 28
+  ctx.shadowColor = 'rgba(201,168,76,0.65)'
+  ctx.shadowBlur  = 36
   const ringG = ctx.createLinearGradient(CX - CR, CY - CR, CX + CR, CY + CR)
-  ringG.addColorStop(0,  GOLD2)
+  ringG.addColorStop(0,   GOLD2)
   ringG.addColorStop(0.5, GOLD)
-  ringG.addColorStop(1,  '#A8893A')
-  ctx.beginPath(); ctx.arc(CX, CY, CR + 12, 0, Math.PI * 2)
-  ctx.strokeStyle = ringG; ctx.lineWidth = 5; ctx.stroke()
+  ringG.addColorStop(1,   '#A8893A')
+  ctx.beginPath(); ctx.arc(CX, CY, CR + 14, 0, Math.PI * 2)
+  ctx.strokeStyle = ringG; ctx.lineWidth = 8; ctx.stroke()
+  ctx.restore()
+
+  // Inner accent ring
+  ctx.save()
+  ctx.globalAlpha = 0.22
+  ctx.beginPath(); ctx.arc(CX, CY, CR + 24, 0, Math.PI * 2)
+  ctx.strokeStyle = GOLD2; ctx.lineWidth = 1; ctx.stroke()
   ctx.restore()
 
   // Photo
@@ -191,38 +218,57 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   const bigH    = 240
   const gap     = 40
 
-  function drawBigStat(label, value, x, y, w) {
+  function drawBigStat(label, value, x, y, w, opts = {}) {
     // Cell bg
     rr(ctx, x, y, w, bigH, 20)
     ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1
     rr(ctx, x, y, w, bigH, 20); ctx.stroke()
 
     // Label
     ctx.textAlign = 'left'
-    ctx.font      = '500 26px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = 'rgba(255,255,255,0.40)'
-    ctx.fillText(label, x + 28, y + 44)
+    ctx.font      = '600 24px "Plus Jakarta Sans", Arial'
+    ctx.fillStyle = 'rgba(255,255,255,0.38)'
+    ctx.fillText(label, x + 28, y + 42)
 
-    // Number
+    // Number — larger
     const numStr = value != null ? value.toFixed(1) : '—'
-    ctx.font      = 'bold 100px "Space Grotesk", "Plus Jakarta Sans", Arial'
+    ctx.font      = 'bold 112px "Space Grotesk", "Plus Jakarta Sans", Arial'
     ctx.fillStyle = '#FFFFFF'
-    ctx.fillText(numStr, x + 28, y + 156)
+    ctx.fillText(numStr, x + 28, y + 164)
 
     // /10
     const nw = ctx.measureText(numStr).width
-    ctx.font      = '500 38px "Plus Jakarta Sans", Arial'
+    ctx.font      = '500 36px "Plus Jakarta Sans", Arial'
     ctx.fillStyle = GOLD
-    ctx.fillText('/10', x + 28 + nw + 8, y + 130)
+    ctx.fillText('/10', x + 28 + nw + 8, y + 136)
 
-    // Bar
-    drawBar(ctx, x + 28, y + bigH - 28, w - 56, 10, value ?? 1)
+    // Score delta (rescan improvement)
+    if (opts.delta != null && opts.delta > 0) {
+      ctx.font      = 'bold 32px "Plus Jakarta Sans", Arial'
+      ctx.fillStyle = '#34C759'
+      ctx.fillText(`+${opts.delta.toFixed(1)}`, x + 28 + nw + 12, y + 172)
+    }
+
+    // Sub-label (tier name under OVERALL)
+    if (opts.subLabel) {
+      ctx.font          = '600 20px "Plus Jakarta Sans", Arial'
+      ctx.fillStyle     = GOLD
+      ctx.letterSpacing = '1px'
+      ctx.fillText(opts.subLabel, x + 28, y + 192)
+      ctx.letterSpacing = '0px'
+    }
+
+    // Bar — thinner
+    drawBar(ctx, x + 28, y + bigH - 22, w - 56, 7, value ?? 1)
   }
 
   const colL = L
   const colR = L + COL_W + gap
-  drawBigStat('OVERALL',   score,     colL, gridTop, COL_W)
+  drawBigStat('OVERALL',   score,     colL, gridTop, COL_W, {
+    delta: scoreDelta,
+    subLabel: (scan.tier ?? '').toUpperCase(),
+  })
   drawBigStat('POTENTIAL', potential, colR, gridTop, COL_W)
 
   // Row 2–3: 4 pillars in 2×2
@@ -239,25 +285,25 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   function drawPillarCell(label, val, x, y, w) {
     rr(ctx, x, y, w, pilH, 16)
     ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1
     rr(ctx, x, y, w, pilH, 16); ctx.stroke()
 
     ctx.textAlign = 'left'
-    ctx.font      = '500 22px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = 'rgba(255,255,255,0.38)'
-    ctx.fillText(label, x + 24, y + 36)
+    ctx.font      = '600 20px "Plus Jakarta Sans", Arial'
+    ctx.fillStyle = 'rgba(255,255,255,0.36)'
+    ctx.fillText(label, x + 24, y + 34)
 
     const valStr = val.toFixed(1)
-    ctx.font      = 'bold 68px "Space Grotesk", Arial'
+    ctx.font      = 'bold 76px "Space Grotesk", Arial'
     ctx.fillStyle = '#FFFFFF'
-    ctx.fillText(valStr, x + 24, y + 112)
+    ctx.fillText(valStr, x + 24, y + 118)
 
     const vw = ctx.measureText(valStr).width
-    ctx.font      = '500 28px "Plus Jakarta Sans", Arial'
+    ctx.font      = '500 26px "Plus Jakarta Sans", Arial'
     ctx.fillStyle = GOLD
-    ctx.fillText('/10', x + 24 + vw + 6, y + 92)
+    ctx.fillText('/10', x + 24 + vw + 6, y + 96)
 
-    drawBar(ctx, x + 24, y + pilH - 22, w - 48, 8, val)
+    drawBar(ctx, x + 24, y + pilH - 18, w - 48, 6, val)
   }
 
   PILLARS.forEach(({ label, val }, i) => {
@@ -273,17 +319,28 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.strokeStyle = 'rgba(201,168,76,0.20)'; ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(L, footY); ctx.lineTo(R_PAD, footY); ctx.stroke()
 
+  // Footer: icon + "Scanned by Ascendus" + domain
+  const iconSize = 38
+  let iconDrawn = false
   try {
     const icon = await loadImage('/src/assets/ascendus-icon.png')
-    ctx.save(); ctx.globalAlpha = 0.65
-    ctx.drawImage(icon, W / 2 - 20, footY + 28, 40, 40)
+    ctx.save(); ctx.globalAlpha = 0.70
+    ctx.drawImage(icon, W / 2 - 120, footY + 22, iconSize, iconSize)
     ctx.restore()
+    iconDrawn = true
   } catch {}
 
-  ctx.textAlign = 'center'
-  ctx.font      = '400 26px "Plus Jakarta Sans", Arial'
-  ctx.fillStyle = 'rgba(255,255,255,0.28)'
-  ctx.fillText('ascendus.app', W / 2, footY + 90)
+  ctx.textAlign = 'left'
+  ctx.font      = '500 26px "Plus Jakarta Sans", Arial'
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.fillText('Scanned by Ascendus', W / 2 - 120 + (iconDrawn ? iconSize + 12 : 0), footY + 48)
+
+  ctx.textAlign     = 'center'
+  ctx.font          = '600 24px "Plus Jakarta Sans", Arial'
+  ctx.fillStyle     = GOLD
+  ctx.letterSpacing = '1px'
+  ctx.fillText('ascendus.app', W / 2, footY + 86)
+  ctx.letterSpacing = '0px'
 }
 
 // ─── Score count-up ───────────────────────────────────────────────────────────
@@ -426,9 +483,9 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
           disabled={!preview || generating}
           className="flex-1 py-4 rounded-full font-heading font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
           style={{
-            background: 'rgba(255,255,255,0.06)',
-            color: 'rgba(255,255,255,0.80)',
-            border: '1px solid rgba(201,168,76,0.45)',
+            background: 'rgba(10,10,10,0.9)',
+            color: 'rgba(255,255,255,0.75)',
+            border: '1px solid rgba(201,168,76,0.50)',
           }}
         >
           <Download size={15} />
@@ -439,7 +496,7 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
           onClick={handleShare}
           disabled={!preview || generating || sharing}
           className="flex-1 py-4 rounded-full font-heading font-bold text-[14px] text-black flex items-center justify-center gap-2 disabled:opacity-40"
-          style={{ background: '#C9A84C' }}
+          style={{ background: 'linear-gradient(135deg, #FFE47A 0%, #C9A84C 60%, #A8893A 100%)', boxShadow: '0 4px 20px rgba(201,168,76,0.35)' }}
         >
           {sharing ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />}
           {sharing ? 'Sharing…' : 'Share'}
