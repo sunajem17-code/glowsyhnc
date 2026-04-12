@@ -1,6 +1,6 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
-const { verifyToken, claudeLimit } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit, requirePro } = require('../middleware/claudeGate')
 
 const router = express.Router()
 
@@ -16,7 +16,7 @@ function parseJSON(raw) {
 
 // POST /api/hair/analyze
 // Body: { imageData: base64string, mediaType?: string }
-router.post('/analyze', verifyToken, claudeLimit, async (req, res) => {
+router.post('/analyze', verifyToken, requirePro, claudeLimit, async (req, res) => {
   const { imageData, mediaType = 'image/jpeg' } = req.body
   if (!imageData) return res.status(400).json({ error: 'imageData required' })
 

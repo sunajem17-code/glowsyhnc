@@ -10,6 +10,7 @@ import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import GlowScoreRing from '../components/GlowScoreRing'
 import { ACHIEVEMENTS } from '../utils/achievements'
+import { api } from '../utils/api'
 
 // ─── Cancel Subscription Modal ────────────────────────────────────────────────
 
@@ -36,17 +37,19 @@ function CancelModal({ onClose }) {
   const [reason, setReason] = useState('')
   const [reasonOpen, setReasonOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [portalError, setPortalError] = useState('')
 
   async function confirmCancel() {
     if (!reason) return
     setCancelling(true)
-    // In production this would call Stripe API. For now, simulate.
-    await new Promise(r => setTimeout(r, 1000))
-    setIsPremium(false)
-    setCancelling(false)
-    setStep(3)
-    // Log reason (non-blocking)
-    console.info('[Cancel] reason:', reason)
+    setPortalError('')
+    try {
+      const { url } = await api.payments.portal()
+      window.location.href = url // Stripe portal handles cancellation
+    } catch (err) {
+      setPortalError('Could not open billing portal. Please contact support@ascendus.com.')
+      setCancelling(false)
+    }
   }
 
   return (
@@ -179,8 +182,11 @@ function CancelModal({ onClose }) {
               className="w-full py-4 rounded-2xl font-heading font-bold text-[14px] mb-3 flex items-center justify-center gap-2 disabled:opacity-40"
               style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.30)', color: '#EF4444' }}
             >
-              {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
+              {cancelling ? 'Opening portal…' : 'Confirm Cancellation'}
             </button>
+            {portalError && (
+              <p className="text-center font-body text-[11px] mb-2" style={{ color: '#EF4444' }}>{portalError}</p>
+            )}
             <p className="text-center font-body text-[11px] text-white/25">
               You keep access until the end of your billing period.
             </p>
