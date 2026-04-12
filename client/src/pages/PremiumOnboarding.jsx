@@ -1231,110 +1231,165 @@ const SLIDE_GOLD_DIM = 'rgba(201,168,76,0.12)'
 const SLIDE_GOLD_BORDER = 'rgba(201,168,76,0.28)'
 
 function Slide1() {
+  const stats = [
+    { num: '72%',  text: 'of people judge character based on appearance alone' },
+    { num: '3.5x', text: 'more likely to be hired if considered attractive' },
+    { num: '8 sec', text: 'before someone decides if they\'re attracted to you' },
+  ]
   return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
-      <h1 className="font-heading font-bold text-center mb-8" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        Your Face Is<br />Costing You
+    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
+      <h1 className="font-heading font-bold text-center mb-2" style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        The Truth Nobody Tells You
       </h1>
+      <p className="font-body text-center text-[14px] mb-7" style={{ color: SLIDE_GOLD }}>
+        Looks affect every area of your life
+      </p>
 
-      {/* Two stat cards */}
-      <div className="flex gap-3 mb-8">
-        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
-          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>38%</span>
-          <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>of people form opinions before you speak</p>
-        </div>
-        <div className="flex-1 rounded-2xl p-4 flex flex-col items-center gap-2" style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}>
-          <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>7 sec</span>
-          <p className="font-body text-[12px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>to make a first impression. That's it.</p>
-        </div>
+      <div className="flex flex-col gap-3 mb-6">
+        {stats.map(({ num, text }, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-4 px-5 py-4 rounded-2xl"
+            style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
+          >
+            <span className="font-heading font-bold flex-shrink-0 w-16 text-right" style={{ fontSize: 28, color: SLIDE_GOLD, lineHeight: 1 }}>{num}</span>
+            <div style={{ width: 1, height: 32, background: SLIDE_GOLD_BORDER, flexShrink: 0 }} />
+            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
+          </motion.div>
+        ))}
       </div>
 
-      <p className="font-heading font-bold text-center text-[18px] mb-2" style={{ color: '#F0EDE8' }}>
-        Attractiveness isn't luck. It's a system.
-      </p>
-      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-        Harvard Business Review, 2021
+      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
+        *Princeton University &amp; Harvard Business School research
       </p>
     </div>
   )
 }
 
 function Slide2() {
-  const rows = [
-    { icon: '✦', text: 'Skin alone accounts for 31% of perceived attractiveness' },
-    { icon: '✦', text: 'Grooming can shift your rating by up to 1.8 points' },
-    { icon: '✦', text: 'Posture correction adds 1–2 inches of visible height' },
+  const withoutItems = [
+    'Random grooming',
+    'No idea what to fix',
+    'Hoping for results',
+    'Generic advice',
+  ]
+  const withItems = [
+    'AI identifies exact weak points',
+    'Personalized fix for each one',
+    'Tracks real improvement',
+    'Specific to YOUR face',
   ]
   return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
-      <h1 className="font-heading font-bold text-center mb-8" style={{ fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        The Gap Is Smaller<br />Than You Think
+    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
+      <h1 className="font-heading font-bold text-center mb-7" style={{ fontSize: 26, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        Most Guys Are Leaving<br />Points on the Table
       </h1>
 
-      <div className="flex flex-col gap-3 mb-8">
-        {rows.map(({ icon, text }, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
-            style={{ background: SLIDE_GOLD_DIM, border: `1px solid ${SLIDE_GOLD_BORDER}` }}
-          >
-            <span className="text-[14px] flex-shrink-0" style={{ color: SLIDE_GOLD }}>{icon}</span>
-            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
-          </motion.div>
-        ))}
+      <div className="flex gap-3 mb-6">
+        {/* Without */}
+        <div className="flex-1 rounded-2xl p-4" style={{ background: 'rgba(224,60,60,0.06)', border: '0.5px solid rgba(224,60,60,0.25)' }}>
+          <p className="font-heading font-bold text-[13px] mb-3" style={{ color: '#E05555' }}>Without a plan</p>
+          {withoutItems.map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 + i * 0.08 }}
+              className="flex items-start gap-2 mb-2"
+            >
+              <span className="mt-0.5 flex-shrink-0" style={{ color: '#E05555', fontSize: 10 }}>✕</span>
+              <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>{item}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* With Ascendus */}
+        <div className="flex-1 rounded-2xl p-4" style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}>
+          <p className="font-heading font-bold text-[13px] mb-3" style={{ color: SLIDE_GOLD }}>With Ascendus</p>
+          {withItems.map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 + i * 0.08 }}
+              className="flex items-start gap-2 mb-2"
+            >
+              <span className="mt-0.5 flex-shrink-0" style={{ color: SLIDE_GOLD, fontSize: 10 }}>✓</span>
+              <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.80)' }}>{item}</p>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
-      <p className="font-heading font-bold text-center text-[18px] mb-2" style={{ color: '#F0EDE8' }}>
-        Small changes. Massive difference.
-      </p>
-      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-        *Based on facial attractiveness research studies
+      <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
+        The difference isn't genetics.<br />It's information.
       </p>
     </div>
   )
 }
 
 function Slide3() {
-  const features = [
-    { icon: '⚡', text: 'AI scans your face + body in seconds' },
-    { icon: '🎯', text: 'Tells you exactly what to fix first' },
-    { icon: '📈', text: 'Tracks your improvement over time' },
-    { icon: '🏆', text: 'Gives you a personalized 12-week plan' },
+  const quickStats = [
+    { num: '+1.4pts', label: 'Average score gain' },
+    { num: '6 wks',  label: 'Avg time to see skin improvement' },
+    { num: '78%',    label: 'Users who see visible results' },
   ]
   return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-24 pb-4">
-      <h1 className="font-heading font-bold text-center mb-1" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        Built Different
+    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
+      <h1 className="font-heading font-bold text-center mb-6" style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
+        Your Potential Is<br />Already There
       </h1>
-      <p className="font-body text-center text-[13px] mb-7" style={{ color: SLIDE_GOLD }}>
-        No fluff. No guesswork. Just results.
-      </p>
 
-      <div className="flex flex-col gap-2.5 mb-8">
-        {features.map(({ icon, text }, i) => (
+      {/* Score arrow visual */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="rounded-2xl px-6 py-5 mb-6 flex flex-col items-center"
+        style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
+      >
+        <div className="flex items-center gap-4 mb-3">
+          <div className="flex flex-col items-center">
+            <span className="font-heading font-bold text-[36px] leading-none" style={{ color: 'rgba(255,255,255,0.45)' }}>5.1</span>
+            <span className="font-body text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>before</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span style={{ color: SLIDE_GOLD, fontSize: 28 }}>→</span>
+            <span className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>90 days</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>6.8</span>
+            <span className="font-body text-[10px] mt-1" style={{ color: SLIDE_GOLD }}>after</span>
+          </div>
+        </div>
+        <p className="font-body text-center text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          Average Ascendus user improvement in 90 days
+        </p>
+      </motion.div>
+
+      {/* 3 quick stats */}
+      <div className="flex gap-2 mb-6">
+        {quickStats.map(({ num, label }, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl"
-            style={{ background: '#0A0A0A', border: `0.5px solid rgba(201,168,76,0.3)` }}
+            transition={{ delay: 0.15 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="flex-1 rounded-xl px-2 py-3 flex flex-col items-center gap-1"
+            style={{ background: '#0A0A0A', border: `0.5px solid rgba(201,168,76,0.25)` }}
           >
-            <span className="text-[20px] flex-shrink-0">{icon}</span>
-            <p className="font-body text-[13px] leading-snug" style={{ color: '#FFFFFF' }}>{text}</p>
+            <span className="font-heading font-bold text-[18px] leading-none" style={{ color: SLIDE_GOLD }}>{num}</span>
+            <p className="font-body text-[10px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.45)' }}>{label}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Big stat */}
-      <div className="rounded-2xl px-5 py-4 text-center mb-2" style={{ background: '#050505', border: `0.5px solid rgba(201,168,76,0.3)` }}>
-        <p className="font-heading font-bold text-[28px]" style={{ color: '#E8C84A' }}>+1.4 points</p>
-        <p className="font-body text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>average improvement in 90 days</p>
-        <p className="font-body text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Based on Ascendus user data</p>
-      </div>
+      <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
+        You just need to know where to start.
+      </p>
     </div>
   )
 }
