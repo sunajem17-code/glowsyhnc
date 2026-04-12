@@ -1255,7 +1255,7 @@ function Slide1() {
             className="flex items-center gap-4 px-5 py-4 rounded-2xl"
             style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
           >
-            <span className="font-heading font-bold flex-shrink-0 w-16 text-right" style={{ fontSize: 28, color: SLIDE_GOLD, lineHeight: 1 }}>{num}</span>
+            <span className="font-heading font-bold flex-shrink-0 w-16 text-center" style={{ fontSize: 28, color: SLIDE_GOLD, lineHeight: 1 }}>{num}</span>
             <div style={{ width: 1, height: 32, background: SLIDE_GOLD_BORDER, flexShrink: 0 }} />
             <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
           </motion.div>
