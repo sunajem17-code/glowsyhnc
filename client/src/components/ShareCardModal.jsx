@@ -93,13 +93,20 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   for (let y = 0; y <= H; y += 54) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
   ctx.restore()
 
-  // ── ASCENDUS wordmark ────────────────────────────────────────────────────────
+  // ── Logo + ASCENDUS wordmark (top-right) ─────────────────────────────────────
+  try {
+    const icon = await loadImage('/src/assets/ascendus-icon.png')
+    ctx.save()
+    ctx.globalAlpha = 0.92
+    ctx.drawImage(icon, W - 52 - 48, 20, 48, 48)
+    ctx.restore()
+  } catch {}
   ctx.save()
-  ctx.textAlign  = 'right'
-  ctx.font       = '600 28px "Plus Jakarta Sans", Arial'
-  ctx.fillStyle  = GOLD
+  ctx.textAlign     = 'right'
+  ctx.font          = '600 28px "Plus Jakarta Sans", Arial'
+  ctx.fillStyle     = GOLD
   ctx.letterSpacing = '4px'
-  ctx.fillText('ASCENDUS', W - 52, 68)
+  ctx.fillText('ASCENDUS', W - 52 - 56, 54)
   ctx.letterSpacing = '0px'
   ctx.restore()
 
