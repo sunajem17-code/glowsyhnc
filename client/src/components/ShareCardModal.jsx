@@ -151,15 +151,25 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.beginPath(); ctx.arc(CX, CY, CR, 0, Math.PI * 2)
   ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 3; ctx.stroke()
 
-  // ── Subtitle below photo ─────────────────────────────────────────────────────
-  const subY = CY + CR + 52
+  // ── Tier badge + subtitle below photo ───────────────────────────────────────
+  const tierName = (scan.tier ?? 'NORMIE').toUpperCase()
+  const tierY    = CY + CR + 72
   ctx.textAlign = 'center'
-  ctx.font      = '400 30px "Plus Jakarta Sans", Arial'
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.font      = 'bold 72px "Plus Jakarta Sans", Arial'
+  const tierG   = ctx.createLinearGradient(W * 0.15, tierY, W * 0.85, tierY)
+  tierG.addColorStop(0,    '#FFE47A')
+  tierG.addColorStop(0.45, GOLD)
+  tierG.addColorStop(1,    '#A8893A')
+  ctx.fillStyle = tierG
+  ctx.fillText(tierName, W / 2, tierY)
+
+  const subY = tierY + 44
+  ctx.font      = '400 28px "Plus Jakarta Sans", Arial'
+  ctx.fillStyle = 'rgba(255,255,255,0.30)'
   ctx.fillText('Your Results', W / 2, subY)
 
   // ── Divider ──────────────────────────────────────────────────────────────────
-  const divY = subY + 48
+  const divY = subY + 44
   const dg   = ctx.createLinearGradient(L, 0, R_PAD, 0)
   dg.addColorStop(0,   'rgba(201,168,76,0)')
   dg.addColorStop(0.3, 'rgba(201,168,76,0.5)')
