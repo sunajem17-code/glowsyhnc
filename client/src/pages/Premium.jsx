@@ -38,10 +38,11 @@ const TESTIMONIALS = [
 
 export default function Premium() {
   const navigate = useNavigate()
-  const { setIsPremium, isPremium } = useStore()
+  const { setIsPremium, isPremium, logout } = useStore()
   const [plan, setPlan] = useState('annual')
   const [subscribing, setSubscribing] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const [searchParams] = useSearchParams()
 
@@ -67,9 +68,21 @@ export default function Premium() {
       const { url } = await api.payments.createCheckout(plan)
       window.location.href = url
     } catch (err) {
-      setCheckoutError(err.message || 'Could not start checkout — please try again.')
+      const msg = err.message || ''
+      if (msg.toLowerCase().includes('session expired') || msg.toLowerCase().includes('user not found')) {
+        setSessionExpired(true)
+        setCheckoutError('')
+      } else {
+        setCheckoutError(msg || 'Could not start checkout — please try again.')
+      }
       setSubscribing(false)
     }
+  }
+
+  function handleRelogin() {
+    if (typeof logout === 'function') logout()
+    localStorage.removeItem('ascendus-storage')
+    navigate('/auth')
   }
 
   if (isPremium) {
@@ -214,6 +227,21 @@ export default function Premium() {
 
         {checkoutError && (
           <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{checkoutError}</p>
+        )}
+
+        {sessionExpired && (
+          <div className="mb-3 rounded-xl p-4 text-center" style={{ background: '#1A1A1A', border: '1px solid rgba(198,168,92,0.2)' }}>
+            <p className="text-[12px] font-body mb-3" style={{ color: '#F0EDE8' }}>
+              Your session is from before our upgrade. Please log out and log back in to subscribe.
+            </p>
+            <button
+              onClick={handleRelogin}
+              className="px-5 py-2 rounded-full text-[12px] font-semibold"
+              style={{ background: GOLD, color: '#000' }}
+            >
+              Log out &amp; back in
+            </button>
+          </div>
         )}
 
         <p className="text-center text-[10px] font-body mb-7" style={{ color: TEXT_DIM }}>

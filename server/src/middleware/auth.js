@@ -12,14 +12,17 @@ function authMiddleware(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET)
     req.userId = payload.userId
+    req.userEmail = payload.email || null
     next()
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
 
-function signToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' })
+function signToken(userId, email) {
+  const payload = { userId }
+  if (email) payload.email = email
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' })
 }
 
 module.exports = { authMiddleware, signToken }
