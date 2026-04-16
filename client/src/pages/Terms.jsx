@@ -21,7 +21,7 @@ export default function Terms() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen" style={{ background: '#080808' }}>
+    <div className="page-scroll-full" style={{ background: '#080808' }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-14 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
         <button

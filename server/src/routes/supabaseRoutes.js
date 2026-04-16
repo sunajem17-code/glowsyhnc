@@ -257,7 +257,7 @@ router.put('/user', auth, async (req, res) => {
     const sbUserId = await getOrCreateUser(email)
     if (!sbUserId) return res.status(500).json({ error: 'Failed to sync user' })
 
-    const allowed = ['gender', 'height_cm', 'weight_kg', 'hair_type', 'assigned_phase', 'is_pro', 'goal_type', 'improvement_focus', 'ai_consent', 'consent_at']
+    const allowed = ['gender', 'height_cm', 'weight_kg', 'hair_type', 'assigned_phase', 'goal_type', 'improvement_focus', 'ai_consent', 'consent_at']
     const updates = {}
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key]
