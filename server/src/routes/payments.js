@@ -31,8 +31,8 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },
-      success_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/premium?success=1`,
-      cancel_url:  `${process.env.CLIENT_URL || 'http://localhost:5173'}/premium?cancelled=1`,
+      success_url: `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/payment-success`,
+      cancel_url:  `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/premium`,
     })
     res.json({ url: session.url })
   } catch (err) {
@@ -82,7 +82,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customers.data[0].id,
-      return_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/profile`,
+      return_url: `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/profile`,
     })
     res.json({ url: session.url })
   } catch (err) {
