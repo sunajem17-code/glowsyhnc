@@ -44,7 +44,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
 })
 
 // Stripe webhook — activates premium after successful payment
-router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature']
   const secret = process.env.STRIPE_WEBHOOK_SECRET
 
