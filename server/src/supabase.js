@@ -5,10 +5,6 @@ const { createClient } = require('@supabase/supabase-js')
 
 let _client = null
 
-/**
- * Returns a Supabase admin client using the service key.
- * Returns null if env vars are not configured — callers must check.
- */
 function getSupabase() {
   if (_client) return _client
   const url = process.env.SUPABASE_URL
@@ -20,6 +16,37 @@ function getSupabase() {
   return _client
 }
 
+// ── User helpers ──────────────────────────────────────────────────────────────
+
+async function getUserByEmail(email) {
+  const sb = getSupabase()
+  if (!sb || !email) return null
+  const { data } = await sb.from('users').select('*').eq('email', email).maybeSingle()
+  return data
+}
+
+async function getUserById(id) {
+  const sb = getSupabase()
+  if (!sb || !id) return null
+  const { data } = await sb.from('users').select('*').eq('id', id).maybeSingle()
+  return data
+}
+
+async function createUser(userData) {
+  const sb = getSupabase()
+  if (!sb) throw new Error('Supabase not configured')
+  const { data, error } = await sb.from('users').insert(userData).select().single()
+  if (error) throw error
+  return data
+}
+
+async function updateUserById(id, updates) {
+  const sb = getSupabase()
+  if (!sb) throw new Error('Supabase not configured')
+  const { error } = await sb.from('users').update(updates).eq('id', id)
+  if (error) throw error
+}
+
 /**
  * Look up a Supabase user by email. Creates one if it doesn't exist.
  * Returns the Supabase UUID string, or null on failure.
@@ -28,7 +55,6 @@ async function getOrCreateUser(email, profile = {}) {
   const sb = getSupabase()
   if (!sb || !email) return null
 
-  // Try existing
   const { data: existing } = await sb
     .from('users')
     .select('id')
@@ -37,7 +63,6 @@ async function getOrCreateUser(email, profile = {}) {
 
   if (existing) return existing.id
 
-  // Create new
   const { data: created, error } = await sb
     .from('users')
     .insert({ email, ...profile })
@@ -51,11 +76,16 @@ async function getOrCreateUser(email, profile = {}) {
   return created.id
 }
 
-/**
- * Check if Supabase is configured and reachable.
- */
 function isConfigured() {
   return getSupabase() !== null
 }
 
-module.exports = { getSupabase, getOrCreateUser, isConfigured }
+module.exports = {
+  getSupabase,
+  getOrCreateUser,
+  getUserByEmail,
+  getUserById,
+  createUser,
+  updateUserById,
+  isConfigured,
+}

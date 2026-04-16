@@ -2,6 +2,7 @@ const express = require('express')
 const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
+const { getUserById, updateUserById, getSupabase } = require('../supabase')
 
 const router = express.Router()
 
@@ -17,7 +18,9 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   const { plan } = req.body // 'monthly' | 'annual'
   if (!PRICES[plan]) return res.status(400).json({ error: 'Invalid plan' })
 
-  const user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
+  // Look up user in Supabase (primary) or SQLite (fallback)
+  let user = await getUserById(req.userId)
+  if (!user) user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   try {
@@ -57,14 +60,17 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
   if (event.type === 'checkout.session.completed' || event.type === 'invoice.payment_succeeded') {
     const userId = event.data.object.metadata?.userId
     if (userId) {
-      db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId)
+      // Update Supabase (primary) + SQLite (fallback)
+      try { await updateUserById(userId, { subscription_tier: 'premium', is_pro: true }) } catch {}
+      try { db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId) } catch {}
     }
   }
 
   if (event.type === 'customer.subscription.deleted') {
     const userId = event.data.object.metadata?.userId
     if (userId) {
-      db.prepare("UPDATE users SET subscription_tier = 'free' WHERE id = ?").run(userId)
+      try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false }) } catch {}
+      try { db.prepare("UPDATE users SET subscription_tier = 'free' WHERE id = ?").run(userId) } catch {}
     }
   }
 
@@ -73,7 +79,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
 
 // Open Stripe Customer Portal (manage/cancel subscription)
 router.post('/portal', authMiddleware, async (req, res) => {
-  const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId)
+  let user = await getUserById(req.userId)
+  if (!user) user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   try {
@@ -91,9 +98,16 @@ router.post('/portal', authMiddleware, async (req, res) => {
 })
 
 // Check premium status (called after redirect back from Stripe)
-router.get('/status', authMiddleware, (req, res) => {
-  const user = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)
-  res.json({ isPremium: user?.subscription_tier === 'premium' })
+router.get('/status', authMiddleware, async (req, res) => {
+  let tier = 'free'
+  const sbUser = await getUserById(req.userId).catch(() => null)
+  if (sbUser) {
+    tier = sbUser.subscription_tier || 'free'
+  } else {
+    const row = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)
+    tier = row?.subscription_tier || 'free'
+  }
+  res.json({ isPremium: tier === 'premium' })
 })
 
 module.exports = router

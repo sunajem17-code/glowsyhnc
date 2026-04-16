@@ -11,7 +11,7 @@
 
 const jwt = require('jsonwebtoken')
 const db  = require('../db')
-const { getSupabase } = require('../supabase')
+const { getSupabase, getUserById } = require('../supabase')
 
 const JWT_SECRET = process.env.JWT_SECRET
 
@@ -112,53 +112,40 @@ async function scanLimit(req, res, next) {
   next()
 }
 
+// ── helper: resolve subscription tier from Supabase (primary) or SQLite (fallback) ──
+async function getSubscriptionTier(userId) {
+  // Try Supabase first (production primary store)
+  const sbUser = await getUserById(userId)
+  if (sbUser) {
+    return {
+      tier: sbUser.subscription_tier || 'free',
+      trialExpires: sbUser.pro_trial_expires_at || null,
+      isPro: sbUser.subscription_tier === 'premium' ||
+        (sbUser.subscription_tier === 'trial' && sbUser.pro_trial_expires_at && new Date() < new Date(sbUser.pro_trial_expires_at)) ||
+        sbUser.is_pro === true,
+    }
+  }
+  // Fall back to SQLite (local dev)
+  const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(userId)
+  const trialActive = row?.subscription_tier === 'trial' && row.pro_trial_expires_at && new Date() < new Date(row.pro_trial_expires_at)
+  return {
+    tier: row?.subscription_tier || 'free',
+    trialExpires: row?.pro_trial_expires_at || null,
+    isPro: row?.subscription_tier === 'premium' || trialActive,
+  }
+}
+
 // ── 4. Pro gate ────────────────────────────────────────────────────────────────
-// Checks SQLite subscription_tier first, then Supabase is_pro / trial as backup.
-// Returns 403 if user is not Pro.
 async function requirePro(req, res, next) {
   if (req.isDemo) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   }
-
   try {
-    // Primary: check local SQLite
-    const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(req.userId)
-    if (row?.subscription_tier === 'premium') {
+    const { isPro } = await getSubscriptionTier(req.userId)
+    if (isPro) {
       req.isPro = true
       return next()
     }
-    // Active referral trial
-    if (row?.subscription_tier === 'trial' && row.pro_trial_expires_at && new Date() < new Date(row.pro_trial_expires_at)) {
-      req.isPro = true
-      return next()
-    }
-
-    // Fallback: check Supabase if configured
-    const sb = getSupabase()
-    if (sb) {
-      // Get user email from SQLite to look up in Supabase
-      const userRow = db.prepare('SELECT email FROM users WHERE id = ?').get(req.userId)
-      if (userRow?.email) {
-        const { data } = await sb
-          .from('users')
-          .select('is_pro, pro_trial_active, pro_trial_expires_at')
-          .eq('email', userRow.email)
-          .maybeSingle()
-
-        if (data) {
-          const trialActive = data.pro_trial_active &&
-            data.pro_trial_expires_at &&
-            new Date() < new Date(data.pro_trial_expires_at)
-
-          if (data.is_pro || trialActive) {
-            req.isPro = true
-            return next()
-          }
-        }
-      }
-    }
-
-    // Not Pro
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   } catch (err) {
     console.error('[claudeGate] requirePro error:', err.message)
@@ -167,35 +154,11 @@ async function requirePro(req, res, next) {
 }
 
 // ── 5. Resolve isPro for non-gated routes (sets req.isPro without blocking) ───
-// Use before scanLimit so it can skip the cap for Pro users.
 async function resolvePro(req, res, next) {
   if (req.isDemo) { req.isPro = false; return next() }
   try {
-    const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(req.userId)
-    const trialActive = row?.subscription_tier === 'trial' &&
-      row.pro_trial_expires_at &&
-      new Date() < new Date(row.pro_trial_expires_at)
-    req.isPro = row?.subscription_tier === 'premium' || trialActive
-
-    if (!req.isPro) {
-      const sb = getSupabase()
-      if (sb) {
-        const userRow = db.prepare('SELECT email FROM users WHERE id = ?').get(req.userId)
-        if (userRow?.email) {
-          const { data } = await sb
-            .from('users')
-            .select('is_pro, pro_trial_active, pro_trial_expires_at')
-            .eq('email', userRow.email)
-            .maybeSingle()
-          if (data) {
-            const trialActive = data.pro_trial_active &&
-              data.pro_trial_expires_at &&
-              new Date() < new Date(data.pro_trial_expires_at)
-            req.isPro = !!(data.is_pro || trialActive)
-          }
-        }
-      }
-    }
+    const { isPro } = await getSubscriptionTier(req.userId)
+    req.isPro = isPro
   } catch {
     req.isPro = false
   }
