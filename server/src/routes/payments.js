@@ -21,7 +21,11 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   // Look up user in Supabase (primary) or SQLite (fallback)
   let user = await getUserById(req.userId)
   if (!user) user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
-  if (!user) return res.status(404).json({ error: 'User not found' })
+  // Fallback: if account was lost (SQLite wipe before Supabase migration), use email from JWT
+  if (!user && req.userEmail) {
+    user = { id: req.userId, email: req.userEmail }
+  }
+  if (!user) return res.status(404).json({ error: 'Session expired. Please log out and log in again.' })
 
   try {
     const session = await stripe.checkout.sessions.create({

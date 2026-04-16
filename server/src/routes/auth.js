@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
       }
 
       const safe = { id: user.id, name: user.name, email: user.email, subscriptionTier: 'free', createdAt: user.created_at }
-      return res.json({ user: safe, token: signToken(user.id) })
+      return res.json({ user: safe, token: signToken(user.id, user.email) })
 
     } else {
       // ── SQLite fallback (local dev) ─────────────────────────────────────────
@@ -73,7 +73,7 @@ router.post('/register', async (req, res) => {
       }
 
       const user = { id, name, email, subscriptionTier: 'free', createdAt: new Date().toISOString() }
-      return res.json({ user, token: signToken(id) })
+      return res.json({ user, token: signToken(id, email) })
     }
   } catch (err) {
     console.error('[Auth] Register error:', err.message)
@@ -112,7 +112,7 @@ router.post('/login', async (req, res) => {
       subscriptionTier: user.subscription_tier || 'free',
       createdAt: user.created_at,
     }
-    res.json({ user: safe, token: signToken(user.id) })
+    res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
     console.error('[Auth] Login error:', err.message)
     res.status(500).json({ error: err.message })
