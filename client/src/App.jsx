@@ -21,6 +21,7 @@ import Terms from './pages/Terms'
 import Referral from './pages/Referral'
 import Compare from './pages/Compare'
 import AICoach from './pages/AICoach'
+import PaymentSuccess from './pages/PaymentSuccess'
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
@@ -48,9 +49,10 @@ export default function App() {
     <BrowserRouter>
       <AnimatePresence mode="wait">
         <Routes>
-          {/* Legal pages — always accessible */}
+          {/* Legal pages + payment return — always accessible */}
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/payment-success" element={<PaymentSuccess />} />
 
           {!hasOnboarded ? (
             <Route path="*" element={<PremiumOnboarding />} />
