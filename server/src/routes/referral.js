@@ -1,29 +1,35 @@
 const express = require('express')
 const db = require('../db')
 const { verifyToken } = require('../middleware/claudeGate')
+const { getUserById, updateUserById } = require('../supabase')
 
 const router = express.Router()
 
-// GET /api/referral/count — returns this user's referral count and code
-router.get('/count', verifyToken, (req, res) => {
+// ── helper: get user from Supabase or SQLite ──────────────────────────────────
+async function getUser(userId) {
+  const sbUser = await getUserById(userId).catch(() => null)
+  if (sbUser) return sbUser
+  return db.prepare('SELECT referral_count, referral_code, subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(userId)
+}
+
+// GET /api/referral/count
+router.get('/count', verifyToken, async (req, res) => {
   if (req.isDemo) return res.json({ count: 0, code: null })
-  const user = db.prepare('SELECT referral_count, referral_code FROM users WHERE id = ?').get(req.userId)
+  const user = await getUser(req.userId)
   res.json({ count: user?.referral_count || 0, code: user?.referral_code || null })
 })
 
-// POST /api/referral/claim-trial — verify >= 5 referrals server-side, then grant 7-day trial
-router.post('/claim-trial', verifyToken, (req, res) => {
+// POST /api/referral/claim-trial
+router.post('/claim-trial', verifyToken, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Account required to claim trial' })
 
-  const user = db.prepare('SELECT referral_count, subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(req.userId)
+  const user = await getUser(req.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
-  // Already full Pro — nothing to grant
   if (user.subscription_tier === 'premium') {
     return res.json({ ok: true, message: 'Already Pro' })
   }
 
-  // Trial already active
   if (user.pro_trial_expires_at && new Date() < new Date(user.pro_trial_expires_at)) {
     return res.json({ ok: true, expiresAt: user.pro_trial_expires_at })
   }
@@ -40,8 +46,9 @@ router.post('/claim-trial', verifyToken, (req, res) => {
   expires.setDate(expires.getDate() + 7)
   const expiresAt = expires.toISOString()
 
-  db.prepare("UPDATE users SET subscription_tier = 'trial', pro_trial_expires_at = ? WHERE id = ?")
-    .run(expiresAt, req.userId)
+  // Update Supabase (primary) + SQLite (fallback)
+  try { await updateUserById(req.userId, { subscription_tier: 'trial', pro_trial_expires_at: expiresAt }) } catch {}
+  try { db.prepare("UPDATE users SET subscription_tier = 'trial', pro_trial_expires_at = ? WHERE id = ?").run(expiresAt, req.userId) } catch {}
 
   res.json({ ok: true, expiresAt })
 })
