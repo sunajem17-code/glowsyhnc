@@ -54,13 +54,20 @@ export default function Premium() {
   }, [searchParams, setIsPremium])
 
   async function handleSubscribe() {
+    // Demo users must create a real account first
+    const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+    const token = stored?.state?.token
+    if (!token || token === 'demo-token') {
+      setCheckoutError('Create a free account first to subscribe.')
+      return
+    }
     setSubscribing(true)
     setCheckoutError('')
     try {
       const { url } = await api.payments.createCheckout(plan)
       window.location.href = url
     } catch (err) {
-      setCheckoutError('Could not start checkout — please try again.')
+      setCheckoutError(err.message || 'Could not start checkout — please try again.')
       setSubscribing(false)
     }
   }
@@ -121,7 +128,7 @@ export default function Premium() {
           >
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
             <span className="text-[11px] font-heading font-bold uppercase tracking-widest" style={{ color: GOLD }}>
-              GlowSync Premium
+              Ascendus Premium
             </span>
           </div>
 
