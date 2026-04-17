@@ -23,16 +23,23 @@ async function request(path, options = {}) {
     }
     const errBody = await res.json().catch(() => ({}))
     if (res.status === 401) {
-      // Clear stale auth state so the app redirects to sign-in on next render
-      try {
-        const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-        if (stored?.state?.token && stored.state.token !== 'demo-token') {
-          stored.state.token = null
-          stored.state.isAuthenticated = false
-          localStorage.setItem('ascendus-storage', JSON.stringify(stored))
-        }
-      } catch {}
-      throw new Error('Session expired. Please sign in again.')
+      const errBody2 = await res.json().catch(() => ({}))
+      // Only treat as "session expired" if it's an auth middleware rejection
+      // (i.e. user has a stored token that the server rejected).
+      // Login/register endpoints return 401 for wrong credentials — show that message instead.
+      const isAuthEndpoint = path.startsWith('/auth/')
+      if (!isAuthEndpoint) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+          if (stored?.state?.token && stored.state.token !== 'demo-token') {
+            stored.state.token = null
+            stored.state.isAuthenticated = false
+            localStorage.setItem('ascendus-storage', JSON.stringify(stored))
+          }
+        } catch {}
+        throw new Error('Session expired. Please sign in again.')
+      }
+      throw new Error(errBody2.error || 'Invalid email or password')
     }
     throw new Error(errBody.error || `Something went wrong (${res.status})`)
   }
