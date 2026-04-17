@@ -54,6 +54,21 @@ app.use('/api/coach',     require('./routes/coach'))
 app.use('/api/hair',      require('./routes/hair'))
 app.use('/api/referral',  require('./routes/referral'))
 
+// Stripe connectivity test (remove after debugging)
+app.get('/api/stripe-ping', async (req, res) => {
+  const https = require('https')
+  const result = await new Promise(resolve => {
+    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET',
+      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` } }, r => {
+      resolve({ status: r.statusCode, ok: true })
+    })
+    req.on('error', e => resolve({ error: e.message, code: e.code }))
+    req.setTimeout(5000, () => resolve({ error: 'timeout' }))
+    req.end()
+  })
+  res.json(result)
+})
+
 // Health checks (root + api path — Railway probes /)
 app.get('/',          (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 app.get('/health',    (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
