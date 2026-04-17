@@ -12,14 +12,24 @@ export default function PaymentSuccess() {
   const { setIsPremium, isAuthenticated } = useStore()
 
   useEffect(() => {
-    // Confirm with server that payment went through before granting access
-    if (isAuthenticated) {
-      api.payments.status()
-        .then(({ isPremium }) => {
-          if (isPremium) setIsPremium(true)
-        })
-        .catch(() => {})
+    if (!isAuthenticated) return
+    let attempts = 0
+    const maxAttempts = 12 // poll for up to 24 seconds waiting for webhook
+
+    const check = async () => {
+      try {
+        const { isPremium } = await api.payments.status()
+        if (isPremium) {
+          setIsPremium(true)
+          return // done
+        }
+      } catch {}
+      attempts++
+      if (attempts < maxAttempts) setTimeout(check, 2000)
     }
+
+    // Small initial delay to let webhook fire
+    setTimeout(check, 1500)
   }, [isAuthenticated, setIsPremium])
 
   return (
