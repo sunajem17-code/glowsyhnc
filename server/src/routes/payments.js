@@ -28,10 +28,29 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Session expired. Please log out and log in again.' })
 
   try {
+    // Get or create a Stripe customer tied to this user
+    let customerId = user.stripe_customer_id || null
+    if (!customerId) {
+      // Check if a customer already exists for this email
+      const existing = await stripe.customers.list({ email: user.email, limit: 1 })
+      if (existing.data.length) {
+        customerId = existing.data[0].id
+      } else {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { userId: user.id },
+        })
+        customerId = customer.id
+      }
+      // Persist stripe_customer_id so we don't create duplicates
+      try { await updateUserById(user.id, { stripe_customer_id: customerId }) } catch {}
+      try { db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, user.id) } catch {}
+    }
+
     const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ['card'],
       mode: 'subscription',
-      customer_email: user.email,
       line_items: [{ price: PRICES[plan], quantity: 1 }],
       subscription_data: {
         trial_period_days: 7,
@@ -88,11 +107,15 @@ router.post('/portal', authMiddleware, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   try {
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 })
-    if (!customers.data.length) return res.status(404).json({ error: 'No billing record found' })
+    let customerId = user.stripe_customer_id || null
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 })
+      if (!customers.data.length) return res.status(404).json({ error: 'No billing record found' })
+      customerId = customers.data[0].id
+    }
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: customers.data[0].id,
+      customer: customerId,
       return_url: `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/profile`,
     })
     res.json({ url: session.url })
