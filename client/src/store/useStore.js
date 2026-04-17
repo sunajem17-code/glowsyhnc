@@ -13,7 +13,8 @@ const useStore = create(
         user,
         token,
         isAuthenticated: true,
-        isPremium: user?.subscriptionTier === 'premium',
+        // Check both subscriptionTier and is_pro so webhook-activated accounts work immediately
+        isPremium: user?.subscriptionTier === 'premium' || user?.is_pro === true,
       }),
       logout: () => set({
         user: null,
@@ -131,6 +132,44 @@ const useStore = create(
       // Premium
       isPremium: false,
       setIsPremium: (v) => set({ isPremium: v }),
+
+      // Refresh Pro status from server — call after payment, trial activation, or app foreground
+      refreshProStatus: async () => {
+        const { token, isAuthenticated } = get()
+        if (!isAuthenticated || !token || token === 'demo-token') return
+        try {
+          const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
+          const base = `https://${API.replace(/^https?:\/\//, '')}/api`
+
+          // 1. Check payment status
+          const statusRes = await fetch(`${base}/payments/status`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (statusRes.ok) {
+            const { isPremium } = await statusRes.json()
+            if (isPremium) set({ isPremium: true })
+          }
+
+          // 2. Refresh user profile so subscriptionTier + is_pro are current
+          const profileRes = await fetch(`${base}/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (profileRes.ok) {
+            const profile = await profileRes.json()
+            const fresh = profile.user || profile
+            set(state => ({
+              user: { ...state.user, ...fresh },
+              isPremium:
+                fresh?.subscriptionTier === 'premium' ||
+                fresh?.subscription_tier === 'premium' ||
+                fresh?.is_pro === true ||
+                state.isPremium, // never downgrade during a session without explicit action
+            }))
+          }
+        } catch {
+          // Fail silently — stale data is better than a crash
+        }
+      },
 
       // Phase
       assignedPhase: null,

@@ -9,7 +9,7 @@ const GOLD_BORDER = 'rgba(198,168,92,0.25)'
 
 export default function PaymentSuccess() {
   const navigate = useNavigate()
-  const { setIsPremium, isAuthenticated } = useStore()
+  const { setIsPremium, isAuthenticated, refreshProStatus } = useStore()
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -21,6 +21,7 @@ export default function PaymentSuccess() {
         const { isPremium } = await api.payments.status()
         if (isPremium) {
           setIsPremium(true)
+          await refreshProStatus() // sync full user profile too
           return // done
         }
       } catch {}
