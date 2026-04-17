@@ -167,7 +167,7 @@ export default function Premium() {
           <div className="grid grid-cols-2 gap-1">
             {[
               { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'Save 48%' },
+              { key: 'annual', label: 'Annual', price: '$49.99/yr', save: 'SAVE 48%' },
             ].map(({ key, label, price, save }) => {
               const isActive = plan === key
               return (

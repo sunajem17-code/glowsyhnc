@@ -778,8 +778,8 @@ function PaywallSheet({ glowScore, onClose }) {
         <div className="rounded-2xl p-1.5 mb-3" style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="grid grid-cols-2 gap-1">
             {[
-              { key: 'monthly', label: 'Monthly', price: '$9.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$4.99/mo', save: 'Best Value' },
+              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
+              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'SAVE 48%' },
             ].map(({ key, label, price, save }) => (
               <button key={key} onClick={() => setPlan(key)}
                 className="py-3 rounded-xl text-center transition-all"
@@ -809,7 +809,7 @@ function PaywallSheet({ glowScore, onClose }) {
           Start Free Trial →
         </motion.button>
         <p className="text-center text-[10px] font-body mb-4" style={{ color: 'rgba(255,255,255,0.25)' }}>
-          {plan === 'annual' ? 'Billed $59.99/year after 7-day trial' : 'Billed $9.99/month after 7-day trial'} · Cancel anytime
+          {plan === 'annual' ? 'Billed $49.99/year after 7-day trial' : 'Billed $7.99/month after 7-day trial'} · Cancel anytime
         </p>
 
         {/* Referral alternative */}

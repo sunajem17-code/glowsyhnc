@@ -82,7 +82,7 @@ export default function Terms() {
         </Section>
 
         <Section title="7. Subscriptions & Payments">
-          <p><strong style={{ color: TEXT }}>Billing:</strong> Ascendus Premium is billed at $9.99/month or $59.99/year (prices shown at checkout). You will be clearly informed of the exact charge before confirming your subscription.</p>
+          <p><strong style={{ color: TEXT }}>Billing:</strong> Ascendus Premium is billed at $7.99/month or $49.99/year (prices shown at checkout). You will be clearly informed of the exact charge before confirming your subscription.</p>
           <p className="mt-2"><strong style={{ color: TEXT }}>Free trial:</strong> If a free trial is offered, you will not be charged until the trial period ends. You may cancel at any time before the trial ends to avoid charges.</p>
           <p className="mt-2"><strong style={{ color: TEXT }}>Cancellation:</strong> You may cancel your subscription at any time through the Subscription settings in your Profile. Cancellation takes effect at the end of the current billing period. No partial refunds are issued for unused time.</p>
           <p className="mt-2"><strong style={{ color: TEXT }}>Refunds:</strong> Refund requests must be submitted within 7 days of charge to support@ascendus.com. We review refund requests on a case-by-case basis. Subscription fees are generally non-refundable after the 7-day window.</p>

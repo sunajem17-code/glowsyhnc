@@ -99,7 +99,7 @@ function CancelModal({ onClose }) {
             {/* Retention offer */}
             <div className="rounded-2xl px-4 py-4 mb-4"
               style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.22)' }}>
-              <p className="font-heading font-bold text-[13px] text-white mb-1">Stay for $4.99 this month</p>
+              <p className="font-heading font-bold text-[13px] text-white mb-1">Stay for $7.99 this month</p>
               <p className="font-body text-[11px] text-white/50 mb-3">
                 50% off your next month — one-time offer to keep your progress alive.
               </p>
