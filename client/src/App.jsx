@@ -22,6 +22,9 @@ import Referral from './pages/Referral'
 import Compare from './pages/Compare'
 import AICoach from './pages/AICoach'
 import PaymentSuccess from './pages/PaymentSuccess'
+import PremiumSplash from './pages/PremiumSplash'
+
+const SESSION_KEY = 'asc_pro_splash_shown'
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
@@ -29,8 +32,11 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium } = useStore()
   const [splashDone, setSplashDone] = useState(false)
+  const [proSplashDone, setProSplashDone] = useState(
+    () => !!sessionStorage.getItem(SESSION_KEY)
+  )
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -43,6 +49,18 @@ export default function App() {
 
   if (!splashDone) {
     return <Splash onDone={() => setSplashDone(true)} />
+  }
+
+  // Show premium splash once per session for Pro users
+  if (splashDone && isAuthenticated && isPremium && !proSplashDone) {
+    return (
+      <AnimatePresence>
+        <PremiumSplash onDone={() => {
+          sessionStorage.setItem(SESSION_KEY, '1')
+          setProSplashDone(true)
+        }} />
+      </AnimatePresence>
+    )
   }
 
   return (
