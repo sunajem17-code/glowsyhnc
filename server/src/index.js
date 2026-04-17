@@ -54,8 +54,10 @@ app.use('/api/coach',     require('./routes/coach'))
 app.use('/api/hair',      require('./routes/hair'))
 app.use('/api/referral',  require('./routes/referral'))
 
-// Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+// Health checks (root + api path — Railway probes /)
+app.get('/',          (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+app.get('/health',    (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+app.get('/api/health',(req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -63,6 +65,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' })
 })
 
-app.listen(PORT, () => {
-  console.log(`GlowSync API running on http://localhost:${PORT}`)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`GlowSync API running on http://0.0.0.0:${PORT}`)
 })
