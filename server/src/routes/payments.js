@@ -62,7 +62,9 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
     })
     res.json({ url: session.url })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[Stripe] checkout error:', err.type, err.code, err.message)
+    console.error('[Stripe] price used:', PRICES[plan])
+    res.status(500).json({ error: err.message, type: err.type, code: err.code })
   }
 })
 
