@@ -33,7 +33,7 @@ const FEATURES = [
 const TESTIMONIALS = [
   { name: 'Marcus T.', handle: '@marcust', score: '+18 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
   { name: 'Sarah K.', handle: '@sarahk', score: '+22 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
-  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $9.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
+  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $7.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
 ]
 
 export default function Premium() {
@@ -166,8 +166,8 @@ export default function Premium() {
         >
           <div className="grid grid-cols-2 gap-1">
             {[
-              { key: 'monthly', label: 'Monthly', price: '$9.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$4.99/mo', save: 'Save 50%' },
+              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
+              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'Save 48%' },
             ].map(({ key, label, price, save }) => {
               const isActive = plan === key
               return (
@@ -222,7 +222,7 @@ export default function Premium() {
             letterSpacing: '0.01em',
           }}
         >
-          {subscribing ? 'Opening checkout…' : plan === 'annual' ? 'Start for $59.99/year' : 'Start for $9.99/month'}
+          {subscribing ? 'Opening checkout…' : plan === 'annual' ? 'Start for $49.99/year' : 'Start for $7.99/month'}
         </motion.button>
 
         {checkoutError && (
@@ -360,7 +360,7 @@ export default function Premium() {
           {subscribing ? 'Opening checkout…' : 'Start My Free Trial →'}
         </motion.button>
         <p className="text-center text-[10px] font-body pb-4" style={{ color: TEXT_DIM }}>
-          Billed {plan === 'annual' ? '$59.99/year (CAD/USD)' : '$9.99/month (CAD/USD)'} after 7-day trial. Cancel anytime in Settings.
+          Billed {plan === 'annual' ? '$49.99/year (CAD/USD)' : '$7.99/month (CAD/USD)'} after 7-day trial. Cancel anytime in Settings.
         </p>
         <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
           By subscribing you agree to our{' '}
