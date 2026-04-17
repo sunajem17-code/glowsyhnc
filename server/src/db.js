@@ -114,6 +114,7 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN referral_code TEXT",
   "ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN pro_trial_expires_at TEXT",
+  "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }
