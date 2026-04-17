@@ -1,4 +1,11 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../.env'), override: true })
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
+
+// Validate Stripe key at startup
+if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_')) {
+  console.error('❌ STRIPE_SECRET_KEY is missing or invalid:', process.env.STRIPE_SECRET_KEY?.slice(0, 12))
+  process.exit(1)
+}
+console.log('✅ Stripe key loaded:', process.env.STRIPE_SECRET_KEY.slice(0, 12) + '...')
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
