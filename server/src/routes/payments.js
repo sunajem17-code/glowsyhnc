@@ -7,7 +7,8 @@ const { getUserById, updateUserById, getSupabase } = require('../supabase')
 const router = express.Router()
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_KEY_HERE', {
-  maxNetworkRetries: 0,
+  httpClient: Stripe.createFetchHttpClient(),
+  maxNetworkRetries: 1,
 })
 
 const PRICES = {
