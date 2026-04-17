@@ -85,10 +85,38 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     return res.status(400).json({ error: `Webhook error: ${err.message}` })
   }
 
-  if (event.type === 'checkout.session.completed' || event.type === 'invoice.payment_succeeded') {
-    const userId = event.data.object.metadata?.userId
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    const userId = session.metadata?.userId
+    const subscriptionId = session.subscription || null
     if (userId) {
-      // Update Supabase (primary) + SQLite (fallback)
+      console.log('[Webhook] checkout.session.completed userId:', userId, 'sub:', subscriptionId)
+      try {
+        await updateUserById(userId, {
+          subscription_tier: 'premium',
+          is_pro: true,
+          stripe_subscription_id: subscriptionId,
+        })
+      } catch (e) { console.error('[Webhook] Supabase update failed:', e.message) }
+      try {
+        db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
+          .run(subscriptionId, userId)
+      } catch {}
+    }
+  }
+
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object
+    // userId lives on the subscription metadata, not the invoice
+    let userId = invoice.metadata?.userId
+    if (!userId && invoice.subscription) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(invoice.subscription)
+        userId = sub.metadata?.userId
+      } catch (e) { console.error('[Webhook] sub lookup failed:', e.message) }
+    }
+    if (userId) {
+      console.log('[Webhook] invoice.payment_succeeded userId:', userId)
       try { await updateUserById(userId, { subscription_tier: 'premium', is_pro: true }) } catch {}
       try { db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId) } catch {}
     }
@@ -97,8 +125,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   if (event.type === 'customer.subscription.deleted') {
     const userId = event.data.object.metadata?.userId
     if (userId) {
-      try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false }) } catch {}
-      try { db.prepare("UPDATE users SET subscription_tier = 'free' WHERE id = ?").run(userId) } catch {}
+      try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false, stripe_subscription_id: null }) } catch {}
+      try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
     }
   }
 
@@ -139,7 +167,8 @@ router.get('/status', authMiddleware, async (req, res) => {
     const row = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)
     tier = row?.subscription_tier || 'free'
   }
-  res.json({ isPremium: tier === 'premium' })
+  const isPro = sbUser?.is_pro === true
+  res.json({ isPremium: tier === 'premium' || isPro })
 })
 
 module.exports = router

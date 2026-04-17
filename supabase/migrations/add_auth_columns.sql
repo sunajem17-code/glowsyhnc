@@ -8,7 +8,9 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS referral_code TEXT,
   ADD COLUMN IF NOT EXISTS referral_count INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
-  ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+  ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT,
+  ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT,
+  ADD COLUMN IF NOT EXISTS is_pro BOOLEAN DEFAULT FALSE;
 
 -- Index for fast email + referral lookups
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (email);
