@@ -56,17 +56,30 @@ app.use('/api/referral',  require('./routes/referral'))
 
 // Stripe connectivity test (remove after debugging)
 app.get('/api/stripe-ping', async (req, res) => {
-  const https = require('https')
-  const result = await new Promise(resolve => {
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET',
-      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` } }, r => {
-      resolve({ status: r.statusCode, ok: true })
+  const dns = require('dns').promises
+  const results = {}
+  // Step 1: DNS
+  try {
+    const addrs = await dns.lookup('api.stripe.com')
+    results.dns = addrs.address
+  } catch (e) {
+    results.dns_error = e.message
+    return res.json(results)
+  }
+  // Step 2: HTTP fetch with timeout
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 5000)
+    const r = await fetch('https://api.stripe.com/v1/charges', {
+      signal: ctrl.signal,
+      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }
     })
-    req.on('error', e => resolve({ error: e.message, code: e.code }))
-    req.setTimeout(5000, () => resolve({ error: 'timeout' }))
-    req.end()
-  })
-  res.json(result)
+    clearTimeout(timer)
+    results.http_status = r.status
+  } catch (e) {
+    results.http_error = e.message
+  }
+  res.json(results)
 })
 
 // Health checks (root + api path — Railway probes /)
