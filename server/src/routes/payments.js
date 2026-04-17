@@ -6,7 +6,10 @@ const { getUserById, updateUserById, getSupabase } = require('../supabase')
 
 const router = express.Router()
 
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_KEY_HERE')
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_KEY_HERE', {
+  apiVersion: '2024-06-20',
+  httpAgent: new (require('https').Agent)({ keepAlive: true }),
+})
 
 const PRICES = {
   monthly: process.env.STRIPE_PRICE_MONTHLY || 'price_monthly_placeholder',
