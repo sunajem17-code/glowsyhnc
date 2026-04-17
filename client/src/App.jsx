@@ -32,7 +32,7 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus } = useStore()
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -46,6 +46,15 @@ export default function App() {
   useEffect(() => {
     if (checkProTrial) checkProTrial()
   }, [])
+
+  // Refresh Pro status on startup and whenever app comes back to foreground
+  useEffect(() => {
+    if (!isAuthenticated) return
+    refreshProStatus()
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [isAuthenticated])
 
   if (!splashDone) {
     return <Splash onDone={() => setSplashDone(true)} />
