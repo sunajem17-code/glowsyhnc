@@ -13,38 +13,29 @@ const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3002
 
-// Middleware
+// ── Stripe webhook — MUST be first, before cors() and express.json() ─────────
+// express.raw() preserves the raw body bytes Stripe needs for signature verification.
+// If express.json() runs first, req.body becomes a parsed object and sig check fails.
+const paymentsRouter = require('./routes/payments')
+app.post('/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentsRouter.handleWebhook,
+)
+console.log('✅ Stripe webhook registered at /api/payments/webhook (raw body)')
+
+// ── General middleware ────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
-    // Allow all localhost ports in dev
     if (origin.startsWith('http://localhost:')) return callback(null, true)
-    // Allow all Vercel preview and production domains
     if (origin.endsWith('.vercel.app')) return callback(null, true)
-    // Allow ascendus.store (production custom domain)
     if (origin === 'https://ascendus.store' || origin === 'https://www.ascendus.store') return callback(null, true)
-    // Allow custom CLIENT_URL if set
     if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true)
     callback(new Error(`CORS blocked: ${origin}`))
   },
   credentials: true,
 }))
-// Stripe webhook needs the raw body bytes — read the stream directly before any JSON parsing.
-// For all other routes use normal express.json().
-app.use((req, res, next) => {
-  if (req.originalUrl === '/api/payments/webhook') {
-    const chunks = []
-    req.on('data', chunk => chunks.push(chunk))
-    req.on('end', () => {
-      req.rawBody = Buffer.concat(chunks)
-      next()
-    })
-    req.on('error', next)
-  } else {
-    express.json({ limit: '10mb' })(req, res, next)
-  }
-})
+app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded photos
@@ -60,7 +51,7 @@ app.use('/api/tasks', require('./routes/tasks'))
 app.use('/api/checkin', require('./routes/checkin'))
 app.use('/api/progress', require('./routes/progress'))
 app.use('/api/products', require('./routes/products'))
-app.use('/api/payments', require('./routes/payments'))
+app.use('/api/payments', paymentsRouter)
 app.use('/api/ai', require('./routes/aiScore'))
 app.use('/api/leaderboard', require('./routes/leaderboard'))
 app.use('/api/supabase',   require('./routes/supabaseRoutes'))
@@ -72,7 +63,6 @@ app.use('/api/referral',  require('./routes/referral'))
 app.get('/api/stripe-ping', async (req, res) => {
   const dns = require('dns').promises
   const results = {}
-  // Step 1: DNS
   try {
     const addrs = await dns.lookup('api.stripe.com')
     results.dns = addrs.address
@@ -80,7 +70,6 @@ app.get('/api/stripe-ping', async (req, res) => {
     results.dns_error = e.message
     return res.json(results)
   }
-  // Step 2: HTTP fetch with timeout
   try {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 5000)
@@ -96,7 +85,7 @@ app.get('/api/stripe-ping', async (req, res) => {
   res.json(results)
 })
 
-// Health checks (root + api path — Railway probes /)
+// Health checks
 app.get('/',          (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 app.get('/health',    (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 app.get('/api/health',(req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
