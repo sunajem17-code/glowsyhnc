@@ -15,7 +15,7 @@ function getReferralCode(user) {
 }
 
 function getReferralLink(code) {
-  return `https://ascendus.app/join?ref=${code}`
+  return `https://ascendus.store/join?ref=${code}`
 }
 
 export default function Referral() {

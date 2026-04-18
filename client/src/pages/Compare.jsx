@@ -408,7 +408,7 @@ async function drawCompareCard({ canvas, beforeScan, afterScan, beforePhoto, aft
   ctx.textAlign = 'center'
   ctx.font = '500 28px "Plus Jakarta Sans", Arial'
   ctx.fillStyle = 'rgba(255,255,255,0.22)'
-  ctx.fillText('Track your glow up at Ascendus', W / 2, H - 48)
+  ctx.fillText('ascendus.store', W / 2, H - 48)
   ctx.beginPath()
   ctx.arc(W / 2 + 216, H - 63, 5, 0, Math.PI * 2)
   ctx.fillStyle = '#C6A85C'
