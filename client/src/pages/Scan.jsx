@@ -424,14 +424,25 @@ export default function Scan() {
   function handleGenderSelect(g) { setLocalGender(g) }
 
   // Convert an image URL (blob: or data:) to base64 string
-  async function toBase64(url) {
+  async function toBase64(url, maxPx = 1024) {
     const res = await fetch(url)
     const blob = await res.blob()
+    // Resize large images via canvas before base64 encoding —
+    // camera photos can be 10MB+ which freezes the browser and exceeds Claude's limit
     return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result) // data:image/...;base64,...
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = reject
+      img.src = URL.createObjectURL(blob)
     })
   }
 
