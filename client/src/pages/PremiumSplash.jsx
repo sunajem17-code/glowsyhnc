@@ -90,7 +90,7 @@ export default function PremiumSplash({ onDone }) {
           marginBottom: 32,
         }}
       >
-        <img src={icon} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain' }} />
+        <img src={icon} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain', mixBlendMode: 'lighten', background: 'transparent' }} />
       </motion.div>
 
       {/* Welcome back, [name] */}
