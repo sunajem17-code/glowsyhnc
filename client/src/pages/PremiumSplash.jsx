@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import appIcon from '../assets/ascendus-icon.png'
+import appIcon from '../assets/ascendus-icon-transparent.png'
 
 const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
@@ -98,7 +98,6 @@ export default function PremiumSplash({ onDone }) {
             height: 120,
             borderRadius: 24,
             display: 'block',
-            mixBlendMode: 'lighten',
           }}
         />
       </motion.div>
