@@ -73,7 +73,11 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
 
 // ── Stripe webhook handler (exported so index.js can mount at /webhook) ──────
 async function handleWebhook(req, res) {
-  console.log('[Webhook] Received event — sig present:', !!req.headers['stripe-signature'])
+  console.log('=== [Webhook] REQUEST RECEIVED ===')
+  console.log('[Webhook] URL:', req.originalUrl)
+  console.log('[Webhook] Body type:', typeof req.body, '| Is Buffer:', Buffer.isBuffer(req.body), '| Length:', req.body?.length)
+  console.log('[Webhook] Sig header present:', !!req.headers['stripe-signature'])
+  console.log('[Webhook] STRIPE_WEBHOOK_SECRET set:', !!process.env.STRIPE_WEBHOOK_SECRET)
 
   const sig = req.headers['stripe-signature']
   const secret = process.env.STRIPE_WEBHOOK_SECRET
@@ -82,57 +86,80 @@ async function handleWebhook(req, res) {
   try {
     if (secret) {
       event = stripe.webhooks.constructEvent(req.body, sig, secret)
+      console.log('[Webhook] ✅ Signature verified')
     } else {
-      // No secret configured — parse raw buffer manually (dev only)
       const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body
       event = JSON.parse(raw)
-      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET set — skipping signature verification')
+      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET — skipping sig verification')
     }
   } catch (err) {
-    console.error('[Webhook] Signature verification failed:', err.message)
+    console.error('[Webhook] ❌ Signature verification FAILED:', err.message)
     return res.status(400).json({ error: `Webhook error: ${err.message}` })
   }
 
-  console.log('[Webhook] Event type:', event.type)
+  console.log('[Webhook] Event type:', event.type, '| Event id:', event.id)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     const userId = session.metadata?.userId
+    const customerEmail = session.customer_details?.email || session.customer_email || '(none)'
     const subscriptionId = session.subscription || null
-    console.log('[Webhook] checkout.session.completed userId:', userId, 'sub:', subscriptionId)
+    console.log('[Webhook] checkout.session.completed')
+    console.log('[Webhook]   userId from metadata:', userId)
+    console.log('[Webhook]   customer email:', customerEmail)
+    console.log('[Webhook]   subscriptionId:', subscriptionId)
+    console.log('[Webhook]   full metadata:', JSON.stringify(session.metadata))
+
     if (userId) {
+      // Update Supabase
       try {
-        await updateUserById(userId, {
+        const result = await updateUserById(userId, {
           subscription_tier: 'premium',
           is_pro: true,
           stripe_subscription_id: subscriptionId,
         })
-        console.log('[Webhook] ✅ Supabase updated for', userId)
-      } catch (e) { console.error('[Webhook] Supabase update failed:', e.message) }
+        console.log('[Webhook] ✅ Supabase update SUCCESS for userId:', userId)
+        console.log('[Webhook]   Supabase result:', JSON.stringify(result))
+      } catch (e) {
+        console.error('[Webhook] ❌ Supabase update FAILED:', e.message)
+        console.error('[Webhook]   Full error:', e)
+      }
+      // Update SQLite
       try {
         db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
           .run(subscriptionId, userId)
-      } catch {}
+        console.log('[Webhook] ✅ SQLite update done')
+      } catch (e) {
+        console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+      }
     } else {
-      console.error('[Webhook] ⚠️  No userId in session metadata — cannot activate premium')
-      console.error('[Webhook] session.metadata:', JSON.stringify(session.metadata))
+      console.error('[Webhook] ❌ NO userId in session metadata — cannot activate premium!')
+      console.error('[Webhook]   session.id:', session.id)
+      console.error('[Webhook]   session.customer:', session.customer)
+      console.error('[Webhook]   All metadata:', JSON.stringify(session.metadata))
     }
   }
 
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object
+    console.log('[Webhook] invoice.payment_succeeded | invoice.id:', invoice.id)
     let userId = invoice.metadata?.userId
+    console.log('[Webhook]   userId from invoice metadata:', userId)
     if (!userId && invoice.subscription) {
       try {
         const sub = await stripe.subscriptions.retrieve(invoice.subscription)
         userId = sub.metadata?.userId
-        console.log('[Webhook] invoice — userId from subscription metadata:', userId)
+        console.log('[Webhook]   userId from subscription metadata:', userId)
       } catch (e) { console.error('[Webhook] sub lookup failed:', e.message) }
     }
     if (userId) {
-      console.log('[Webhook] invoice.payment_succeeded userId:', userId)
-      try { await updateUserById(userId, { subscription_tier: 'premium', is_pro: true }) } catch {}
+      try {
+        await updateUserById(userId, { subscription_tier: 'premium', is_pro: true })
+        console.log('[Webhook] ✅ Supabase updated (invoice) for userId:', userId)
+      } catch (e) { console.error('[Webhook] ❌ Supabase update failed (invoice):', e.message) }
       try { db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId) } catch {}
+    } else {
+      console.error('[Webhook] ❌ Could not find userId for invoice:', invoice.id)
     }
   }
 
@@ -145,6 +172,7 @@ async function handleWebhook(req, res) {
     }
   }
 
+  console.log('=== [Webhook] DONE — responded { received: true } ===')
   res.json({ received: true })
 }
 
