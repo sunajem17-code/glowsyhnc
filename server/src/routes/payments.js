@@ -76,14 +76,14 @@ async function handleWebhook(req, res) {
   console.log('=== [Webhook] REQUEST RECEIVED ===')
   console.log('[Webhook] URL:', req.originalUrl)
   console.log('[Webhook] rawBody present:', !!req.rawBody, '| is Buffer:', Buffer.isBuffer(req.rawBody), '| length:', req.rawBody?.length)
-  console.log('[Webhook] Sig header present:', !!req.headers['stripe-signature'])
-  console.log('[Webhook] STRIPE_WEBHOOK_SECRET set:', !!process.env.STRIPE_WEBHOOK_SECRET)
-
   const sig = req.headers['stripe-signature']
-  const secret = process.env.STRIPE_WEBHOOK_SECRET
-
-  // req.rawBody is the raw Buffer captured by express.json's verify callback in index.js
+  const secret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim()
   const rawBody = req.rawBody
+
+  console.log('[Webhook] sig present:', !!sig)
+  console.log('[Webhook] secret length:', secret.length, '| starts with:', secret.slice(0, 12))
+  console.log('[Webhook] rawBody length:', rawBody?.length, '| is Buffer:', Buffer.isBuffer(rawBody))
+  console.log('[Webhook] rawBody preview:', rawBody?.slice(0, 80).toString())
 
   let event
   try {
