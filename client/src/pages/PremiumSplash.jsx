@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import icon from '../assets/ascendus-logo.svg'
+import icon from '../assets/ascendus-icon.svg'
 
 const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
