@@ -30,13 +30,21 @@ app.use(cors({
   },
   credentials: true,
 }))
-// Capture raw body for Stripe webhook signature verification.
-// The verify callback runs before JSON parsing — we store the raw Buffer
-// on req.rawBody so the webhook handler can use it even after express.json parses req.body.
-app.use(express.json({
-  limit: '10mb',
-  verify: (req, _res, buf) => { req.rawBody = buf },
-}))
+// Stripe webhook needs the raw body bytes — read the stream directly before any JSON parsing.
+// For all other routes use normal express.json().
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/payments/webhook') {
+    const chunks = []
+    req.on('data', chunk => chunks.push(chunk))
+    req.on('end', () => {
+      req.rawBody = Buffer.concat(chunks)
+      next()
+    })
+    req.on('error', next)
+  } else {
+    express.json({ limit: '10mb' })(req, res, next)
+  }
+})
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded photos
