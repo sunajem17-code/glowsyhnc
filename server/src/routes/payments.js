@@ -71,48 +71,62 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   }
 })
 
-// Stripe webhook — activates premium after successful payment
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+// ── Stripe webhook handler (exported so index.js can mount at /webhook) ──────
+async function handleWebhook(req, res) {
+  console.log('[Webhook] Received event — sig present:', !!req.headers['stripe-signature'])
+
   const sig = req.headers['stripe-signature']
   const secret = process.env.STRIPE_WEBHOOK_SECRET
 
   let event
   try {
-    event = secret
-      ? stripe.webhooks.constructEvent(req.body, sig, secret)
-      : JSON.parse(req.body)
+    if (secret) {
+      event = stripe.webhooks.constructEvent(req.body, sig, secret)
+    } else {
+      // No secret configured — parse raw buffer manually (dev only)
+      const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body
+      event = JSON.parse(raw)
+      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET set — skipping signature verification')
+    }
   } catch (err) {
+    console.error('[Webhook] Signature verification failed:', err.message)
     return res.status(400).json({ error: `Webhook error: ${err.message}` })
   }
+
+  console.log('[Webhook] Event type:', event.type)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     const userId = session.metadata?.userId
     const subscriptionId = session.subscription || null
+    console.log('[Webhook] checkout.session.completed userId:', userId, 'sub:', subscriptionId)
     if (userId) {
-      console.log('[Webhook] checkout.session.completed userId:', userId, 'sub:', subscriptionId)
       try {
         await updateUserById(userId, {
           subscription_tier: 'premium',
           is_pro: true,
           stripe_subscription_id: subscriptionId,
         })
+        console.log('[Webhook] ✅ Supabase updated for', userId)
       } catch (e) { console.error('[Webhook] Supabase update failed:', e.message) }
       try {
         db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
           .run(subscriptionId, userId)
       } catch {}
+    } else {
+      console.error('[Webhook] ⚠️  No userId in session metadata — cannot activate premium')
+      console.error('[Webhook] session.metadata:', JSON.stringify(session.metadata))
     }
   }
 
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object
-    // userId lives on the subscription metadata, not the invoice
     let userId = invoice.metadata?.userId
     if (!userId && invoice.subscription) {
       try {
         const sub = await stripe.subscriptions.retrieve(invoice.subscription)
         userId = sub.metadata?.userId
+        console.log('[Webhook] invoice — userId from subscription metadata:', userId)
       } catch (e) { console.error('[Webhook] sub lookup failed:', e.message) }
     }
     if (userId) {
@@ -124,6 +138,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   if (event.type === 'customer.subscription.deleted') {
     const userId = event.data.object.metadata?.userId
+    console.log('[Webhook] subscription.deleted userId:', userId)
     if (userId) {
       try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false, stripe_subscription_id: null }) } catch {}
       try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
@@ -131,7 +146,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   }
 
   res.json({ received: true })
-})
+}
+
+// Keep route in this router for /api/payments/webhook (raw body handled in index.js)
+router.post('/webhook', handleWebhook)
 
 // Open Stripe Customer Portal (manage/cancel subscription)
 router.post('/portal', authMiddleware, async (req, res) => {
@@ -171,4 +189,5 @@ router.get('/status', authMiddleware, async (req, res) => {
   res.json({ isPremium: tier === 'premium' || isPro })
 })
 
+router.handleWebhook = handleWebhook
 module.exports = router

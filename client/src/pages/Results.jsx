@@ -774,50 +774,112 @@ function PaywallSheet({ glowScore, onClose }) {
           ))}
         </div>
 
-        {/* Plan toggle */}
-        <div className="rounded-2xl p-1.5 mb-3" style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="grid grid-cols-2 gap-1">
-            {[
-              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$4.17/mo', save: 'SAVE 48%' },
-            ].map(({ key, label, price, save }) => (
-              <button key={key} onClick={() => setPlan(key)}
-                className="py-3 rounded-xl text-center transition-all"
-                style={{
-                  background: plan === key ? 'rgba(198,168,92,0.12)' : 'transparent',
-                  border: `1px solid ${plan === key ? 'rgba(198,168,92,0.35)' : 'transparent'}`,
-                }}>
-                <p className="text-[11px] font-heading font-bold" style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.35)' }}>{label}</p>
-                <p className="text-sm font-mono font-bold" style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.35)' }}>{price}</p>
-                {save && <span className="text-[9px] font-heading font-bold" style={{ color: '#C6A85C' }}>{save} ★</span>}
-              </button>
-            ))}
+        {/* Two-card paywall */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+
+          {/* ── Pro card ── */}
+          <div
+            className="flex flex-col rounded-2xl p-3.5"
+            style={{
+              background: 'rgba(198,168,92,0.07)',
+              border: '1.5px solid rgba(198,168,92,0.45)',
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>Pro</p>
+              <span
+                className="text-[8px] font-heading font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}
+              >
+                BEST VALUE
+              </span>
+            </div>
+
+            {/* Plan mini-toggle */}
+            <div className="rounded-xl p-1 mb-2.5" style={{ background: 'rgba(0,0,0,0.35)' }}>
+              <div className="grid grid-cols-2 gap-0.5">
+                {[
+                  { key: 'monthly', label: 'Mo', price: '$7.99' },
+                  { key: 'annual', label: 'Yr', price: '$49.99' },
+                ].map(({ key, label, price }) => (
+                  <button
+                    key={key}
+                    onClick={() => setPlan(key)}
+                    className="py-1.5 rounded-lg text-center transition-all"
+                    style={{
+                      background: plan === key ? 'rgba(198,168,92,0.2)' : 'transparent',
+                      border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
+                    }}
+                  >
+                    <p className="text-[9px] font-heading font-bold leading-none" style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.3)' }}>{label}</p>
+                    <p className="text-[11px] font-mono font-bold mt-0.5" style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.3)' }}>{price}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {plan === 'annual' && (
+              <p className="text-center text-[9px] font-heading font-bold mb-2" style={{ color: '#C6A85C' }}>
+                SAVE 48% ★
+              </p>
+            )}
+
+            {/* CTA */}
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => navigate('/premium')}
+              className="mt-auto w-full py-2.5 rounded-xl font-heading font-bold text-[12px]"
+              style={{
+                background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)',
+                color: '#0A0A0A',
+                boxShadow: '0 3px 16px rgba(198,168,92,0.35)',
+              }}
+            >
+              Unlock Pro
+            </motion.button>
+          </div>
+
+          {/* ── Free Trial card ── */}
+          <div
+            className="flex flex-col rounded-2xl p-3.5"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.09)',
+            }}
+          >
+            {/* Header */}
+            <div className="mb-2">
+              <p className="font-heading font-bold text-[13px] text-white">Try Free</p>
+            </div>
+
+            {/* Price info */}
+            <div className="mb-2.5 flex-1">
+              <p className="font-mono font-bold text-[22px] leading-none text-white mb-1">7 Days</p>
+              <p className="font-body text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                Share with<br />5 friends
+              </p>
+            </div>
+
+            {/* CTA */}
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => { onClose(); navigate('/referral') }}
+              className="mt-auto w-full py-2.5 rounded-xl font-heading font-bold text-[12px] border"
+              style={{
+                background: 'transparent',
+                color: '#C6A85C',
+                borderColor: 'rgba(198,168,92,0.45)',
+              }}
+            >
+              Get Free Trial
+            </motion.button>
           </div>
         </div>
 
-        {/* Primary CTA */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/premium')}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-2"
-          style={{
-            background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)',
-            color: '#0A0A0A',
-            boxShadow: '0 4px 24px rgba(198,168,92,0.3)',
-          }}
-        >
-          Start Free Trial →
-        </motion.button>
-        <p className="text-center text-[10px] font-body mb-4" style={{ color: 'rgba(255,255,255,0.25)' }}>
-          {plan === 'annual' ? 'Billed $49.99/year after 7-day trial' : 'Billed $7.99/month after 7-day trial'} · Cancel anytime
+        {/* Fine print */}
+        <p className="text-center text-[10px] font-body mb-4" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          Cancel anytime. No hidden fees.
         </p>
-
-        {/* Referral alternative */}
-        <button onClick={() => { onClose(); navigate('/referral') }}
-          className="w-full py-3 rounded-2xl font-heading font-bold text-[13px] border mb-3"
-          style={{ color: '#C6A85C', borderColor: 'rgba(198,168,92,0.25)', background: 'transparent' }}>
-          🎁 Share with 5 Friends → Get 7 Days Free
-        </button>
 
         {/* No thanks */}
         <button
