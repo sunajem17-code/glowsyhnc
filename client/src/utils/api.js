@@ -88,7 +88,7 @@ export const api = {
     recommended: () => request('/products/recommended'),
   },
   payments: {
-    createCheckout: (plan) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    createCheckout: (plan, noTrial = false) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan, noTrial }) }),
     portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
   },

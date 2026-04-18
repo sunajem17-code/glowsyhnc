@@ -447,8 +447,8 @@ export default function Scan() {
   }
 
   async function startAnalysis(skipBodyOverride = false) {
-    // Paywall check
-    if (!isPremium && scanCount >= 1) {
+    // Paywall check — free users get 1 scan per month
+    if (isFreeScanBlocked) {
       navigate('/premium')
       return
     }

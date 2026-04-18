@@ -18,7 +18,7 @@ const PRICES = {
 
 // Create Stripe Checkout session
 router.post('/create-checkout', authMiddleware, async (req, res) => {
-  const { plan } = req.body // 'monthly' | 'annual'
+  const { plan, noTrial } = req.body // plan: 'monthly' | 'annual', noTrial: bool
   if (!PRICES[plan]) return res.status(400).json({ error: 'Invalid plan' })
 
   // Look up user in Supabase (primary) or SQLite (fallback)
@@ -56,7 +56,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       mode: 'subscription',
       line_items: [{ price: PRICES[plan], quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
+        ...(noTrial ? {} : { trial_period_days: 2 }),
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },

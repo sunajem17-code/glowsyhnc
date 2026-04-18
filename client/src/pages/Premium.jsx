@@ -18,7 +18,7 @@ const TEXT = '#F0EDE8'
 const TEXT_DIM = '#4A4642'
 
 const FEATURES = [
-  { name: 'Face + Body Scan', free: true, premium: true },
+  { name: 'Face + Body Scan', free: '1/month', premium: 'Unlimited' },
   { name: 'Glow Score + Sub-Scores', free: true, premium: true },
   { name: 'Basic Recommendations', free: true, premium: true },
   { name: 'Full 12-Week Action Plan', free: 'First only', premium: true },
@@ -39,8 +39,9 @@ const TESTIMONIALS = [
 export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
-  const [plan, setPlan] = useState('annual')
-  const [subscribing, setSubscribing] = useState(false)
+  const [plan] = useState('monthly')
+  const [subscribingTrial, setSubscribingTrial] = useState(false)
+  const [subscribingNow, setSubscribingNow] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
 
@@ -54,7 +55,7 @@ export default function Premium() {
     }
   }, [searchParams, setIsPremium])
 
-  async function handleSubscribe() {
+  async function handleSubscribe(noTrial = false) {
     // Demo users must create a real account first
     const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
     const token = stored?.state?.token
@@ -62,10 +63,11 @@ export default function Premium() {
       setCheckoutError('Create a free account first to subscribe.')
       return
     }
-    setSubscribing(true)
+    if (noTrial) setSubscribingNow(true)
+    else setSubscribingTrial(true)
     setCheckoutError('')
     try {
-      const { url } = await api.payments.createCheckout(plan)
+      const { url } = await api.payments.createCheckout(plan, noTrial)
       window.location.href = url
     } catch (err) {
       const msg = err.message || ''
@@ -75,7 +77,8 @@ export default function Premium() {
       } else {
         setCheckoutError(msg || 'Could not start checkout — please try again.')
       }
-      setSubscribing(false)
+      setSubscribingNow(false)
+      setSubscribingTrial(false)
     }
   }
 
@@ -159,62 +162,14 @@ export default function Premium() {
 
       <div className="px-4">
 
-        {/* ── Plan Toggle ─────────────────────────────────────────────── */}
-        <div
-          className="rounded-2xl p-1.5 mb-4"
-          style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
-        >
-          <div className="grid grid-cols-2 gap-1">
-            {[
-              { key: 'monthly', label: 'Monthly', price: '$7.99/mo', save: '' },
-              { key: 'annual', label: 'Annual', price: '$49.99/yr', save: 'SAVE 48%' },
-            ].map(({ key, label, price, save }) => {
-              const isActive = plan === key
-              return (
-                <button
-                  key={key}
-                  onClick={() => setPlan(key)}
-                  className="py-3.5 rounded-xl text-center transition-all duration-200"
-                  style={{
-                    background: isActive ? `${GOLD}18` : 'transparent',
-                    border: `1px solid ${isActive ? GOLD_BORDER : 'transparent'}`,
-                  }}
-                >
-                  <p
-                    className="text-[11px] font-heading font-bold"
-                    style={{ color: isActive ? GOLD : TEXT_DIM }}
-                  >
-                    {label}
-                  </p>
-                  <p
-                    className="text-sm font-mono font-bold mt-0.5"
-                    style={{ color: isActive ? TEXT : TEXT_DIM }}
-                  >
-                    {price}
-                  </p>
-                  {save && (
-                    <span
-                      className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full mt-1 inline-block"
-                      style={{
-                        background: isActive ? `${GOLD}22` : 'rgba(255,255,255,0.05)',
-                        color: isActive ? GOLD : TEXT_DIM,
-                      }}
-                    >
-                      {save}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        {/* ── Two-option CTA ──────────────────────────────────────────── */}
 
-        {/* ── Primary CTA ─────────────────────────────────────────────── */}
+        {/* Option 1: 2-day free trial (primary) */}
         <motion.button
-          whileTap={{ scale: subscribing ? 1 : 0.97 }}
-          onClick={handleSubscribe}
-          disabled={subscribing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-2 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60"
+          whileTap={{ scale: subscribingTrial ? 1 : 0.97 }}
+          onClick={() => handleSubscribe(false)}
+          disabled={subscribingTrial || subscribingNow}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
             color: '#0A0A0A',
@@ -222,8 +177,36 @@ export default function Premium() {
             letterSpacing: '0.01em',
           }}
         >
-          {subscribing ? 'Opening checkout…' : plan === 'annual' ? 'Start for $49.99/year' : 'Start for $7.99/month'}
+          {subscribingTrial ? 'Opening checkout…' : '✦ Start 2-Day Free Trial'}
         </motion.button>
+        <p className="text-center text-[10px] font-body mb-4" style={{ color: TEXT_DIM }}>
+          Then $7.99/mo · Cancel anytime before trial ends
+        </p>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px" style={{ background: BORDER }} />
+          <span className="text-[10px] font-body uppercase tracking-widest" style={{ color: TEXT_DIM }}>or</span>
+          <div className="flex-1 h-px" style={{ background: BORDER }} />
+        </div>
+
+        {/* Option 2: Pay now (no trial) */}
+        <motion.button
+          whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
+          onClick={() => handleSubscribe(true)}
+          disabled={subscribingNow || subscribingTrial}
+          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] mb-1 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40"
+          style={{
+            background: `rgba(198,168,92,0.10)`,
+            border: `1px solid ${GOLD_BORDER}`,
+            color: GOLD,
+          }}
+        >
+          {subscribingNow ? 'Opening checkout…' : 'Pay $7.99/mo Now'}
+        </motion.button>
+        <p className="text-center text-[10px] font-body mb-6" style={{ color: TEXT_DIM }}>
+          Start immediately · No trial · Cancel anytime
+        </p>
 
         {checkoutError && (
           <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{checkoutError}</p>
@@ -243,10 +226,6 @@ export default function Premium() {
             </button>
           </div>
         )}
-
-        <p className="text-center text-[10px] font-body mb-7" style={{ color: TEXT_DIM }}>
-          Cancel anytime · No commitment · 7-day free trial
-        </p>
 
         {/* ── Feature Comparison ──────────────────────────────────────── */}
         <div
@@ -347,20 +326,20 @@ export default function Premium() {
 
         {/* ── Final CTA ───────────────────────────────────────────────── */}
         <motion.button
-          whileTap={{ scale: subscribing ? 1 : 0.97 }}
-          onClick={handleSubscribe}
-          disabled={subscribing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-3 transition-all duration-200 disabled:opacity-60"
+          whileTap={{ scale: subscribingTrial ? 1 : 0.97 }}
+          onClick={() => handleSubscribe(false)}
+          disabled={subscribingTrial || subscribingNow}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-1 transition-all duration-200 disabled:opacity-60"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
             color: '#0A0A0A',
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribing ? 'Opening checkout…' : 'Start My Free Trial →'}
+          {subscribingTrial ? 'Opening checkout…' : '✦ Start 2-Day Free Trial →'}
         </motion.button>
         <p className="text-center text-[10px] font-body pb-4" style={{ color: TEXT_DIM }}>
-          Billed {plan === 'annual' ? '$49.99/year (CAD/USD)' : '$7.99/month (CAD/USD)'} after 7-day trial. Cancel anytime in Settings.
+          $7.99/month after 2-day trial. Cancel anytime in Settings.
         </p>
         <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
           By subscribing you agree to our{' '}
