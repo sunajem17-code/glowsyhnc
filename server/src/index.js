@@ -13,17 +13,6 @@ const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3002
 
-// ── Stripe webhook — raw body MUST be parsed BEFORE express.json() ──────────
-// express.json() would destroy the raw bytes Stripe needs for signature verification.
-// Register these routes first; body-parser sets req._body=true so express.json() skips them.
-const paymentsRouter = require('./routes/payments')
-app.post(
-  ['/webhook', '/api/payments/webhook'],
-  express.raw({ type: 'application/json' }),
-  paymentsRouter.handleWebhook,
-)
-console.log('✅ Stripe webhook registered at /webhook and /api/payments/webhook')
-
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
@@ -41,7 +30,13 @@ app.use(cors({
   },
   credentials: true,
 }))
-app.use(express.json({ limit: '10mb' }))
+// Capture raw body for Stripe webhook signature verification.
+// The verify callback runs before JSON parsing — we store the raw Buffer
+// on req.rawBody so the webhook handler can use it even after express.json parses req.body.
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => { req.rawBody = buf },
+}))
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded photos
