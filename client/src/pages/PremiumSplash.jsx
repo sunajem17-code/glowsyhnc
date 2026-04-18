@@ -97,8 +97,8 @@ export default function PremiumSplash({ onDone }) {
             width: 120,
             height: 120,
             borderRadius: 24,
-            overflow: 'hidden',
             display: 'block',
+            mixBlendMode: 'lighten',
           }}
         />
       </motion.div>
