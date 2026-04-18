@@ -289,7 +289,7 @@ export default function Profile() {
 
   function handleShare() {
     const shareText = `I've been tracking my glow-up with Ascendus! My current score: ${latestScan?.glowScore ?? '—'}/100`
-    const shareUrl = 'https://ascendus.app'
+    const shareUrl = 'https://ascendus.store'
     if (navigator.share) {
       navigator.share({ title: 'Ascendus', text: shareText, url: shareUrl })
     } else {
@@ -298,7 +298,7 @@ export default function Profile() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText('https://ascendus.app')
+    navigator.clipboard.writeText('https://ascendus.store')
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -698,8 +698,8 @@ export default function Profile() {
 
               <p className="text-[13px] font-body mb-5" style={{ color: TEXT_DIM }}>
                 {latestScan
-                  ? `My Ascendus score is ${latestScan.glowScore}/100 — track your glow-up at ascendus.app`
-                  : 'Track your full-body glow-up at ascendus.app'}
+                  ? `My Ascendus score is ${latestScan.glowScore}/100 — track your glow-up at ascendus.store`
+                  : 'Track your full-body glow-up at ascendus.store'}
               </p>
 
               <div className="grid grid-cols-3 gap-3 mb-4">
@@ -709,14 +709,14 @@ export default function Profile() {
                     emoji: '𝕏',
                     bg: '#0A0A0A',
                     border: 'rgba(255,255,255,0.1)',
-                    action: () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I've been tracking my glow-up with Ascendus ${latestScan ? `My score: ${latestScan.glowScore}/100` : ''}\n\nascendus.app`)}`, '_blank'),
+                    action: () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I've been tracking my glow-up with Ascendus ${latestScan ? `My score: ${latestScan.glowScore}/100` : ''}\n\nascendus.store`)}`, '_blank'),
                   },
                   {
                     label: 'WhatsApp',
                     emoji: '💬',
                     bg: '#0D1F12',
                     border: 'rgba(37,211,102,0.2)',
-                    action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out Ascendus — the full-body glow-up tracker ascendus.app`)}`, '_blank'),
+                    action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out Ascendus — the full-body glow-up tracker ascendus.store`)}`, '_blank'),
                   },
                   {
                     label: 'Instagram',

@@ -339,7 +339,7 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.font          = '600 24px "Plus Jakarta Sans", Arial'
   ctx.fillStyle     = GOLD
   ctx.letterSpacing = '1px'
-  ctx.fillText('ascendus.app', W / 2, footY + 86)
+  ctx.fillText('ascendus.store', W / 2, footY + 86)
   ctx.letterSpacing = '0px'
 }
 
