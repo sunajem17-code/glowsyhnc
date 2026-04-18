@@ -273,6 +273,8 @@ export default function Profile() {
   const [rateOpen, setRateOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancellingDirect, setCancellingDirect] = useState(false)
+  const [cancelDirectError, setCancelDirectError] = useState('')
   const [copied, setCopied] = useState(false)
   const [rating, setRating] = useState(0)
   const [rated, setRated] = useState(false)
@@ -285,6 +287,18 @@ export default function Profile() {
   function handleLogout() {
     logout()
     navigate('/auth')
+  }
+
+  async function handleCancelDirect() {
+    setCancellingDirect(true)
+    setCancelDirectError('')
+    try {
+      const { url } = await api.payments.portal()
+      window.location.href = url
+    } catch (err) {
+      setCancelDirectError('Could not open billing portal. Try again or email support@ascendus.com.')
+      setCancellingDirect(false)
+    }
   }
 
   function handleShare() {
@@ -531,7 +545,7 @@ export default function Profile() {
               Start Free Trial →
             </motion.button>
             <p className="text-center text-[10px] font-body mt-2.5" style={{ color: TEXT_DIM }}>
-              7-day free trial · Cancel anytime
+              2-day free trial · Cancel anytime
             </p>
           </div>
         </motion.div>
@@ -560,12 +574,26 @@ export default function Profile() {
         />
         <div style={dividerStyle} />
         {isPremium ? (
-          <SettingsRow
-            icon={CreditCard}
-            label="Manage Subscription"
-            value="✦ Premium"
-            onClick={() => setCancelOpen(true)}
-          />
+          <>
+            <SettingsRow
+              icon={CreditCard}
+              label="Manage Subscription"
+              value="✦ Premium"
+              onClick={() => setCancelOpen(true)}
+            />
+            <div style={dividerStyle} />
+            <SettingsRow
+              icon={Trash2}
+              label={cancellingDirect ? 'Opening portal…' : 'Cancel Subscription'}
+              danger
+              onClick={handleCancelDirect}
+            />
+            {cancelDirectError && (
+              <p className="px-4 pb-2 text-[11px] font-body" style={{ color: '#EF4444' }}>
+                {cancelDirectError}
+              </p>
+            )}
+          </>
         ) : (
           <SettingsRow
             icon={CreditCard}
