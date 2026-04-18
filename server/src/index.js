@@ -13,6 +13,17 @@ const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3002
 
+// ── Stripe webhook — raw body MUST be parsed BEFORE express.json() ──────────
+// express.json() would destroy the raw bytes Stripe needs for signature verification.
+// Register these routes first; body-parser sets req._body=true so express.json() skips them.
+const paymentsRouter = require('./routes/payments')
+app.post(
+  ['/webhook', '/api/payments/webhook'],
+  express.raw({ type: 'application/json' }),
+  paymentsRouter.handleWebhook,
+)
+console.log('✅ Stripe webhook registered at /webhook and /api/payments/webhook')
+
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
