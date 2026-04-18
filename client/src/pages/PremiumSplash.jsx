@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import logo from '../assets/ascendus-logo.png'
+import icon from '../assets/ascendus-icon.png'
 
 const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
@@ -90,7 +90,7 @@ export default function PremiumSplash({ onDone }) {
           marginBottom: 32,
         }}
       >
-        <img src={logo} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain' }} />
+        <img src={icon} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain' }} />
       </motion.div>
 
       {/* Welcome back, [name] */}
@@ -165,7 +165,7 @@ export default function PremiumSplash({ onDone }) {
           letterSpacing: '0.01em',
         }}
       >
-        Your ascent continues.
+        Looksmax. Ascend. Dominate.
       </motion.p>
     </motion.div>
   )
