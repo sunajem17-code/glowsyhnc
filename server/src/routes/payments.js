@@ -78,24 +78,20 @@ async function handleWebhook(req, res) {
   console.log('[Webhook] rawBody present:', !!req.rawBody, '| is Buffer:', Buffer.isBuffer(req.rawBody), '| length:', req.rawBody?.length)
   const sig = req.headers['stripe-signature']
   const secret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim()
-  const rawBody = req.rawBody
 
+  // express.raw() sets req.body to a Buffer — that's what constructEvent needs
   console.log('[Webhook] sig present:', !!sig)
-  console.log('[Webhook] secret length:', secret.length, '| starts with:', secret.slice(0, 12))
-  console.log('[Webhook] rawBody length:', rawBody?.length, '| is Buffer:', Buffer.isBuffer(rawBody))
-  console.log('[Webhook] rawBody preview:', rawBody?.slice(0, 80).toString())
+  console.log('[Webhook] secret length:', secret.length, '| starts:', secret.slice(0, 12))
+  console.log('[Webhook] body is Buffer:', Buffer.isBuffer(req.body), '| length:', req.body?.length)
 
   let event
   try {
-    if (secret && rawBody) {
-      event = stripe.webhooks.constructEvent(rawBody, sig, secret)
+    if (secret) {
+      event = stripe.webhooks.constructEvent(req.body, sig, secret)
       console.log('[Webhook] ✅ Signature verified')
-    } else if (!secret) {
-      event = Buffer.isBuffer(rawBody) ? JSON.parse(rawBody.toString()) : req.body
-      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET — skipping sig verification')
     } else {
-      console.error('[Webhook] ❌ rawBody missing — express.json verify callback not firing')
-      return res.status(400).json({ error: 'Webhook raw body not captured' })
+      event = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body
+      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET — skipping sig verification')
     }
   } catch (err) {
     console.error('[Webhook] ❌ Signature verification FAILED:', err.message)
