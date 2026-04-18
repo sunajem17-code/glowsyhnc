@@ -558,7 +558,12 @@ export default function Scan() {
       navigate('/results')
     } catch (err) {
       console.error('[Scan] AI scoring failed:', err)
-      setError(err.message || 'AI scoring failed. Check that the server is running and the API key is set.')
+      const msg = err.message || ''
+      if (msg === 'AI_QUOTA_EXCEEDED' || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded')) {
+        setError('Our AI is taking a quick break. Please try again in a few minutes.')
+      } else {
+        setError(msg || 'Analysis failed — please try again.')
+      }
       setBodySkipped(false)
       setStep(2)
     }

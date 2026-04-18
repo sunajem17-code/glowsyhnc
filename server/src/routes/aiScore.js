@@ -442,7 +442,17 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     res.json(result)
   } catch (err) {
     console.error('[aiScore] Error:', err.message)
-    res.status(500).json({ error: err.message || 'AI scoring failed' })
+    const msg = err.message || ''
+    // Anthropic quota / rate-limit errors — don't leak raw API message to users
+    if (
+      msg.toLowerCase().includes('quota') ||
+      msg.toLowerCase().includes('rate limit') ||
+      msg.toLowerCase().includes('exceeded') ||
+      err.status === 429 || err.statusCode === 429
+    ) {
+      return res.status(503).json({ error: 'AI_QUOTA_EXCEEDED' })
+    }
+    res.status(500).json({ error: msg || 'AI scoring failed' })
   }
 })
 
