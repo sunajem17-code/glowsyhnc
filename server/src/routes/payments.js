@@ -75,22 +75,27 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
 async function handleWebhook(req, res) {
   console.log('=== [Webhook] REQUEST RECEIVED ===')
   console.log('[Webhook] URL:', req.originalUrl)
-  console.log('[Webhook] Body type:', typeof req.body, '| Is Buffer:', Buffer.isBuffer(req.body), '| Length:', req.body?.length)
+  console.log('[Webhook] rawBody present:', !!req.rawBody, '| is Buffer:', Buffer.isBuffer(req.rawBody), '| length:', req.rawBody?.length)
   console.log('[Webhook] Sig header present:', !!req.headers['stripe-signature'])
   console.log('[Webhook] STRIPE_WEBHOOK_SECRET set:', !!process.env.STRIPE_WEBHOOK_SECRET)
 
   const sig = req.headers['stripe-signature']
   const secret = process.env.STRIPE_WEBHOOK_SECRET
 
+  // req.rawBody is the raw Buffer captured by express.json's verify callback in index.js
+  const rawBody = req.rawBody
+
   let event
   try {
-    if (secret) {
-      event = stripe.webhooks.constructEvent(req.body, sig, secret)
+    if (secret && rawBody) {
+      event = stripe.webhooks.constructEvent(rawBody, sig, secret)
       console.log('[Webhook] ✅ Signature verified')
-    } else {
-      const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body
-      event = JSON.parse(raw)
+    } else if (!secret) {
+      event = Buffer.isBuffer(rawBody) ? JSON.parse(rawBody.toString()) : req.body
       console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET — skipping sig verification')
+    } else {
+      console.error('[Webhook] ❌ rawBody missing — express.json verify callback not firing')
+      return res.status(400).json({ error: 'Webhook raw body not captured' })
     }
   } catch (err) {
     console.error('[Webhook] ❌ Signature verification FAILED:', err.message)
