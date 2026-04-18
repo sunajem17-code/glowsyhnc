@@ -60,8 +60,8 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },
-      success_url: `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/payment-success`,
-      cancel_url:  `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/premium`,
+      success_url: `${req.headers.origin || process.env.CLIENT_URL || 'https://ascendus.store'}/payment-success`,
+      cancel_url:  `${req.headers.origin || process.env.CLIENT_URL || 'https://ascendus.store'}/premium`,
     })
     res.json({ url: session.url })
   } catch (err) {
@@ -196,7 +196,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.CLIENT_URL || 'https://glowsyhnc.vercel.app'}/profile`,
+      return_url: `${req.headers.origin || process.env.CLIENT_URL || 'https://ascendus.store'}/profile`,
     })
     res.json({ url: session.url })
   } catch (err) {
