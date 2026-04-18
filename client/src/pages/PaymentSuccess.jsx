@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
@@ -6,32 +6,44 @@ import { api } from '../utils/api'
 
 const GOLD = '#C6A85C'
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
+const SESSION_KEY = 'asc_pro_splash_shown'
 
 export default function PaymentSuccess() {
   const navigate = useNavigate()
   const { setIsPremium, isAuthenticated, refreshProStatus } = useStore()
+  const navigatedRef = useRef(false)
 
   useEffect(() => {
-    if (!isAuthenticated) return
-    let attempts = 0
-    const maxAttempts = 12 // poll for up to 24 seconds waiting for webhook
+    // Stripe only redirects here on successful payment — set premium immediately (optimistic)
+    setIsPremium(true)
+    // Mark the pro splash as already shown so it doesn't fire again on top of this page
+    sessionStorage.setItem(SESSION_KEY, '1')
 
-    const check = async () => {
-      try {
-        const { isPremium } = await api.payments.status()
-        if (isPremium) {
-          setIsPremium(true)
-          await refreshProStatus() // sync full user profile too
-          return // done
-        }
-      } catch {}
-      attempts++
-      if (attempts < maxAttempts) setTimeout(check, 2000)
+    // Background: confirm with server + sync profile (non-blocking)
+    if (isAuthenticated) {
+      refreshProStatus().catch(() => {})
+
+      let attempts = 0
+      const poll = async () => {
+        try {
+          const { isPremium } = await api.payments.status()
+          if (isPremium) { setIsPremium(true); return }
+        } catch {}
+        attempts++
+        if (attempts < 8) setTimeout(poll, 2500)
+      }
+      setTimeout(poll, 1500)
     }
 
-    // Small initial delay to let webhook fire
-    setTimeout(check, 1500)
-  }, [isAuthenticated, setIsPremium])
+    // Auto-navigate to dashboard after 2.8 s so user stays logged in
+    const t = setTimeout(() => {
+      if (!navigatedRef.current) {
+        navigatedRef.current = true
+        navigate('/', { replace: true })
+      }
+    }, 2800)
+    return () => clearTimeout(t)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -72,21 +84,36 @@ export default function PaymentSuccess() {
           className="font-body text-[14px] mb-10 max-w-xs leading-relaxed"
           style={{ color: 'rgba(255,255,255,0.45)' }}
         >
-          Your payment was successful. All premium features are now unlocked.
+          Payment confirmed. Taking you to your dashboard…
         </motion.p>
 
+        {/* Loading dots */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="flex items-center gap-2"
+        >
+          {[0, 1, 2].map(i => (
+            <motion.div
+              key={i}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: GOLD }}
+            />
+          ))}
+        </motion.div>
+
+        {/* Manual fallback button */}
         <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/', { replace: true })}
-          className="w-full max-w-xs py-4 rounded-2xl font-heading font-bold text-[15px]"
-          style={{
-            background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 50%, #A8893A 100%)`,
-            color: '#0A0A0A',
-            boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
-          }}
+          onClick={() => { navigatedRef.current = true; navigate('/', { replace: true }) }}
+          className="mt-8 font-body text-[13px] underline"
+          style={{ color: 'rgba(198,168,92,0.6)' }}
         >
           Go to Dashboard →
         </motion.button>
