@@ -251,8 +251,8 @@ export default function Progress() {
 
       {/* Transformation Reel */}
       <div
-        onClick={() => !isPremium ? navigate('/premium') : null}
-        className={`card mb-4 flex items-center gap-3 ${!isPremium ? 'cursor-pointer' : ''}`}
+        onClick={() => isPremium ? navigate('/compare') : navigate('/premium')}
+        className="card mb-4 flex items-center gap-3 cursor-pointer active:opacity-70 transition-opacity"
       >
         <div className="w-12 h-12 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
           <Video size={22} className="text-[#C6A85C]" />
@@ -266,7 +266,10 @@ export default function Progress() {
             Premium
           </span>
         ) : (
-          <button className="px-3 py-1.5 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white">
+          <button
+            onClick={e => { e.stopPropagation(); navigate('/compare') }}
+            className="px-3 py-1.5 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white"
+          >
             Generate
           </button>
         )}
