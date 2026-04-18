@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import icon from '../assets/ascendus-icon.png'
+import icon from '../assets/ascendus-logo.svg'
 
 const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
@@ -90,7 +90,7 @@ export default function PremiumSplash({ onDone }) {
           marginBottom: 32,
         }}
       >
-        <img src={icon} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain', mixBlendMode: 'lighten', background: 'transparent' }} />
+        <img src={icon} alt="Ascendus" style={{ width: 90, height: 90, objectFit: 'contain', background: 'transparent' }} />
       </motion.div>
 
       {/* Welcome back, [name] */}
