@@ -6,15 +6,27 @@ const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGa
 const router = express.Router()
 
 // ── Score cache: hash(face+body) → full result ────────────────────────────────
-// Prevents re-analyzing the same photos. Same photo = same score every time.
+// Prevents re-analyzing the EXACT same photos.
+// IMPORTANT: must sample start + middle + end — JPEG headers are identical across
+// photos from the same device, so slicing only the start caused everyone on the
+// same phone model to get the first user's cached score.
 const scoreCache = new Map()
+// Force-clear cache on every deploy so stale bad-key entries can't persist
+// (cache is in-memory only anyway — this is a no-op on fresh process starts)
+scoreCache.clear()
+
+function sampleB64(s) {
+  if (!s) return 'null'
+  const mid = Math.floor(s.length / 2)
+  // Start (after any header), middle, end, plus total length as uniqueness signal
+  return s.slice(200, 500) + '|' + s.slice(mid - 150, mid + 150) + '|' + s.slice(-300) + '|len=' + s.length
+}
 
 function hashImages(faceB64, bodyB64) {
-  // Hash first 1000 chars — enough to fingerprint the image, fast to compute
   return crypto.createHash('sha256')
-    .update(faceB64.slice(0, 1000) + '|' + bodyB64.slice(0, 1000))
+    .update(sampleB64(faceB64) + '||' + sampleB64(bodyB64))
     .digest('hex')
-    .slice(0, 20)
+    .slice(0, 24)
 }
 
 function getClient() {
@@ -327,8 +339,8 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     const faceBase64 = stripPrefix(faceImage)
 
     // ── Cache check — same photo always returns same score ─────────────────────
-    const cacheKeyRaw = skipBody ? faceBase64.slice(0, 1000) + '|SKIP' : faceBase64.slice(0, 1000) + '|' + stripPrefix(bodyImage).slice(0, 1000)
-    const cacheKey = crypto.createHash('sha256').update(cacheKeyRaw).digest('hex').slice(0, 20)
+    const bodyB64ForCache = skipBody ? null : stripPrefix(bodyImage)
+    const cacheKey = hashImages(faceBase64, bodyB64ForCache ?? 'SKIP')
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] Cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
