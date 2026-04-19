@@ -132,6 +132,15 @@ FACE SCORING — assess these features:
 - Facial thirds ratio (forehead : midface : lower face)
 - Skin quality and texture
 
+SKIN CLARITY SCORING (skin_clarity sub-score) — MANDATORY RULES:
+- Clear skin (no visible acne, scarring, blemishes, or hyperpigmentation) → MINIMUM 7.5/10
+- Mostly clear with minor texture or slight unevenness → 6.5–7.5/10
+- Some visible acne, active blemishes, or uneven skin tone → 5.0–6.5/10
+- Significant acne, acne scarring, or hyperpigmentation → below 5.0/10
+- CRITICAL: Clear smooth skin with no visible problems MUST score 7.5 or higher. Do NOT penalize healthy clear skin.
+- Only score below 7.5 if you can visibly see blemishes, acne, scarring, or skin texture problems in the photo.
+- If the skin appears smooth and even in tone, assume it is clear unless there is visible evidence otherwise.
+
 Facial structure tiers (strict):
 - "soft/round"  → no visible bone structure, round face, fat deposits on jaw: face_score MAX 5.0
 - "average"     → some definition, typical bone structure: face_score MAX 6.5
@@ -448,9 +457,9 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     const result = {
       overallScore:      final,
       faceScore:         Math.round(faceScore    * 10) / 10,
-      bodyScore:         Math.round(bodyScore     * 10) / 10,
+      bodyScore:         skipBody ? null : Math.round(bodyScore * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,
-      bodyFatLevel:      bodyResult.body_category.toLowerCase(),
+      bodyFatLevel:      skipBody ? null : bodyResult.body_category.toLowerCase(),
       bodySkipped:       skipBody || false,
       bodyFatCapApplied,
       tier,
@@ -464,7 +473,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         eyeArea:           r(faceSub.eye_area),
         facialHarmony:     r(faceSub.facial_harmony),
       },
-      bodySubScores: {
+      bodySubScores: skipBody ? null : {
         shoulderWaistRatio:  r(bodySub.shoulder_waist_ratio),
         posture:             r(bodySub.posture),
         postureGrade:        bodySub.posture_grade || null,
@@ -472,7 +481,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         bodyComposition:     r(bodySub.body_composition ?? bodyResult.body_score),
         compositionCategory: bodyResult.body_category,
       },
-      bodyDetail: bodyResult.detail ?? null,
+      bodyDetail: skipBody ? null : (bodyResult.detail ?? null),
       pillars: hasPillars ? {
         harmony:    Math.round(harmony    * 10) / 10,
         angularity: Math.round(angularity * 10) / 10,

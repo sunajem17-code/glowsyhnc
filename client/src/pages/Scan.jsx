@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api } from '../utils/api'
@@ -693,10 +693,19 @@ export default function Scan() {
               </button>
               <button
                 onClick={() => { setBodySkipped(true); startAnalysis(true) }}
-                className="w-full mt-2 py-3 font-body text-[13px] text-center"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
+                className="w-full mt-3 py-4 rounded-xl flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
+                style={{
+                  border: '1.5px solid rgba(201,168,76,0.55)',
+                  background: 'rgba(201,168,76,0.06)',
+                }}
               >
-                Skip for now — face only
+                <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
+                <div className="text-left">
+                  <p className="font-heading font-bold text-[14px] text-white leading-tight">Skip Body Scan</p>
+                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                    Score based on face only
+                  </p>
+                </div>
               </button>
             </>
           )}
