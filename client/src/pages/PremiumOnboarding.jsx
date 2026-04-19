@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -122,10 +122,35 @@ function OptionGrid({ options, selected, onSelect, cols = 2 }) {
 }
 
 function Slider({ label, unit, value, min, max, step = 1, onChange }) {
+  const trackRef = useRef(null)
+  const dragging = useRef(false)
   const pct = ((value - min) / (max - min)) * 100
+
+  function calcValue(clientX) {
+    const rect = trackRef.current.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const raw = min + ratio * (max - min)
+    return Math.max(min, Math.min(max, Math.round(raw / step) * step))
+  }
+
+  function onPointerDown(e) {
+    dragging.current = true
+    trackRef.current.setPointerCapture(e.pointerId)
+    onChange(calcValue(e.clientX))
+  }
+
+  function onPointerMove(e) {
+    if (!dragging.current) return
+    onChange(calcValue(e.clientX))
+  }
+
+  function onPointerUp() {
+    dragging.current = false
+  }
+
   return (
     <div className="mb-6">
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex items-baseline justify-between mb-4">
         <span className="text-[11px] font-heading font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>
           {label}
         </span>
@@ -133,23 +158,43 @@ function Slider({ label, unit, value, min, max, step = 1, onChange }) {
           {value}<span className="text-[14px] ml-1" style={{ color: 'rgba(198,168,92,0.55)' }}>{unit}</span>
         </span>
       </div>
-      <div className="relative h-[44px] flex items-center">
-        <div className="absolute inset-x-0 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }} />
-        <div className="absolute left-0 h-1 rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, #A8893A, ${G})` }} />
-        <input
-          type="range" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(Number(e.target.value))}
-          className="absolute inset-x-0 w-full opacity-0 h-[44px] cursor-pointer"
-          style={{ zIndex: 2 }}
-        />
+
+      {/* Track — pointer events handle both touch and mouse */}
+      <div
+        ref={trackRef}
+        className="relative flex items-center select-none"
+        style={{ height: 48, touchAction: 'none', cursor: 'pointer' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {/* Background track */}
+        <div className="absolute inset-x-0 rounded-full" style={{ height: 4, background: 'rgba(255,255,255,0.08)' }} />
+        {/* Filled track */}
         <div
-          className="absolute w-6 h-6 rounded-full border-2 pointer-events-none"
-          style={{ left: `calc(${pct}% - ${pct * 0.24}px - 2px)`, background: G, borderColor: BG, boxShadow: `0 0 12px rgba(198,168,92,0.5)`, zIndex: 1 }}
+          className="absolute left-0 rounded-full"
+          style={{ height: 4, width: `${pct}%`, background: `linear-gradient(90deg, #A8893A, ${G})` }}
+        />
+        {/* Thumb */}
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 28,
+            height: 28,
+            left: `${pct}%`,
+            transform: 'translateX(-50%)',
+            background: G,
+            border: `2.5px solid ${BG}`,
+            boxShadow: `0 0 0 4px rgba(198,168,92,0.18), 0 0 14px rgba(198,168,92,0.45)`,
+            pointerEvents: 'none',
+          }}
         />
       </div>
+
       <div className="flex justify-between mt-1">
-        <span className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>{min}{unit}</span>
-        <span className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>{max}{unit}</span>
+        <span className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>{min}</span>
+        <span className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>{max}</span>
       </div>
     </div>
   )
