@@ -886,8 +886,9 @@ function StepSocialProof({ onNext, onBack }) {
 // ── STEP 8: Height ─────────────────────────────────────────────────────────────
 function StepHeight({ data, onChange, onNext, onBack, units }) {
   const cm = data.height || 175
-  const feet = Math.floor(cm / 30.48)
-  const inches = Math.round((cm / 30.48 - feet) * 12)
+  let feet = Math.floor(cm / 30.48)
+  let inches = Math.round((cm / 30.48 - feet) * 12)
+  if (inches === 12) { feet += 1; inches = 0 }
 
   return (
     <div className="flex flex-col h-full px-6">
