@@ -1104,17 +1104,20 @@ export default function Results() {
   const skinScore = faceData?.skinClarity ?? null
   const skinCategory =
     skinScore == null ? null :
-    skinScore >= 8    ? 'Clear'         :
-    skinScore >= 6.5  ? 'Good'          :
-    skinScore >= 5    ? 'Fair'          :
+    skinScore >= 7.5  ? 'Clear'         :
+    skinScore >= 6.0  ? 'Good'          :
+    skinScore >= 4.5  ? 'Fair'          :
     skinScore >= 3.5  ? 'Blemish-Prone' : 'Problematic'
+  // Only flag issues for scores that actually indicate a problem.
+  // Clear skin (7.5+) gets NO problem tags — only maintenance messaging.
   const skinIssues = skinScore == null ? [] : [
-    skinScore < 6.5 ? 'acne'         : null,
-    skinScore < 5   ? 'scarring'      : null,
-    skinScore < 7   ? 'oiliness'      : null,
-    skinScore < 6   ? 'dark_circles'  : null,
-    skinScore < 8   ? 'dullness'      : null,
+    skinScore < 5.5 ? 'acne'         : null,
+    skinScore < 4.5 ? 'scarring'      : null,
+    skinScore < 6.0 ? 'oiliness'      : null,
+    skinScore < 5.0 ? 'dark_circles'  : null,
+    skinScore < 6.5 ? 'dullness'      : null,
   ].filter(Boolean)
+  const skinIsClear = skinScore != null && skinScore >= 7.5
   const skinPotential = skinScore != null ? Math.min(10, skinScore + (skinScore < 5 ? 2.5 : skinScore < 7 ? 1.8 : 1.2)).toFixed(1) : null
 
   const SKIN_INGREDIENTS = {
@@ -1156,7 +1159,12 @@ export default function Results() {
     }],
   }
 
-  const skinAMRoutine = [
+  const skinAMRoutine = skinIsClear ? [
+    'Gentle cleanser (CeraVe Hydrating or La Roche-Posay Toleriane)',
+    'Vitamin C serum 10–15% (maintains brightness and defends against sun damage)',
+    'Lightweight moisturizer',
+    'SPF 50 (your #1 long-term anti-aging tool — non-negotiable)',
+  ] : [
     'Gentle cleanser (CeraVe or La Roche-Posay)',
     skinIssues.includes('scarring')    ? 'Vitamin C serum 15%'           : null,
     skinIssues.includes('oiliness')    ? 'Niacinamide 10%'               : null,
@@ -1165,7 +1173,11 @@ export default function Results() {
     'SPF 50 (non-negotiable — all actives require sun protection)',
   ].filter(Boolean)
 
-  const skinPMRoutine = [
+  const skinPMRoutine = skinIsClear ? [
+    'Gentle cleanser',
+    'Retinol 0.025–0.05% 2×/week (preventative — maintains smooth texture long-term)',
+    'Peptide moisturizer (builds collagen, supports skin firmness)',
+  ] : [
     'Gentle cleanser',
     skinIssues.includes('acne')        ? 'Benzoyl Peroxide 2.5% (spot treatment or full face)' : null,
     skinIssues.includes('dullness')    ? 'AHA/glycolic acid 2–3×/week (alternate with retinol)' : null,
@@ -1323,27 +1335,16 @@ export default function Results() {
         )
       })()}
 
-      {/* ── Body photo missing banner ─────────────────────────────── */}
+      {/* ── Face-only label (replaces old banner — detail is in Body Analysis card) */}
       {bodySkipped && (
-        <button
-          onClick={() => navigate('/scan')}
-          className="w-full mb-4 px-4 py-3 rounded-2xl flex items-center gap-3 text-left"
-          style={{
-            background: 'linear-gradient(135deg, rgba(198,168,92,0.1) 0%, rgba(198,168,92,0.04) 100%)',
-            border: '1px solid rgba(198,168,92,0.3)',
-          }}
-        >
-          <span className="text-lg flex-shrink-0">📸</span>
-          <div className="flex-1 min-w-0">
-            <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>
-              Add a body photo to get your full score
-            </p>
-            <p className="font-body text-[11px] text-secondary leading-snug">
-              Your score currently uses face only (70%) + grooming (30%). Tap to rescan with body.
-            </p>
+        <div className="mb-3 flex justify-center">
+          <div
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-heading font-bold text-[10px] uppercase tracking-wide"
+            style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C' }}
+          >
+            📷 Face Score Only
           </div>
-          <ArrowRight size={14} style={{ color: '#C6A85C', flexShrink: 0 }} />
-        </button>
+        </div>
       )}
 
       {/* ── Score breakdown card ───────────────────────────────────── */}
@@ -1353,13 +1354,14 @@ export default function Results() {
           <div className="flex-1">
             <p className="font-heading font-bold text-base text-primary mb-0.5">Score Breakdown</p>
             <p className="text-xs text-secondary font-body leading-relaxed">
-              Face 55% · Body 35% · Appeal 10%
-              {aiScore?.bodyFatCapApplied && <span className="text-warning"> · Body cap applied</span>}
+              {bodySkipped
+                ? 'Face 70% · Appeal 30% · Body not scanned'
+                : <>Face 55% · Body 35% · Appeal 10%{aiScore?.bodyFatCapApplied && <span className="text-warning"> · Body cap applied</span>}</>}
             </p>
-            <div className="grid grid-cols-3 gap-2 mt-2.5">
+            <div className={`grid gap-2 mt-2.5 ${bodySkipped ? 'grid-cols-2' : 'grid-cols-3'}`}>
               {[
-                { label: 'Face', val: aiScore?.faceScore, color: '#1A6B5C' },
-                { label: 'Body', val: aiScore?.bodyScore, color: '#F5A623' },
+                { label: 'Face',   val: aiScore?.faceScore,    color: '#1A6B5C' },
+                ...(!bodySkipped ? [{ label: 'Body', val: aiScore?.bodyScore, color: '#F5A623' }] : []),
                 { label: 'Appeal', val: aiScore?.groomingScore, color: '#34C759' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="text-center">
@@ -1401,7 +1403,7 @@ export default function Results() {
           <div className="mt-2 flex items-center gap-2">
             <div className="flex-1 text-[10px] text-secondary font-body">
               Facial structure: <span className="font-bold capitalize text-primary">{facialStructure}</span>
-              {aiScore?.bodyFatLevel && <> · Body: <span className="font-bold capitalize text-primary">{aiScore.bodyFatLevel.replace('_', ' ')}</span></>}
+              {aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided' && <> · Body: <span className="font-bold capitalize text-primary">{aiScore.bodyFatLevel.replace('_', ' ')}</span></>}
             </div>
           </div>
         </Section>
@@ -1510,6 +1512,30 @@ export default function Results() {
 
       {/* ── Body Analysis ─────────────────────────────────────────── */}
       <Section title="Body Analysis" emoji="💪" defaultOpen={false}>
+        {bodySkipped ? (
+          /* ── Skipped state ── */
+          <div className="flex flex-col items-center justify-center py-5 text-center">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
+              style={{ background: 'rgba(201,168,76,0.09)', border: '1px solid rgba(201,168,76,0.22)' }}
+            >
+              <span className="text-2xl">📷</span>
+            </div>
+            <p className="font-heading font-bold text-sm text-primary mb-1">Body scan skipped</p>
+            <p className="font-body text-[11px] text-secondary leading-relaxed mb-4 max-w-[200px]">
+              Add a body photo to unlock V-taper, posture, and composition analysis — and get your complete score.
+            </p>
+            <button
+              onClick={() => navigate('/scan')}
+              className="px-6 py-2.5 rounded-xl font-heading font-bold text-[13px] text-black active:opacity-80 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}
+            >
+              Rescan with Body Photo →
+            </button>
+          </div>
+        ) : (
+        /* ── Full body data ── */
+        <>
         {/* Score overview */}
         <div className="mb-3 rounded-xl p-3" style={{ background: 'rgba(26,107,92,0.07)', border: '1px solid rgba(26,107,92,0.15)' }}>
           <p className="text-[9px] font-heading font-bold uppercase tracking-wide text-secondary mb-2">
@@ -1608,6 +1634,8 @@ export default function Results() {
             </p>
           </div>
         )}
+        </> /* end full body data */
+        )} {/* end bodySkipped ternary */}
       </Section>
 
       {/* ── Hairstyle Recommendations ─────────────────────────────── */}
@@ -1715,7 +1743,7 @@ export default function Results() {
           {/* Free: score + category */}
           <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
             <div className="text-center flex-shrink-0">
-              <div className="text-2xl font-mono font-bold" style={{ color: skinScore >= 7 ? '#34C759' : skinScore >= 5 ? '#F5A623' : '#E07A5F' }}>
+              <div className="text-2xl font-mono font-bold" style={{ color: skinScore >= 7.5 ? '#34C759' : skinScore >= 5 ? '#F5A623' : '#E07A5F' }}>
                 {skinScore.toFixed(1)}
               </div>
               <div className="text-[9px] font-body text-secondary">/10</div>
@@ -1723,11 +1751,13 @@ export default function Results() {
             <div className="flex-1">
               <p className="text-sm font-heading font-bold text-primary">{skinCategory}</p>
               <p className="text-[10px] text-secondary font-body leading-snug">
-                {skinIssues.length > 0
-                  ? `Detected: ${skinIssues.map(i => i.replace('_', ' ')).join(', ')}`
-                  : 'No major skin issues detected'}
+                {skinIsClear
+                  ? 'Your skin is in great condition. Focus on maintaining with SPF and hydration.'
+                  : skinIssues.length > 0
+                    ? `Detected: ${skinIssues.map(i => i.replace('_', ' ')).join(', ')}`
+                    : 'No major skin issues detected'}
               </p>
-              {skinPotential && (
+              {!skinIsClear && skinPotential && (
                 <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C' }}>
                   With this routine: {skinScore.toFixed(1)} → {skinPotential} skin score
                 </p>
@@ -1738,7 +1768,15 @@ export default function Results() {
           {/* Pro: full ingredient protocol */}
           {isPremium ? (
             <div className="space-y-4">
-              {skinIssues.length > 0 && skinIssues.map(issue => {
+              {skinIsClear && (
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(52,199,89,0.07)', border: '1px solid rgba(52,199,89,0.2)' }}>
+                  <p className="text-[11px] font-heading font-bold mb-1" style={{ color: '#34C759' }}>✓ Clear Skin Maintenance Protocol</p>
+                  <p className="text-[10px] text-secondary font-body leading-relaxed">
+                    Your skin is clear — the goal now is preservation, not treatment. Daily SPF 50 prevents photoaging (the #1 cause of visible skin decline). A low-dose retinol 2×/week maintains smooth texture over time. Vitamin C each morning fights oxidative damage and keeps tone even.
+                  </p>
+                </div>
+              )}
+              {!skinIsClear && skinIssues.map(issue => {
                 const ingredients = SKIN_INGREDIENTS[issue]
                 if (!ingredients) return null
                 const list = Array.isArray(ingredients) ? ingredients : [ingredients]

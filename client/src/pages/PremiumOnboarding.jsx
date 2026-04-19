@@ -121,7 +121,7 @@ function OptionGrid({ options, selected, onSelect, cols = 2 }) {
   )
 }
 
-function Slider({ label, unit, value, min, max, step = 1, onChange }) {
+function Slider({ label, unit, value, displayValue, min, max, step = 1, onChange }) {
   const trackRef = useRef(null)
   const dragging = useRef(false)
   const pct = ((value - min) / (max - min)) * 100
@@ -155,7 +155,7 @@ function Slider({ label, unit, value, min, max, step = 1, onChange }) {
           {label}
         </span>
         <span className="font-heading font-bold text-[30px]" style={{ color: G, letterSpacing: '-0.02em' }}>
-          {value}<span className="text-[14px] ml-1" style={{ color: 'rgba(198,168,92,0.55)' }}>{unit}</span>
+          {displayValue ?? value}<span className="text-[14px] ml-1" style={{ color: 'rgba(198,168,92,0.55)' }}>{unit}</span>
         </span>
       </div>
 
@@ -991,8 +991,9 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
 
         <Slider
           label="Weight"
-          unit={units === 'imperial' ? `lbs (${lbs})` : 'kg'}
+          unit={units === 'imperial' ? 'lbs' : 'kg'}
           value={kg}
+          displayValue={units === 'imperial' ? lbs : kg}
           min={40}
           max={180}
           onChange={v => onChange('weight', v)}
