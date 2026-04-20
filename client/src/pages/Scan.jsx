@@ -570,8 +570,16 @@ export default function Scan() {
     } catch (err) {
       console.error('[Scan] AI scoring failed:', err)
       const msg = err.message || ''
-      if (msg === 'AI_QUOTA_EXCEEDED' || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded')) {
-        setError('Our AI is taking a quick break. Please try again in a few minutes.')
+      const msgLower = msg.toLowerCase()
+      if (
+        msg === 'AI_QUOTA_EXCEEDED' ||
+        msgLower.includes('quota') ||
+        msgLower.includes('exceeded') ||
+        msgLower.includes('rate limit') ||
+        msgLower.includes('overloaded') ||
+        msgLower.includes('capacity')
+      ) {
+        setError('High demand right now — please wait 30 seconds and try again.')
       } else {
         setError(msg || 'Analysis failed — please try again.')
       }
