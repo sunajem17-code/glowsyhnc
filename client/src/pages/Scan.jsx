@@ -399,6 +399,24 @@ export default function Scan() {
   const [bodySkipped, setBodySkipped] = useState(false)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [error, setError] = useState('')
+  const [rateLimited, setRateLimited] = useState(false)
+  const [retryCountdown, setRetryCountdown] = useState(0)
+
+  // Keep a stable ref to startAnalysis so the countdown effect can call it
+  // without a stale closure (startAnalysis captures facePhoto/bodyPhoto).
+  const startAnalysisRef = useRef(null)
+
+  // Countdown → auto-retry when it hits 0
+  useEffect(() => {
+    if (!rateLimited) return
+    if (retryCountdown <= 0) {
+      setRateLimited(false)
+      startAnalysisRef.current?.()
+      return
+    }
+    const t = setTimeout(() => setRetryCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [rateLimited, retryCountdown])
 
   // Show paywall immediately if free scan already used this month
   if (isFreeScanBlocked) {
@@ -474,7 +492,7 @@ export default function Scan() {
       try {
         const scoreCall = api.ai.score({ faceImage: faceB64, ...(bodyB64 ? { bodyImage: bodyB64 } : {}), gender: g, skipBody: skip })
         const timeoutCall = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Analysis timed out — please try again')), 90_000)
+          setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
         )
         aiResult = await Promise.race([scoreCall, timeoutCall])
       } finally {
@@ -569,24 +587,21 @@ export default function Scan() {
       navigate('/results')
     } catch (err) {
       console.error('[Scan] AI scoring failed:', err)
-      const msg = err.message || ''
-      const msgLower = msg.toLowerCase()
-      if (
-        msg === 'AI_QUOTA_EXCEEDED' ||
-        msgLower.includes('quota') ||
-        msgLower.includes('exceeded') ||
-        msgLower.includes('rate limit') ||
-        msgLower.includes('overloaded') ||
-        msgLower.includes('capacity')
-      ) {
-        setError('High demand right now — please wait 30 seconds and try again.')
+      if (err.message === 'rate_limited') {
+        setRateLimited(true)
+        setRetryCountdown(err.retryAfter || 30)
+        setBodySkipped(false)
+        setStep(2)
       } else {
-        setError(msg || 'Analysis failed — please try again.')
+        setError(err.message || 'Analysis failed — please try again.')
+        setBodySkipped(false)
+        setStep(2)
       }
-      setBodySkipped(false)
-      setStep(2)
     }
   }
+
+  // Keep ref fresh each render so the countdown effect can call latest closure
+  startAnalysisRef.current = startAnalysis
 
   const isAnalyzing = step === 3
   const totalPhotoSteps = 2
@@ -656,8 +671,46 @@ export default function Scan() {
         </AnimatePresence>
       </div>
 
+      {/* Rate-limit countdown ring */}
+      {rateLimited && (
+        <div className="px-4 pb-2">
+          <div className="flex flex-col items-center gap-3 px-4 py-4 rounded-2xl border"
+            style={{ background: 'rgba(201,168,76,0.08)', borderColor: 'rgba(201,168,76,0.3)' }}>
+            <div className="relative w-16 h-16">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(201,168,76,0.2)" strokeWidth="4" />
+                <circle
+                  cx="32" cy="32" r="28"
+                  fill="none"
+                  stroke="#C6A85C"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 28}`}
+                  strokeDashoffset={`${2 * Math.PI * 28 * (retryCountdown / 30)}`}
+                  style={{ transition: 'stroke-dashoffset 1s linear' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-heading font-bold text-lg" style={{ color: '#C6A85C' }}>{retryCountdown}</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-heading font-bold text-primary">High demand right now</p>
+              <p className="text-xs text-secondary font-body mt-0.5">Auto-retrying in {retryCountdown}s…</p>
+            </div>
+            <button
+              onClick={() => { setRateLimited(false); startAnalysisRef.current?.() }}
+              className="text-xs font-heading font-bold px-5 py-2 rounded-xl active:opacity-70 transition-opacity"
+              style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}
+            >
+              Retry Now
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error */}
-      {error && (
+      {error && !rateLimited && (
         <div className="px-4 pb-2">
           <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
             <AlertCircle size={15} className="text-warning flex-shrink-0" />

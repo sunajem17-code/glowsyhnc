@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import AchievementToast from './AchievementToast'
 import useStore from '../store/useStore'
@@ -21,6 +21,11 @@ export default function Layout() {
       <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
+      <footer className="flex items-center justify-center gap-4 py-2 pb-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <Link to="/privacy" className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>Privacy Policy</Link>
+        <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 10 }}>·</span>
+        <Link to="/terms" className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>Terms of Service</Link>
+      </footer>
       <BottomNav />
     </div>
   )

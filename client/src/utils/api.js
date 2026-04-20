@@ -41,7 +41,10 @@ async function request(path, options = {}) {
       }
       throw new Error(errBody2.error || 'Invalid email or password')
     }
-    throw new Error(errBody.error || `Something went wrong (${res.status})`)
+    // Attach structured fields (retryAfter, etc.) to the thrown error
+    const err = new Error(errBody.error || `Something went wrong (${res.status})`)
+    if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
+    throw err
   }
   return res.json()
 }
@@ -54,6 +57,7 @@ export const api = {
   user: {
     profile: () => request('/user/profile'),
     update: (data) => request('/user/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    deleteAccount: () => request('/user/account', { method: 'DELETE' }),
   },
   scan: {
     upload: (formData) => {
