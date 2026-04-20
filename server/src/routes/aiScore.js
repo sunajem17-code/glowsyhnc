@@ -33,6 +33,34 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
 
+// ── Retry helper ──────────────────────────────────────────────────────────────
+// Retries fn up to maxRetries times on Anthropic 429 / overloaded responses.
+// Exponential backoff: 1 s → 2 s → 4 s (+ up to 500 ms jitter each time).
+// All other errors (bad key, invalid image, etc.) are thrown immediately.
+async function withRetry(fn, maxRetries = 3, baseDelayMs = 1000) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const status = err.status ?? err.statusCode ?? 0
+      const msg = (err.message || '').toLowerCase()
+      const isRetryable =
+        status === 429 ||
+        status === 529 ||
+        msg.includes('rate limit') ||
+        msg.includes('rate_limit') ||
+        msg.includes('overloaded') ||
+        msg.includes('capacity')
+
+      if (!isRetryable || attempt === maxRetries) throw err
+
+      const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500
+      console.warn(`[aiScore] Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms — reason: ${err.message?.slice(0, 80)}`)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+}
+
 function parseJSON(raw, label) {
   const match = raw.match(/\{[\s\S]*\}/)
   if (!match) throw new Error(`${label} returned non-JSON: ${raw.slice(0, 200)}`)
@@ -208,10 +236,11 @@ Return ONLY this JSON — no markdown, nothing else:
 
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
+// Uses claude-haiku-3-5 (10× higher rate limits than Opus; sufficient for structured matching).
 async function getCelebrityMatch(faceBase64, faceMediaType) {
   const client = getClient()
   const response = await client.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-haiku-3-5',
     max_tokens: 700,
     system: `You are a strict facial structure analyst. Your job is to match faces to celebrities based ONLY on measurable bone structure and physical features — never on vibes, fame, or flattery.
 
@@ -410,8 +439,8 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       // Only run face + celebrity — body defaults applied
       console.log('[aiScore] skipBody=true — running face + celebrity only...')
       ;[faceResult, celebResult] = await Promise.all([
-        getFaceScore(faceBase64, faceMediaType, gender),
-        getCelebrityMatch(faceBase64, faceMediaType).catch(err => {
+        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
+        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
           console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
           return null
         }),
@@ -432,9 +461,9 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       // Run body + face + celebrity calls in parallel — all fully independent
       console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
       ;[bodyResult, faceResult, celebResult] = await Promise.all([
-        getBodyScore(bodyBase64, bodyMediaType),
-        getFaceScore(faceBase64, faceMediaType, gender),
-        getCelebrityMatch(faceBase64, faceMediaType).catch(err => {
+        withRetry(() => getBodyScore(bodyBase64, bodyMediaType)),
+        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
+        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
           console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
           return null
         }),
