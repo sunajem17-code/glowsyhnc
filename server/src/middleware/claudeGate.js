@@ -96,9 +96,7 @@ async function scanLimit(req, res, next) {
   if (req.isDemo) {
     const allowed = checkLimit(req.userId, 'scan', 1, 60 * 60 * 1000)
     if (!allowed) {
-      return res.status(429).json({
-        error: 'Scan limit reached — create an account and upgrade to Pro for unlimited scans',
-      })
+      return res.status(429).json({ error: 'hourly_cap_reached', plan: 'demo' })
     }
     return next()
   }
@@ -106,9 +104,7 @@ async function scanLimit(req, res, next) {
   // Real free users: 3 scans per 24 hours
   const allowed = checkLimit(req.userId, 'scan', 3, 24 * 60 * 60 * 1000)
   if (!allowed) {
-    return res.status(429).json({
-      error: 'Free tier limit — max 3 scans per day. Upgrade to Pro for unlimited.',
-    })
+    return res.status(429).json({ error: 'hourly_cap_reached', plan: 'free' })
   }
   next()
 }
