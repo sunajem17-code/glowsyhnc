@@ -236,11 +236,11 @@ Return ONLY this JSON — no markdown, nothing else:
 
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
-// Uses claude-haiku-3-5 (10× higher rate limits than Opus; sufficient for structured matching).
+// Uses claude-3-5-haiku-20241022 (10× higher rate limits than Opus; sufficient for structured matching).
 async function getCelebrityMatch(faceBase64, faceMediaType) {
   const client = getClient()
   const response = await client.messages.create({
-    model: 'claude-haiku-3-5',
+    model: 'claude-3-5-haiku-20241022',
     max_tokens: 700,
     system: `You are a strict facial structure analyst. Your job is to match faces to celebrities based ONLY on measurable bone structure and physical features — never on vibes, fame, or flattery.
 
