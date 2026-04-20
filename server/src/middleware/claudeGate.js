@@ -74,12 +74,13 @@ function verifyToken(req, res, next) {
 }
 
 // ── 2. Claude call rate limit (all endpoints) ──────────────────────────────────
-// Max 10 Claude calls per user per hour
+// Pro users: 100 calls/hour  |  Free users: 25/hour  |  Demo: 5/hour
 function claudeLimit(req, res, next) {
-  const allowed = checkLimit(req.userId, 'claude', 10, 60 * 60 * 1000)
+  const max = req.isPro ? 100 : req.isDemo ? 5 : 25
+  const allowed = checkLimit(req.userId, 'claude', max, 60 * 60 * 1000)
   if (!allowed) {
     return res.status(429).json({
-      error: 'Rate limit reached — max 10 AI requests per hour',
+      error: `Rate limit reached — please try again in a few minutes`,
     })
   }
   next()
