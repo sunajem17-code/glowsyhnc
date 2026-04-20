@@ -54,6 +54,10 @@ export default function PrivacyPolicy() {
             <li><strong style={{ color: TEXT }}>Profile data:</strong> Height, weight, gender, hair type (optional)</li>
             <li><strong style={{ color: TEXT }}>Usage data:</strong> App activity, check-in history, streak data</li>
             <li><strong style={{ color: TEXT }}>Payment data:</strong> Processed by Stripe. We never store raw card details.</li>
+            <li><strong style={{ color: TEXT }}>Daily check-in data:</strong> Mood, water intake, skincare routine completions, and exercise logs. Collected to track your progress and personalize your looksmax plan over time.</li>
+            <li><strong style={{ color: TEXT }}>Leaderboard data:</strong> Your public display name and improvement score. Collected to power community rankings and displayed publicly to other Ascendus users.</li>
+            <li><strong style={{ color: TEXT }}>Referral data:</strong> Referral code and attribution (who referred you). Collected to track referrals and grant rewards accordingly.</li>
+            <li><strong style={{ color: TEXT }}>Consent record:</strong> A timestamp of when you accepted our Terms of Service and Privacy Policy (<code>consent_at</code>), and whether you granted AI photo analysis consent (<code>ai_consent</code>). Retained for legal compliance purposes.</li>
           </ul>
         </Section>
 
@@ -88,7 +92,7 @@ export default function PrivacyPolicy() {
             <li><strong style={{ color: TEXT }}>Delete account:</strong> Profile → Delete Account & Data</li>
             <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com — we will delete within 30 days</li>
           </ul>
-          <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law.</p>
+          <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law. Deletion may take up to 30 days to propagate through all systems including automated backups.</p>
         </Section>
 
         <Section title="5. Third-Party Services">
@@ -126,6 +130,7 @@ export default function PrivacyPolicy() {
             <li>JWT tokens for session management</li>
             <li>Row-level security (RLS) on all database tables</li>
             <li>API keys stored server-side only, never exposed to the browser</li>
+            <li>We use browser localStorage to store your session and scan results locally on your device</li>
           </ul>
         </Section>
 

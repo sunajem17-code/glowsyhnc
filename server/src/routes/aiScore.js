@@ -33,11 +33,37 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
 
+// ── Concurrency queue ─────────────────────────────────────────────────────────
+// At most MAX_CONCURRENT scoring requests run simultaneously.
+// Additional requests are queued (FIFO) and run as slots free up.
+const MAX_CONCURRENT = 2
+let _running = 0
+const _waiters = []
+
+function acquireSlot() {
+  return new Promise(resolve => {
+    if (_running < MAX_CONCURRENT) {
+      _running++
+      resolve()
+    } else {
+      console.log(`[aiScore] Queue: ${_waiters.length + 1} request(s) waiting (${_running}/${MAX_CONCURRENT} running)`)
+      _waiters.push(resolve)
+    }
+  })
+}
+
+function releaseSlot() {
+  if (_waiters.length > 0) {
+    _waiters.shift()() // hand slot to next waiter
+  } else {
+    _running--
+  }
+}
+
 // ── Retry helper ──────────────────────────────────────────────────────────────
-// Retries fn up to maxRetries times on Anthropic 429 / overloaded responses.
-// Exponential backoff: 1 s → 2 s → 4 s (+ up to 500 ms jitter each time).
-// All other errors (bad key, invalid image, etc.) are thrown immediately.
-async function withRetry(fn, maxRetries = 3, baseDelayMs = 1000) {
+// Retries fn up to 3 times on Anthropic 429 / 529 / overloaded responses.
+// Backoff: 2 s → 4 s → 8 s (+ up to 500 ms jitter). Other errors throw immediately.
+async function withRetry(fn, maxRetries = 3, baseDelayMs = 2000) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn()
@@ -55,7 +81,7 @@ async function withRetry(fn, maxRetries = 3, baseDelayMs = 1000) {
       if (!isRetryable || attempt === maxRetries) throw err
 
       const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500
-      console.warn(`[aiScore] Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms — reason: ${err.message?.slice(0, 80)}`)
+      console.warn(`[aiScore] Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms — ${err.message?.slice(0, 80)}`)
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
@@ -407,6 +433,7 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
 // verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
 // resolvePro sets req.isPro so scanLimit can skip the cap for Pro users.
 router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  await acquireSlot()
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey || apiKey.trim() === '') {
@@ -541,17 +568,20 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     res.json(result)
   } catch (err) {
     console.error('[aiScore] Error:', err.message)
-    const msg = err.message || ''
-    // Anthropic quota / rate-limit errors — don't leak raw API message to users
-    if (
-      msg.toLowerCase().includes('quota') ||
-      msg.toLowerCase().includes('rate limit') ||
-      msg.toLowerCase().includes('exceeded') ||
-      err.status === 429 || err.statusCode === 429
-    ) {
-      return res.status(503).json({ error: 'AI_QUOTA_EXCEEDED' })
+    const msg = (err.message || '').toLowerCase()
+    const status = err.status ?? err.statusCode ?? 0
+    const isRateLimit =
+      status === 429 || status === 529 ||
+      msg.includes('quota') || msg.includes('rate limit') ||
+      msg.includes('rate_limit') || msg.includes('exceeded') ||
+      msg.includes('overloaded') || msg.includes('capacity')
+
+    if (isRateLimit) {
+      return res.status(429).json({ error: 'rate_limited', retryAfter: 30 })
     }
-    res.status(500).json({ error: msg || 'AI scoring failed' })
+    res.status(500).json({ error: err.message || 'AI scoring failed' })
+  } finally {
+    releaseSlot()
   }
 })
 

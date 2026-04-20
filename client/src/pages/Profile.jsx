@@ -280,6 +280,9 @@ export default function Profile() {
   const [rated, setRated] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [dataDeleted, setDataDeleted] = useState(false)
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteAccountError, setDeleteAccountError] = useState('')
 
   const bestScore = scans.length > 0 ? Math.max(...scans.map(s => s.glowScore)) : 0
   const latestScan = scans[0]
@@ -287,6 +290,19 @@ export default function Profile() {
   function handleLogout() {
     logout()
     navigate('/auth')
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true)
+    setDeleteAccountError('')
+    try {
+      await api.user.deleteAccount()
+      logout()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setDeleteAccountError(err.message || 'Deletion failed. Try again or email support@ascendus.com.')
+      setDeletingAccount(false)
+    }
   }
 
   async function handleCancelDirect() {
@@ -673,12 +689,7 @@ export default function Profile() {
         <SettingsRow
           icon={Trash2}
           label="Delete Account & Data"
-          onClick={() => {
-            if (confirm('Are you sure? This permanently deletes all your data.')) {
-              logout()
-              navigate('/auth')
-            }
-          }}
+          onClick={() => { setDeleteAccountOpen(true); setDeleteAccountError('') }}
           danger
         />
       </motion.div>
@@ -1065,6 +1076,109 @@ export default function Profile() {
       <AnimatePresence>
         {cancelOpen && (
           <CancelModal onClose={() => setCancelOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Account Modal ──────────────────────────────────── */}
+      <AnimatePresence>
+        {deleteAccountOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+              className="w-full rounded-t-3xl"
+              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none' }}
+            >
+              {/* Handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
+              </div>
+
+              <div className="px-5 pt-4 pb-10">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <Trash2 size={16} style={{ color: '#EF4444' }} />
+                    </div>
+                    <h3 className="font-heading font-bold text-[18px] text-white">Delete Account</h3>
+                  </div>
+                  <button
+                    onClick={() => !deletingAccount && setDeleteAccountOpen(false)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: 'rgba(255,255,255,0.08)' }}
+                  >
+                    <X size={15} className="text-white" />
+                  </button>
+                </div>
+
+                {/* Warning box */}
+                <div className="rounded-2xl px-4 py-4 mb-5"
+                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                  <p className="font-heading font-bold text-[13px] mb-2" style={{ color: '#EF4444' }}>
+                    This is permanent and cannot be undone.
+                  </p>
+                  <ul className="space-y-1.5">
+                    {[
+                      'Your account and login will be deleted',
+                      'All scans, scores, and progress history',
+                      'Your 12-week plan and check-in streak',
+                      'Your active subscription will be cancelled',
+                    ].map(line => (
+                      <li key={line} className="flex items-start gap-2">
+                        <span className="mt-0.5 text-[10px]" style={{ color: 'rgba(239,68,68,0.7)' }}>✕</span>
+                        <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Error message */}
+                {deleteAccountError && (
+                  <p className="font-body text-[11px] mb-3 text-center" style={{ color: '#EF4444' }}>
+                    {deleteAccountError}
+                  </p>
+                )}
+
+                {/* Buttons */}
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount}
+                  className="w-full py-4 rounded-2xl font-heading font-bold text-[14px] mb-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: '#EF4444', color: 'white' }}
+                >
+                  {deletingAccount ? (
+                    <>
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="inline-block"
+                        style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
+                      />
+                      Deleting…
+                    </>
+                  ) : 'Yes, Delete Everything'}
+                </button>
+                <button
+                  onClick={() => setDeleteAccountOpen(false)}
+                  disabled={deletingAccount}
+                  className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px]"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </MotionPage>
