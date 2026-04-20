@@ -401,6 +401,8 @@ export default function Scan() {
   const [error, setError] = useState('')
   const [rateLimited, setRateLimited] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
+  const [scanCapReached, setScanCapReached] = useState(false)
+  const [scanCapPlan, setScanCapPlan] = useState('free')
 
   // Keep a stable ref to startAnalysis so the countdown effect can call it
   // without a stale closure (startAnalysis captures facePhoto/bodyPhoto).
@@ -587,7 +589,12 @@ export default function Scan() {
       navigate('/results')
     } catch (err) {
       console.error('[Scan] AI scoring failed:', err)
-      if (err.message === 'rate_limited') {
+      if (err.message === 'hourly_cap_reached') {
+        setScanCapPlan(err.plan || 'free')
+        setScanCapReached(true)
+        setBodySkipped(false)
+        setStep(2)
+      } else if (err.message === 'rate_limited') {
         setRateLimited(true)
         setRetryCountdown(err.retryAfter || 30)
         setBodySkipped(false)
@@ -670,6 +677,58 @@ export default function Scan() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Scan-cap upgrade modal */}
+      {scanCapReached && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-8"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}>
+          <motion.div
+            initial={{ y: 60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 60, opacity: 0 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+            className="w-full max-w-sm rounded-3xl overflow-hidden"
+            style={{ background: 'var(--card)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            {/* Gold accent bar */}
+            <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }} />
+
+            <div className="px-6 pt-6 pb-7 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: 'rgba(201,168,76,0.12)' }}>
+                🔒
+              </div>
+
+              <div>
+                <h3 className="font-heading font-bold text-lg text-primary leading-snug">
+                  {scanCapPlan === 'demo'
+                    ? "Demo scan limit reached"
+                    : "Free scan limit reached"}
+                </h3>
+                <p className="text-sm text-secondary font-body mt-2 leading-relaxed">
+                  {scanCapPlan === 'demo'
+                    ? "Create a free account to get more scans, or upgrade to Pro for unlimited access."
+                    : "You've hit your free scan limit for this period. Upgrade to Pro for unlimited scans."}
+                </p>
+              </div>
+
+              <button
+                onClick={() => { setScanCapReached(false); navigate('/premium') }}
+                className="btn-amber w-full"
+              >
+                Upgrade to Pro →
+              </button>
+
+              <button
+                onClick={() => setScanCapReached(false)}
+                className="text-sm font-heading font-bold text-secondary active:opacity-60 transition-opacity"
+              >
+                Remind me later
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Rate-limit countdown ring */}
       {rateLimited && (
