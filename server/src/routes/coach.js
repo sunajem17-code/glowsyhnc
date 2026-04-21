@@ -138,7 +138,7 @@ router.post('/message', verifyToken, requirePro, claudeLimit, async (req, res) =
     const systemPrompt = buildSystemPrompt(scanContext)
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-5',
       max_tokens: 400,
       system: systemPrompt,
       messages: recentMessages.map(m => ({
