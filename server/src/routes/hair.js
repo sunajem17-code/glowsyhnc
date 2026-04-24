@@ -24,7 +24,7 @@ router.post('/analyze', verifyToken, requirePro, claudeLimit, async (req, res) =
     const client = getClient()
 
     const message = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-5',
+      model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
       max_tokens: 1200,
       messages: [{
         role: 'user',
