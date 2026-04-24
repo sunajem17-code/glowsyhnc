@@ -144,23 +144,99 @@ async function handleWebhook(req, res) {
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object
     console.log('[Webhook] invoice.payment_succeeded | invoice.id:', invoice.id)
-    let userId = invoice.metadata?.userId
-    console.log('[Webhook]   userId from invoice metadata:', userId)
+    console.log('[Webhook]   invoice.customer:', invoice.customer)
+    console.log('[Webhook]   invoice.subscription:', invoice.subscription)
+    console.log('[Webhook]   invoice.metadata:', JSON.stringify(invoice.metadata))
+
+    let userId = null
+    let resolvedBy = null
+
+    // ── Step 1: invoice metadata ──────────────────────────────────────────────
+    userId = invoice.metadata?.userId || null
+    if (userId) {
+      resolvedBy = 'invoice.metadata'
+      console.log('[Webhook]   ✅ Step 1 — userId from invoice metadata:', userId)
+    } else {
+      console.log('[Webhook]   ⬜ Step 1 — no userId in invoice metadata')
+    }
+
+    // ── Step 2: subscription metadata ────────────────────────────────────────
     if (!userId && invoice.subscription) {
+      console.log('[Webhook]   🔍 Step 2 — looking up subscription:', invoice.subscription)
       try {
         const sub = await stripe.subscriptions.retrieve(invoice.subscription)
-        userId = sub.metadata?.userId
-        console.log('[Webhook]   userId from subscription metadata:', userId)
-      } catch (e) { console.error('[Webhook] sub lookup failed:', e.message) }
+        userId = sub.metadata?.userId || null
+        if (userId) {
+          resolvedBy = 'subscription.metadata'
+          console.log('[Webhook]   ✅ Step 2 — userId from subscription metadata:', userId)
+        } else {
+          console.log('[Webhook]   ⬜ Step 2 — no userId in subscription metadata:', JSON.stringify(sub.metadata))
+        }
+      } catch (e) {
+        console.error('[Webhook]   ❌ Step 2 — subscription lookup failed:', e.message)
+      }
     }
+
+    // ── Step 3: Stripe customer metadata ─────────────────────────────────────
+    if (!userId && invoice.customer) {
+      console.log('[Webhook]   🔍 Step 3 — looking up Stripe customer:', invoice.customer)
+      try {
+        const customer = await stripe.customers.retrieve(invoice.customer)
+        userId = customer.metadata?.userId || null
+        if (userId) {
+          resolvedBy = 'customer.metadata'
+          console.log('[Webhook]   ✅ Step 3 — userId from customer metadata:', userId)
+        } else {
+          console.log('[Webhook]   ⬜ Step 3 — no userId in customer metadata:', JSON.stringify(customer.metadata))
+        }
+      } catch (e) {
+        console.error('[Webhook]   ❌ Step 3 — customer lookup failed:', e.message)
+      }
+    }
+
+    // ── Step 4: Supabase lookup by stripe_customer_id ─────────────────────────
+    if (!userId && invoice.customer) {
+      console.log('[Webhook]   🔍 Step 4 — querying Supabase by stripe_customer_id:', invoice.customer)
+      try {
+        const supabase = getSupabase()
+        const { data, error } = await supabase
+          .from('users')
+          .select('id')
+          .eq('stripe_customer_id', invoice.customer)
+          .limit(1)
+          .single()
+        if (error) {
+          console.log('[Webhook]   ⬜ Step 4 — Supabase query returned no match:', error.message)
+        } else if (data?.id) {
+          userId = data.id
+          resolvedBy = 'supabase.stripe_customer_id'
+          console.log('[Webhook]   ✅ Step 4 — userId from Supabase by stripe_customer_id:', userId)
+        } else {
+          console.log('[Webhook]   ⬜ Step 4 — no matching user in Supabase for customer:', invoice.customer)
+        }
+      } catch (e) {
+        console.error('[Webhook]   ❌ Step 4 — Supabase lookup failed:', e.message)
+      }
+    }
+
+    // ── Apply update or log failure ───────────────────────────────────────────
     if (userId) {
+      console.log('[Webhook]   userId resolved via:', resolvedBy)
       try {
         await updateUserById(userId, { subscription_tier: 'premium', is_pro: true })
         console.log('[Webhook] ✅ Supabase updated (invoice) for userId:', userId)
-      } catch (e) { console.error('[Webhook] ❌ Supabase update failed (invoice):', e.message) }
-      try { db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId) } catch {}
+      } catch (e) {
+        console.error('[Webhook] ❌ Supabase update failed (invoice):', e.message)
+      }
+      try {
+        db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId)
+        console.log('[Webhook] ✅ SQLite updated (invoice) for userId:', userId)
+      } catch (e) {
+        console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+      }
     } else {
-      console.error('[Webhook] ❌ Could not find userId for invoice:', invoice.id)
+      console.error('[Webhook] ❌ All 4 fallbacks exhausted — could not find userId for invoice:', invoice.id)
+      console.error('[Webhook]   customer:', invoice.customer, '| subscription:', invoice.subscription)
     }
   }
 
