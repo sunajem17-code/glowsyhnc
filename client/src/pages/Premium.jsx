@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, X, ChevronLeft, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -120,6 +121,11 @@ export default function Premium() {
 
   return (
     <div className="page-scroll-full" style={{ background: SURFACE }}>
+      <Helmet>
+        <title>Ascendus Pro — Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
+        <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, celebrity lookalikes, body composition scores, and a personalized looksmax plan. Start your glow up today." />
+        <meta name="keywords" content="looksmax pro, face rating app, glow up tracker, AI appearance score, looksmaxxing app, unlimited scans" />
+      </Helmet>
 
       {/* ── Hero Header ─────────────────────────────────────────────── */}
       <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden">
