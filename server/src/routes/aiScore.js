@@ -172,7 +172,7 @@ async function getFaceScore(faceBase64, faceMediaType, gender) {
   const client = getClient()
   const isFemale = gender === 'female'
   const response = await client.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-5',
     max_tokens: 600,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
