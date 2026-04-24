@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Helmet } from 'react-helmet-async'
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -106,6 +107,11 @@ export default function Leaderboard() {
 
   return (
     <MotionPage className="px-4">
+      <Helmet>
+        <title>Looksmax Leaderboard — Most Improved This Week | Ascendus</title>
+        <meta name="description" content="See who's glowing up the most this week. Compare your AI appearance score against others and climb the weekly looksmax leaderboard." />
+        <meta name="keywords" content="looksmax leaderboard, glow up ranking, face rating leaderboard, most improved, appearance score rank" />
+      </Helmet>
       <PageHeader
         title="Most Improved 🏆"
         subtitle="This week · Anonymous · Resets Monday"

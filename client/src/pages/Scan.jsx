@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -616,6 +617,11 @@ export default function Scan() {
 
   return (
     <div className="flex flex-col h-full bg-page">
+      <Helmet>
+        <title>AI Face Rating &amp; Looksmax Scan — Ascendus</title>
+        <meta name="description" content="Upload your photo for an instant AI face rating, body composition score, and celebrity lookalike match. Get your free looksmax scan in under 60 seconds." />
+        <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
+      </Helmet>
       {/* Header */}
       {!isAnalyzing && (
         <PageHeader

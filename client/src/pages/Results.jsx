@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -1289,6 +1290,11 @@ export default function Results() {
 
   return (
     <>
+    <Helmet>
+      <title>Your AI Appearance Score &amp; Looksmax Results — Ascendus</title>
+      <meta name="description" content="See your AI face rating, body composition score, celebrity lookalike matches, and a personalized 12-week looksmax plan built around your results." />
+      <meta name="keywords" content="face rating results, AI appearance score, looksmax results, celebrity lookalike, glow up plan, body score" />
+    </Helmet>
     {/* Score reveal overlay — shown once for fresh scans */}
     {showReveal && !revealDone && (
       <ScoreReveal
