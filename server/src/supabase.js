@@ -80,6 +80,61 @@ function isConfigured() {
   return getSupabase() !== null
 }
 
+// ── Scan cache helpers ────────────────────────────────────────────────────────
+// Persistent L2 cache backed by the scan_cache Supabase table.
+// TTL: 7 days. Falls back silently if Supabase is unavailable.
+// Table DDL: server/migrations/001_create_scan_cache.sql
+
+const SCAN_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days in ms
+
+/**
+ * Look up a cached scan result by its image hash.
+ * Returns the cached result object, or null on miss / stale / error.
+ */
+async function getScanCache(imageHash) {
+  const sb = getSupabase()
+  if (!sb) return null
+  try {
+    const { data, error } = await sb
+      .from('scan_cache')
+      .select('result, created_at')
+      .eq('image_hash', imageHash)
+      .maybeSingle()
+    if (error || !data) return null
+
+    const ageMs = Date.now() - new Date(data.created_at).getTime()
+    if (ageMs > SCAN_CACHE_TTL_MS) {
+      // Stale — purge so the next scan refreshes it
+      sb.from('scan_cache').delete().eq('image_hash', imageHash).catch(() => {})
+      return null
+    }
+    return data.result
+  } catch (err) {
+    console.warn('[Supabase] scan_cache read failed (non-fatal):', err.message)
+    return null
+  }
+}
+
+/**
+ * Persist a scan result to the cache. Upserts so re-scans of the same
+ * photo overwrite rather than duplicate. Fire-and-forget safe.
+ */
+async function setScanCache(imageHash, result) {
+  const sb = getSupabase()
+  if (!sb) return
+  try {
+    const { error } = await sb
+      .from('scan_cache')
+      .upsert(
+        { image_hash: imageHash, result, created_at: new Date().toISOString() },
+        { onConflict: 'image_hash' }
+      )
+    if (error) console.warn('[Supabase] scan_cache write error:', error.message)
+  } catch (err) {
+    console.warn('[Supabase] scan_cache write failed (non-fatal):', err.message)
+  }
+}
+
 module.exports = {
   getSupabase,
   getOrCreateUser,
@@ -88,4 +143,6 @@ module.exports = {
   createUser,
   updateUserById,
   isConfigured,
+  getScanCache,
+  setScanCache,
 }
