@@ -2,6 +2,7 @@ const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
+const { getScanCache, setScanCache } = require('../supabase')
 
 const router = express.Router()
 
@@ -27,6 +28,17 @@ function hashImages(faceB64, bodyB64) {
     .update(sampleB64(faceB64) + '||' + sampleB64(bodyB64))
     .digest('hex')
     .slice(0, 24)
+}
+
+// Full SHA256 over complete image content — used for the persistent Supabase cache.
+// Unlike hashImages() (which samples), this hashes the entire base64 payload so
+// two different images can never produce the same key. Prefix must already be stripped.
+function computeFullHash(faceB64, bodyB64) {
+  const h = crypto.createHash('sha256')
+  h.update(faceB64)
+  h.update('||')
+  h.update(bodyB64 ?? 'skip')
+  return h.digest('hex') // 64-char hex string
 }
 
 function getClient() {
@@ -441,7 +453,6 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
 // verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
 // resolvePro sets req.isPro so scanLimit can skip the cap for Pro users.
 router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => {
-  await acquireSlot()
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey || apiKey.trim() === '') {
@@ -459,51 +470,70 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     // Detect actual media type BEFORE stripping the prefix
     const faceMediaType = getMediaType(faceImage)
     const faceBase64 = stripPrefix(faceImage)
-
-    // ── Cache check — same photo always returns same score ─────────────────────
     const bodyB64ForCache = skipBody ? null : stripPrefix(bodyImage)
+
+    // ── L1: in-process memory cache (ephemeral, fastest path) ─────────────────
     const cacheKey = hashImages(faceBase64, bodyB64ForCache ?? 'SKIP')
     if (scoreCache.has(cacheKey)) {
-      console.log('[aiScore] Cache hit:', cacheKey)
+      console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
     }
 
+    // ── L2: Supabase persistent cache (survives deploys, 7-day TTL) ───────────
+    const fullHash = computeFullHash(faceBase64, bodyB64ForCache)
+    const sbCached = await getScanCache(fullHash)
+    if (sbCached) {
+      console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
+      // Promote to L1 so subsequent requests in this process skip Supabase entirely
+      if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
+      scoreCache.set(cacheKey, sbCached)
+      return res.json(sbCached)
+    }
+
+    console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
+
+    // Acquire concurrency slot only now — cache hits above never need it
+    await acquireSlot()
     let bodyResult, faceResult, celebResult
 
-    if (skipBody) {
-      // Only run face + celebrity — body defaults applied
-      console.log('[aiScore] skipBody=true — running face + celebrity only...')
-      ;[faceResult, celebResult] = await Promise.all([
-        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
-        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
-          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-          return null
-        }),
-      ])
-      bodyResult = {
-        body_category: 'NOT_PROVIDED',
-        body_score: 5.0,
-        body_cap: 10.0,
-        reasoning: 'Body photo not provided — using neutral default score.',
-        sub_scores: { shoulder_waist_ratio: null, posture: null, posture_grade: null, body_proportions: null, body_composition: 5.0 },
-        detail: null,
-      }
-    } else {
-      const bodyMediaType = getMediaType(bodyImage)
-      const bodyBase64 = stripPrefix(bodyImage)
-      console.log('[aiScore] Media types — face:', faceMediaType, '| body:', bodyMediaType)
+    try {
+      if (skipBody) {
+        // Only run face + celebrity — body defaults applied
+        console.log('[aiScore] skipBody=true — running face + celebrity only...')
+        ;[faceResult, celebResult] = await Promise.all([
+          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
+          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
+            console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+            return null
+          }),
+        ])
+        bodyResult = {
+          body_category: 'NOT_PROVIDED',
+          body_score: 5.0,
+          body_cap: 10.0,
+          reasoning: 'Body photo not provided — using neutral default score.',
+          sub_scores: { shoulder_waist_ratio: null, posture: null, posture_grade: null, body_proportions: null, body_composition: 5.0 },
+          detail: null,
+        }
+      } else {
+        const bodyMediaType = getMediaType(bodyImage)
+        const bodyBase64 = stripPrefix(bodyImage)
+        console.log('[aiScore] Media types — face:', faceMediaType, '| body:', bodyMediaType)
 
-      // Run body + face + celebrity calls in parallel — all fully independent
-      console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
-      ;[bodyResult, faceResult, celebResult] = await Promise.all([
-        withRetry(() => getBodyScore(bodyBase64, bodyMediaType)),
-        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
-        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
-          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-          return null
-        }),
-      ])
-      console.log('[aiScore] Body:', bodyResult.body_category, bodyResult.body_score, '| cap:', bodyResult.body_cap)
+        // Run body + face + celebrity calls in parallel — all fully independent
+        console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
+        ;[bodyResult, faceResult, celebResult] = await Promise.all([
+          withRetry(() => getBodyScore(bodyBase64, bodyMediaType)),
+          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
+          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
+            console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+            return null
+          }),
+        ])
+        console.log('[aiScore] Body:', bodyResult.body_category, bodyResult.body_score, '| cap:', bodyResult.body_cap)
+      }
+    } finally {
+      releaseSlot()
     }
 
     console.log('[aiScore] Face:', faceResult.face_score, '| grooming:', faceResult.grooming_score, '| structure:', faceResult.facial_structure)
@@ -569,9 +599,15 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       faceTraits: celebResult?.face_traits ?? null,
     }
 
-    // Store in cache (cap at 500 entries to prevent memory leak)
+    // ── Write to both caches (L1 in-memory + L2 Supabase) ─────────────────────
     if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
     scoreCache.set(cacheKey, result)
+    // L2 write is fire-and-forget — never blocks the response
+    setScanCache(fullHash, result).then(() => {
+      console.log('[aiScore] L2 Supabase cache written:', fullHash.slice(0, 16))
+    }).catch(err => {
+      console.warn('[aiScore] L2 Supabase cache write failed (non-fatal):', err.message)
+    })
 
     res.json(result)
   } catch (err) {
@@ -588,8 +624,6 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       return res.status(429).json({ error: 'rate_limited', retryAfter: 30 })
     }
     res.status(500).json({ error: err.message || 'AI scoring failed' })
-  } finally {
-    releaseSlot()
   }
 })
 
