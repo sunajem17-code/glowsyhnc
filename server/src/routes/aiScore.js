@@ -209,11 +209,19 @@ GROOMING SCORING — assess:
 
 THE 4 PILLARS — rate each independently on 1.0–10.0:
 - Harmony: How well all features work together as a cohesive unit. Consider facial symmetry, facial thirds balance, and overall visual balance.
-- Angularity: Sharpness and definition of physical structure. Consider jawline sharpness, cheekbone prominence, brow ridge, chin projection, and overall facial definition.
+- Angularity: Sharpness and definition of physical structure. This is the PRIMARY structural pillar.
+  ANGULARITY SCORING RUBRIC — MANDATORY. Use the full range. Do not compress into 6–8.
+  9.0–10.0 → Elite bone structure: razor-sharp jawline with defined gonial angle, highly prominent cheekbones, strong visible brow ridge, forward chin projection, zero visible facial fat obscuring bone. This tier is real — use it when the evidence is present.
+  7.5–8.9  → Strong, clearly defined structure: sharp jawline, visible prominent cheekbones, good brow definition, lean facial structure. An 8 is NOT flattery — it is an accurate description of above-average bone structure.
+  6.0–7.4  → Moderate definition: jawline visible but not sharp, cheekbones present but not prominent, average to slightly above-average structure with some softness.
+  4.0–5.9  → Below-average structure: soft or undefined jaw, facial fat obscuring bone, cheekbones not visible, lacks skeletal definition.
+  1.0–3.9  → Poor angularity: round or heavy face, no visible bone structure at all.
+  CRITICAL: A face with a visibly sharp jaw, prominent cheekbones, and defined brow ridge MUST score 8.5 or higher. Giving 7.0 to a face with clearly strong bone structure is an inaccurate deflation — do not do it. Use the full 1–10 range.
+
 - Features: Quality of individual facial features. Consider eye shape and size, nose shape and proportion, lip fullness, skin clarity, and overall feature quality.
 - Dimorphism: How strongly the person expresses their biological sex characteristics. ${isFemale ? 'Rate femininity: soft features, high cheekbones, feminine facial structure.' : 'Rate masculinity: strong jaw, hunter eyes, brow ridge, defined bone structure.'}
 
-Be honest. Do not inflate scores.
+Be honest and accurate. High scores (9+) for elite bone structure ARE the honest score — accuracy means using the full range, not clustering in the middle.
 
 HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "straight"   → hair lies flat, no curl pattern
