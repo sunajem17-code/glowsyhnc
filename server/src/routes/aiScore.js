@@ -122,20 +122,26 @@ function stripPrefix(dataUrl) {
 
 // ── CALL 1: Body Composition ──────────────────────────────────────────────────
 // Focused entirely on body fat. Strict classifier.
-async function getBodyScore(bodyBase64, bodyMediaType) {
+async function getBodyScore(bodyBase64, bodyMediaType, gender = 'male') {
   const client = getClient()
+  const isFemale = gender === 'female'
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 500,
     system: `You are a body composition classifier. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
-Classify body fat level from the image using these strict criteria:
-
+${isFemale ? `FEMALE BODY ASSESSMENT — score based on feminine physique standards:
+OBESE: Significant excess fat, no visible waist definition, heavy limbs
+OVERWEIGHT: Noticeable fat accumulation, waist not defined, soft physique
+AVERAGE: Normal fat distribution, some waist definition, typical female proportions
+ATHLETIC: Visible muscle tone, defined waist, good hip-to-waist ratio, fit physique
+LEAN_ATHLETIC: Very fit and toned, clear hourglass shape, low body fat, athletic definition` :
+`MALE BODY ASSESSMENT — score based on masculine physique standards:
 OBESE: Large visible stomach, excess fat on chest/back/arms, no muscle definition visible
 OVERWEIGHT: Noticeable fat accumulation, soft physique, some definition lost
 AVERAGE: Normal fat distribution, not lean but not overweight
 ATHLETIC: Visible muscle tone, low body fat, defined physique
-LEAN_ATHLETIC: Clearly muscular, very low body fat, highly defined
+LEAN_ATHLETIC: Clearly muscular, very low body fat, highly defined`}
 
 Score mapping (NON-NEGOTIABLE):
 - OBESE        → body_score: 2.0,  body_cap: 4.5
@@ -151,14 +157,14 @@ Return ONLY this JSON — no markdown, nothing else:
   "body_cap": <number>,
   "reasoning": "<one sentence max>",
   "sub_scores": {
-    "shoulder_waist_ratio": <number 1.0–10.0, V-taper assessment>,
+    "shoulder_waist_ratio": <number 1.0–10.0, ${isFemale ? 'hourglass ratio — waist-to-hip definition and feminine curve' : 'V-taper assessment — shoulder-to-waist ratio'}>,
     "posture": <number 1.0–10.0, alignment and forward head posture>,
     "posture_grade": "<A|B|C|D|F>",
-    "body_proportions": <number 1.0–10.0, torso-to-leg ratio and limb symmetry>,
+    "body_proportions": <number 1.0–10.0, ${isFemale ? 'overall feminine proportions — hip-to-waist-to-shoulder balance' : 'torso-to-leg ratio and limb symmetry'}>,
     "body_composition": <number 1.0–10.0, same as body_score>
   },
   "detail": {
-    "swr_estimate": "<shoulder-to-waist ratio string e.g. '1.35:1' — estimate from visible proportions>",
+    "swr_estimate": "<${isFemale ? 'waist-to-hip ratio string e.g. 0.68' : 'shoulder-to-waist ratio string e.g. 1.35:1'} — estimate from visible proportions>",
     "bf_range": "<estimated body fat % range e.g. '25-30' — two numbers only>",
     "posture_issues": ["<list each that applies: forward_head | rounded_shoulders | anterior_pelvic_tilt | none>"],
     "muscle_mass_rating": "<low|average|above_average|high>",
@@ -213,8 +219,7 @@ Include a "profile" object in your JSON response.` : ''
 Score face and grooming on a 1.0–10.0 scale.
 
 FACE SCORING — assess these features:
-- Jawline definition and sharpness
-- Cheekbone prominence
+- ${isFemale ? 'Facial softness, high cheekbones, feminine bone structure, large eyes, full lips' : 'Jawline definition and sharpness, cheekbone prominence, brow ridge, masculine structure'}
 - Facial symmetry
 - Eye area (shape, spacing, periorbital hollowing)
 - Facial thirds ratio (forehead : midface : lower face)
@@ -228,32 +233,56 @@ SKIN CLARITY SCORING (skin_clarity sub-score) — MANDATORY RULES:
 - CRITICAL: Clear smooth skin with no visible problems MUST score 7.5 or higher. Do NOT penalize healthy clear skin.
 - Only score below 7.5 if you can visibly see blemishes, acne, scarring, or skin texture problems in the photo.
 - If the skin appears smooth and even in tone, assume it is clear unless there is visible evidence otherwise.
+${isFemale ? '- FEMALE: Skin and grooming are weighted MORE heavily. Clear glowing skin, neat brows, healthy hair are major scoring factors.' : ''}
 
-Facial structure tiers (strict):
+${isFemale ? `FEMALE FACIAL STRUCTURE TIERS (strict):
+- "heavy"       → significant facial fat obscuring all bone structure, puffy: face_score MAX 4.5
+- "soft/round"  → round face with soft features, minimal bone definition — CAN be attractive for females: face_score MAX 6.5
+- "average"     → typical female bone structure, some definition: face_score MAX 7.5
+- "defined"     → visible cheekbones, clean facial lines, feminine bone structure: face_score up to 8.5
+- "elite"       → high cheekbones, perfect facial thirds, model-tier feminine structure: face_score up to 10.0
+
+FEMALE JAWLINE RULES — different from males:
+- Soft rounded jaw on a female = feminine = POSITIVE. Do NOT penalize soft jaws on females.
+- A very sharp masculine jaw on a female = reduces femininity = may lower Dimorphism score.
+- Ideal female jaw: softly defined, not overly sharp, blends smoothly into neck.` :
+`Facial structure tiers (strict):
 - "soft/round"  → no visible bone structure, round face, fat deposits on jaw: face_score MAX 5.0
 - "average"     → some definition, typical bone structure: face_score MAX 6.5
 - "defined"     → clear jawline and cheekbones: face_score up to 7.5
-- "strong"      → sharp jaw, prominent cheekbones, elite bone structure: face_score up to 10.0
+- "strong"      → sharp jaw, prominent cheekbones, elite bone structure: face_score up to 10.0`}
 
 GROOMING SCORING — assess:
 - Hair (clean, styled vs greasy/unkempt)
-- Facial hair (groomed vs patchy/messy)
+${isFemale ? '- Makeup application (enhances natural features vs absent or heavy)' : '- Facial hair (groomed vs patchy/messy)'}
 - Skin condition (clear vs acne/dull)
 - Overall presentation
+${isFemale ? '- FEMALE: Grooming is weighted 1.5× more than for males. Neat brows, healthy hair, and clear skin heavily boost the score.' : ''}
 
 THE 4 PILLARS — rate each independently on 1.0–10.0:
 - Harmony: How well all features work together as a cohesive unit. Consider facial symmetry, facial thirds balance, and overall visual balance.
-- Angularity: Sharpness and definition of physical structure. This is the PRIMARY structural pillar.
+- Angularity: ${isFemale ?
+  `For females — assess FEMININE facial refinement, NOT masculine sharpness.
+  FEMALE ANGULARITY SCORING RUBRIC:
+  9.0–10.0 → Elite feminine structure: high prominent cheekbones, clean facial lines, defined but soft jawline, model-tier bone structure.
+  7.5–8.9  → Strong feminine definition: visible cheekbones, clean jaw, refined facial structure above average.
+  6.0–7.4  → Moderate definition: some cheekbone visibility, average feminine structure, slight softness.
+  4.0–5.9  → Below-average structure: full face with minimal bone definition.
+  1.0–3.9  → Poor structure: heavy or round face, no visible bone structure.
+  CRITICAL: A female face with high cheekbones and refined structure MUST score 8.0+. Do NOT apply male standards.` :
+  `Sharpness and definition of physical structure. This is the PRIMARY structural pillar.
   ANGULARITY SCORING RUBRIC — MANDATORY. Use the full range. Do not compress into 6–8.
   9.0–10.0 → Elite bone structure: razor-sharp jawline with defined gonial angle, highly prominent cheekbones, strong visible brow ridge, forward chin projection, zero visible facial fat obscuring bone. This tier is real — use it when the evidence is present.
   7.5–8.9  → Strong, clearly defined structure: sharp jawline, visible prominent cheekbones, good brow definition, lean facial structure. An 8 is NOT flattery — it is an accurate description of above-average bone structure.
   6.0–7.4  → Moderate definition: jawline visible but not sharp, cheekbones present but not prominent, average to slightly above-average structure with some softness.
   4.0–5.9  → Below-average structure: soft or undefined jaw, facial fat obscuring bone, cheekbones not visible, lacks skeletal definition.
   1.0–3.9  → Poor angularity: round or heavy face, no visible bone structure at all.
-  CRITICAL: A face with a visibly sharp jaw, prominent cheekbones, and defined brow ridge MUST score 8.5 or higher. Giving 7.0 to a face with clearly strong bone structure is an inaccurate deflation — do not do it. Use the full 1–10 range.
+  CRITICAL: A face with a visibly sharp jaw, prominent cheekbones, and defined brow ridge MUST score 8.5 or higher. Giving 7.0 to a face with clearly strong bone structure is an inaccurate deflation — do not do it. Use the full 1–10 range.`}
 
-- Features: Quality of individual facial features. Consider eye shape and size, nose shape and proportion, lip fullness, skin clarity, and overall feature quality.
-- Dimorphism: How strongly the person expresses their biological sex characteristics. ${isFemale ? 'Rate femininity: soft features, high cheekbones, feminine facial structure.' : 'Rate masculinity: strong jaw, hunter eyes, brow ridge, defined bone structure.'}
+- Features: Quality of individual facial features. ${isFemale ? 'Consider eye size and shape (large almond eyes score highest), nose refinement, lip fullness, brow shape, and skin clarity. Skin clarity is weighted 1.5× for females.' : 'Consider eye shape and size, nose shape and proportion, lip fullness, skin clarity, and overall feature quality.'}
+- Dimorphism: ${isFemale ?
+  'Rate FEMININITY — how strongly this face expresses feminine sex characteristics. High score: large eyes, high soft cheekbones, smooth skin, delicate features, soft jaw. Low score: masculine jaw, heavy brow ridge, wide nose, angular masculine structure on a female face.' :
+  'Rate masculinity: strong jaw, hunter eyes, brow ridge, defined bone structure.'}
 
 Be honest and accurate. High scores (9+) for elite bone structure ARE the honest score — accuracy means using the full range, not clustering in the middle.
 
@@ -362,19 +391,22 @@ ACCURACY OVER FAME — the most structurally accurate match wins, even if they a
 
 CANDIDATE POOLS BY ETHNICITY AND GENDER (non-exhaustive — use your full knowledge):
 
-${isFemale ? `FEMALE POOLS:
-  WHITE EUROPEAN/AMERICAN (models/actresses): Bella Hadid, Gigi Hadid, Emily Ratajkowski, Kendall Jenner,
-    Hailey Bieber, Adriana Lima, Candice Swanepoel, Rosie Huntington-Whiteley, Karlie Kloss, Miranda Kerr,
-    Romee Strijd, Sara Sampaio, Barbara Palvin, Elsa Hosk, Sofia Richie, Scarlett Johansson,
-    Sydney Sweeney, Florence Pugh, Margot Robbie, Emma Stone, Ana de Armas, Blake Lively,
-    Taylor Swift, Dua Lipa, Sabrina Carpenter, Dove Cameron, Madison Beer
-  FITNESS/SOCIAL (any ethnicity): Sommer Ray, Paige Hathaway, Whitney Simmons, Tammy Hembrow,
-    Addison Rae, Charli D'Amelio, Emma Chamberlain, Dixie D'Amelio, Olivia Rodrigo
-  BLACK/MIXED: Naomi Campbell, Iman, Winnie Harlow, Normani, SZA, Doja Cat, Beyoncé, Rihanna,
-    Nicki Minaj, Cardi B, Zendaya, Jenna Ortega, Ashley Graham, Paloma Elsesser
-  ASIAN/INTERNATIONAL: Lisa (BLACKPINK), Jennie (BLACKPINK), IU, Song Hye-kyo, Somi,
-    Priyanka Chopra, Deepika Padukone, Alia Bhatt, Kim Kardashian, Kylie Jenner,
-    Selena Gomez, Ariana Grande, Camila Cabello` : `MALE POOLS:
+${isFemale ? `FEMALE POOLS — use ONLY these female celebrities. Match skin tone exactly before anything else:
+  BLACK/DARK-SKIN: Beyoncé, Rihanna, Zendaya, Lupita Nyong'o, Naomi Campbell, Halle Bailey,
+    Ari Lennox, Normani, Jorja Smith, Tyla
+  LATINO/OLIVE: Selena Gomez, Jennifer Lopez, Camila Cabello, Dua Lipa, Rosalía
+  ASIAN: Lisa (BLACKPINK), Jennie (BLACKPINK), Gemma Chan, Awkwafina, Constance Wu
+  WHITE EUROPEAN/AMERICAN: Margot Robbie, Sydney Sweeney, Florence Pugh, Sabrina Carpenter,
+    Olivia Rodrigo, Hailey Bieber, Kendall Jenner
+  MIDDLE EASTERN: Nadine Njeim, Haifa Wehbe
+  INTERNET FAMOUS (any ethnicity): Alix Earle, Emma Chamberlain, Addison Rae
+
+  ⚠ FEMALE MATCHING RULES — NON-NEGOTIABLE:
+  - ONLY match to females on this list. Never return a male name for a female subject.
+  - Skin tone MUST match exactly. Black/dark skin → only Black/dark celebrities. White → only White celebrities. Never cross.
+  - Face shape MUST match. Round face → only round-faced matches. Angular → only angular matches.
+  - Similarity MAX 78% unless near-identical. Never go above 78%.
+  - shared_traits must name at least 2 specific anatomical features (e.g. "high cheekbones, almond eyes"). Never use "vibe" or "energy".` : `MALE POOLS:
   WHITE EUROPEAN/AMERICAN (actors/models): Timothée Chalamet, Jacob Elordi, Austin Butler, Paul Mescal,
     Tom Holland, Zac Efron, Glen Powell, Richard Madden, Kit Harington, Henry Cavill, Chris Hemsworth,
     Pedro Pascal, Adam Driver, Brad Pitt, Ryan Reynolds, Leonardo DiCaprio, Harry Styles,
@@ -419,11 +451,14 @@ Return ONLY this JSON — no markdown, no explanation, nothing else:
 }`
 
   // ── Fallback system prompt — fame-focused, simpler ──────────────────────────
-  const fallbackSystemPrompt = `You are a celebrity identification assistant. Given a face photo, name the most famous person this person looks like — actors, models, athletes, or influencers with mainstream recognition (100k+ followers or widely known name).
+  const fallbackSystemPrompt = `You are a celebrity identification assistant. Given a face photo, name the most famous ${isFemale ? 'female' : 'male'} person this person looks like — ${isFemale ? 'actresses, female models, female athletes, or female influencers' : 'actors, male models, male athletes, or male influencers'} with mainstream recognition (100k+ followers or widely known name).
+
+${isFemale ? `FEMALE ONLY — only return female celebrity names. Skin tone must match. Max similarity 78%.
+Preferred pool: Beyoncé, Rihanna, Zendaya, Lupita Nyong'o, Naomi Campbell, Halle Bailey, Normani, Tyla, Selena Gomez, Jennifer Lopez, Camila Cabello, Dua Lipa, Lisa BLACKPINK, Jennie BLACKPINK, Gemma Chan, Margot Robbie, Sydney Sweeney, Florence Pugh, Sabrina Carpenter, Olivia Rodrigo, Hailey Bieber, Kendall Jenner, Nadine Njeim, Alix Earle, Emma Chamberlain, Addison Rae` : ''}
 
 Return ONLY this JSON — no markdown, nothing else:
 {
-  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer>", "similarity": <55–75>, "shared_traits": "<2+ specific anatomical features that match>" },
+  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer>", "similarity": <55–78>, "shared_traits": "<2+ specific anatomical features that match>" },
   "match2": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" },
   "match3": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" }
 }`
@@ -540,7 +575,7 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
   if (gender === 'female') {
     if      (final >= 9.5) tier = 'True Eve'
     else if (final >= 8.5) tier = 'Eve'
-    else if (final >= 7.0) tier = 'Stacey'
+    else if (final >= 7.0) tier = 'Stacy'
     else if (final >= 6.0) tier = 'High Tier Becky'
     else if (final >= 5.0) tier = 'Mid Tier Becky'
     else if (final >= 4.0) tier = 'Low Tier Becky'
@@ -639,7 +674,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
         console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
         ;[bodyResult, faceResult, celebResult] = await Promise.all([
-          withRetry(() => getBodyScore(bodyBase64, bodyMediaType)),
+          withRetry(() => getBodyScore(bodyBase64, bodyMediaType, gender)),
           withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType)),
           withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender)).catch(err => {
             console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
