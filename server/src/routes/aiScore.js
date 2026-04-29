@@ -2,7 +2,7 @@ const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
-const { getScanCache, setScanCache } = require('../supabase')
+const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
 
 const router = express.Router()
 
@@ -23,9 +23,9 @@ function sampleB64(s) {
   return s.slice(200, 500) + '|' + s.slice(mid - 150, mid + 150) + '|' + s.slice(-300) + '|len=' + s.length
 }
 
-function hashImages(faceB64, bodyB64) {
+function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(sampleB64(faceB64) + '||' + sampleB64(bodyB64))
+    .update(sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -33,11 +33,13 @@ function hashImages(faceB64, bodyB64) {
 // Full SHA256 over complete image content — used for the persistent Supabase cache.
 // Unlike hashImages() (which samples), this hashes the entire base64 payload so
 // two different images can never produce the same key. Prefix must already be stripped.
-function computeFullHash(faceB64, bodyB64) {
+function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   const h = crypto.createHash('sha256')
   h.update(faceB64)
   h.update('||')
   h.update(bodyB64 ?? 'skip')
+  h.update('||SIDE:')
+  h.update(sideB64 ?? 'noside')
   return h.digest('hex') // 64-char hex string
 }
 
@@ -177,15 +179,35 @@ Return ONLY this JSON — no markdown, nothing else:
   return parseJSON(response.content[0]?.text?.trim() || '', 'Body scorer')
 }
 
-// ── CALL 2: Face + Grooming + 4 Pillars ──────────────────────────────────────
+// ── CALL 2: Face + Grooming + 4 Pillars (+ optional side profile) ────────────
 // Focused on facial structure, grooming, and the 4 aesthetic pillars.
-// No body. No overall score. Pillars drive the aesthetic score in code.
-async function getFaceScore(faceBase64, faceMediaType, gender) {
+// When sideBase64 is provided a second image is sent and profile metrics are
+// returned in the "profile" key. No body. No overall score.
+async function getFaceScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null) {
   const client = getClient()
   const isFemale = gender === 'female'
+  const hasSide = !!sideBase64
+
+  const profileSection = hasSide ? `
+
+SIDE PROFILE ANALYSIS — A side-profile photo has been provided as Image 2. Analyze the lateral view:
+- profile_score: Overall lateral facial aesthetics 1.0–10.0. Strong jaw/chin projection, tall straight nose bridge, and forward mid-face score highest.
+- nose_bridge: "soft" (low/flat bridge), "medium" (average height), "strong" (tall and straight), or "aquiline" (curved/Roman nose).
+- jawline_projection: "recessed" (jaw sits behind vertical), "average" (neutral), "projected" (forward jaw), or "strong" (strong forward projection).
+- chin_projection: "recessed" (chin behind Ricketts E-line), "average" (on the line), "projected" (slightly ahead), or "prominent" (well ahead of E-line).
+Include a "profile" object in your JSON response.` : ''
+
+  const profileSchema = hasSide ? `,
+  "profile": {
+    "profile_score": <number 1.0–10.0>,
+    "nose_bridge": "<soft|medium|strong|aquiline>",
+    "jawline_projection": "<recessed|average|projected|strong>",
+    "chin_projection": "<recessed|average|projected|prominent>"
+  }` : ''
+
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 600,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: hasSide ? 1100 : 950,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 Score face and grooming on a 1.0–10.0 scale.
@@ -244,6 +266,15 @@ HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "bald"       → shaved head or very close cut with no texture visible
 - "unknown"    → hair not visible or cannot be determined from photo
 
+FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe:
+- jawline: sharpness, gonial angle definition, and visible edge clarity
+- cheekbones: height, prominence, and forward projection of the malar bones
+- symmetry: left-right balance of features, spacing, and facial midline
+- skin_quality: surface clarity, texture uniformity, and visible skin condition
+- masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
+- facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
+Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
+${profileSection}
 Return ONLY this JSON — no markdown, nothing else:
 {
   "face_score": <number 1.0–10.0>,
@@ -266,11 +297,25 @@ Return ONLY this JSON — no markdown, nothing else:
   },
   "key_strengths": ["<strength 1>", "<strength 2>"],
   "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
-  "top_improvement": "<single most impactful improvement>"
+  "top_improvement": "<single most impactful improvement>",
+  "face_metrics": {
+    "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "symmetry":               { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "skin_quality":           { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "masculinity_femininity": { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "facial_thirds":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+  }${profileSchema}
 }`,
     messages: [{
       role: 'user',
-      content: [
+      content: hasSide ? [
+        { type: 'text',  text: 'Image 1 — front-facing photo:' },
+        { type: 'image', source: { type: 'base64', media_type: faceMediaType,  data: faceBase64  } },
+        { type: 'text',  text: 'Image 2 — side profile (right side):' },
+        { type: 'image', source: { type: 'base64', media_type: sideMediaType,  data: sideBase64  } },
+        { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face, grooming, and side profile. Return ONLY the JSON.` },
+      ] : [
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
         { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face and grooming. Return ONLY the JSON.` },
       ],
@@ -282,106 +327,171 @@ Return ONLY this JSON — no markdown, nothing else:
 
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
-// Uses claude-haiku-4-5-20251001 (high rate limits; sufficient for structured matching).
-async function getCelebrityMatch(faceBase64, faceMediaType) {
-  const client = getClient()
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 700,
-    system: `You are a strict facial structure analyst. Your job is to match faces to celebrities based ONLY on measurable bone structure and physical features — never on vibes, fame, or flattery.
+// Uses claude-haiku-4-5-20251001. Now accepts gender to provide appropriate pools.
+// Includes automatic fallback retry when generic/unknown names are detected.
+async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male') {
+  const client  = getClient()
+  const isFemale = gender === 'female'
 
-══ STEP 1: MEASURE THESE TRAITS FIRST (do this before thinking of any celebrity) ══
+  // ── Helper: detect if any returned name is generic or unrecognisable ────────
+  function isGenericOrUnknown(parsed) {
+    if (!parsed) return true
+    const names = [parsed.match1, parsed.match2, parsed.match3]
+      .filter(Boolean)
+      .map(m => (m.celebrity || '').trim().toLowerCase())
+    if (names.length === 0) return true
+    return names.some(n =>
+      !n ||
+      n.length < 3 ||
+      /unknown|generic|person|individual|n\/a|no match|nobody|placeholder/i.test(n)
+    )
+  }
 
-1. SKIN TONE — classify as one of: pale / light / medium / tan / brown / dark-brown / deep-dark
-2. FACE SHAPE — classify as one of: oval / round / square / oblong / diamond / heart / triangle
-3. JAW — classify as one of: sharp-angular / moderate / soft-rounded / wide-square / recessed
-4. CHEEKBONES — classify as one of: prominent-high / average / flat / wide
-5. EYES — classify as one of: almond / round / hooded / deep-set / wide-set / close-set / monolid
-6. NOSE — classify as one of: wide-flat / broad / medium / narrow / upturned / aquiline / bulbous-tip
-7. LIPS — classify as one of: full / medium / thin
-8. FACE FULLNESS — classify as one of: very-lean / lean / average / full / heavy
-9. ESTIMATED ETHNICITY — classify as one of: East-Asian / South-Asian / Southeast-Asian / Black-African / Black-American / Middle-Eastern / Latino / White-European / Mixed / Other
+  // ── Primary system prompt — expanded to cover models, athletes, influencers ─
+  const systemPrompt = `You are a facial match specialist. You identify the most visually similar celebrity, model, athlete, or public figure for any face worldwide — not just Hollywood actors.
 
-══ STEP 2: HARD MATCHING RULES (violations = wrong answer) ══
+YOUR MATCH POOL — draw from ALL of these categories equally:
+• Actors & musicians (Hollywood, Bollywood, K-pop, Nollywood, Latin, European)
+• Fashion models (Victoria's Secret, Vogue runway, Sports Illustrated, editorial)
+• Fitness models, physique athletes, and men's health cover models
+• Instagram / TikTok creators with 500k+ followers
+• Professional athletes (soccer, basketball, boxing, UFC, NFL, tennis, F1)
+• International celebrities from any country or industry
 
-RULE 1 — SKIN TONE IS NON-NEGOTIABLE:
-  - pale/light → ONLY match pale/light celebrities
-  - medium/tan → ONLY match medium/tan celebrities
-  - brown/dark-brown/deep-dark → ONLY match brown/dark celebrities
-  - NEVER match across more than one skin tone category
+ACCURACY OVER FAME — the most structurally accurate match wins, even if they are less famous than an actor. A runway model who shares identical bone structure beats a mismatched Hollywood star every time.
 
-RULE 2 — FACE SHAPE MUST MATCH:
-  - round face → ONLY round-faced celebrities (Kevin Hart, Jack Black, etc.)
-  - sharp jaw → ONLY sharp-jaw celebrities (Henry Cavill, Michael B Jordan, etc.)
-  - soft jaw → ONLY soft-jaw celebrities
-  - NEVER match a round soft face to a chiseled angular celebrity
+CANDIDATE POOLS BY ETHNICITY AND GENDER (non-exhaustive — use your full knowledge):
 
-RULE 3 — BODY TYPE MUST MATCH if visible:
-  - heavy/full face → ONLY match stocky or full-faced celebrities
-  - lean face → ONLY match lean celebrities
-  - NEVER match a heavy person to a lean athletic celebrity
+${isFemale ? `FEMALE POOLS:
+  WHITE EUROPEAN/AMERICAN (models/actresses): Bella Hadid, Gigi Hadid, Emily Ratajkowski, Kendall Jenner,
+    Hailey Bieber, Adriana Lima, Candice Swanepoel, Rosie Huntington-Whiteley, Karlie Kloss, Miranda Kerr,
+    Romee Strijd, Sara Sampaio, Barbara Palvin, Elsa Hosk, Sofia Richie, Scarlett Johansson,
+    Sydney Sweeney, Florence Pugh, Margot Robbie, Emma Stone, Ana de Armas, Blake Lively,
+    Taylor Swift, Dua Lipa, Sabrina Carpenter, Dove Cameron, Madison Beer
+  FITNESS/SOCIAL (any ethnicity): Sommer Ray, Paige Hathaway, Whitney Simmons, Tammy Hembrow,
+    Addison Rae, Charli D'Amelio, Emma Chamberlain, Dixie D'Amelio, Olivia Rodrigo
+  BLACK/MIXED: Naomi Campbell, Iman, Winnie Harlow, Normani, SZA, Doja Cat, Beyoncé, Rihanna,
+    Nicki Minaj, Cardi B, Zendaya, Jenna Ortega, Ashley Graham, Paloma Elsesser
+  ASIAN/INTERNATIONAL: Lisa (BLACKPINK), Jennie (BLACKPINK), IU, Song Hye-kyo, Somi,
+    Priyanka Chopra, Deepika Padukone, Alia Bhatt, Kim Kardashian, Kylie Jenner,
+    Selena Gomez, Ariana Grande, Camila Cabello` : `MALE POOLS:
+  WHITE EUROPEAN/AMERICAN (actors/models): Timothée Chalamet, Jacob Elordi, Austin Butler, Paul Mescal,
+    Tom Holland, Zac Efron, Glen Powell, Richard Madden, Kit Harington, Henry Cavill, Chris Hemsworth,
+    Pedro Pascal, Adam Driver, Brad Pitt, Ryan Reynolds, Leonardo DiCaprio, Harry Styles,
+    Lucky Blue Smith, David Gandy, Jon Kortajarena, Sean O'Pry, Tyler Cameron, Jordan Barrett
+  FITNESS/SOCIAL (any ethnicity): Jeff Seid, David Laid, Ryan Terry, Simeon Panda, Ulisses Jr,
+    Steve Cook, Lazar Angelov, Noah Beck, Vinnie Hacker, Chase Hudson, Bryce Hall, MrBeast
+  BLACK/MIXED (actors/athletes/musicians): Michael B Jordan, Idris Elba, Winston Duke, Kofi Siriboe,
+    Mahershala Ali, John Boyega, Dwayne Johnson, Drake, Travis Scott, The Weeknd, ASAP Rocky,
+    LeBron James, Steph Curry, Ja Morant, Devin Booker, Giannis Antetokounmpo,
+    Anthony Joshua, KSI, Israel Adesanya, Kevin Hart, Kai Cenat
+  ASIAN/INTERNATIONAL: BTS (V/Jin/Jungkook/RM/Suga/J-Hope/Jimin), Park Seo-jun, Song Joong-ki,
+    Lee Jong-suk, Lee Min-ho, Godfrey Gao, Simu Liu, Steven Yeun
+  LATINO/MIDDLE EASTERN: Bad Bunny, Maluma, J Balvin, Ozuna, Neymar, Kylian Mbappé,
+    Rami Malek, Marwan Kenzari, Oscar Isaac, Diego Luna, Gael Garcia Bernal
+  SOUTH ASIAN: Hrithik Roshan, Ranveer Singh, Shahid Kapoor, Tiger Shroff, Vidyut Jammwal,
+    Dev Patel, Riz Ahmed`}
 
-RULE 4 — ETHNICITY-AWARE POOL:
-  Use the correct celebrity pool based on detected ethnicity:
+══ STEP 1: MEASURE THESE TRAITS FIRST ══
+1. SKIN TONE: pale / light / medium / tan / brown / dark-brown / deep-dark
+2. FACE SHAPE: oval / round / square / oblong / diamond / heart / triangle
+3. JAW: sharp-angular / moderate / soft-rounded / wide-square / recessed
+4. CHEEKBONES: prominent-high / average / flat / wide
+5. EYES: almond / round / hooded / deep-set / wide-set / close-set / monolid
+6. NOSE: wide-flat / broad / medium / narrow / upturned / aquiline
+7. LIPS: full / medium / thin
+8. FACE FULLNESS: very-lean / lean / average / full / heavy
+9. ETHNICITY: East-Asian / South-Asian / Southeast-Asian / Black-African / Black-American / Middle-Eastern / Latino / White-European / Mixed
 
-  BLACK (African/American): Kevin Hart, Idris Elba, Michael B Jordan, Winston Duke, Kofi Siriboe,
-    Dwayne Johnson (mixed), Drake, Kendrick Lamar, LeBron James, Giannis Antetokounmpo, Kai Cenat,
-    Druski, IShowSpeed, Lil Baby, Travis Scott, Childish Gambino, Mahershala Ali, John Boyega,
-    Anthony Joshua, Devin Booker, Steph Curry
-
-  EAST ASIAN: BTS (Jin/RM/Jungkook/V/Suga/J-Hope/Jimin), Steven Yeun, John Cho, Simu Liu,
-    Bruce Lee, Godfrey Gao, Song Joong-ki, Park Seo-jun, Lee Min-ho, Daniel Dae Kim, Shang-Chi
-
-  SOUTH/SOUTHEAST ASIAN: Riz Ahmed, Kumail Nanjiani, Dev Patel, Ranveer Singh, Hrithik Roshan,
-    Tiger Shroff, Vidyut Jammwal
-
-  MIDDLE EASTERN: Rami Malek, Oscar Isaac (Guatemalan/Cuban), Marwan Kenzari, Tahar Rahim
-
-  LATINO: Bad Bunny, J Balvin, Ozuna, Maluma, Oscar Isaac, Michael Pena, Diego Luna, Gael Garcia Bernal
-
-  WHITE EUROPEAN/AMERICAN: Zac Efron, Tom Holland, Timothée Chalamet, Jacob Elordi, Austin Butler,
-    Chris Evans, Ryan Reynolds, Brad Pitt, Leonardo DiCaprio, Harry Styles, Adam Driver,
-    Paul Mescal, Pedro Pascal, Kit Harington, Henry Cavill, Charlie Hunnam, Chris Hemsworth,
-    MrBeast (Jimmy Donaldson), PewDiePie, KSI (mixed)
-
-  MIXED/AMBIGUOUS: The Weeknd, Bruno Mars, KSI, Dwayne Johnson, Keanu Reeves, Zayn Malik
-
-RULE 5 — SIMILARITY SCORES MUST BE HONEST:
-  - 75–78%: Very strong match, multiple features align precisely
-  - 65–74%: Good match, primary structural features align
-  - 55–64%: Moderate match, some features align but differences are notable
-  - Below 55%: Weak match — if this is the best you can do, say so explicitly
-  - NEVER give 80%+ unless near-identical
-  - Most honest matches will be 60–72%
-
-RULE 6 — SHARED TRAITS MUST BE SPECIFIC AND MEASURABLE:
-  BAD: "similar vibe", "both look cool", "same energy"
-  GOOD: "both have wide-set almond eyes, broad nose, and round face with full cheeks"
-  GOOD: "matching sharp square jaw, high cheekbones, and deep-set eyes"
-  Every shared_traits field must name at least 2 specific anatomical features.
-
-RULE 7 — IF NO GOOD MATCH EXISTS:
-  Give the closest honest match with similarity 55–58% and explain in shared_traits
-  exactly what makes it a weak match (e.g. "closest match available — similar nose shape
-  but jaw and face fullness differ significantly").
+══ STEP 2: MATCHING RULES ══
+- SKIN TONE IS NON-NEGOTIABLE: never match across more than one skin tone category.
+- FACE SHAPE MUST MATCH: round face → only round-faced matches. Sharp angular jaw → only angular matches.
+- CATEGORY IS OPEN: if bone structure matches a model better than an actor, return the model. If they look like an athlete, return the athlete.
+- SIMILARITY must be honest: 70–78% = strong (multiple features align), 60–69% = good, 55–59% = moderate. Never 80%+ unless near-identical.
+- SHARED TRAITS: name at least 2 specific anatomical features (e.g. "matching high cheekbones, almond eyes, oval face"). Never use "vibe", "energy", or "look".
 
 ══ STEP 3: OUTPUT ══
-
 Return ONLY this JSON — no markdown, no explanation, nothing else:
 {
-  "match1": { "celebrity": "Full Name", "similarity": <number 55–78>, "shared_traits": "<2+ specific anatomical features>" },
-  "match2": { "celebrity": "Full Name", "similarity": <number 55–75>, "shared_traits": "<2+ specific anatomical features>" },
-  "match3": { "celebrity": "Full Name", "similarity": <number 55–72>, "shared_traits": "<2+ specific anatomical features>" }
-}`,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
-        { type: 'text', text: 'Follow the 3-step process. Measure traits first, apply all matching rules, then return the JSON.' },
-      ],
-    }],
-  })
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Celebrity matcher')
+  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer|Fitness Model>", "similarity": <55–78>, "shared_traits": "<2+ specific anatomical features>" },
+  "match2": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <55–75>, "shared_traits": "<2+ specific anatomical features>" },
+  "match3": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <55–72>, "shared_traits": "<2+ specific anatomical features>" }
+}`
+
+  // ── Fallback system prompt — fame-focused, simpler ──────────────────────────
+  const fallbackSystemPrompt = `You are a celebrity identification assistant. Given a face photo, name the most famous person this person looks like — actors, models, athletes, or influencers with mainstream recognition (100k+ followers or widely known name).
+
+Return ONLY this JSON — no markdown, nothing else:
+{
+  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer>", "similarity": <55–75>, "shared_traits": "<2+ specific anatomical features that match>" },
+  "match2": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" },
+  "match3": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" }
+}`
+
+  // ── Primary call ───────────────────────────────────────────────────────────
+  let parsed
+  try {
+    const primaryResp = await client.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 800,
+      system:     systemPrompt,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
+          { type: 'text',  text: `Analyze this person's facial features — bone structure, eye shape, jawline, skin tone, and overall aesthetic. Match them to the most visually similar real celebrity, model, athlete, or public figure. Do not default to the most famous person — find the most accurate facial match. If they resemble a model more than an actor, say the model. Return ONLY the JSON.` },
+        ],
+      }],
+    })
+
+    const primaryRaw = primaryResp.content[0]?.text?.trim() ?? ''
+    console.log('[celeb] Primary raw (first 300):', primaryRaw.slice(0, 300))
+
+    parsed = parseJSON(primaryRaw, 'Celebrity matcher')
+    const primaryLog = [parsed.match1, parsed.match2, parsed.match3]
+      .filter(Boolean)
+      .map(m => `${m.celebrity} [${m.profession ?? '?'}] ${m.similarity}%`)
+      .join(' | ')
+    console.log('[celeb] Primary matches:', primaryLog || '(none parsed)')
+  } catch (err) {
+    console.warn('[celeb] Primary call failed:', err.message)
+    throw err
+  }
+
+  // ── Fallback: retry if any name looks generic or unrecognisable ────────────
+  if (isGenericOrUnknown(parsed)) {
+    console.log('[celeb] Generic/unknown name detected — retrying with fallback prompt...')
+    try {
+      const fallbackResp = await client.messages.create({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        system:     fallbackSystemPrompt,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
+            { type: 'text',  text: `Who is the most famous person this person looks like? Be specific — give a real name of someone with over 100k followers or mainstream recognition. Return ONLY the JSON.` },
+          ],
+        }],
+      })
+
+      const fallbackRaw = fallbackResp.content[0]?.text?.trim() ?? ''
+      console.log('[celeb] Fallback raw (first 300):', fallbackRaw.slice(0, 300))
+
+      const fallbackParsed = parseJSON(fallbackRaw, 'Celebrity matcher fallback')
+      const fallbackLog = [fallbackParsed.match1, fallbackParsed.match2, fallbackParsed.match3]
+        .filter(Boolean)
+        .map(m => `${m.celebrity} [${m.profession ?? '?'}] ${m.similarity}%`)
+        .join(' | ')
+      console.log('[celeb] Fallback matches:', fallbackLog || '(none parsed)')
+      return fallbackParsed
+    } catch (fallbackErr) {
+      console.warn('[celeb] Fallback also failed (returning primary result):', fallbackErr.message)
+      // Fall through — return the original parsed result even if names were weak
+    }
+  }
+
+  return parsed
 }
 
 // ── CALL 4: Final score in CODE — AI never touches this ──────────────────────
@@ -459,7 +569,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { faceImage, bodyImage, gender = 'male', skipBody = false } = req.body
+    const { faceImage, bodyImage, sideImage, gender = 'male', skipBody = false } = req.body
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -472,15 +582,19 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     const faceBase64 = stripPrefix(faceImage)
     const bodyB64ForCache = skipBody ? null : stripPrefix(bodyImage)
 
+    // Side profile (optional — undefined / null / missing are all handled)
+    const sideBase64    = sideImage ? stripPrefix(sideImage)    : null
+    const sideMediaType = sideImage ? getMediaType(sideImage)   : null
+
     // ── L1: in-process memory cache (ephemeral, fastest path) ─────────────────
-    const cacheKey = hashImages(faceBase64, bodyB64ForCache ?? 'SKIP')
+    const cacheKey = hashImages(faceBase64, bodyB64ForCache ?? 'SKIP', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
     }
 
     // ── L2: Supabase persistent cache (survives deploys, 7-day TTL) ───────────
-    const fullHash = computeFullHash(faceBase64, bodyB64ForCache)
+    const fullHash = computeFullHash(faceBase64, bodyB64ForCache, sideBase64)
     const sbCached = await getScanCache(fullHash)
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
@@ -500,9 +614,10 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       if (skipBody) {
         // Only run face + celebrity — body defaults applied
         console.log('[aiScore] skipBody=true — running face + celebrity only...')
+        console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
         ;[faceResult, celebResult] = await Promise.all([
-          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
-          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
+          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType)),
+          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender)).catch(err => {
             console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
             return null
           }),
@@ -522,10 +637,11 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
 
         // Run body + face + celebrity calls in parallel — all fully independent
         console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
+        console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
         ;[bodyResult, faceResult, celebResult] = await Promise.all([
           withRetry(() => getBodyScore(bodyBase64, bodyMediaType)),
-          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender)),
-          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType)).catch(err => {
+          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType)),
+          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender)).catch(err => {
             console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
             return null
           }),
@@ -537,7 +653,12 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     }
 
     console.log('[aiScore] Face:', faceResult.face_score, '| grooming:', faceResult.grooming_score, '| structure:', faceResult.facial_structure)
-    console.log('[aiScore] Celebrity:', celebResult ? celebResult.match1?.celebrity : 'unavailable')
+    console.log('[aiScore] Celebrity matches:', celebResult
+      ? [celebResult.match1, celebResult.match2, celebResult.match3]
+          .filter(Boolean)
+          .map(m => `${m.celebrity} [${m.profession ?? 'unknown'}] ${m.similarity}%`)
+          .join(' | ')
+      : 'unavailable')
 
     // Final score: pure code — no AI involvement
     const { final, tier, bodyFatCapApplied, faceScore, bodyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = calculateFinalScore(bodyResult, faceResult, gender, skipBody)
@@ -585,18 +706,38 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       keyStrengths:      faceResult.key_strengths,
       keyWeaknesses:     faceResult.key_weaknesses,
       topImprovement:    faceResult.top_improvement,
+      faceMetrics: (() => {
+        const fm = faceResult.face_metrics
+        if (!fm) return null
+        const metric = (key) => fm[key]?.score != null
+          ? { score: r(fm[key].score), descriptor: fm[key].descriptor ?? null }
+          : null
+        return {
+          jawline:               metric('jawline'),
+          cheekbones:            metric('cheekbones'),
+          symmetry:              metric('symmetry'),
+          skinQuality:           metric('skin_quality'),
+          masculinityFemininity: metric('masculinity_femininity'),
+          facialThirds:          metric('facial_thirds'),
+        }
+      })(),
       bodyReasoning:     bodyResult.reasoning,
       celebrityMatches:  celebResult
         ? [celebResult.match1, celebResult.match2, celebResult.match3]
             .filter(Boolean)
             .map(m => ({
               celebrity:    m.celebrity,
+              profession:   m.profession   ?? null,
               similarity:   m.similarity,
               reason:       m.shared_traits ?? m.reason ?? '',
               shared_traits: m.shared_traits ?? m.reason ?? '',
             }))
         : null,
       faceTraits: celebResult?.face_traits ?? null,
+      // Side profile — null when no side photo was provided
+      hasSideProfile: !!sideBase64,
+      profileScore:   faceResult.profile?.profile_score ?? null,
+      profileData:    faceResult.profile ?? null,
     }
 
     // ── Write to both caches (L1 in-memory + L2 Supabase) ─────────────────────
@@ -609,6 +750,18 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       console.warn('[aiScore] L2 Supabase cache write failed (non-fatal):', err.message)
     })
 
+    // ── Persist to scan history (fire-and-forget, skip demo users) ────────────
+    if (req.userId && req.userId !== 'demo') {
+      saveScanHistory(req.userId, {
+        overallScore:    result.overallScore,
+        faceScore:       result.faceScore,
+        bodyScore:       result.bodyScore,
+        groomingScore:   result.groomingScore,
+        tier:            result.tier,
+        celebrityMatch:  result.celebrityMatches?.[0]?.celebrity ?? null,
+      }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
+    }
+
     res.json(result)
   } catch (err) {
     console.error('[aiScore] Error:', err.message)
@@ -618,12 +771,14 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       status === 429 || status === 529 ||
       msg.includes('quota') || msg.includes('rate limit') ||
       msg.includes('rate_limit') || msg.includes('exceeded') ||
-      msg.includes('overloaded') || msg.includes('capacity')
+      msg.includes('overloaded') || msg.includes('capacity') ||
+      msg.includes('too many') || msg.includes('limit')
 
     if (isRateLimit) {
-      return res.status(429).json({ error: 'rate_limited', retryAfter: 30 })
+      return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
     }
-    res.status(500).json({ error: err.message || 'AI scoring failed' })
+    // Never expose raw Anthropic error strings to the client
+    res.status(500).json({ error: 'AI scoring failed — please try again.' })
   }
 })
 
