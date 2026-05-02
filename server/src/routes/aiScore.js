@@ -75,13 +75,15 @@ function releaseSlot() {
 }
 
 // ── Retry helper ──────────────────────────────────────────────────────────────
-// 429 (rate limit) → wait 5 s, retry up to 3 times
-// 529 (overloaded) → wait 3 s, retry up to 3 times
-// quota/exceeded   → treated same as 429 (5 s wait)
-// Other errors     → throw immediately, no retry
-// After 3 retries  → throw enriched error with exact status + message for Railway logs
+// Exponential backoff on 429 / 529 / quota errors:
+//   Attempt 1 fails → wait 2 s → retry 1
+//   Retry   1 fails → wait 5 s → retry 2
+//   Retry   2 fails → wait 10 s → retry 3
+//   Retry   3 fails → throw enriched error with exact status + message (for Railway)
+// Non-retryable errors throw immediately with no wait.
 async function withRetry(fn, label = 'api') {
-  const MAX_RETRIES = 3
+  const MAX_RETRIES  = 3
+  const BACKOFF_MS   = [0, 2000, 5000, 10000] // indexed by attempt number (1-based)
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
@@ -99,9 +101,8 @@ async function withRetry(fn, label = 'api') {
       const isRetryable = is429 || is529
 
       const typeTag = is429 ? '429_RATE_LIMIT' : is529 ? '529_OVERLOADED' : `${status}_ERROR`
-      const waitMs  = is429 ? 5000 : 3000
 
-      // Always log the exact status + message so Railway shows the real cause
+      // Always log exact status + message so Railway shows the real cause
       console.error(`[aiScore:${label}] attempt=${attempt} status=${status} type=${typeTag} msg="${fullMsg.slice(0, 300)}"`)
 
       if (!isRetryable) {
@@ -110,7 +111,7 @@ async function withRetry(fn, label = 'api') {
       }
 
       if (attempt > MAX_RETRIES) {
-        // Exhausted retries — throw enriched error with full detail
+        // Exhausted all retries — throw enriched error with full detail
         console.error(`[aiScore:${label}] GAVE UP after ${MAX_RETRIES} retries — status=${status} type=${typeTag}`)
         const enriched = new Error(`[${typeTag}] after ${MAX_RETRIES} retries: ${fullMsg || `HTTP ${status}`}`)
         enriched.status = status
@@ -118,6 +119,7 @@ async function withRetry(fn, label = 'api') {
         throw enriched
       }
 
+      const waitMs = BACKOFF_MS[attempt] ?? 10000
       console.error(`[aiScore:${label}] waiting ${waitMs}ms before retry ${attempt}/${MAX_RETRIES}...`)
       await new Promise(resolve => setTimeout(resolve, waitMs))
     }
@@ -696,12 +698,12 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     let bodyResult, faceResult, celebResult
 
     try {
-      // 500 ms stagger between API calls — prevents simultaneous burst hitting rate limits
-      const stagger = () => new Promise(r => setTimeout(r, 500))
+      // 1000 ms stagger between API calls — spaces requests to stay within 50 req/min limit
+      const stagger = () => new Promise(r => setTimeout(r, 1000))
 
       if (skipBody) {
         // Only run face + celebrity — body defaults applied
-        console.log('[aiScore] skipBody=true — running face then celebrity (staggered 500ms)...')
+        console.log('[aiScore] skipBody=true — running face then celebrity (staggered 1000ms)...')
         console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
         faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
         await stagger()
@@ -722,8 +724,8 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         const bodyBase64 = stripPrefix(bodyImage)
         console.log('[aiScore] Media types — face:', faceMediaType, '| body:', bodyMediaType)
 
-        // Stagger calls 500ms apart — avoids simultaneous burst on Tier 1 rate limits
-        console.log('[aiScore] Starting body → face → celebrity (staggered 500ms each)...')
+        // Stagger calls 1000ms apart — spaces requests to stay within 50 req/min limit
+        console.log('[aiScore] Starting body → face → celebrity (staggered 1000ms each)...')
         console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
         bodyResult = await withRetry(() => getBodyScore(bodyBase64, bodyMediaType, gender), 'body')
         await stagger()
