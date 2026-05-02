@@ -541,17 +541,24 @@ Return ONLY this JSON — no markdown, nothing else:
 function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody = false) {
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
 
-  // 4 Pillars — average becomes the aesthetic (face) component
+  // ── 4 Pillars → aesthetic score ──────────────────────────────────────────────
+  // The aesthetic (face) component is ALWAYS the exact mathematical average of the
+  // 4 pillar scores returned by the AI. The AI's face_score field is ignored — code
+  // owns this number. Formula: aesthetic = (harmony + angularity + features + dimorphism) / 4
   const p = faceResult.pillars || {}
   let harmony     = clamp(p.harmony)
   let angularity  = clamp(p.angularity)
   let features    = clamp(p.features)
   let dimorphism  = clamp(p.dimorphism)
-  const pillarAvg   = (harmony + angularity + features + dimorphism) / 4
-
-  // Use pillar average if available, otherwise fall back to raw face_score
   const hasPillars = p.harmony != null && p.angularity != null && p.features != null && p.dimorphism != null
-  const faceScore     = hasPillars ? Math.round(pillarAvg * 10) / 10 : clamp(faceResult.face_score)
+
+  // Exact (unrounded) pillar average — used in the weighted formula for precision.
+  // The AI's face_score is only used as a fallback when all 4 pillars are absent.
+  const pillarAvg  = (harmony + angularity + features + dimorphism) / 4
+  const aestheticRaw = hasPillars ? pillarAvg : clamp(faceResult.face_score)
+
+  // Displayed face score = pillar average rounded to 1 decimal
+  const faceScore     = Math.round(aestheticRaw * 10) / 10
   const bodyScore     = clamp(bodyResult.body_score)
   const groomingScore = clamp(faceResult.grooming_score)
   const bodyCap       = clamp(bodyResult.body_cap, 10.0)
@@ -559,16 +566,18 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
   let weighted, capped
   if (skipBody) {
     // Face 70% + Grooming 30% — no body cap
-    weighted = faceScore * 0.70 + groomingScore * 0.30
+    // Use unrounded aestheticRaw to avoid compounding rounding error
+    weighted = aestheticRaw * 0.70 + groomingScore * 0.30
     capped = weighted
   } else {
     // Weighted average: aesthetic 55%, body 35%, grooming 10%
-    weighted = faceScore * 0.55 + bodyScore * 0.35 + groomingScore * 0.10
+    // Use unrounded aestheticRaw to avoid compounding rounding error
+    weighted = aestheticRaw * 0.55 + bodyScore * 0.35 + groomingScore * 0.10
     // Enforce body cap in code — Math.min() — AI cannot override this
     capped = Math.min(weighted, bodyCap)
   }
 
-  // Round to 1 decimal
+  // Round final score to 1 decimal — only rounding that matters
   const final = Math.round(capped * 10) / 10
 
   const bodyFatCapApplied = capped < weighted
