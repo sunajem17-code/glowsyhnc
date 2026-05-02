@@ -867,10 +867,12 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     console.error(`[aiScore] ROUTE ERROR — userId=${req.userId} status=${status} retryExhausted=${!!err.retryExhausted} msg="${msg.slice(0, 300)}"`)
 
     if (isRateLimit) {
-      return res.status(503).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
+      // 'rate_limited' is the machine-readable code the client checks for countdown/auto-retry
+      return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
     }
 
-    res.status(500).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
+    // Generic server error — client shows fallback message
+    res.status(500).json({ error: 'server_error' })
   }
 })
 

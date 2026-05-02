@@ -600,10 +600,11 @@ export default function Scan() {
         setStep(3)
       } else if (err.message === 'rate_limited') {
         setRateLimited(true)
-        setRetryCountdown(err.retryAfter || 30)
+        setRetryCountdown(err.retryAfter || 60)
         setStep(3)
       } else {
-        setError(err.message || 'Analysis failed — please try again.')
+        // server_error, timeout, network failure — show retry button
+        setError('Analysis unavailable right now. Please try again in a minute.')
         setStep(3)
       }
     }
@@ -755,10 +756,18 @@ export default function Scan() {
       {/* Error */}
       {error && !rateLimited && (
         <div className="px-4 pb-2">
-          <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
-            <AlertCircle size={15} className="text-warning flex-shrink-0" />
-            <p className="text-sm text-warning font-body flex-1">{error}</p>
-            <button onClick={() => setError('')} className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100"><X size={14} className="text-warning" /></button>
+          <div className="flex flex-col gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
+            <div className="flex items-center gap-2">
+              <AlertCircle size={15} className="text-warning flex-shrink-0" />
+              <p className="text-sm text-warning font-body flex-1">{error}</p>
+              <button onClick={() => setError('')} className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100"><X size={14} className="text-warning" /></button>
+            </div>
+            <button
+              onClick={() => { setError(''); startAnalysisRef.current?.() }}
+              className="w-full text-sm font-heading font-bold py-2 rounded-xl active:opacity-70 transition-opacity"
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
+              Try Again
+            </button>
           </div>
         </div>
       )}

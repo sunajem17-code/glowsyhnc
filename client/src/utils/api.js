@@ -18,7 +18,9 @@ async function request(path, options = {}) {
   if (!res.ok) {
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
-    if (contentType.includes('text/html') || res.status === 502 || res.status === 503 || res.status === 504) {
+    // 502/504 are proxy/gateway errors that return HTML — bail early.
+    // 503 from our own API returns JSON (rate-limit payload) — let it fall through.
+    if (contentType.includes('text/html') || res.status === 502 || res.status === 504) {
       throw new Error('Server unavailable')
     }
     const errBody = await res.json().catch(() => ({}))
@@ -59,6 +61,7 @@ export const api = {
     profile: () => request('/user/profile'),
     update: (data) => request('/user/profile', { method: 'PUT', body: JSON.stringify(data) }),
     deleteAccount: () => request('/user/account', { method: 'DELETE' }),
+    scanHistory: () => request('/user/scan-history'),
   },
   scan: {
     upload: (formData) => {
@@ -90,7 +93,8 @@ export const api = {
     compare: (id1, id2) => request(`/progress/compare?id1=${id1}&id2=${id2}`),
   },
   products: {
-    recommended: () => request('/products/recommended'),
+    recommended:     ()     => request('/products/recommended'),
+    recommendations: (data) => request('/products/recommendations', { method: 'POST', body: JSON.stringify(data) }),
   },
   payments: {
     createCheckout: (plan, noTrial = false) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan, noTrial }) }),
