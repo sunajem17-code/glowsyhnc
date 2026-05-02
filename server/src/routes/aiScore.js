@@ -75,29 +75,32 @@ function releaseSlot() {
 }
 
 // ── Retry helper ──────────────────────────────────────────────────────────────
-// Retries fn up to 3 times on Anthropic 429 / 529 / overloaded responses.
-// Backoff: 2 s → 4 s → 8 s (+ up to 500 ms jitter). Other errors throw immediately.
-async function withRetry(fn, maxRetries = 3, baseDelayMs = 2000) {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      const status = err.status ?? err.statusCode ?? 0
-      const msg = (err.message || '').toLowerCase()
-      const isRetryable =
-        status === 429 ||
-        status === 529 ||
-        msg.includes('rate limit') ||
-        msg.includes('rate_limit') ||
-        msg.includes('overloaded') ||
-        msg.includes('capacity')
+// On 529 / quota / overloaded: waits 3 s then retries exactly once.
+// Any other error throws immediately. Non-retryable on second failure.
+async function withRetry(fn) {
+  try {
+    return await fn()
+  } catch (err) {
+    const status = err.status ?? err.statusCode ?? 0
+    const msg = (err.message || '').toLowerCase()
+    const isRetryable =
+      status === 429 ||
+      status === 529 ||
+      msg.includes('quota') ||
+      msg.includes('rate limit') ||
+      msg.includes('rate_limit') ||
+      msg.includes('overloaded') ||
+      msg.includes('capacity') ||
+      msg.includes('exceeded') ||
+      msg.includes('too many')
 
-      if (!isRetryable || attempt === maxRetries) throw err
+    if (!isRetryable) throw err
 
-      const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500
-      console.warn(`[aiScore] Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms — ${err.message?.slice(0, 80)}`)
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
+    console.error(`[aiScore] Rate limit hit — waiting 3s then retrying once. Error: ${err.message?.slice(0, 120)}`)
+    await new Promise(resolve => setTimeout(resolve, 3000))
+
+    // Second attempt — let any error propagate to the route handler
+    return await fn()
   }
 }
 
@@ -799,21 +802,22 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
 
     res.json(result)
   } catch (err) {
-    console.error('[aiScore] Error:', err.message)
-    const msg = (err.message || '').toLowerCase()
     const status = err.status ?? err.statusCode ?? 0
+    const msg = (err.message || '').toLowerCase()
     const isRateLimit =
       status === 429 || status === 529 ||
       msg.includes('quota') || msg.includes('rate limit') ||
       msg.includes('rate_limit') || msg.includes('exceeded') ||
       msg.includes('overloaded') || msg.includes('capacity') ||
-      msg.includes('too many') || msg.includes('limit')
+      msg.includes('too many')
 
     if (isRateLimit) {
-      return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
+      console.error(`[aiScore] Quota/rate-limit after retry — userId=${req.userId} status=${status} msg="${err.message?.slice(0, 120)}"`)
+      return res.status(503).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
     }
-    // Never expose raw Anthropic error strings to the client
-    res.status(500).json({ error: 'AI scoring failed — please try again.' })
+
+    console.error(`[aiScore] Unexpected error — userId=${req.userId} status=${status} msg="${err.message?.slice(0, 120)}"`)
+    res.status(500).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
   }
 })
 
