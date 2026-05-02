@@ -543,10 +543,10 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
 
   // 4 Pillars — average becomes the aesthetic (face) component
   const p = faceResult.pillars || {}
-  const harmony     = clamp(p.harmony)
-  const angularity  = clamp(p.angularity)
-  const features    = clamp(p.features)
-  const dimorphism  = clamp(p.dimorphism)
+  let harmony     = clamp(p.harmony)
+  let angularity  = clamp(p.angularity)
+  let features    = clamp(p.features)
+  let dimorphism  = clamp(p.dimorphism)
   const pillarAvg   = (harmony + angularity + features + dimorphism) / 4
 
   // Use pillar average if available, otherwise fall back to raw face_score
@@ -574,10 +574,17 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
   const bodyFatCapApplied = capped < weighted
 
   // Tier assignment — exact ranges, gender-aware
+  // MALE:   Sub 3 (<4) · Low Tier Normie (4–4.9) · Mid Tier Normie (5–5.9)
+  //         High Tier Normie (6–6.9) · Chadlite (7–7.9) · Chad (8–8.9)
+  //         Adam Lite (9–9.4) · True Adam (9.5–10)
+  // FEMALE: Sub 3 (<4) · Low Tier Becky (4–4.9) · Mid Tier Becky (5–5.9)
+  //         High Tier Becky (6–6.9) · Stacy (7–7.9) · Eve (8–8.9)
+  //         Eve Lite (9–9.4) · True Eve (9.5–10)
   let tier
   if (gender === 'female') {
     if      (final >= 9.5) tier = 'True Eve'
-    else if (final >= 8.5) tier = 'Eve'
+    else if (final >= 9.0) tier = 'Eve Lite'
+    else if (final >= 8.0) tier = 'Eve'
     else if (final >= 7.0) tier = 'Stacy'
     else if (final >= 6.0) tier = 'High Tier Becky'
     else if (final >= 5.0) tier = 'Mid Tier Becky'
@@ -585,13 +592,24 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
     else                   tier = 'Sub 3'
   } else {
     if      (final >= 9.5) tier = 'True Adam'
-    else if (final >= 8.5) tier = 'Adam Lite'
-    else if (final >= 7.5) tier = 'Chad'
+    else if (final >= 9.0) tier = 'Adam Lite'
+    else if (final >= 8.0) tier = 'Chad'
     else if (final >= 7.0) tier = 'Chadlite'
     else if (final >= 6.0) tier = 'High Tier Normie'
     else if (final >= 5.0) tier = 'Mid Tier Normie'
     else if (final >= 4.0) tier = 'Low Tier Normie'
     else                   tier = 'Sub 3'
+  }
+
+  // Pillar floor rule: when overall >= 8.0, no individual pillar can be more than
+  // 1.5 points below the overall score. Prevents contradictory displays
+  // (e.g. 8.5 overall with 5.0 harmony). Only adjusts displayed values — final unchanged.
+  if (final >= 8.0 && hasPillars) {
+    const pillarFloor = Math.round((final - 1.5) * 10) / 10
+    harmony    = Math.max(harmony,    pillarFloor)
+    angularity = Math.max(angularity, pillarFloor)
+    features   = Math.max(features,   pillarFloor)
+    dimorphism = Math.max(dimorphism, pillarFloor)
   }
 
   return { final, tier, bodyFatCapApplied, faceScore, bodyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars }

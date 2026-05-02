@@ -94,7 +94,7 @@ export function checkAchievements(state) {
 
   // Top tier
   const latestTier = scans?.[0]?.tier
-  if (['Chadlite', 'Chad', 'Gigachad'].includes(latestTier) && !already('top_tier')) {
+  if (['Chadlite', 'Chad', 'Adam Lite', 'True Adam', 'Stacy', 'Eve', 'Eve Lite', 'True Eve'].includes(latestTier) && !already('top_tier')) {
     toUnlock.push('top_tier')
   }
 

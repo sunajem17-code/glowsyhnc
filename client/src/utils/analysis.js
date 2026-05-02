@@ -20,11 +20,12 @@ function seededRand(seed, offset = 0) {
 // ─── Tier definitions ─────────────────────────────────────────────────────────
 //
 // MALE:   Sub 3 (1–3.9) · Low Tier Normie (4–4.9) · Mid Tier Normie (5–5.9)
-//         High Tier Normie (6–6.9) · Chadlite (7–7.4) · Chad (7.5–8.4)
-//         Adam Lite (8.5–9.4) · True Adam (9.5–10)
+//         High Tier Normie (6–6.9) · Chadlite (7–7.9) · Chad (8–8.9)
+//         Adam Lite (9–9.4) · True Adam (9.5–10)
 //
 // FEMALE: Sub 3 (1–3.9) · Low Tier Becky (4–4.9) · Mid Tier Becky (5–5.9)
-//         High Tier Becky (6–6.9) · Stacey (7–8.4) · Eve (8.5–9.4) · True Eve (9.5–10)
+//         High Tier Becky (6–6.9) · Stacy (7–7.9) · Eve (8–8.9)
+//         Eve Lite (9–9.4) · True Eve (9.5–10)
 
 export const MALE_TIERS = [
   {
@@ -38,7 +39,7 @@ export const MALE_TIERS = [
     nextTierSteps: ['This tier is the realistic ceiling. Maintain and optimize.'],
   },
   {
-    min: 8.5, max: 9.5,
+    min: 9.0, max: 9.5,
     label: 'Adam Lite', shortLabel: 'Adam Lite',
     color: '#DDA0FF', bg: 'rgba(155,89,182,0.13)', border: '#9B59B6',
     emoji: '💎',
@@ -52,7 +53,7 @@ export const MALE_TIERS = [
     ],
   },
   {
-    min: 7.5, max: 8.5,
+    min: 8.0, max: 9.0,
     label: 'Chad', shortLabel: 'Chad',
     color: '#A29BFE', bg: 'rgba(108,92,231,0.12)', border: '#6C5CE7',
     emoji: '🔥',
@@ -66,7 +67,7 @@ export const MALE_TIERS = [
     ],
   },
   {
-    min: 7.0, max: 7.5,
+    min: 7.0, max: 8.0,
     label: 'Chadlite', shortLabel: 'Chadlite',
     color: '#74B9FF', bg: 'rgba(9,132,227,0.11)', border: '#0984E3',
     emoji: '⚡',
@@ -149,8 +150,8 @@ export const FEMALE_TIERS = [
     nextTierSteps: ['This tier is the realistic ceiling. Maintain and optimize.'],
   },
   {
-    min: 8.5, max: 9.5,
-    label: 'Eve', shortLabel: 'Eve',
+    min: 9.0, max: 9.5,
+    label: 'Eve Lite', shortLabel: 'Eve Lite',
     color: '#DDA0FF', bg: 'rgba(155,89,182,0.13)', border: '#9B59B6',
     emoji: '💎',
     desc: 'Extremely rare. Near-perfect facial structure with very few flaws. Top 1–2% globally. Striking features, excellent symmetry, and minimal flaws.',
@@ -163,9 +164,23 @@ export const FEMALE_TIERS = [
     ],
   },
   {
-    min: 7.0, max: 8.5,
-    label: 'Stacey', shortLabel: 'Stacey',
+    min: 8.0, max: 9.0,
+    label: 'Eve', shortLabel: 'Eve',
     color: '#A29BFE', bg: 'rgba(108,92,231,0.12)', border: '#6C5CE7',
+    emoji: '✨',
+    desc: 'Highly attractive. Exceptional cheekbones, facial harmony, and clear definition. Top 5–10%. Targeted refinements can reach Eve Lite.',
+    percentile: 'Top 5–10%',
+    nextTier: 'Eve Lite',
+    nextTierSteps: [
+      'Identify and target weakest sub-score — one focused improvement closes the gap.',
+      'Advanced skincare — retinoids and vitamin C for texture and clarity.',
+      'Body composition optimization for facial definition.',
+    ],
+  },
+  {
+    min: 7.0, max: 8.0,
+    label: 'Stacy', shortLabel: 'Stacy',
+    color: '#74B9FF', bg: 'rgba(9,132,227,0.11)', border: '#0984E3',
     emoji: '🔥',
     desc: 'Highly attractive. Strong cheekbones, facial harmony, and clear definition. Top 10–15%. Targeted improvements can reach Eve.',
     percentile: 'Top 10–15%',
@@ -183,7 +198,7 @@ export const FEMALE_TIERS = [
     emoji: '✅',
     desc: 'Clearly attractive. Objectively above average with a strong base. Top 20–30%. Minor flaws present but nothing structurally limiting.',
     percentile: 'Top 20–30%',
-    nextTier: 'Stacey',
+    nextTier: 'Stacy',
     nextTierSteps: [
       'Skincare protocol (cleanser → BHA/AHA → moisturizer → SPF daily) for 8 weeks.',
       'Body composition improvement — leaner face alone shifts tier perception.',
