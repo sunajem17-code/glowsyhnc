@@ -235,7 +235,7 @@ Include a "profile" object in your JSON response.` : ''
   }` : ''
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-sonnet-4-6',
     max_tokens: hasSide ? 1100 : 950,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
