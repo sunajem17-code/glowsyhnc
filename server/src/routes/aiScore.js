@@ -75,32 +75,52 @@ function releaseSlot() {
 }
 
 // ── Retry helper ──────────────────────────────────────────────────────────────
-// On 529 / quota / overloaded: waits 3 s then retries exactly once.
-// Any other error throws immediately. Non-retryable on second failure.
-async function withRetry(fn) {
-  try {
-    return await fn()
-  } catch (err) {
-    const status = err.status ?? err.statusCode ?? 0
-    const msg = (err.message || '').toLowerCase()
-    const isRetryable =
-      status === 429 ||
-      status === 529 ||
-      msg.includes('quota') ||
-      msg.includes('rate limit') ||
-      msg.includes('rate_limit') ||
-      msg.includes('overloaded') ||
-      msg.includes('capacity') ||
-      msg.includes('exceeded') ||
-      msg.includes('too many')
+// 429 (rate limit) → wait 5 s, retry up to 3 times
+// 529 (overloaded) → wait 3 s, retry up to 3 times
+// quota/exceeded   → treated same as 429 (5 s wait)
+// Other errors     → throw immediately, no retry
+// After 3 retries  → throw enriched error with exact status + message for Railway logs
+async function withRetry(fn, label = 'api') {
+  const MAX_RETRIES = 3
 
-    if (!isRetryable) throw err
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const status  = err.status ?? err.statusCode ?? 0
+      // Anthropic SDK nests the real message inside err.error on some versions
+      const apiMsg  = err.error?.error?.message || err.error?.message || ''
+      const rawMsg  = err.message || ''
+      const fullMsg = apiMsg || rawMsg
 
-    console.error(`[aiScore] Rate limit hit — waiting 3s then retrying once. Error: ${err.message?.slice(0, 120)}`)
-    await new Promise(resolve => setTimeout(resolve, 3000))
+      const lower   = fullMsg.toLowerCase()
+      const is429   = status === 429 || lower.includes('rate limit') || lower.includes('rate_limit') || lower.includes('too many') || lower.includes('quota') || lower.includes('exceeded')
+      const is529   = status === 529 || lower.includes('overloaded') || lower.includes('capacity')
+      const isRetryable = is429 || is529
 
-    // Second attempt — let any error propagate to the route handler
-    return await fn()
+      const typeTag = is429 ? '429_RATE_LIMIT' : is529 ? '529_OVERLOADED' : `${status}_ERROR`
+      const waitMs  = is429 ? 5000 : 3000
+
+      // Always log the exact status + message so Railway shows the real cause
+      console.error(`[aiScore:${label}] attempt=${attempt} status=${status} type=${typeTag} msg="${fullMsg.slice(0, 300)}"`)
+
+      if (!isRetryable) {
+        // Non-retryable — re-throw immediately
+        throw err
+      }
+
+      if (attempt > MAX_RETRIES) {
+        // Exhausted retries — throw enriched error with full detail
+        console.error(`[aiScore:${label}] GAVE UP after ${MAX_RETRIES} retries — status=${status} type=${typeTag}`)
+        const enriched = new Error(`[${typeTag}] after ${MAX_RETRIES} retries: ${fullMsg || `HTTP ${status}`}`)
+        enriched.status = status
+        enriched.retryExhausted = true
+        throw enriched
+      }
+
+      console.error(`[aiScore:${label}] waiting ${waitMs}ms before retry ${attempt}/${MAX_RETRIES}...`)
+      await new Promise(resolve => setTimeout(resolve, waitMs))
+    }
   }
 }
 
@@ -676,17 +696,19 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     let bodyResult, faceResult, celebResult
 
     try {
+      // 500 ms stagger between API calls — prevents simultaneous burst hitting rate limits
+      const stagger = () => new Promise(r => setTimeout(r, 500))
+
       if (skipBody) {
         // Only run face + celebrity — body defaults applied
-        console.log('[aiScore] skipBody=true — running face + celebrity only...')
+        console.log('[aiScore] skipBody=true — running face then celebrity (staggered 500ms)...')
         console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-        ;[faceResult, celebResult] = await Promise.all([
-          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType)),
-          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender)).catch(err => {
-            console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-            return null
-          }),
-        ])
+        faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
+        await stagger()
+        celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
+          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+          return null
+        })
         bodyResult = {
           body_category: 'NOT_PROVIDED',
           body_score: 5.0,
@@ -700,17 +722,17 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         const bodyBase64 = stripPrefix(bodyImage)
         console.log('[aiScore] Media types — face:', faceMediaType, '| body:', bodyMediaType)
 
-        // Run body + face + celebrity calls in parallel — all fully independent
-        console.log('[aiScore] Starting body + face + celebrity scoring in parallel...')
+        // Stagger calls 500ms apart — avoids simultaneous burst on Tier 1 rate limits
+        console.log('[aiScore] Starting body → face → celebrity (staggered 500ms each)...')
         console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-        ;[bodyResult, faceResult, celebResult] = await Promise.all([
-          withRetry(() => getBodyScore(bodyBase64, bodyMediaType, gender)),
-          withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType)),
-          withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender)).catch(err => {
-            console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-            return null
-          }),
-        ])
+        bodyResult = await withRetry(() => getBodyScore(bodyBase64, bodyMediaType, gender), 'body')
+        await stagger()
+        faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
+        await stagger()
+        celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
+          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+          return null
+        })
         console.log('[aiScore] Body:', bodyResult.body_category, bodyResult.body_score, '| cap:', bodyResult.body_cap)
       }
     } finally {
@@ -830,20 +852,22 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     res.json(result)
   } catch (err) {
     const status = err.status ?? err.statusCode ?? 0
-    const msg = (err.message || '').toLowerCase()
+    const msg    = err.message || ''
+    const lower  = msg.toLowerCase()
     const isRateLimit =
-      status === 429 || status === 529 ||
-      msg.includes('quota') || msg.includes('rate limit') ||
-      msg.includes('rate_limit') || msg.includes('exceeded') ||
-      msg.includes('overloaded') || msg.includes('capacity') ||
-      msg.includes('too many')
+      status === 429 || status === 529 || err.retryExhausted ||
+      lower.includes('quota') || lower.includes('rate limit') ||
+      lower.includes('rate_limit') || lower.includes('exceeded') ||
+      lower.includes('overloaded') || lower.includes('capacity') ||
+      lower.includes('too many')
+
+    // Full error detail always logged to Railway — including retry-exhausted errors
+    console.error(`[aiScore] ROUTE ERROR — userId=${req.userId} status=${status} retryExhausted=${!!err.retryExhausted} msg="${msg.slice(0, 300)}"`)
 
     if (isRateLimit) {
-      console.error(`[aiScore] Quota/rate-limit after retry — userId=${req.userId} status=${status} msg="${err.message?.slice(0, 120)}"`)
       return res.status(503).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
     }
 
-    console.error(`[aiScore] Unexpected error — userId=${req.userId} status=${status} msg="${err.message?.slice(0, 120)}"`)
     res.status(500).json({ error: 'Analysis unavailable right now. Please try again in a minute.' })
   }
 })
