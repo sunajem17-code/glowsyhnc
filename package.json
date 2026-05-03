@@ -6,9 +6,14 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install"
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@secretlint/secretlint-rule-pattern": "^12.3.1",
+    "@secretlint/secretlint-rule-preset-recommend": "^12.3.1",
+    "concurrently": "^8.2.2",
+    "husky": "^9.1.7",
+    "secretlint": "^12.3.1"
   }
 }

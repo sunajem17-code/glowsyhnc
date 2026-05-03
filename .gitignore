@@ -1,7 +1,18 @@
 node_modules/
+
+# Environment files — never commit these
 .env
+.env.local
+.env.production
+.env.development
+.env.test
+.env.*
+*.env
+*.env.save
 server/.env
 server/.env.save
+client/.env
+
 data/
 dist/
 .DS_Store
