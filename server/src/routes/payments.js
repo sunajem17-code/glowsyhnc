@@ -67,7 +67,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[Stripe] checkout error:', err.type, err.code, err.message)
     console.error('[Stripe] price used:', PRICES[plan])
-    res.status(500).json({ error: err.message, type: err.type, code: err.code })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -157,21 +157,21 @@ async function handleWebhook(req, res) {
 
   // express.raw() sets req.body to a Buffer — that's what constructEvent needs
   console.log('[Webhook] sig present:', !!sig)
-  console.log('[Webhook] secret length:', secret.length, '| starts:', secret.slice(0, 12))
   console.log('[Webhook] body is Buffer:', Buffer.isBuffer(req.body), '| length:', req.body?.length)
+
+  // Reject immediately if webhook secret is not configured — never process unverified events
+  if (!secret) {
+    console.error('[Webhook] ❌ STRIPE_WEBHOOK_SECRET is not set — refusing unverified webhook')
+    return res.status(400).json({ error: 'Webhook not configured' })
+  }
 
   let event
   try {
-    if (secret) {
-      event = stripe.webhooks.constructEvent(req.body, sig, secret)
-      console.log('[Webhook] ✅ Signature verified')
-    } else {
-      event = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body
-      console.warn('[Webhook] ⚠️  No STRIPE_WEBHOOK_SECRET — skipping sig verification')
-    }
+    event = stripe.webhooks.constructEvent(req.body, sig, secret)
+    console.log('[Webhook] ✅ Signature verified')
   } catch (err) {
     console.error('[Webhook] ❌ Signature verification FAILED:', err.message)
-    return res.status(400).json({ error: `Webhook error: ${err.message}` })
+    return res.status(400).json({ error: 'Webhook signature verification failed' })
   }
 
   console.log('[Webhook] Event type:', event.type, '| Event id:', event.id)
@@ -277,7 +277,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
     })
     res.json({ url: session.url })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 

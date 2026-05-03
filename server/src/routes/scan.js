@@ -1,7 +1,7 @@
 const express = require('express')
-const multer = require('multer')
-const path = require('path')
-const fs = require('fs')
+const multer  = require('multer')
+const path    = require('path')
+const fs      = require('fs')
 const { v4: uuid } = require('uuid')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
@@ -13,15 +13,29 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
 const storage = multer.diskStorage({
   destination: UPLOADS_DIR,
-  filename: (req, file, cb) => cb(null, `${uuid()}-${file.originalname}`),
+  filename: (req, file, cb) => cb(null, `${uuid()}.${file.mimetype.split('/')[1]}`),
 })
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
+
+// Only accept JPEG, PNG, and WebP — reject everything else before it hits disk
+const fileFilter = (req, file, cb) => {
+  if (/^image\/(jpeg|png|webp)$/.test(file.mimetype)) {
+    cb(null, true)
+  } else {
+    cb(new Error('Only JPEG, PNG, and WebP images are allowed'), false)
+  }
+}
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+})
 
 router.post('/upload', authMiddleware, upload.fields([
   { name: 'facePhoto', maxCount: 1 },
   { name: 'bodyPhoto', maxCount: 1 },
 ]), (req, res) => {
-  const scanId = uuid()
+  const scanId    = uuid()
   const facePhoto = req.files?.facePhoto?.[0]
   const bodyPhoto = req.files?.bodyPhoto?.[0]
   if (!facePhoto || !bodyPhoto) return res.status(400).json({ error: 'Both photos required' })
@@ -58,9 +72,9 @@ router.get('/history', authMiddleware, (req, res) => {
   const scans = db.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC').all(req.userId)
   const parsed = scans.map(s => ({
     ...s,
-    faceData: s.face_data ? JSON.parse(s.face_data) : null,
-    bodyData: s.body_data ? JSON.parse(s.body_data) : null,
-    insights: s.insights ? JSON.parse(s.insights) : [],
+    faceData: s.face_data  ? JSON.parse(s.face_data)  : null,
+    bodyData: s.body_data  ? JSON.parse(s.body_data)  : null,
+    insights: s.insights   ? JSON.parse(s.insights)   : [],
   }))
   res.json({ scans: parsed })
 })
@@ -72,7 +86,7 @@ router.get('/:id', authMiddleware, (req, res) => {
     ...scan,
     faceData: scan.face_data ? JSON.parse(scan.face_data) : null,
     bodyData: scan.body_data ? JSON.parse(scan.body_data) : null,
-    insights: scan.insights ? JSON.parse(scan.insights) : [],
+    insights: scan.insights  ? JSON.parse(scan.insights)  : [],
   })
 })
 

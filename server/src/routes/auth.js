@@ -1,5 +1,6 @@
-const express = require('express')
-const bcrypt = require('bcryptjs')
+const express   = require('express')
+const bcrypt    = require('bcryptjs')
+const rateLimit = require('express-rate-limit')
 const { v4: uuid } = require('uuid')
 const db = require('../db')
 const { signToken } = require('../middleware/auth')
@@ -7,8 +8,17 @@ const { getSupabase, getUserByEmail, createUser } = require('../supabase')
 
 const router = express.Router()
 
+// ── Rate limiter: 10 attempts per 15 minutes per IP ──────────────────────────
+const authLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,
+  max:              10,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: 'Too many attempts — please try again in 15 minutes' },
+})
+
 // ── POST /api/auth/register ───────────────────────────────────────────────────
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { name, email, password, refCode } = req.body
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' })
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
@@ -77,12 +87,12 @@ router.post('/register', async (req, res) => {
     }
   } catch (err) {
     console.error('[Auth] Register error:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
 
@@ -106,16 +116,16 @@ router.post('/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' })
 
     const safe = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
+      id:               user.id,
+      name:             user.name,
+      email:            user.email,
       subscriptionTier: user.subscription_tier || 'free',
-      createdAt: user.created_at,
+      createdAt:        user.created_at,
     }
     res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
     console.error('[Auth] Login error:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 

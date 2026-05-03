@@ -115,7 +115,7 @@ router.post('/scans', auth, async (req, res) => {
     res.json({ scanId: scan.id, userId: sbUserId })
   } catch (err) {
     console.error('[Supabase] Save scan failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -146,7 +146,7 @@ router.get('/scans', auth, async (req, res) => {
     res.json({ scans: scans ?? [] })
   } catch (err) {
     console.error('[Supabase] Load scans failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -177,7 +177,7 @@ router.get('/progress', auth, async (req, res) => {
     res.json({ progress: progress ?? [] })
   } catch (err) {
     console.error('[Supabase] Load progress failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -201,7 +201,7 @@ router.patch('/tasks/:id', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     console.error('[Supabase] Update task failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -233,7 +233,7 @@ router.get('/tasks', auth, async (req, res) => {
     res.json({ tasks: tasks ?? [] })
   } catch (err) {
     console.error('[Supabase] Load tasks failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -263,7 +263,7 @@ router.put('/user', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     console.error('[Supabase] Update user failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
@@ -294,7 +294,7 @@ router.post('/upload-image', auth, async (req, res) => {
     res.json({ url: publicUrl })
   } catch (err) {
     console.error('[Supabase] Image upload failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 

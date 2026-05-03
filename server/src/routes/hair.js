@@ -74,7 +74,7 @@ Return this exact JSON structure with no extra text:
     res.json(result)
   } catch (err) {
     console.error('[Hair] Analysis failed:', err.message)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 

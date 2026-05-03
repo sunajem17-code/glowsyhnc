@@ -1,9 +1,11 @@
 const express = require('express')
 const { v4: uuidv4 } = require('uuid')
 const db = require('../db')
+const { authMiddleware } = require('../middleware/auth')
+
 const router = express.Router()
 
-// Get this week's leaderboard (top 20 by improvement)
+// Get this week's leaderboard (top 20 by improvement) — public
 router.get('/', (req, res) => {
   try {
     const weekStart = getWeekStart()
@@ -16,17 +18,20 @@ router.get('/', (req, res) => {
     `).all(weekStart)
     res.json({ leaderboard: rows, weekStart })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[Leaderboard] GET error:', err.message)
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
-// Submit/update score
-router.post('/submit', (req, res) => {
+// Submit/update score — requires auth; identity comes from JWT, not request body
+router.post('/submit', authMiddleware, (req, res) => {
   try {
-    const { username, score } = req.body
-    if (!username || score === undefined || score === null) {
-      return res.status(400).json({ error: 'username and score required' })
+    const { score } = req.body
+    if (score === undefined || score === null) {
+      return res.status(400).json({ error: 'score required' })
     }
+    // Use the authenticated userId as the username — users cannot spoof other users
+    const username = req.userId
     const weekStart = getWeekStart()
     const existing = db.prepare('SELECT * FROM leaderboard WHERE username = ? AND week_start = ?').get(username, weekStart)
     if (existing) {
@@ -36,7 +41,8 @@ router.post('/submit', (req, res) => {
     }
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[Leaderboard] POST error:', err.message)
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 
