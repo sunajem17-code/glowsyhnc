@@ -1,21 +1,24 @@
-const express   = require('express')
-const bcrypt    = require('bcryptjs')
-const rateLimit = require('express-rate-limit')
+const express = require('express')
+const bcrypt  = require('bcryptjs')
 const { v4: uuid } = require('uuid')
 const db = require('../db')
 const { signToken } = require('../middleware/auth')
 const { getSupabase, getUserByEmail, createUser } = require('../supabase')
+const { createLimiter } = require('../middleware/ratelimit')
 
 const router = express.Router()
 
-// ── Rate limiter: 10 attempts per 15 minutes per IP ──────────────────────────
-const authLimiter = rateLimit({
-  windowMs:         15 * 60 * 1000,
-  max:              10,
-  standardHeaders:  true,
-  legacyHeaders:    false,
-  message:          { error: 'Too many attempts — please try again in 15 minutes' },
-})
+// ── Rate limiter: 10 attempts per 15 minutes per IP (Upstash-backed) ─────────
+const checkAuthLimit = createLimiter('auth', 10, '15 m', 15 * 60 * 1000)
+
+async function authLimiter(req, res, next) {
+  const ip      = req.ip || req.socket?.remoteAddress || 'unknown'
+  const allowed = await checkAuthLimit(ip)
+  if (!allowed) {
+    return res.status(429).json({ error: 'Too many attempts — please try again in 15 minutes' })
+  }
+  next()
+}
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
 router.post('/register', authLimiter, async (req, res) => {

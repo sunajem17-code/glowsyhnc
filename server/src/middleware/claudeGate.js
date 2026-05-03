@@ -4,47 +4,33 @@
  *
  * Exports:
  *   verifyToken   — JWT required; demo-token accepted as rate-limited guest
- *   claudeLimit   — 10 Claude calls / user / hour (all endpoints)
- *   scanLimit     — 3 scans / free user / day
+ *   claudeLimit   — Claude calls per hour (100 pro / 25 free / 5 demo)
+ *   scanLimit     — 3 scans/day free users; 1/hour demo; unlimited pro
  *   requirePro    — 403 unless user has active Pro or trial
+ *   resolvePro    — sets req.isPro without blocking
+ *
+ * Rate limits backed by Upstash Redis (persistent across deploys + instances).
+ * Falls back to in-memory automatically when Upstash is not configured.
  */
 
 const jwt = require('jsonwebtoken')
 const db  = require('../db')
 const { getSupabase, getUserById } = require('../supabase')
+const { createLimiter } = require('./ratelimit')
 
 const JWT_SECRET = process.env.JWT_SECRET
 
-// ── In-memory rate limit store ─────────────────────────────────────────────────
-// Map<key, { count, windowStart }>
-const _limits = new Map()
-
-function checkLimit(userId, bucket, max, windowMs) {
-  const key = `${userId}:${bucket}`
-  const now = Date.now()
-  let entry = _limits.get(key)
-
-  if (!entry || now - entry.windowStart > windowMs) {
-    entry = { count: 0, windowStart: now }
-  }
-
-  if (entry.count >= max) {
-    _limits.set(key, entry)
-    return false   // rejected
-  }
-
-  entry.count += 1
-  _limits.set(key, entry)
-  return true      // allowed
+// ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
+const checkClaude = {
+  pro:  createLimiter('claude:pro',  100, '1 h',  60 * 60 * 1000),
+  free: createLimiter('claude:free', 25,  '1 h',  60 * 60 * 1000),
+  demo: createLimiter('claude:demo', 5,   '1 h',  60 * 60 * 1000),
 }
 
-// Prune stale entries every 30 minutes to prevent unbounded memory growth
-setInterval(() => {
-  const cutoff = Date.now() - 2 * 60 * 60 * 1000  // 2 hours
-  for (const [key, entry] of _limits) {
-    if (entry.windowStart < cutoff) _limits.delete(key)
-  }
-}, 30 * 60 * 1000)
+const checkScan = {
+  free: createLimiter('scan:free', 3, '24 h', 24 * 60 * 60 * 1000),
+  demo: createLimiter('scan:demo', 1, '1 h',   1 * 60 * 60 * 1000),
+}
 
 // ── 1. Token verification ──────────────────────────────────────────────────────
 function verifyToken(req, res, next) {
@@ -57,9 +43,9 @@ function verifyToken(req, res, next) {
 
   // Demo token: limited guest access, no real user in DB
   if (token === 'demo-token') {
-    req.userId   = 'demo'
-    req.isDemo   = true
-    req.isPro    = false
+    req.userId = 'demo'
+    req.isDemo = true
+    req.isPro  = false
     return next()
   }
 
@@ -73,62 +59,59 @@ function verifyToken(req, res, next) {
   }
 }
 
-// ── 2. Claude call rate limit (all endpoints) ──────────────────────────────────
-// Pro users: 100 calls/hour  |  Free users: 25/hour  |  Demo: 5/hour
-function claudeLimit(req, res, next) {
-  const max = req.isPro ? 100 : req.isDemo ? 5 : 25
-  const allowed = checkLimit(req.userId, 'claude', max, 60 * 60 * 1000)
+// ── 2. Claude call rate limit ──────────────────────────────────────────────────
+// Pro: 100/hour · Free: 25/hour · Demo: 5/hour
+async function claudeLimit(req, res, next) {
+  const tier    = req.isPro ? 'pro' : req.isDemo ? 'demo' : 'free'
+  const allowed = await checkClaude[tier](req.userId)
   if (!allowed) {
-    return res.status(429).json({
-      error: `Rate limit reached — please try again in a few minutes`,
-    })
+    return res.status(429).json({ error: 'Rate limit reached — please try again in a few minutes' })
   }
   next()
 }
 
-// ── 3. Scan-specific rate limit (free users only) ──────────────────────────────
-// Max 3 scans per day for free users; Pro users are unrestricted
+// ── 3. Scan-specific rate limit ────────────────────────────────────────────────
+// Pro: unlimited · Free: 3/day · Demo: 1/hour
 async function scanLimit(req, res, next) {
-  // Pro users skip the scan cap entirely
   if (req.isPro) return next()
 
-  // Demo users: 1 scan per session (per hour window)
   if (req.isDemo) {
-    const allowed = checkLimit(req.userId, 'scan', 1, 60 * 60 * 1000)
-    if (!allowed) {
-      return res.status(429).json({ error: 'hourly_cap_reached', plan: 'demo' })
-    }
+    const allowed = await checkScan.demo(req.userId)
+    if (!allowed) return res.status(429).json({ error: 'hourly_cap_reached', plan: 'demo' })
     return next()
   }
 
-  // Real free users: 3 scans per 24 hours
-  const allowed = checkLimit(req.userId, 'scan', 3, 24 * 60 * 60 * 1000)
-  if (!allowed) {
-    return res.status(429).json({ error: 'hourly_cap_reached', plan: 'free' })
-  }
+  const allowed = await checkScan.free(req.userId)
+  if (!allowed) return res.status(429).json({ error: 'hourly_cap_reached', plan: 'free' })
   next()
 }
 
-// ── helper: resolve subscription tier from Supabase (primary) or SQLite (fallback) ──
+// ── helper: resolve subscription tier ─────────────────────────────────────────
 async function getSubscriptionTier(userId) {
   // Try Supabase first (production primary store)
   const sbUser = await getUserById(userId)
   if (sbUser) {
     return {
-      tier: sbUser.subscription_tier || 'free',
+      tier:        sbUser.subscription_tier || 'free',
       trialExpires: sbUser.pro_trial_expires_at || null,
-      isPro: sbUser.subscription_tier === 'premium' ||
-        (sbUser.subscription_tier === 'trial' && sbUser.pro_trial_expires_at && new Date() < new Date(sbUser.pro_trial_expires_at)) ||
+      isPro:
+        sbUser.subscription_tier === 'premium' ||
+        (sbUser.subscription_tier === 'trial' &&
+          sbUser.pro_trial_expires_at &&
+          new Date() < new Date(sbUser.pro_trial_expires_at)) ||
         sbUser.is_pro === true,
     }
   }
   // Fall back to SQLite (local dev)
   const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(userId)
-  const trialActive = row?.subscription_tier === 'trial' && row.pro_trial_expires_at && new Date() < new Date(row.pro_trial_expires_at)
+  const trialActive =
+    row?.subscription_tier === 'trial' &&
+    row.pro_trial_expires_at &&
+    new Date() < new Date(row.pro_trial_expires_at)
   return {
-    tier: row?.subscription_tier || 'free',
+    tier:        row?.subscription_tier || 'free',
     trialExpires: row?.pro_trial_expires_at || null,
-    isPro: row?.subscription_tier === 'premium' || trialActive,
+    isPro:       row?.subscription_tier === 'premium' || trialActive,
   }
 }
 
@@ -146,11 +129,11 @@ async function requirePro(req, res, next) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   } catch (err) {
     console.error('[claudeGate] requirePro error:', err.message)
-    return res.status(500).json({ error: 'Could not verify subscription' })
+    return res.status(500).json({ error: 'internal_error' })
   }
 }
 
-// ── 5. Resolve isPro for non-gated routes (sets req.isPro without blocking) ───
+// ── 5. Resolve isPro without blocking ─────────────────────────────────────────
 async function resolvePro(req, res, next) {
   if (req.isDemo) { req.isPro = false; return next() }
   try {
