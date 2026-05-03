@@ -557,7 +557,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
     {
       key: 'aiConsent',
       label: 'I consent to AI photo analysis',
-      sub: 'My face and body photos will be sent to Anthropic Claude AI for analysis and stored securely. I can delete my data anytime in Settings.',
+      sub: 'My face photos will be sent to Anthropic Claude AI for analysis and stored securely. I can delete my data anytime in Settings.',
     },
     {
       key: 'disclaimer',

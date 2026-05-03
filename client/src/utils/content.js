@@ -274,7 +274,7 @@ export const GROOMING_TIPS = [
 ]
 
 // ─── 12-Week Personalized Plan Generator ──────────────────────────────────────
-export function generatePlanTasks(faceData, bodyData, pillars = null, phase = 'TRANSFORM', gender = 'male') {
+export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM', gender = 'male') {
   const isFemale = gender === 'female'
   const lowH = pillars ? pillars.harmony < 6 : false
   const lowA = pillars ? pillars.angularity < 6 : false

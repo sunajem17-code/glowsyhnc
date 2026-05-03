@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
-import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock, ShoppingBag, ExternalLink, Sparkles } from 'lucide-react'
+import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import logo from '../assets/ascendus-icon.png'
 import GlowScoreRing from '../components/GlowScoreRing'
@@ -522,61 +523,68 @@ function ScoreRow({ label, score, note, detail, tip, isPremium, onUpgrade }) {
   )
 }
 
-// ─── Body metric detail card ──────────────────────────────────────────────────
 
-function BodyMetricCard({ label, score, classification, keyLine, urgencyLine, detected, protocol, scoreImpact, isPremium, onUpgrade }) {
-  const [open, setOpen] = useState(false)
-  const col = score >= 8 ? '#34C759' : score >= 6 ? '#C6A85C' : score >= 4 ? '#F5A623' : '#E07A5F'
-  const bg  = score >= 8 ? 'rgba(52,199,89,0.12)' : score >= 6 ? 'rgba(198,168,92,0.12)' : score >= 4 ? 'rgba(245,166,35,0.12)' : 'rgba(224,122,95,0.12)'
-  const pct = score != null ? ((score - 1) / 9) * 100 : 0
-  const hasExpand = !!(detected || protocol || scoreImpact)
+// ─── Personalized Product Stack ───────────────────────────────────────────────
+
+function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillars, gender, onUpgrade }) {
+  const [open, setOpen]         = useState(false)
+  const [products, setProducts] = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [fetched, setFetched]   = useState(false)
+
+  async function handleOpen() {
+    const next = !open
+    setOpen(next)
+    if (next && !fetched) {
+      setLoading(true)
+      try {
+        const { products: recs } = await api.products.recommendations({
+          weaknesses,
+          skinIssues,
+          groomingScore,
+          pillars,
+          gender,
+        })
+        setProducts(recs || [])
+      } catch {
+        setProducts([])
+      } finally {
+        setLoading(false)
+        setFetched(true)
+      }
+    }
+  }
+
+  // Free users see 1 full card; the rest are blurred with an upgrade gate
+  const VISIBLE_FREE = 1
+  const visibleProducts = isPremium ? products : products.slice(0, VISIBLE_FREE)
+  const lockedProducts  = isPremium ? []       : products.slice(VISIBLE_FREE)
+
+  function amazonUrl(searchQuery) {
+    return `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`
+  }
 
   return (
-    <div className="py-3 border-b border-default last:border-0">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-12 text-center py-1.5 rounded-lg" style={{ background: bg }}>
-          <div className="text-sm font-mono font-bold leading-none" style={{ color: col }}>
-            {score != null ? score.toFixed(1) : '—'}
-          </div>
-          <div className="text-[8px] font-mono mt-0.5 opacity-70" style={{ color: col }}>/10</div>
+    <div className="card mb-3">
+      {/* Header / toggle */}
+      <button className="w-full flex items-center gap-2 mb-1" onClick={handleOpen}>
+        <span className="text-base">🛍️</span>
+        <h2 className="font-heading font-bold text-sm text-primary flex-1 text-left">Your Personalized Product Stack</h2>
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(198,168,92,0.12)', color: '#C6A85C' }}>
+          {isPremium ? 'AI PICKS' : 'AI PICKS'}
+        </span>
+        <div
+          className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+          style={{ background: 'rgba(198,168,92,0.15)' }}
+        >
+          {open
+            ? <ChevronUp  size={13} style={{ color: '#C6A85C' }} />
+            : <ChevronDown size={13} style={{ color: '#C6A85C' }} />}
         </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
-            <p className="text-[13px] font-heading font-bold text-primary">{label}</p>
-            {classification && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: col, background: bg }}>
-                {classification}
-              </span>
-            )}
-          </div>
-          {keyLine && <p className="text-[10px] font-body text-secondary mb-1 leading-snug">{keyLine}</p>}
-          <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-1">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: col }}
-              initial={{ width: 0 }}
-              animate={{ width: `${pct}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            />
-          </div>
-          {urgencyLine && (
-            <p className="text-[10px] font-body leading-tight" style={{ color: col }}>
-              {urgencyLine}
-            </p>
-          )}
-        </div>
-
-        {hasExpand && (
-          <button onClick={() => setOpen(o => !o)} className="flex-shrink-0 mt-1 flex flex-col items-center">
-            {!isPremium && <Lock size={9} className="text-[#C6A85C] mb-0.5" />}
-            {open ? <ChevronUp size={13} className="text-secondary" /> : <ChevronDown size={13} className="text-secondary" />}
-          </button>
-        )}
-      </div>
+      </button>
 
       <AnimatePresence>
-        {open && hasExpand && (
+        {open && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -584,35 +592,182 @@ function BodyMetricCard({ label, score, classification, keyLine, urgencyLine, de
             transition={{ duration: 0.22 }}
             className="overflow-hidden"
           >
-            <div className="mt-2 space-y-1.5" style={{ paddingLeft: '60px' }}>
-              {isPremium ? (
-                <>
-                  {detected && (
-                    <div className="rounded-xl p-2.5 bg-black/[0.03] dark:bg-white/[0.04]">
-                      <p className="text-[9px] font-heading font-bold uppercase tracking-wide text-secondary mb-1">What Was Detected</p>
-                      <p className="text-[11px] font-body text-primary leading-relaxed">{detected}</p>
+            {/* Intro blurb */}
+            <p className="text-[10px] text-secondary font-body mb-3 leading-snug">
+              Products matched to your scan — selected based on your detected weak areas and skin issues.
+            </p>
+
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <div className="w-9 h-9 rounded-xl flex-shrink-0" style={{ background: 'rgba(198,168,92,0.1)' }} />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 rounded w-3/4" style={{ background: 'rgba(198,168,92,0.15)' }} />
+                      <div className="h-2 rounded w-full" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                      <div className="h-2 rounded w-1/2" style={{ background: 'rgba(255,255,255,0.04)' }} />
                     </div>
-                  )}
-                  {protocol && (
-                    <div className="rounded-xl p-2.5 bg-black/[0.03] dark:bg-white/[0.04]">
-                      <p className="text-[9px] font-heading font-bold uppercase tracking-wide text-secondary mb-1">Fix Protocol</p>
-                      <p className="text-[11px] font-body text-primary leading-relaxed">{protocol}</p>
+                  </div>
+                ))}
+                <div className="flex items-center justify-center gap-1.5 py-1">
+                  <div className="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#C6A85C', borderTopColor: 'transparent' }} />
+                  <span className="text-[10px] text-secondary font-body">Personalizing your stack…</span>
+                </div>
+              </div>
+            )}
+
+            {/* No results */}
+            {!loading && fetched && products.length === 0 && (
+              <p className="text-[11px] text-secondary font-body text-center py-4">
+                No recommendations available right now — try again after your next scan.
+              </p>
+            )}
+
+            {/* Product cards (visible to all) */}
+            {!loading && visibleProducts.map((product, i) => (
+              <motion.a
+                key={i}
+                href={amazonUrl(product.searchQuery || product.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex items-start gap-3 p-3 rounded-xl mb-2 no-underline active:opacity-70 transition-opacity group"
+                style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.14)' }}
+              >
+                {/* Icon */}
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(198,168,92,0.12)' }}>
+                  <ShoppingBag size={16} style={{ color: '#C6A85C' }} />
+                </div>
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-heading font-bold text-[12px] text-primary leading-snug mb-0.5 flex items-center gap-1">
+                    {product.name}
+                    <ExternalLink size={9} className="text-secondary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </p>
+                  <p className="text-[10px] text-secondary font-body leading-snug">{product.description}</p>
+                </div>
+                {/* Amazon CTA */}
+                <span
+                  className="flex-shrink-0 text-[9px] font-heading font-bold px-2 py-1 rounded-lg self-center"
+                  style={{ background: '#FF9900', color: '#000' }}
+                >
+                  Amazon
+                </span>
+              </motion.a>
+            ))}
+
+            {/* Locked products (free users) */}
+            {!loading && lockedProducts.length > 0 && (
+              <div className="relative rounded-2xl overflow-hidden mt-1">
+                {/* Blurred ghost cards */}
+                <div className="blur-sm pointer-events-none select-none opacity-40 space-y-2">
+                  {lockedProducts.map((product, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.14)' }}>
+                      <div className="w-9 h-9 rounded-xl flex-shrink-0" style={{ background: 'rgba(198,168,92,0.12)' }} />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-heading font-bold text-[12px] text-primary">{product.name}</p>
+                        <p className="text-[10px] text-secondary font-body">{product.description}</p>
+                      </div>
                     </div>
-                  )}
-                  {scoreImpact && (
-                    <div className="rounded-xl p-2.5 border" style={{ borderColor: col + '40', background: bg }}>
-                      <p className="text-[9px] font-heading font-bold uppercase tracking-wide mb-1" style={{ color: col }}>Score Impact</p>
-                      <p className="text-[11px] font-body font-semibold leading-relaxed" style={{ color: col }}>{scoreImpact}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <ProText text={[detected, protocol].filter(Boolean).join(' ')} onUpgrade={onUpgrade} />
-              )}
-            </div>
+                  ))}
+                </div>
+                {/* Upgrade overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl" style={{ background: 'rgba(18,18,18,0.82)', backdropFilter: 'blur(4px)' }}>
+                  <Lock size={18} className="mb-2" style={{ color: '#C6A85C' }} />
+                  <p className="font-heading font-bold text-sm text-primary mb-0.5">
+                    {lockedProducts.length} more product{lockedProducts.length !== 1 ? 's' : ''} in your stack
+                  </p>
+                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-6">
+                    Unlock your full AI-curated product stack with Pro
+                  </p>
+                  <button
+                    onClick={onUpgrade}
+                    className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black"
+                    style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}
+                  >
+                    Upgrade to Pro →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pro: affiliate disclaimer */}
+            {!loading && fetched && products.length > 0 && (
+              <p className="text-[9px] text-secondary font-body text-center mt-2 opacity-50">
+                Links open Amazon search · Ascendus may earn from qualifying purchases
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── Face metric bar ──────────────────────────────────────────────────────────
+
+function FaceMetricBar({ label, score, descriptor, locked = false, onUpgrade }) {
+  const pct        = score != null ? Math.round((score / 10) * 100) : 0
+  const scoreColor = score >= 7 ? '#34C759' : score >= 5 ? '#F5A623' : '#E07A5F'
+
+  if (locked) {
+    return (
+      <div className="relative overflow-hidden py-3 border-b border-default last:border-0">
+        {/* blurred ghost */}
+        <div className="blur-sm select-none pointer-events-none opacity-40">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-heading font-bold text-primary">{label}</span>
+            <span className="text-sm font-mono font-bold" style={{ color: '#C6A85C' }}>
+              7.5<span className="text-[9px] font-normal text-secondary">/10</span>
+            </span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden mb-1.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
+            <div className="h-full rounded-full" style={{ width: '75%', background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
+          </div>
+          <p className="text-[10px] text-secondary font-body">Placeholder descriptor for this metric</p>
+        </div>
+        {/* lock overlay */}
+        <div className="absolute inset-0 flex items-center justify-between px-2.5 rounded-lg"
+          style={{ background: 'rgba(18,18,18,0.72)', backdropFilter: 'blur(2px)' }}>
+          <div className="flex items-center gap-1.5">
+            <Lock size={10} style={{ color: '#C6A85C' }} />
+            <span className="text-[10px] font-heading font-bold" style={{ color: '#C6A85C' }}>Pro metric</span>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-md text-black"
+            style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 100%)' }}
+          >
+            Unlock
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="py-3 border-b border-default last:border-0">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-heading font-bold text-primary">{label}</span>
+        <span className="font-mono font-bold text-sm" style={{ color: scoreColor }}>
+          {score?.toFixed(1)}<span className="text-[9px] font-normal text-secondary">/10</span>
+        </span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden mb-1.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+      {descriptor && (
+        <p className="text-[10px] text-secondary font-body leading-snug">{descriptor}</p>
+      )}
     </div>
   )
 }
@@ -704,19 +859,66 @@ function ProGate({ onUpgrade }) {
 
 // ─── Paywall Full-Screen ──────────────────────────────────────────────────────
 
-function PaywallSheet({ glowScore, onClose }) {
+function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const navigate = useNavigate()
-  const [plan, setPlan] = useState('annual')
+  const [plan, setPlan]     = useState('monthly')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState('')
+
+  // ── Personalisation — find worst pillar ──────────────────────────────────
+  const PILLAR_LABELS = {
+    harmony:    'Harmony',
+    angularity: 'Angularity',
+    features:   'Features',
+    dimorphism: gender === 'female' ? 'Femininity' : 'Dimorphism',
+  }
+  const worstEntry = pillars
+    ? Object.entries(pillars).reduce((a, b) => (a[1] < b[1] ? a : b))
+    : null
+  const worstKey   = worstEntry?.[0] ?? null
+  const worstScore = worstEntry?.[1] ?? null
+  const worstLabel = worstKey ? (PILLAR_LABELS[worstKey] ?? worstKey) : null
+  const scoreDrag  = worstScore != null ? Math.min(1.8, (7.5 - worstScore) * 0.18).toFixed(1) : null
 
   const potential = Math.min(10, (glowScore ?? 5) + 1.8).toFixed(1)
+  const gap       = ((Number(potential) - (glowScore ?? 5)).toFixed(1))
+
+  const hookHeadline = worstLabel && worstScore != null && worstScore < 6.5
+    ? `Your ${worstLabel} scored ${worstScore.toFixed(1)} — it's pulling your score down.`
+    : `You're ${gap} points below your potential.`
+
+  const hookSub = worstLabel && worstScore != null && worstScore < 6.5
+    ? `This single pillar is costing you ~${scoreDrag} points. Pro unlocks the exact protocol to fix it.`
+    : `Your full breakdown and 12-week protocol are waiting.`
+
+  // ── Direct checkout ───────────────────────────────────────────────────────
+  async function handleCheckout(noTrial = false) {
+    const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+    const token  = stored?.state?.token
+    if (!token || token === 'demo-token') {
+      navigate('/auth')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const { url } = await api.payments.createCheckout(plan, noTrial)
+      window.location.href = url
+    } catch (err) {
+      setError(err.message || 'Could not open checkout — please try again.')
+      setLoading(false)
+    }
+  }
 
   const locked = [
-    { icon: '⭐', label: 'Celebrity Lookalikes', sub: '3 matches with % similarity + shared traits' },
-    { icon: '💪', label: 'Complete Body Analysis', sub: '12 detailed body metrics & protocols' },
-    { icon: '🗺️', label: '12-Week Personalized Plan', sub: 'Built from your exact scores' },
-    { icon: '📈', label: `Score Projection +${(1.8).toFixed(1)}`, sub: `Your potential: ${potential}/10` },
-    { icon: '📊', label: 'Progress Tracking', sub: 'Before/after comparison graph' },
-    { icon: '🤖', label: 'AI Improvement Coach', sub: 'Ask questions about your results' },
+    worstLabel && worstScore != null && worstScore < 6.5
+      ? { icon: '🎯', label: `Fix Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
+      : { icon: '📈', label: 'Score Projection', sub: `Your potential: ${potential}/10 · roadmap included` },
+    { icon: '⭐', label: 'Celebrity Lookalikes', sub: '3 AI matches with % similarity' },
+    { icon: '📐', label: 'Full Face Metrics', sub: '6 detailed scores + AI descriptors' },
+    { icon: '✂️', label: 'Hairstyle Recommendations', sub: 'Face-shape matched styles + protocols' },
+    { icon: '🗺️', label: '12-Week Personalized Plan', sub: 'Built from your exact scan results' },
+    { icon: '🤖', label: 'AI Improvement Coach', sub: 'Unlimited questions about your results' },
   ]
 
   return (
@@ -731,165 +933,152 @@ function PaywallSheet({ glowScore, onClose }) {
       <div className="h-px w-full flex-shrink-0"
         style={{ background: 'linear-gradient(90deg, transparent, rgba(198,168,92,0.55), transparent)' }} />
 
-      <div className="flex-1 px-5 pt-10 pb-10 flex flex-col">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <img src={logo} alt="Ascendus" style={{ height: 36, mixBlendMode: 'lighten', margin: '0 auto 12px' }} />
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4"
+      <div className="flex-1 px-5 pt-9 pb-10 flex flex-col">
+
+        {/* Logo + badge */}
+        <div className="flex items-center justify-center gap-2 mb-5">
+          <img src={logo} alt="Ascendus" style={{ height: 28, mixBlendMode: 'lighten' }} />
+          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full"
             style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.25)' }}>
-            <span style={{ color: '#C6A85C', fontSize: 11 }}>✦</span>
-            <span className="text-[10px] font-heading font-bold uppercase tracking-widest" style={{ color: '#C6A85C' }}>Pro</span>
+            <span style={{ color: '#C6A85C', fontSize: 10 }}>✦</span>
+            <span className="text-[9px] font-heading font-bold uppercase tracking-widest" style={{ color: '#C6A85C' }}>Pro</span>
           </div>
-          <h2 className="font-heading font-bold text-[26px] text-white mb-2" style={{ letterSpacing: '-0.02em' }}>
-            You're leaving gains<br />on the table.
-          </h2>
-          <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            Unlock your complete analysis and 12-week transformation plan.
-          </p>
+        </div>
+
+        {/* Score projection */}
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="text-center">
+            <p className="font-mono font-bold leading-none mb-1" style={{ fontSize: 36, color: '#E07A5F' }}>
+              {glowScore?.toFixed(1) ?? '—'}
+            </p>
+            <p className="text-[9px] font-body uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>Current</p>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <ArrowRight size={22} style={{ color: 'rgba(198,168,92,0.6)' }} />
+            <span className="text-[8px] font-heading font-bold" style={{ color: '#C6A85C' }}>+{gap}</span>
+          </div>
+          <div className="text-center">
+            <p className="font-mono font-bold leading-none mb-1" style={{ fontSize: 36, color: '#34C759' }}>
+              {potential}
+            </p>
+            <p className="text-[9px] font-body uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>Potential</p>
+          </div>
+        </div>
+
+        {/* Personalised hook */}
+        <div className="mb-4 px-4 py-3.5 rounded-2xl"
+          style={{ background: 'rgba(224,122,95,0.09)', border: '1px solid rgba(224,122,95,0.22)' }}>
+          <p className="font-heading font-bold text-[14px] text-white mb-1 leading-snug">{hookHeadline}</p>
+          <p className="font-body text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>{hookSub}</p>
         </div>
 
         {/* Social proof */}
-        <div className="flex items-center justify-center gap-2 mb-5">
+        <div className="flex items-center justify-center gap-2 mb-4">
           <div className="flex -space-x-1.5">
             {['#C6A85C','#A29BFE','#34C759'].map((c, i) => (
-              <div key={i} className="w-6 h-6 rounded-full border-2 border-black" style={{ background: c, opacity: 0.85 }} />
+              <div key={i} className="w-5 h-5 rounded-full border-2 border-black" style={{ background: c, opacity: 0.85 }} />
             ))}
           </div>
           <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>
-            <span className="font-bold" style={{ color: 'rgba(255,255,255,0.65)' }}>847 men</span> upgraded this week
+            <span className="font-bold" style={{ color: 'rgba(255,255,255,0.65)' }}>1,200+ users</span> improved their score this month
           </p>
         </div>
 
         {/* Locked items */}
-        <div className="space-y-2 mb-5">
+        <div className="space-y-1.5 mb-5">
           {locked.map(({ icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-2xl"
+            <div key={label} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="text-lg">{icon}</span>
-              <div className="flex-1">
-                <p className="font-heading font-semibold text-[13px] text-white">{label}</p>
-                <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{sub}</p>
+              <span className="text-base flex-shrink-0">{icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-semibold text-[12px] text-white leading-snug">{label}</p>
+                <p className="font-body text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.33)' }}>{sub}</p>
               </div>
-              <Lock size={13} style={{ color: '#C6A85C', flexShrink: 0 }} />
+              <Lock size={12} style={{ color: '#C6A85C', flexShrink: 0 }} />
             </div>
           ))}
         </div>
 
-        {/* Two-card paywall */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-
-          {/* ── Pro card ── */}
-          <div
-            className="flex flex-col rounded-2xl p-3.5"
-            style={{
-              background: 'rgba(198,168,92,0.07)',
-              border: '1.5px solid rgba(198,168,92,0.45)',
-            }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>Pro</p>
-              <span
-                className="text-[8px] font-heading font-bold px-1.5 py-0.5 rounded-full"
-                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}
+        {/* Plan toggle */}
+        <div className="rounded-xl p-1 mb-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="grid grid-cols-2 gap-0.5">
+            {[
+              { key: 'monthly', label: 'Monthly', price: '$7.99/mo' },
+              { key: 'annual',  label: 'Annual',  price: '$4.17/mo', badge: 'SAVE 48%' },
+            ].map(({ key, label, price, badge }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPlan(key)}
+                className="py-2 rounded-lg text-center transition-all"
+                style={{
+                  background: plan === key ? 'rgba(198,168,92,0.18)' : 'transparent',
+                  border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
+                }}
               >
-                BEST VALUE
-              </span>
-            </div>
-
-            {/* Plan mini-toggle */}
-            <div className="rounded-xl p-1 mb-2.5" style={{ background: 'rgba(0,0,0,0.35)' }}>
-              <div className="grid grid-cols-2 gap-0.5">
-                {[
-                  { key: 'monthly', label: 'Mo', price: '$7.99' },
-                  { key: 'annual', label: 'Yr', price: '$49.99' },
-                ].map(({ key, label, price }) => (
-                  <button
-                    key={key}
-                    onClick={() => setPlan(key)}
-                    className="py-1.5 rounded-lg text-center transition-all"
-                    style={{
-                      background: plan === key ? 'rgba(198,168,92,0.2)' : 'transparent',
-                      border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
-                    }}
-                  >
-                    <p className="text-[9px] font-heading font-bold leading-none" style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.3)' }}>{label}</p>
-                    <p className="text-[11px] font-mono font-bold mt-0.5" style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.3)' }}>{price}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {plan === 'annual' && (
-              <p className="text-center text-[9px] font-heading font-bold mb-2" style={{ color: '#C6A85C' }}>
-                SAVE 48% ★
-              </p>
-            )}
-
-            {/* CTA */}
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={() => navigate('/premium')}
-              className="mt-auto w-full py-2.5 rounded-xl font-heading font-bold text-[12px]"
-              style={{
-                background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)',
-                color: '#0A0A0A',
-                boxShadow: '0 3px 16px rgba(198,168,92,0.35)',
-              }}
-            >
-              Unlock Pro
-            </motion.button>
-          </div>
-
-          {/* ── Free Trial card ── */}
-          <div
-            className="flex flex-col rounded-2xl p-3.5"
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.09)',
-            }}
-          >
-            {/* Header */}
-            <div className="mb-2">
-              <p className="font-heading font-bold text-[13px] text-white">Try Free</p>
-            </div>
-
-            {/* Price info */}
-            <div className="mb-2.5 flex-1">
-              <p className="font-mono font-bold text-[22px] leading-none text-white mb-1">7 Days</p>
-              <p className="font-body text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                Share with<br />5 friends
-              </p>
-            </div>
-
-            {/* CTA */}
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={() => { onClose(); navigate('/referral') }}
-              className="mt-auto w-full py-2.5 rounded-xl font-heading font-bold text-[12px] border"
-              style={{
-                background: 'transparent',
-                color: '#C6A85C',
-                borderColor: 'rgba(198,168,92,0.45)',
-              }}
-            >
-              Get Free Trial
-            </motion.button>
+                <p className="text-[10px] font-heading font-bold leading-none mb-0.5"
+                  style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.3)' }}>
+                  {label}{badge && plan === key ? ` · ${badge}` : ''}
+                </p>
+                <p className="text-[12px] font-mono font-bold"
+                  style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.25)' }}>
+                  {price}
+                </p>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Fine print */}
-        <p className="text-center text-[10px] font-body mb-4" style={{ color: 'rgba(255,255,255,0.22)' }}>
-          Cancel anytime. No hidden fees.
+        {/* Primary CTA — free trial */}
+        <motion.button
+          whileTap={{ scale: loading ? 1 : 0.97 }}
+          onClick={() => handleCheckout(false)}
+          disabled={loading}
+          type="button"
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+          style={{
+            background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)',
+            color: '#0A0A0A',
+            boxShadow: '0 4px 20px rgba(198,168,92,0.35)',
+            letterSpacing: '0.01em',
+          }}
+        >
+          {loading ? 'Opening checkout…' : '✦ Start 7-Day Free Trial'}
+        </motion.button>
+        <p className="text-center text-[10px] font-body mb-3" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          $0 today · then {plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$7.99/mo'} · cancel anytime
         </p>
 
-        {/* No thanks */}
+        {/* Secondary CTA — pay now */}
+        <motion.button
+          whileTap={{ scale: loading ? 1 : 0.97 }}
+          onClick={() => handleCheckout(true)}
+          disabled={loading}
+          type="button"
+          className="w-full py-3 rounded-xl font-heading font-bold text-[13px] mb-4 transition-all disabled:opacity-40"
+          style={{
+            background: 'rgba(198,168,92,0.08)',
+            border: '1px solid rgba(198,168,92,0.28)',
+            color: 'rgba(198,168,92,0.75)',
+          }}
+        >
+          Pay Now — No Trial
+        </motion.button>
+
+        {error && (
+          <p className="text-center text-[11px] font-body mb-3" style={{ color: '#EF4444' }}>{error}</p>
+        )}
+
+        {/* Dismiss — uses their actual score as guilt anchor */}
         <button
           onClick={onClose}
-          className="w-full py-2.5 font-body text-[13px] text-center"
-          style={{ color: 'rgba(255,255,255,0.28)' }}
+          type="button"
+          className="w-full py-2 font-body text-[12px] text-center"
+          style={{ color: 'rgba(255,255,255,0.22)' }}
         >
-          No thanks, show me my free results
+          No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
         </button>
+
       </div>
     </motion.div>
   )
@@ -927,9 +1116,14 @@ export default function Results() {
     )
   }
 
-  const { faceData, bodyData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches, bodySkipped } = currentScan
+  const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches } = currentScan
   const glowScore = currentScan.glowScore != null ? (currentScan.glowScore > 10 ? Math.round(currentScan.glowScore) / 10 : currentScan.glowScore) : null
   const pillars = scanPillars ?? aiScore?.pillars ?? null
+
+  const profileData      = aiScore?.profileData   ?? null
+  const profileScore     = aiScore?.profileScore  ?? null
+  const hasSideProfile   = !!(aiScore?.hasSideProfile || profileData)
+  const faceMetrics      = aiScore?.faceMetrics   ?? null
 
   const facialStructure = aiScore?.facialStructure ?? 'average'
 
@@ -956,150 +1150,6 @@ export default function Results() {
   const resolvedMatches = (celebrityMatches ?? aiScore?.celebrityMatches) ||
     CELEB_FALLBACKS[gender === 'female' ? 'female' : 'male'][facialStructure] ||
     CELEB_FALLBACKS[gender === 'female' ? 'female' : 'male']['average']
-
-  // ─── Body metric detail computations ────────────────────────────────────────
-  const bDetail = bodyData?.detail ?? {}
-
-  // V-Taper
-  const swrScore    = bodyData?.shoulderWaistRatio ?? null
-  const swrEstimate = bDetail.swr_estimate ?? null
-  const swrClass    =
-    swrScore == null ? null :
-    swrScore >= 7.5  ? 'Strong V-Taper' :
-    swrScore >= 5.5  ? 'Moderate V-Taper' :
-    swrScore >= 4.0  ? 'Weak V-Taper' : 'No V-Taper'
-  const swrKeyLine = swrEstimate
-    ? `Estimated ratio: ${swrEstimate} · Ideal is 1.6:1 or higher`
-    : 'Ideal shoulder-to-waist ratio: 1.6:1 or higher'
-  const swrUrgency =
-    swrScore != null && swrScore < 4 ? '⚠ Critical — V-taper is a top metric for attractiveness' :
-    swrScore != null && swrScore < 6 ? 'Building shoulder width is your highest-ROI body move' : null
-  const swrDetected = swrEstimate
-    ? `Estimated shoulder-to-waist ratio: ${swrEstimate}. ${swrClass ? swrClass + ' classification.' : ''} The ideal ratio for a strong V-shape is 1.6:1 or higher. Below 1.3 = No V-Taper, 1.3–1.45 = Weak, 1.45–1.6 = Moderate, above 1.6 = Strong.`
-    : `V-Taper assessed from visible shoulder and waist proportions in photo. ${swrClass ? swrClass + ' detected.' : ''} The ideal shoulder-to-waist ratio is 1.6:1 or higher.`
-  const swrProtocol =
-    swrScore != null && swrScore < 7.5
-      ? 'Priority exercises: Lateral raises 4×15, Wide-grip pull-ups 4×8, Overhead press 4×10. Run these 3× per week minimum. Additionally: enter a calorie deficit to shrink your waist. Visible improvement in 8–12 weeks with consistent execution.'
-      : 'Maintain with lateral raises 3×15 weekly. Use progressive overload to widen further. Protect it during bulk phases by monitoring waist measurements.'
-  const swrScoreImpact =
-    swrScore != null && swrScore < 6.5
-      ? `Building to Strong V-Taper (7.5+) combined with a cut phase could add approximately +${Math.min((7.5 - swrScore) * 0.12, 1.5).toFixed(1)} points to your overall score.`
-      : null
-
-  // Posture
-  const postureScore  = bodyData?.posture ?? null
-  const postureGrade  = bodyData?.postureGradeValue ?? null
-  const postureIssues = bDetail.posture_issues ?? []
-  const isNoIssues    = !postureIssues.length || postureIssues.every(x => x === 'none')
-  const postureGradeExplain = {
-    A: 'Elite posture. You stand tall with no visible imbalances. This is actively boosting your score.',
-    B: "Good posture with minor issues. One or two areas to correct — you're close to elite.",
-    C: 'Moderate posture issues are visibly affecting your appearance and perceived height.',
-    D: 'Significant posture problems. This is lowering your score by 1+ points.',
-    F: 'Severe posture issues detected. This is one of the biggest single drags on your overall score.',
-  }[postureGrade] ?? null
-  const postureDetectedLines = [
-    postureIssues.includes('forward_head')          ? 'Forward head posture detected'     : null,
-    postureIssues.includes('rounded_shoulders')     ? 'Rounded shoulders detected'        : null,
-    postureIssues.includes('anterior_pelvic_tilt')  ? 'Anterior pelvic tilt detected'     : null,
-    isNoIssues                                      ? 'No major posture issues detected'   : null,
-  ].filter(Boolean)
-  const postureDetected = [
-    postureGrade && postureGradeExplain ? `Grade ${postureGrade}: ${postureGradeExplain}` : null,
-    postureDetectedLines.length ? postureDetectedLines.join(' · ') : null,
-  ].filter(Boolean).join(' ')
-  const postureProtocolLines = [
-    postureIssues.includes('forward_head')         ? 'Forward head → Chin tucks 3×20 daily, keep screens at eye level.'                              : null,
-    postureIssues.includes('rounded_shoulders')    ? 'Rounded shoulders → Wall angels 3×12, face pulls 4×15, stretch pecs every morning.'            : null,
-    postureIssues.includes('anterior_pelvic_tilt') ? 'Anterior pelvic tilt → Hip flexor stretches 2×60s, glute bridges 3×20, dead bugs 3×10 daily.' : null,
-    isNoIssues                                     ? 'Maintain: Thoracic extensions and daily mobility to lock in your posture.'                      : null,
-  ].filter(Boolean)
-  const postureProtocol = postureProtocolLines.length
-    ? postureProtocolLines.join(' ') + ' Consistent execution produces 2-grade improvement in 6 weeks.'
-    : null
-  const postureUrgency =
-    postureScore != null && postureScore < 4 ? `⚠ Grade ${postureGrade ?? 'D'} — posture is significantly dragging your score` :
-    postureScore != null && postureScore < 6 ? `Grade ${postureGrade ?? 'C'} — visible issues affecting perceived height and jaw` : null
-  const postureScoreImpact =
-    postureScore != null && postureScore < 7
-      ? `Improving from grade ${postureGrade ?? 'C'} to grade A would add approximately +${Math.min((8.5 - postureScore) * 0.10, 1.2).toFixed(1)} to your overall score.`
-      : null
-
-  // Body Proportions
-  const propScore  = bodyData?.bodyProportions ?? null
-  const armDev     = bDetail.arm_development ?? null
-  const chestDev   = bDetail.chest_development ?? null
-  const bFrame     = bDetail.frame ?? null
-  const propClass  =
-    propScore == null ? null :
-    propScore >= 7.5  ? 'Well Proportioned' :
-    propScore >= 5.5  ? 'Average' :
-    propScore >= 4.0  ? 'Imbalanced' : 'Significantly Imbalanced'
-  const propKeyLine = [
-    armDev   && `Arms: ${armDev}`,
-    chestDev && `Chest: ${chestDev}`,
-    bFrame   && `Frame: ${bFrame}`,
-  ].filter(Boolean).join(' · ')
-  const worstArea = armDev === 'underdeveloped' ? 'arms' : chestDev === 'flat' ? 'chest' : null
-  const propDetected = [
-    armDev   && `Arm development: ${armDev}.`,
-    chestDev && `Chest development: ${chestDev}.`,
-    bFrame   && `Overall frame: ${bFrame}.`,
-    (!armDev && !chestDev && !bFrame) ? 'Proportions assessed from visible body structure in photo.' : null,
-    worstArea ? `Your ${worstArea} are the primary imbalance — prioritize these before adding overall volume.` : null,
-  ].filter(Boolean).join(' ')
-  const propProtocol =
-    worstArea === 'arms'
-      ? 'Priority (arms): Barbell curls 3×10, skull crushers 3×12, hammer curls 3×15 — 2× per week. Add cable curls and tricep pushdowns. Visible change in 8–10 weeks of progressive loading.'
-      : worstArea === 'chest'
-      ? 'Priority (chest): Incline dumbbell press 4×10, cable flyes 3×12, weighted dips 3×12 — 2× per week. Incline press targets upper chest which is most visible. Expect change in 8–12 weeks.'
-      : 'Focus on symmetry. Match lagging muscle groups to your strongest. Use progressive overload on any underdeveloped area before adding overall training volume.'
-  const propScoreImpact =
-    propScore != null && propScore < 6
-      ? `Balancing proportions to 7.5+ could contribute approximately +${Math.min((7.5 - propScore) * 0.10, 1.0).toFixed(1)} to your overall score.`
-      : null
-
-  // Body Composition
-  const compScore    = bodyData?.bodyComposition ?? null
-  const bfRange      = bDetail.bf_range ?? null
-  const muscleMass   = bDetail.muscle_mass_rating ?? null
-  const compCategory = bodyData?.compositionCategory ?? null
-  const compClass    =
-    compCategory === 'LEAN_ATHLETIC' ? 'Lean Athletic' :
-    compCategory === 'ATHLETIC'      ? 'Athletic'      :
-    compCategory === 'AVERAGE'       ? 'Average'       :
-    compCategory === 'OVERWEIGHT'    ? 'Overweight'    :
-    compCategory === 'OBESE'         ? 'Obese'         : null
-  const compKeyLine = [
-    bfRange    && `Est. body fat: ${bfRange}%`,
-    muscleMass && `Muscle mass: ${muscleMass.replace('_', ' ')}`,
-  ].filter(Boolean).join(' · ')
-  const compUrgency =
-    compScore != null && compScore < 4 ? '⚠ Body fat is capping your entire score — this is your #1 fix' :
-    compScore != null && compScore < 6 ? 'Body fat is simultaneously hiding your jawline and V-taper' : null
-  const currentBsVal     = bodyData?.bodyScore ?? 5.0
-  const gainIfAthletic   = currentBsVal < 7.5 ? Math.min((7.5 - currentBsVal) * 0.35, 2.5) : 0
-  const projectedOverallScore = glowScore != null && gainIfAthletic > 0.1
-    ? Math.min(glowScore + gainIfAthletic, 10).toFixed(1) : null
-  const bfWeeksEstimate = bfRange
-    ? (parseInt(bfRange.split('-')[0]) > 30 ? '20–28 weeks'
-      : parseInt(bfRange.split('-')[0]) > 25 ? '16–20 weeks'
-      : parseInt(bfRange.split('-')[0]) > 20 ? '12–16 weeks' : '8–12 weeks')
-    : '12–20 weeks'
-  const compDetected = [
-    bfRange
-      ? `Estimated body fat: ${bfRange}% (${compClass ?? 'assessed from photo'}).`
-      : `Current category: ${compClass ?? 'assessed from photo'}.`,
-    muscleMass ? `Muscle mass: ${muscleMass.replace('_', ' ')}.` : null,
-    'Body fat is the single metric that simultaneously affects your score, jawline definition, V-taper, and posture grade.',
-  ].filter(Boolean).join(' ')
-  const compProtocol = bfRange
-    ? `Target body fat: 12–15%. Currently estimated at ${bfRange}%. Calorie target: 500 cal/day deficit. Protein: 0.8–1g per lb of bodyweight. Estimated timeline to target range: ${bfWeeksEstimate}. This is your #1 improvement area — fixing this moves multiple metrics simultaneously.`
-    : `Target body fat: 12–15%. Calorie target: 500 cal/day deficit. Protein: 0.8–1g per lb of bodyweight. Estimated timeline: ${bfWeeksEstimate}. Lowering body fat simultaneously improves your jawline, V-taper, and posture grade.`
-  const compScoreImpact =
-    projectedOverallScore != null && gainIfAthletic > 0.3
-      ? `If you reach Athletic body fat (12–15%), your overall score would increase from ${glowScore?.toFixed(1)} to approximately ${projectedOverallScore}. This is the highest-impact single change you can make.`
-      : null
 
   // ─── Skin Analysis ──────────────────────────────────────────────────────────
   const skinScore = faceData?.skinClarity ?? null
@@ -1187,57 +1237,6 @@ export default function Results() {
     'Moisturizer (heavier than AM is fine)',
   ].filter(Boolean)
 
-  // ─── Body Workout Plan ──────────────────────────────────────────────────────
-  const workoutPhase =
-    compCategory === 'OBESE' || compCategory === 'OVERWEIGHT' ? 'CUT' :
-    compCategory === 'LEAN_ATHLETIC' ? 'SPECIALIZE' : 'RECOMP'
-
-  const workoutPhaseLabel =
-    workoutPhase === 'CUT'       ? 'Fat Loss + V-Taper Building' :
-    workoutPhase === 'SPECIALIZE'? 'Specialization — Fix Weak Areas' : 'Recomp — Build While Cutting'
-
-  const WORKOUT_LIBRARY = {
-    vtaper: [
-      { name: 'Wide-Grip Pull-Up',     sets: '4×8',  rest: '90s', why: 'Widens upper back — the #1 V-taper driver. Each set increases visible lat width.', scoreImpact: 'Adds lat width — directly improves Shoulder-Waist Ratio score.', week: 'Wk 1–12' },
-      { name: 'Lateral Raise (Cable)', sets: '4×15', rest: '60s', why: 'Grows medial deltoid — widens shoulder silhouette above the waistline.', scoreImpact: 'Wider shoulders increase V-Taper and Dimorphism scores.', week: 'Wk 1–12' },
-      { name: 'Overhead Press',        sets: '4×8',  rest: '90s', why: 'Builds anterior and medial delts — broadens shoulder cap for stronger V-taper.', scoreImpact: 'Shoulder mass directly increases Dimorphism pillar.', week: 'Wk 1–12' },
-      { name: 'Cable Crunch + Vacuum', sets: '3×20', rest: '45s', why: 'Strengthens transverse abdominis to visually narrow the waist in combination with deficit.', scoreImpact: 'Narrower waist improves ratio — raises V-Taper score.', week: 'Wk 5–12' },
-    ],
-    posture: [
-      { name: 'Face Pull (Cable)',      sets: '4×15', rest: '60s', why: 'Corrects rounded shoulders by strengthening rear delts and rotator cuff.', scoreImpact: 'Grade C → B improvement adds ~+0.4 to overall score.', week: 'Wk 1–12' },
-      { name: 'Wall Angel',            sets: '3×12', rest: '45s', why: 'Resets thoracic extension — directly counters rounded-upper-back pattern.', scoreImpact: 'Upright posture increases perceived height by 1–2 inches visually.', week: 'Wk 1–8' },
-      { name: 'Dead Bug',              sets: '3×10', rest: '45s', why: 'Activates deep core to correct anterior pelvic tilt — flattens stomach, straightens spine.', scoreImpact: 'APT correction improves Posture grade and reduces belly protrusion.', week: 'Wk 1–8' },
-    ],
-    proportion: [
-      { name: 'Incline Dumbbell Press', sets: '4×10', rest: '90s', why: 'Targets upper chest — most visually prominent chest area both clothed and shirtless.', scoreImpact: 'Upper chest development improves Body Proportions score.', week: 'Wk 1–12' },
-      { name: 'Barbell Curl',          sets: '3×10', rest: '60s', why: 'Builds bicep peak — most visible arm muscle from front angle.', scoreImpact: 'Arm development improves Proportions score and overall body impression.', week: 'Wk 1–12' },
-      { name: 'Weighted Dip',          sets: '3×12', rest: '90s', why: 'Trains lower chest and tricep — creates fullness and arm thickness.', scoreImpact: 'Tricep mass adds visible arm thickness even in a T-shirt.', week: 'Wk 1–12' },
-    ],
-    composition: [
-      { name: 'HIIT Sprint Intervals', sets: '8×30s / 90s rest', rest: 'Built-in', why: 'Spikes EPOC (post-exercise burn) — burns fat for 24–48h post-session.', scoreImpact: 'Fat loss simultaneously improves jawline, V-taper, and posture score.', week: 'Wk 1–12' },
-      { name: 'Romanian Deadlift',     sets: '4×10', rest: '90s', why: 'Builds posterior chain while in a deficit — protects muscle during fat loss.', scoreImpact: 'Maintains body proportions score while cutting.', week: 'Wk 1–12' },
-    ],
-  }
-
-  const weakBodyAreas = [
-    swrScore    != null && swrScore    < 6.5 ? 'vtaper'      : null,
-    propScore   != null && propScore   < 6   ? 'proportion'  : null,
-    postureScore != null && postureScore < 6 ? 'posture'     : null,
-    compScore   != null && compScore   < 5   ? 'composition' : null,
-  ].filter(Boolean)
-
-  const generatedWorkout = (() => {
-    const areas = weakBodyAreas.length > 0 ? weakBodyAreas : ['vtaper']
-    const exercises = areas.flatMap(a => WORKOUT_LIBRARY[a] ?? [])
-    if (workoutPhase === 'CUT' && !weakBodyAreas.includes('composition')) {
-      exercises.push(...WORKOUT_LIBRARY.composition)
-    }
-    const seen = new Set()
-    return exercises.filter(e => { if (seen.has(e.name)) return false; seen.add(e.name); return true }).slice(0, 7)
-  })()
-
-  const workoutFreePreview = generatedWorkout[0] ?? null
-
   // ─── Nutrition Plan (TDEE) ──────────────────────────────────────────────────
   const nutHeightCm = userProfile?.heightCm ?? null
   const nutWeightKg = userProfile?.weightKg ?? null
@@ -1254,7 +1253,7 @@ export default function Results() {
   })()
 
   const nutritionPhase =
-    compCategory === 'OBESE' || compCategory === 'OVERWEIGHT' || nutGoal === 'Lose Fat' ? 'CUT' :
+    nutGoal === 'Lose Fat' ? 'CUT' :
     nutGoal === 'Build Muscle' ? 'BULK' : 'RECOMP'
 
   const nutritionTarget = tdee == null ? null :
@@ -1293,7 +1292,7 @@ export default function Results() {
     <Helmet>
       <title>Your AI Appearance Score &amp; Looksmax Results — Ascendus</title>
       <meta name="description" content="See your AI face rating, body composition score, celebrity lookalike matches, and a personalized 12-week looksmax plan built around your results." />
-      <meta name="keywords" content="face rating results, AI appearance score, looksmax results, celebrity lookalike, glow up plan, body score" />
+      <meta name="keywords" content="face rating results, AI appearance score, looksmax results, celebrity lookalike, glow up plan, facial analysis" />
     </Helmet>
     {/* Score reveal overlay — shown once for fresh scans */}
     {showReveal && !revealDone && (
@@ -1341,17 +1340,44 @@ export default function Results() {
         )
       })()}
 
-      {/* ── Face-only label (replaces old banner — detail is in Body Analysis card) */}
-      {bodySkipped && (
-        <div className="mb-3 flex justify-center">
-          <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-heading font-bold text-[10px] uppercase tracking-wide"
-            style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C' }}
+      {/* ── Score drag alert — free users only, needs pillar data ──── */}
+      {!isPremium && pillars && (() => {
+        const worst = Object.entries(pillars).reduce((a, b) => (a[1] < b[1] ? a : b))
+        const LABELS = { harmony: 'Harmony', angularity: 'Angularity', features: 'Features', dimorphism: 'Dimorphism' }
+        const label  = LABELS[worst[0]] ?? worst[0]
+        const score  = worst[1]
+        if (score > 7) return null
+        const impact = Math.min(1.5, (7.5 - score) * 0.15).toFixed(1)
+        return (
+          <button
+            type="button"
+            onClick={() => setShowPaywall(true)}
+            className="w-full mb-4 px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-left active:opacity-70 transition-opacity"
+            style={{ background: 'rgba(224,122,95,0.08)', border: '1px solid rgba(224,122,95,0.2)' }}
           >
-            📷 Face Score Only
-          </div>
+            <span className="text-[15px] flex-shrink-0">⚠</span>
+            <p className="font-body text-[11px] leading-relaxed flex-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Your <span className="font-bold" style={{ color: '#E07A5F' }}>{label} ({score.toFixed(1)})</span> is your biggest score drag
+              {' — '}<span className="font-bold" style={{ color: '#34C759' }}>fixing it adds ~+{impact} pts</span>
+              <span style={{ color: '#C6A85C' }}> · See how →</span>
+            </p>
+          </button>
+        )
+      })()}
+
+      {/* ── Full Scan / Basic Scan badge ─────────────────────────── */}
+      <div className="mb-3 flex justify-center">
+        <div
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-heading font-bold text-[10px] uppercase tracking-wide"
+          style={
+            hasSideProfile
+              ? { background: 'rgba(52,199,89,0.1)', border: '1px solid rgba(52,199,89,0.3)', color: '#34C759' }
+              : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }
+          }
+        >
+          {hasSideProfile ? '✦ Full Scan — Profile Analysis Included' : '◎ Basic Scan — Side Profile Not Included'}
         </div>
-      )}
+      </div>
 
       {/* ── Score breakdown card ───────────────────────────────────── */}
       <div className="card mb-4">
@@ -1360,14 +1386,11 @@ export default function Results() {
           <div className="flex-1">
             <p className="font-heading font-bold text-base text-primary mb-0.5">Score Breakdown</p>
             <p className="text-xs text-secondary font-body leading-relaxed">
-              {bodySkipped
-                ? 'Face 70% · Appeal 30% · Body not scanned'
-                : <>Face 55% · Body 35% · Appeal 10%{aiScore?.bodyFatCapApplied && <span className="text-warning"> · Body cap applied</span>}</>}
+              Face · Appeal · 4 Facial Pillars
             </p>
-            <div className={`grid gap-2 mt-2.5 ${bodySkipped ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className="grid gap-2 mt-2.5 grid-cols-2">
               {[
                 { label: 'Face',   val: aiScore?.faceScore,    color: '#1A6B5C' },
-                ...(!bodySkipped ? [{ label: 'Body', val: aiScore?.bodyScore, color: '#F5A623' }] : []),
                 { label: 'Appeal', val: aiScore?.groomingScore, color: '#34C759' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="text-center">
@@ -1500,6 +1523,44 @@ export default function Results() {
         </Section>
       )}
 
+      {/* ── Face Metrics ─────────────────────────────────────────── */}
+      {faceMetrics && (
+        <Section title="Face Metrics" emoji="📐" defaultOpen={false}>
+          {(() => {
+            const mascFemLabel = gender === 'female' ? 'Femininity' : 'Masculinity'
+            const metrics = [
+              { key: 'jawline',               label: 'Jawline',        data: faceMetrics.jawline,               pro: false },
+              { key: 'symmetry',              label: 'Symmetry',       data: faceMetrics.symmetry,              pro: false },
+              { key: 'cheekbones',            label: 'Cheekbones',     data: faceMetrics.cheekbones,            pro: true  },
+              { key: 'skinQuality',           label: 'Skin Quality',   data: faceMetrics.skinQuality,           pro: true  },
+              { key: 'mascFem',               label: mascFemLabel,     data: faceMetrics.masculinityFemininity, pro: true  },
+              { key: 'facialThirds',          label: 'Facial Thirds',  data: faceMetrics.facialThirds,          pro: true  },
+            ]
+            const locked4Count = metrics.filter(m => m.pro && !isPremium && m.data).length
+            return (
+              <>
+                <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
+                  AI-scored breakdown of your individual facial features.
+                  {!isPremium && locked4Count > 0 && <span style={{ color: '#C6A85C' }}> {locked4Count} metrics locked — upgrade to Pro to unlock.</span>}
+                </p>
+                {metrics.map(({ key, label, data, pro }) =>
+                  data ? (
+                    <FaceMetricBar
+                      key={key}
+                      label={label}
+                      score={data.score}
+                      descriptor={data.descriptor}
+                      locked={pro && !isPremium}
+                      onUpgrade={() => navigate('/premium')}
+                    />
+                  ) : null
+                )}
+              </>
+            )
+          })()}
+        </Section>
+      )}
+
       {/* ── Face Feature Breakdown ────────────────────────────────── */}
       <Section title="Face Feature Breakdown" emoji="👤" defaultOpen={false}>
         <div className="space-y-0">
@@ -1516,133 +1577,119 @@ export default function Results() {
         </div>
       </Section>
 
-      {/* ── Body Analysis ─────────────────────────────────────────── */}
-      <Section title="Body Analysis" emoji="💪" defaultOpen={false}>
-        {bodySkipped ? (
-          /* ── Skipped state ── */
-          <div className="flex flex-col items-center justify-center py-5 text-center">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
-              style={{ background: 'rgba(201,168,76,0.09)', border: '1px solid rgba(201,168,76,0.22)' }}
-            >
-              <span className="text-2xl">📷</span>
+      {/* ── Profile Analysis (side profile scan) ────────────────── */}
+      {hasSideProfile && profileData && (
+        <Section title="Profile Analysis" emoji="↗️" defaultOpen={false} badge="FULL">
+          {/* Profile score row */}
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-xl" style={{ background: 'rgba(52,199,89,0.07)', border: '1px solid rgba(52,199,89,0.18)' }}>
+            <div className="text-center flex-shrink-0">
+              <div
+                className="text-2xl font-mono font-bold"
+                style={{ color: profileScore >= 7 ? '#34C759' : profileScore >= 5 ? '#F5A623' : '#E07A5F' }}
+              >
+                {profileScore != null ? profileScore.toFixed(1) : '—'}
+              </div>
+              <div className="text-[9px] font-body text-secondary">/ 10</div>
             </div>
-            <p className="font-heading font-bold text-sm text-primary mb-1">Body scan skipped</p>
-            <p className="font-body text-[11px] text-secondary leading-relaxed mb-4 max-w-[200px]">
-              Add a body photo to unlock V-taper, posture, and composition analysis — and get your complete score.
-            </p>
-            <button
-              onClick={() => navigate('/scan')}
-              className="px-6 py-2.5 rounded-xl font-heading font-bold text-[13px] text-black active:opacity-80 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}
-            >
-              Rescan with Body Photo →
-            </button>
+            <div className="flex-1">
+              <p className="text-sm font-heading font-bold text-primary">Profile Score</p>
+              <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">
+                Assessed from your right-side profile photo · nose bridge, jaw projection, chin depth
+              </p>
+            </div>
           </div>
-        ) : (
-        /* ── Full body data ── */
-        <>
-        {/* Score overview */}
-        <div className="mb-3 rounded-xl p-3" style={{ background: 'rgba(26,107,92,0.07)', border: '1px solid rgba(26,107,92,0.15)' }}>
-          <p className="text-[9px] font-heading font-bold uppercase tracking-wide text-secondary mb-2">
-            Body Sub-Scores · <span style={{ color: '#C6A85C' }}>contributes 35% to your overall rating</span>
-          </p>
-          <div className="grid grid-cols-4 gap-2">
+
+          {/* Profile metrics grid */}
+          <div className="space-y-0">
             {[
-              { label: 'V-Taper',      score: swrScore   },
-              { label: 'Posture',      score: postureScore },
-              { label: 'Proportions', score: propScore   },
-              { label: 'Comp',         score: compScore  },
-            ].map(({ label, score: s }) => {
-              const c = s != null ? (s >= 7 ? '#34C759' : s >= 5 ? '#F5A623' : '#E07A5F') : '#888'
+              {
+                key: 'nose_bridge',
+                label: 'Nose Bridge',
+                value: profileData.nose_bridge,
+                descriptions: {
+                  'high':     'High nose bridge — adds strong vertical definition and perceived structure to the mid-face.',
+                  'medium':   'Average nose bridge height — proportional and balanced with your other features.',
+                  'low':      'Low nose bridge — sits flatter on the profile; rhinoplasty or contouring can enhance this.',
+                  'straight': 'Straight nose bridge profile — clean, balanced line that reads well in photos.',
+                  'convex':   'Convex (Roman) nose profile — adds character and masculine distinction.',
+                  'concave':  'Concave nose bridge — slightly upturned profile; generally considered a feminine trait.',
+                },
+                color: '#A29BFE',
+              },
+              {
+                key: 'jawline_projection',
+                label: 'Jawline Projection',
+                value: profileData.jawline_projection,
+                descriptions: {
+                  'strong':   'Strong jaw projection — highly attractive from the side. One of the top masculine structural traits.',
+                  'moderate': 'Moderate jaw projection — solid structural base. Mewing and chewing hard foods can improve this over time.',
+                  'weak':     'Weak jaw projection — the jaw recedes behind the nose. Mewing, dental work, or corrective surgery addresses this.',
+                  'recessed': 'Recessed jaw (retrognathia) — the chin and jaw sit back significantly. Orthognathic surgery is the definitive fix.',
+                },
+                color: '#F5A623',
+              },
+              {
+                key: 'chin_projection',
+                label: 'Chin Projection',
+                value: profileData.chin_projection,
+                descriptions: {
+                  'ideal':      'Ideal chin projection — chin tip aligns with or slightly behind the lower lip when viewed from the side.',
+                  'strong':     'Strong chin projection — prominent and forward. A highly attractive masculine trait from the side.',
+                  'moderate':   'Moderate chin projection — slightly behind ideal. Chin exercises and mewing can marginally improve over time.',
+                  'weak':       'Weak chin projection — chin recesses behind the lower lip. Chin filler or implant is the fastest solution.',
+                  'recessed':   'Significantly recessed chin — noticeably soft from the side. This is capping your profile score the most.',
+                },
+                color: '#34C759',
+              },
+            ].map(({ key, label, value, descriptions, color }) => {
+              const desc = value && descriptions[value]
+                ? descriptions[value]
+                : `${label} assessment not available.`
+              const valueLabel = value
+                ? value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')
+                : '—'
+              const scoreVal = profileData[`${key}_score`] ?? null
               return (
-                <div key={label} className="text-center">
-                  <div className="text-base font-mono font-bold leading-none mb-0.5" style={{ color: c }}>
-                    {s != null ? s.toFixed(1) : '—'}
+                <div key={key} className="py-3 border-b border-default last:border-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className="px-2 py-0.5 rounded-md text-[10px] font-heading font-bold flex-shrink-0"
+                      style={{ background: `${color}18`, color }}
+                    >
+                      {valueLabel}
+                    </div>
+                    <p className="text-sm font-heading font-bold text-primary flex-1">{label}</p>
+                    {scoreVal != null && (
+                      <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color }}>
+                        {scoreVal.toFixed(1)}/10
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[9px] text-secondary font-body">{label}</div>
+                  {isPremium
+                    ? <p className="text-[10px] text-secondary font-body leading-relaxed">{desc}</p>
+                    : <ProText text={desc} onUpgrade={() => navigate('/premium')} />
+                  }
                 </div>
               )
             })}
           </div>
-        </div>
 
-        <div className="space-y-0">
-          {swrScore != null && (
-            <BodyMetricCard
-              label="Shoulder-Waist Ratio (V-Taper)"
-              score={swrScore}
-              classification={swrClass}
-              keyLine={swrKeyLine}
-              urgencyLine={swrUrgency}
-              detected={swrDetected}
-              protocol={swrProtocol}
-              scoreImpact={swrScoreImpact}
-              isPremium={isPremium}
-              onUpgrade={() => navigate('/premium')}
-            />
+          {/* Profile improvement note */}
+          {profileScore != null && profileScore < 7 && (
+            <div className="mt-3 rounded-xl p-3 border" style={{ borderColor: 'rgba(198,168,92,0.3)', background: 'rgba(198,168,92,0.06)' }}>
+              <p className="text-[9px] font-heading font-bold uppercase tracking-wide mb-1" style={{ color: '#C6A85C' }}>
+                Profile Improvement
+              </p>
+              <p className="text-[10px] font-body text-primary leading-relaxed">
+                {profileScore < 5
+                  ? 'Profile structure is significantly impacting your score. Mewing (tongue posture), jaw exercises, and reducing body fat are the highest-ROI non-surgical interventions. Consult an orthodontist if jaw recession is significant.'
+                  : 'Mewing and hard chewing foods (2–3 minutes daily) can improve jaw projection over 6–12 months. Maintaining low body fat reveals existing jaw structure.'}
+              </p>
+            </div>
           )}
-          {postureScore != null && (
-            <BodyMetricCard
-              label={`Posture · Grade ${postureGrade ?? '—'}`}
-              score={postureScore}
-              classification={postureGrade ? `Grade ${postureGrade}` : null}
-              keyLine={postureDetectedLines.length ? postureDetectedLines.join(' · ') : null}
-              urgencyLine={postureUrgency}
-              detected={postureDetected}
-              protocol={postureProtocol}
-              scoreImpact={postureScoreImpact}
-              isPremium={isPremium}
-              onUpgrade={() => navigate('/premium')}
-            />
-          )}
-          {propScore != null && (
-            <BodyMetricCard
-              label="Body Proportions"
-              score={propScore}
-              classification={propClass}
-              keyLine={propKeyLine || null}
-              urgencyLine={propScore < 6 ? 'Imbalanced development is reducing your overall score' : null}
-              detected={propDetected}
-              protocol={propProtocol}
-              scoreImpact={propScoreImpact}
-              isPremium={isPremium}
-              onUpgrade={() => navigate('/premium')}
-            />
-          )}
-          {compScore != null && (
-            <BodyMetricCard
-              label="Body Composition"
-              score={compScore}
-              classification={compClass}
-              keyLine={compKeyLine || null}
-              urgencyLine={compUrgency}
-              detected={compDetected}
-              protocol={compProtocol}
-              scoreImpact={compScoreImpact}
-              isPremium={isPremium}
-              onUpgrade={() => navigate('/premium')}
-            />
-          )}
-        </div>
+        </Section>
+      )}
 
-        {/* Score projection */}
-        {projectedOverallScore != null && gainIfAthletic > 0.3 && (
-          <div className="mt-3 rounded-xl p-3 border" style={{ borderColor: 'rgba(245,166,35,0.40)', background: 'rgba(245,166,35,0.07)' }}>
-            <p className="text-[9px] font-heading font-bold uppercase tracking-wide mb-1.5" style={{ color: '#F5A623' }}>
-              Your Potential Score
-            </p>
-            <p className="text-xs font-body leading-relaxed text-primary">
-              If you reach Athletic body fat (12–15%) and build your V-Taper, your score could increase from{' '}
-              <span className="font-bold font-mono" style={{ color: '#E07A5F' }}>{glowScore?.toFixed(1)}</span>
-              {' '}to approximately{' '}
-              <span className="font-bold font-mono" style={{ color: '#34C759' }}>{projectedOverallScore}</span>.
-            </p>
-          </div>
-        )}
-        </> /* end full body data */
-        )} {/* end bodySkipped ternary */}
-      </Section>
 
       {/* ── Hairstyle Recommendations ─────────────────────────────── */}
       <Section title="Hairstyle Recommendations" emoji="✂️" defaultOpen={false}>
@@ -1848,77 +1895,16 @@ export default function Results() {
         </Section>
       )}
 
-      {/* ── Body Workout Plan ─────────────────────────────────────── */}
-      {generatedWorkout.length > 0 && (
-        <Section title="Body Workout Plan" emoji="💪" defaultOpen={false} badge="PRO">
-          {/* Free: phase label + 1 exercise preview */}
-          <div className="mb-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(26,107,92,0.08)', border: '1px solid rgba(26,107,92,0.20)' }}>
-            <p className="text-[9px] font-heading font-bold uppercase tracking-wide text-secondary mb-0.5">Your Training Phase</p>
-            <p className="text-sm font-heading font-bold text-primary">{workoutPhaseLabel}</p>
-            <p className="text-[10px] text-secondary font-body mt-0.5">
-              Built from your body scan · {weakBodyAreas.length > 0 ? `Targeting: ${weakBodyAreas.join(', ')}` : 'Targeting: V-Taper development'}
-            </p>
-          </div>
-
-          {workoutFreePreview && (
-            <div className="mb-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[12px] font-heading font-bold text-primary">{workoutFreePreview.name}</p>
-                <div className="flex gap-2">
-                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(26,107,92,0.15)', color: '#1A6B5C' }}>{workoutFreePreview.sets}</span>
-                  <span className="text-[9px] font-mono px-2 py-0.5 rounded-full text-secondary" style={{ background: 'rgba(255,255,255,0.05)' }}>Rest {workoutFreePreview.rest}</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-secondary font-body leading-relaxed">{workoutFreePreview.why}</p>
-              <p className="text-[10px] font-body mt-1" style={{ color: '#C6A85C' }}>Score impact: {workoutFreePreview.scoreImpact}</p>
-            </div>
-          )}
-
-          {/* Pro: full plan */}
-          {isPremium ? (
-            <div className="space-y-2">
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary mb-2">12-Week Appearance Plan · {generatedWorkout.length} exercises</p>
-              {generatedWorkout.map((ex, i) => (
-                <div key={i} className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex items-start justify-between mb-1.5">
-                    <p className="text-[12px] font-heading font-bold text-primary leading-tight">{ex.name}</p>
-                    <div className="flex gap-1.5 flex-shrink-0 ml-2">
-                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(26,107,92,0.15)', color: '#1A6B5C' }}>{ex.sets}</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full text-secondary" style={{ background: 'rgba(255,255,255,0.05)' }}>{ex.week}</span>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-secondary font-body leading-relaxed mb-1">{ex.why}</p>
-                  <p className="text-[10px] font-body" style={{ color: '#C6A85C' }}>Score impact: {ex.scoreImpact}</p>
-                </div>
-              ))}
-              <div className="mt-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
-                <p className="text-[10px] font-body text-secondary leading-relaxed">
-                  <span className="font-bold text-primary">Frequency:</span> 4×/week. Run each session in the order listed.
-                  {workoutPhase === 'CUT' ? ' Combine with 500 cal/day deficit for maximum fat loss while maintaining muscle.' : workoutPhase === 'BULK' ? ' Eat 300 cal surplus on training days. Prioritize protein at 1g/lb bodyweight.' : ' Eat at maintenance. High protein (1g/lb) mandatory for recomp to work.'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="relative rounded-2xl overflow-hidden">
-              <div className="blur-sm pointer-events-none select-none opacity-35 space-y-2">
-                {['Wide-Grip Pull-Up — 4×8 · Widens upper back — V-taper driver', 'Lateral Raise — 4×15 · Grows medial deltoid, widens silhouette', 'Overhead Press — 4×8 · Broadens shoulder cap', 'Face Pull — 4×15 · Corrects rounded shoulders', 'Incline Dumbbell Press — 4×10 · Upper chest visibility'].map((ex, i) => (
-                  <div key={i} className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
-                    <p className="text-[10px] font-body text-primary">{ex}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
-                <Lock size={18} className="text-[#C6A85C] mb-2" />
-                <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
-                <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full 12-week appearance-focused plan built from your body scan results</p>
-                <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
-                  Upgrade to Pro →
-                </button>
-              </div>
-            </div>
-          )}
-        </Section>
-      )}
+      {/* ── Personalized Product Stack ────────────────────────────── */}
+      <ProductStack
+        isPremium={isPremium}
+        weaknesses={aiScore?.keyWeaknesses ?? []}
+        skinIssues={skinIssues}
+        groomingScore={aiScore?.groomingScore ?? null}
+        pillars={pillars}
+        gender={gender}
+        onUpgrade={() => navigate('/premium')}
+      />
 
       {/* ── Nutrition Plan ────────────────────────────────────────── */}
       <Section title="Nutrition Plan" emoji="🥩" defaultOpen={false} badge="PRO">
@@ -2124,7 +2110,9 @@ export default function Results() {
     <AnimatePresence>
       {showPaywall && !isPremium && (
         <PaywallSheet
-          glowScore={currentScan?.glowScore}
+          glowScore={glowScore}
+          pillars={pillars}
+          gender={gender ?? 'male'}
           onClose={() => setShowPaywall(false)}
         />
       )}

@@ -145,72 +145,7 @@ function stripPrefix(dataUrl) {
   return dataUrl.replace(/^data:image\/\w+;base64,/, '')
 }
 
-// ── CALL 1: Body Composition ──────────────────────────────────────────────────
-// Focused entirely on body fat. Strict classifier.
-async function getBodyScore(bodyBase64, bodyMediaType, gender = 'male') {
-  const client = getClient()
-  const isFemale = gender === 'female'
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 500,
-    system: `You are a body composition classifier. You output ONLY a JSON object. No explanations. No text. Just JSON.
-
-${isFemale ? `FEMALE BODY ASSESSMENT — score based on feminine physique standards:
-OBESE: Significant excess fat, no visible waist definition, heavy limbs
-OVERWEIGHT: Noticeable fat accumulation, waist not defined, soft physique
-AVERAGE: Normal fat distribution, some waist definition, typical female proportions
-ATHLETIC: Visible muscle tone, defined waist, good hip-to-waist ratio, fit physique
-LEAN_ATHLETIC: Very fit and toned, clear hourglass shape, low body fat, athletic definition` :
-`MALE BODY ASSESSMENT — score based on masculine physique standards:
-OBESE: Large visible stomach, excess fat on chest/back/arms, no muscle definition visible
-OVERWEIGHT: Noticeable fat accumulation, soft physique, some definition lost
-AVERAGE: Normal fat distribution, not lean but not overweight
-ATHLETIC: Visible muscle tone, low body fat, defined physique
-LEAN_ATHLETIC: Clearly muscular, very low body fat, highly defined`}
-
-Score mapping (NON-NEGOTIABLE):
-- OBESE        → body_score: 2.0,  body_cap: 4.5
-- OVERWEIGHT   → body_score: 3.5,  body_cap: 5.5
-- AVERAGE      → body_score: 5.0,  body_cap: 10.0
-- ATHLETIC     → body_score: 7.5,  body_cap: 10.0
-- LEAN_ATHLETIC → body_score: 9.0, body_cap: 10.0
-
-Return ONLY this JSON — no markdown, nothing else:
-{
-  "body_category": "<OBESE|OVERWEIGHT|AVERAGE|ATHLETIC|LEAN_ATHLETIC>",
-  "body_score": <number>,
-  "body_cap": <number>,
-  "reasoning": "<one sentence max>",
-  "sub_scores": {
-    "shoulder_waist_ratio": <number 1.0–10.0, ${isFemale ? 'hourglass ratio — waist-to-hip definition and feminine curve' : 'V-taper assessment — shoulder-to-waist ratio'}>,
-    "posture": <number 1.0–10.0, alignment and forward head posture>,
-    "posture_grade": "<A|B|C|D|F>",
-    "body_proportions": <number 1.0–10.0, ${isFemale ? 'overall feminine proportions — hip-to-waist-to-shoulder balance' : 'torso-to-leg ratio and limb symmetry'}>,
-    "body_composition": <number 1.0–10.0, same as body_score>
-  },
-  "detail": {
-    "swr_estimate": "<${isFemale ? 'waist-to-hip ratio string e.g. 0.68' : 'shoulder-to-waist ratio string e.g. 1.35:1'} — estimate from visible proportions>",
-    "bf_range": "<estimated body fat % range e.g. '25-30' — two numbers only>",
-    "posture_issues": ["<list each that applies: forward_head | rounded_shoulders | anterior_pelvic_tilt | none>"],
-    "muscle_mass_rating": "<low|average|above_average|high>",
-    "arm_development": "<underdeveloped|average|developed>",
-    "chest_development": "<flat|average|developed>",
-    "frame": "<narrow|average|wide>"
-  }
-}`,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
-        { type: 'text',  text: 'Classify this body composition. Return ONLY the JSON.' },
-      ],
-    }],
-  })
-
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Body scorer')
-}
-
-// ── CALL 2: Face + Grooming + 4 Pillars (+ optional side profile) ────────────
+// ── CALL 1: Face + Grooming + 4 Pillars (+ optional side profile) ────────────
 // Focused on facial structure, grooming, and the 4 aesthetic pillars.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
@@ -554,19 +489,19 @@ Return ONLY this JSON — no markdown, nothing else:
   return parsed
 }
 
-// ── CALL 4: Final score in CODE — AI never touches this ──────────────────────
+// ── Final score in CODE — AI never touches this ───────────────────────────────
 //
-// Normal weights: Aesthetic (4-pillar avg) 55% · Body 35% · Grooming 10%
-// Skip-body weights: Aesthetic 70% · Grooming 30% (no body cap applied)
-// Body cap enforced with Math.min() — no AI involvement
+// Formula: overall = (harmony + angularity + features + dimorphism) / 4
+// Grooming score is tracked separately but does NOT affect the overall score.
+// No body component — face pillars are the entire score.
 //
-function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody = false) {
+function calculateFinalScore(faceResult, gender = 'male') {
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
 
-  // ── 4 Pillars → aesthetic score ──────────────────────────────────────────────
-  // The aesthetic (face) component is ALWAYS the exact mathematical average of the
-  // 4 pillar scores returned by the AI. The AI's face_score field is ignored — code
-  // owns this number. Formula: aesthetic = (harmony + angularity + features + dimorphism) / 4
+  // ── 4 Pillars → overall score ─────────────────────────────────────────────
+  // The overall score is ALWAYS the exact mathematical average of the 4 pillar
+  // scores. The AI's face_score field is ignored — code owns this number.
+  // Formula: overall = (harmony + angularity + features + dimorphism) / 4
   const p = faceResult.pillars || {}
   let harmony     = clamp(p.harmony)
   let angularity  = clamp(p.angularity)
@@ -574,35 +509,15 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
   let dimorphism  = clamp(p.dimorphism)
   const hasPillars = p.harmony != null && p.angularity != null && p.features != null && p.dimorphism != null
 
-  // Exact (unrounded) pillar average — used in the weighted formula for precision.
-  // The AI's face_score is only used as a fallback when all 4 pillars are absent.
-  const pillarAvg  = (harmony + angularity + features + dimorphism) / 4
+  // Exact (unrounded) pillar average. AI's face_score is fallback only.
+  const pillarAvg    = (harmony + angularity + features + dimorphism) / 4
   const aestheticRaw = hasPillars ? pillarAvg : clamp(faceResult.face_score)
 
-  // Displayed face score = pillar average rounded to 1 decimal
   const faceScore     = Math.round(aestheticRaw * 10) / 10
-  const bodyScore     = clamp(bodyResult.body_score)
   const groomingScore = clamp(faceResult.grooming_score)
-  const bodyCap       = clamp(bodyResult.body_cap, 10.0)
 
-  let weighted, capped
-  if (skipBody) {
-    // Face 70% + Grooming 30% — no body cap
-    // Use unrounded aestheticRaw to avoid compounding rounding error
-    weighted = aestheticRaw * 0.70 + groomingScore * 0.30
-    capped = weighted
-  } else {
-    // Weighted average: aesthetic 55%, body 35%, grooming 10%
-    // Use unrounded aestheticRaw to avoid compounding rounding error
-    weighted = aestheticRaw * 0.55 + bodyScore * 0.35 + groomingScore * 0.10
-    // Enforce body cap in code — Math.min() — AI cannot override this
-    capped = Math.min(weighted, bodyCap)
-  }
-
-  // Round final score to 1 decimal — only rounding that matters
-  const final = Math.round(capped * 10) / 10
-
-  const bodyFatCapApplied = capped < weighted
+  // Overall = pillar average (face only). No body weight, no body cap.
+  const final = Math.round(aestheticRaw * 10) / 10
 
   // Tier assignment — exact ranges, gender-aware
   // MALE:   Sub 3 (<4) · Low Tier Normie (4–4.9) · Mid Tier Normie (5–5.9)
@@ -643,7 +558,7 @@ function calculateFinalScore(bodyResult, faceResult, gender = 'male', skipBody =
     dimorphism = Math.max(dimorphism, pillarFloor)
   }
 
-  return { final, tier, bodyFatCapApplied, faceScore, bodyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
+  return { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -656,36 +571,31 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { faceImage, bodyImage, sideImage, gender = 'male', skipBody = false } = req.body
+    const { faceImage, sideImage, gender = 'male' } = req.body
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
-    }
-    if (!skipBody && !bodyImage) {
-      return res.status(400).json({ error: 'Body image is required (or pass skipBody: true)' })
     }
 
     // Detect actual media type BEFORE stripping the prefix
     const faceMediaType = getMediaType(faceImage)
-    const faceBase64 = stripPrefix(faceImage)
-    const bodyB64ForCache = skipBody ? null : stripPrefix(bodyImage)
+    const faceBase64    = stripPrefix(faceImage)
 
-    // Side profile (optional — undefined / null / missing are all handled)
-    const sideBase64    = sideImage ? stripPrefix(sideImage)    : null
-    const sideMediaType = sideImage ? getMediaType(sideImage)   : null
+    // Side profile (optional)
+    const sideBase64    = sideImage ? stripPrefix(sideImage)  : null
+    const sideMediaType = sideImage ? getMediaType(sideImage) : null
 
-    // ── L1: in-process memory cache (ephemeral, fastest path) ─────────────────
-    const cacheKey = hashImages(faceBase64, bodyB64ForCache ?? 'SKIP', sideBase64)
+    // ── L1: in-process memory cache ───────────────────────────────────────────
+    const cacheKey = hashImages(faceBase64, 'FACE_ONLY', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
     }
 
-    // ── L2: Supabase persistent cache (survives deploys, 7-day TTL) ───────────
-    const fullHash = computeFullHash(faceBase64, bodyB64ForCache, sideBase64)
+    // ── L2: Supabase persistent cache ─────────────────────────────────────────
+    const fullHash = computeFullHash(faceBase64, null, sideBase64)
     const sbCached = await getScanCache(fullHash)
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
-      // Promote to L1 so subsequent requests in this process skip Supabase entirely
       if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
       scoreCache.set(cacheKey, sbCached)
       return res.json(sbCached)
@@ -695,48 +605,20 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
 
     // Acquire concurrency slot only now — cache hits above never need it
     await acquireSlot()
-    let bodyResult, faceResult, celebResult
+    let faceResult, celebResult
 
     try {
-      // 1000 ms stagger between API calls — spaces requests to stay within 50 req/min limit
+      // 1000 ms stagger between API calls
       const stagger = () => new Promise(r => setTimeout(r, 1000))
 
-      if (skipBody) {
-        // Only run face + celebrity — body defaults applied
-        console.log('[aiScore] skipBody=true — running face then celebrity (staggered 1000ms)...')
-        console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-        faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
-        await stagger()
-        celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
-          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-          return null
-        })
-        bodyResult = {
-          body_category: 'NOT_PROVIDED',
-          body_score: 5.0,
-          body_cap: 10.0,
-          reasoning: 'Body photo not provided — using neutral default score.',
-          sub_scores: { shoulder_waist_ratio: null, posture: null, posture_grade: null, body_proportions: null, body_composition: 5.0 },
-          detail: null,
-        }
-      } else {
-        const bodyMediaType = getMediaType(bodyImage)
-        const bodyBase64 = stripPrefix(bodyImage)
-        console.log('[aiScore] Media types — face:', faceMediaType, '| body:', bodyMediaType)
-
-        // Stagger calls 1000ms apart — spaces requests to stay within 50 req/min limit
-        console.log('[aiScore] Starting body → face → celebrity (staggered 1000ms each)...')
-        console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-        bodyResult = await withRetry(() => getBodyScore(bodyBase64, bodyMediaType, gender), 'body')
-        await stagger()
-        faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
-        await stagger()
-        celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
-          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-          return null
-        })
-        console.log('[aiScore] Body:', bodyResult.body_category, bodyResult.body_score, '| cap:', bodyResult.body_cap)
-      }
+      console.log('[aiScore] Starting face → celebrity (staggered 1000ms)...')
+      console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
+      faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
+      await stagger()
+      celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
+        console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+        return null
+      })
     } finally {
       releaseSlot()
     }
@@ -750,22 +632,17 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       : 'unavailable')
 
     // Final score: pure code — no AI involvement
-    const { final, tier, bodyFatCapApplied, faceScore, bodyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = calculateFinalScore(bodyResult, faceResult, gender, skipBody)
-    console.log('[aiScore] Final:', final, tier, '| cap applied:', bodyFatCapApplied)
+    const { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = calculateFinalScore(faceResult, gender)
+    console.log('[aiScore] Final:', final, tier)
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
 
     const faceSub = faceResult.sub_scores || {}
-    const bodySub = bodyResult.sub_scores || {}
     const r = (v) => v != null ? Math.round(Number(v) * 10) / 10 : null
 
     const result = {
       overallScore:      final,
       faceScore:         Math.round(faceScore    * 10) / 10,
-      bodyScore:         skipBody ? null : Math.round(bodyScore * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,
-      bodyFatLevel:      skipBody ? null : bodyResult.body_category.toLowerCase(),
-      bodySkipped:       skipBody || false,
-      bodyFatCapApplied,
       tier,
       facialStructure:   faceResult.facial_structure,
       hairType:          faceResult.hair_type ?? 'unknown',
@@ -777,15 +654,6 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
         eyeArea:           r(faceSub.eye_area),
         facialHarmony:     r(faceSub.facial_harmony),
       },
-      bodySubScores: skipBody ? null : {
-        shoulderWaistRatio:  r(bodySub.shoulder_waist_ratio),
-        posture:             r(bodySub.posture),
-        postureGrade:        bodySub.posture_grade || null,
-        bodyProportions:     r(bodySub.body_proportions),
-        bodyComposition:     r(bodySub.body_composition ?? bodyResult.body_score),
-        compositionCategory: bodyResult.body_category,
-      },
-      bodyDetail: skipBody ? null : (bodyResult.detail ?? null),
       pillars: hasPillars ? {
         harmony:    Math.round(harmony    * 10) / 10,
         angularity: Math.round(angularity * 10) / 10,
@@ -810,7 +678,6 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
           facialThirds:          metric('facial_thirds'),
         }
       })(),
-      bodyReasoning:     bodyResult.reasoning,
       celebrityMatches:  celebResult
         ? [celebResult.match1, celebResult.match2, celebResult.match3]
             .filter(Boolean)
@@ -833,22 +700,31 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
     scoreCache.set(cacheKey, result)
     // L2 write is fire-and-forget — never blocks the response
-    setScanCache(fullHash, result).then(() => {
-      console.log('[aiScore] L2 Supabase cache written:', fullHash.slice(0, 16))
-    }).catch(err => {
-      console.warn('[aiScore] L2 Supabase cache write failed (non-fatal):', err.message)
-    })
+    // Wrapped in try-catch so a missing/undefined export can't propagate to the outer catch
+    try {
+      setScanCache(fullHash, result).then(() => {
+        console.log('[aiScore] L2 Supabase cache written:', fullHash.slice(0, 16))
+      }).catch(err => {
+        console.warn('[aiScore] L2 Supabase cache write failed (non-fatal):', err.message)
+      })
+    } catch (e) {
+      console.warn('[aiScore] L2 cache call error (non-fatal):', e.message)
+    }
 
     // ── Persist to scan history (fire-and-forget, skip demo users) ────────────
+    // Wrapped in try-catch so a TypeError (e.g. undefined function) is non-fatal
     if (req.userId && req.userId !== 'demo') {
-      saveScanHistory(req.userId, {
-        overallScore:    result.overallScore,
-        faceScore:       result.faceScore,
-        bodyScore:       result.bodyScore,
-        groomingScore:   result.groomingScore,
-        tier:            result.tier,
-        celebrityMatch:  result.celebrityMatches?.[0]?.celebrity ?? null,
-      }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
+      try {
+        saveScanHistory(req.userId, {
+          overallScore:    result.overallScore,
+          faceScore:       result.faceScore,
+          groomingScore:   result.groomingScore,
+          tier:            result.tier,
+          celebrityMatch:  result.celebrityMatches?.[0]?.celebrity ?? null,
+        }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
+      } catch (e) {
+        console.warn('[aiScore] scan_history call error (non-fatal):', e.message)
+      }
     }
 
     res.json(result)

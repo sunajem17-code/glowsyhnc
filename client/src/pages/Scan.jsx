@@ -11,7 +11,6 @@ import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 
 const ANALYSIS_STEPS = [
-  { label: 'Analyzing body composition...', emoji: '💪' },
   { label: 'Scanning facial structure...', emoji: '🎯' },
   { label: 'Matching celebrity lookalikes...', emoji: '⭐' },
   { label: 'Calculating your score...', emoji: '⚡' },
@@ -79,20 +78,6 @@ function FaceGuide() {
   )
 }
 
-function BodyGuide() {
-  return (
-    <svg width="90" height="185" viewBox="0 0 90 185">
-      <ellipse cx="45" cy="25" rx="18" ry="22" fill="none" stroke="#C6A85C" strokeWidth="2" strokeDasharray="6,4" opacity="0.8"/>
-      <rect x="24" y="44"  width="42" height="62" rx="6" fill="none" stroke="#C6A85C" strokeWidth="2"   strokeDasharray="6,4" opacity="0.8"/>
-      <rect x="10" y="47"  width="15" height="54" rx="5" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.6"/>
-      <rect x="65" y="47"  width="15" height="54" rx="5" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.6"/>
-      <rect x="28" y="104" width="13" height="68" rx="5" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.6"/>
-      <rect x="49" y="104" width="13" height="68" rx="5" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.6"/>
-      <line x1="10" y1="52" x2="80" y2="52" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.6"/>
-      <line x1="24" y1="80" x2="66" y2="80" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.6"/>
-    </svg>
-  )
-}
 
 // Side-profile silhouette: head facing right, with markers for nose/chin/jaw
 function SideGuide({ size = 'normal' }) {
@@ -193,7 +178,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
                     <line x1="90"  y1="10"  x2="90"  y2="230" stroke="white" strokeWidth="0.5" opacity="0.3"/>
                     <line x1="10"  y1="120" x2="170" y2="120" stroke="white" strokeWidth="0.5" opacity="0.3"/>
                   </svg>
-                ) : stepNum === 3 ? (
+                ) : (
                   /* Side-profile guide — head facing right */
                   <svg width="170" height="220" viewBox="0 0 170 220" className="opacity-65">
                     <path
@@ -211,16 +196,6 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
                     <line x1="10"  y1="88"  x2="160" y2="88"  stroke="white" strokeWidth="0.5" opacity="0.25"/>
                     {/* "Face right" arrow */}
                     <text x="148" y="64" fill="#C6A85C" fontSize="22" opacity="0.9">→</text>
-                  </svg>
-                ) : (
-                  /* Body guide */
-                  <svg width="120" height="260" viewBox="0 0 120 260" className="opacity-60">
-                    <ellipse cx="60" cy="35"  rx="24" ry="30" fill="none" stroke="#C6A85C" strokeWidth="2.5" strokeDasharray="8,5"/>
-                    <rect x="32"   y="62"  width="56" height="85" rx="8" fill="none" stroke="#C6A85C" strokeWidth="2.5" strokeDasharray="8,5"/>
-                    <rect x="16"   y="65"  width="18" height="72" rx="6" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="6,5" opacity="0.7"/>
-                    <rect x="86"   y="65"  width="18" height="72" rx="6" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="6,5" opacity="0.7"/>
-                    <rect x="37"   y="145" width="18" height="100" rx="6" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="6,5" opacity="0.7"/>
-                    <rect x="65"   y="145" width="18" height="100" rx="6" fill="none" stroke="#C6A85C" strokeWidth="1.5" strokeDasharray="6,5" opacity="0.7"/>
                   </svg>
                 )}
               </div>
@@ -289,7 +264,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
           </>
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
-            {stepNum === 1 ? <FaceGuide /> : stepNum === 3 ? <SideGuide /> : <BodyGuide />}
+            {stepNum === 1 ? <FaceGuide /> : <SideGuide />}
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
         )}
@@ -380,19 +355,18 @@ function AnalyzingScreen({ currentStep, slow }) {
 }
 
 // ─── Main Scan Page ───────────────────────────────────────────────────────────
-// Steps: 0=gender  1=face  2=body  3=side-profile  4=analyzing
+// Steps: 0=gender  1=face  2=side-profile  3=analyzing
 
 const STEP_META = [
   { title: 'Select Gender',  subtitle: 'For accurate Overall Rating results' },
-  { title: 'Face Photo',     subtitle: 'Step 1 of 3 — Front face' },
-  { title: 'Body Photo',     subtitle: 'Step 2 of 3 — Full body' },
-  { title: 'Side Profile',   subtitle: 'Step 3 of 3 — Optional · Unlocks profile analysis' },
+  { title: 'Face Photo',     subtitle: 'Take your photo' },
+  { title: 'Side Profile',   subtitle: 'Optional · Unlocks profile analysis' },
 ]
 
 export default function Scan() {
   const navigate = useNavigate()
   const {
-    setPendingFacePhoto, setPendingBodyPhoto, addScan, setCurrentScan, setCurrentPlan,
+    setPendingFacePhoto, addScan, setCurrentScan, setCurrentPlan,
     gender: savedGender, setGender, isPremium, scanCount, incrementScanCount,
     setAssignedPhase, userProfile, lastScanDate, setLastScanDate,
   } = useStore()
@@ -409,9 +383,7 @@ export default function Scan() {
   const [step, setStep]                   = useState(0)
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
-  const [bodyPhoto, setBodyPhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
-  const [bodySkipped, setBodySkipped]     = useState(false)
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
   const [error, setError]                 = useState('')
@@ -469,36 +441,31 @@ export default function Scan() {
   }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
-  async function startAnalysis(skipBodyOverride = false, skipSideOverride = false) {
+  async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
-    const skip     = skipBodyOverride || bodySkipped
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
     setGender(g)
-    setStep(4)  // analyzing
+    setStep(3)  // analyzing
     setError('')
     setAnalysisStep(0)
 
     try {
       const faceB64 = await toBase64(facePhoto)
-      const bodyB64 = skip ? null : await toBase64(bodyPhoto)
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
 
       setAnalysisStep(1)
       setSlowAnalysis(false)
-      const stageTimer    = setInterval(() => setAnalysisStep(prev => prev < 3 ? prev + 1 : prev), 1800)
-      // Show "Still analyzing… almost there" after 12 s (covers retry wait times)
-      const slowTimer     = setTimeout(() => setSlowAnalysis(true), 12000)
+      const stageTimer = setInterval(() => setAnalysisStep(prev => prev < 3 ? prev + 1 : prev), 1800)
+      const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       let aiResult
       try {
         const scoreCall = api.ai.score({
           faceImage: faceB64,
-          ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
           ...(sideB64 ? { sideImage: sideB64 } : {}),
           gender: g,
-          skipBody: skip,
         })
         const timeoutCall = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
@@ -514,17 +481,14 @@ export default function Scan() {
       await new Promise(r => setTimeout(r, 350))
       setAnalysisStep(4)
 
-      console.info('[Scan] AI score:', aiResult.overallScore, aiResult.tier,
-        '| body:', aiResult.bodyFatLevel, '| side:', aiResult.hasSideProfile)
+      console.info('[Scan] AI score:', aiResult.overallScore, aiResult.tier, '| side:', aiResult.hasSideProfile)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
         scanDate:       new Date().toISOString(),
         analyzedAt:     new Date().toISOString(),
         facePhotoUrl:   faceB64,
-        bodyPhotoUrl:   bodyB64 ?? null,
         sidePhotoUrl:   sideB64 ?? null,
-        bodySkipped:    skip,
         hasSideProfile: aiResult.hasSideProfile ?? false,
         gender:         g,
         umaxScore:      aiResult.overallScore,
@@ -541,51 +505,34 @@ export default function Scan() {
           eyeArea:           aiResult.faceSubScores?.eyeArea           ?? null,
           facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
         },
-        bodyData: {
-          bodyScore:           aiResult.bodyScore,
-          bodyFatLevel:        aiResult.bodyFatLevel,
-          shoulderWaistRatio:  aiResult.bodySubScores?.shoulderWaistRatio  ?? null,
-          posture:             aiResult.bodySubScores?.posture             ?? null,
-          postureGradeValue:   aiResult.bodySubScores?.postureGrade        ?? null,
-          bodyProportions:     aiResult.bodySubScores?.bodyProportions     ?? null,
-          bodyComposition:     aiResult.bodySubScores?.bodyComposition     ?? null,
-          compositionCategory: aiResult.bodySubScores?.compositionCategory ?? null,
-          detail:              aiResult.bodyDetail ?? null,
-        },
         pillars:          aiResult.pillars         ?? null,
         celebrityMatches: aiResult.celebrityMatches ?? null,
       }
 
-      const assignedPh = assignPhase(aiResult.bodyScore, userProfile?.goal)
-      const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.bodyData, scanRecord.pillars, assignedPh, g)
+      const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
+      const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, assignedPh, g)
       setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
       setPendingFacePhoto(faceB64)
-      setPendingBodyPhoto(bodyB64)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
 
       // Persist to Supabase (non-blocking)
       api.supabase.saveScan({
-        overallScore:       aiResult.overallScore,
-        tier:               aiResult.tier,
-        faceScore:          aiResult.faceScore,
-        bodyScore:          aiResult.bodyScore,
-        bodyCategory:       aiResult.bodyFatLevel,
-        groomingScore:      aiResult.groomingScore,
-        harmony:            aiResult.pillars?.harmony,
-        angularity:         aiResult.pillars?.angularity,
-        features:           aiResult.pillars?.features,
-        dimorphism:         aiResult.pillars?.dimorphism,
-        potentialScore:     Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
-        celebrityMatches:   aiResult.celebrityMatches,
-        bodyFatEstimate:    aiResult.bodyFatLevel,
-        shoulderWaistRatio: aiResult.bodySubScores?.shoulderWaistRatio,
-        postureGrade:       aiResult.bodySubScores?.postureGrade,
-        hairTypeDetected:   aiResult.hairType,
-        faceShape:          aiResult.facialStructure,
-        gender:             g,
-        assignedPhase:      assignedPh?.toLowerCase(),
+        overallScore:     aiResult.overallScore,
+        tier:             aiResult.tier,
+        faceScore:        aiResult.faceScore,
+        groomingScore:    aiResult.groomingScore,
+        harmony:          aiResult.pillars?.harmony,
+        angularity:       aiResult.pillars?.angularity,
+        features:         aiResult.pillars?.features,
+        dimorphism:       aiResult.pillars?.dimorphism,
+        potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
+        celebrityMatches: aiResult.celebrityMatches,
+        hairTypeDetected: aiResult.hairType,
+        faceShape:        aiResult.facialStructure,
+        gender:           g,
+        assignedPhase:    assignedPh?.toLowerCase(),
         tasks,
       }).catch(err => console.warn('[Supabase] Scan save failed (non-fatal):', err.message))
 
@@ -597,28 +544,27 @@ export default function Scan() {
       if (err.message === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
-        setStep(3)
+        setStep(2)
       } else if (err.message === 'rate_limited') {
         setRateLimited(true)
         setRetryCountdown(err.retryAfter || 60)
-        setStep(3)
+        setStep(2)
       } else {
-        // server_error, timeout, network failure — show retry button
         setError('Analysis unavailable right now. Please try again in a minute.')
-        setStep(3)
+        setStep(2)
       }
     }
   }
 
   startAnalysisRef.current = startAnalysis
 
-  const isAnalyzing = step === 4
+  const isAnalyzing = step === 3
 
   return (
     <div className="flex flex-col h-full bg-page">
       <Helmet>
         <title>AI Face Rating &amp; Looksmax Scan — Ascendus</title>
-        <meta name="description" content="Upload your photo for an instant AI face rating, body composition score, and celebrity lookalike match. Get your free looksmax scan in under 60 seconds." />
+        <meta name="description" content="Upload your photo for an instant AI face rating, celebrity lookalike match, and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
       </Helmet>
 
@@ -627,11 +573,11 @@ export default function Scan() {
         <PageHeader title={STEP_META[step]?.title ?? ''} subtitle={STEP_META[step]?.subtitle ?? ''} back={step > 0} />
       )}
 
-      {/* Progress bar (photo steps 1–3) */}
-      {step >= 1 && step <= 3 && (
+      {/* Progress bar (photo steps 1–2) */}
+      {step >= 1 && step <= 2 && (
         <div className="px-4 pb-3">
           <div className="flex gap-2">
-            {[1, 2, 3].map(i => (
+            {[1, 2].map(i => (
               <div key={i} className="flex-1 h-1 rounded-full transition-colors duration-300"
                 style={{ background: i <= step ? '#C6A85C' : 'var(--border)' }} />
             ))}
@@ -639,8 +585,6 @@ export default function Scan() {
           <p className="text-xs text-secondary font-body mt-1.5">
             {step === 1
               ? 'Neutral expression · Face centered · Good lighting · No harsh shadows'
-              : step === 2
-              ? 'Full silhouette visible · Arms slightly out · Front-facing · 6–8 ft from camera'
               : 'Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera'}
           </p>
         </div>
@@ -660,11 +604,6 @@ export default function Scan() {
             </motion.div>
           )}
           {step === 2 && (
-            <motion.div key="body" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <PhotoUploadStep stepNum={2} guide="Full silhouette visible. Straight posture, arms slightly out. Front-facing. 6–8 feet from camera." photo={bodyPhoto} onPhoto={url => { setBodyPhoto(url); setError('') }} />
-            </motion.div>
-          )}
-          {step === 3 && (
             <motion.div key="side" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               {/* Side-profile tips banner */}
               <div className="mx-4 mb-1 px-3 py-2 rounded-xl flex items-start gap-2.5"
@@ -681,7 +620,7 @@ export default function Scan() {
                   OPTIONAL
                 </span>
               </div>
-              <PhotoUploadStep stepNum={3}
+              <PhotoUploadStep stepNum={2}
                 guide="Turn 90° to the right. Keep your face relaxed and neutral. 3–6 feet from camera."
                 photo={sidePhoto}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
@@ -787,36 +726,15 @@ export default function Scan() {
           {step === 1 && (
             <button onClick={() => facePhoto && (setStep(2), setError(''))} disabled={!facePhoto}
               className={`btn-primary ${!facePhoto ? 'opacity-50' : ''}`}>
-              {facePhoto ? 'Continue → Body Photo' : 'Take or upload face photo first'}
+              {facePhoto ? 'Continue →' : 'Take or upload face photo first'}
             </button>
           )}
 
-          {/* Step 2: body */}
+          {/* Step 2: side profile */}
           {step === 2 && (
             <>
-              <button onClick={() => bodyPhoto && (setStep(3), setError(''))} disabled={!bodyPhoto}
-                className={`btn-primary ${!bodyPhoto ? 'opacity-50' : ''}`}>
-                {bodyPhoto ? 'Continue → Side Profile' : 'Take or upload body photo first'}
-              </button>
               <button
-                onClick={() => { setBodySkipped(true); setStep(3) }}
-                className="w-full mt-3 py-4 rounded-xl flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
-                style={{ border: '1.5px solid rgba(201,168,76,0.55)', background: 'rgba(201,168,76,0.06)' }}
-              >
-                <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
-                <div className="text-left">
-                  <p className="font-heading font-bold text-[14px] text-white leading-tight">Skip Body Scan</p>
-                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>Score based on face only</p>
-                </div>
-              </button>
-            </>
-          )}
-
-          {/* Step 3: side profile */}
-          {step === 3 && (
-            <>
-              <button
-                onClick={() => startAnalysis(bodySkipped, false)}
+                onClick={() => startAnalysis(false)}
                 className="btn-amber"
                 disabled={!sidePhoto}
                 style={!sidePhoto ? { opacity: 0.55 } : {}}
@@ -824,7 +742,7 @@ export default function Scan() {
                 {sidePhoto ? '✦ Full Scan — Analyze Now' : 'Take or upload side profile first'}
               </button>
               <button
-                onClick={() => startAnalysis(bodySkipped, true)}
+                onClick={() => startAnalysis(true)}
                 className="w-full mt-3 py-4 rounded-xl flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
                 style={{ border: '1.5px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)' }}
               >
@@ -832,7 +750,7 @@ export default function Scan() {
                 <div className="text-left">
                   <p className="font-heading font-bold text-[14px] text-white leading-tight">Skip Side Profile</p>
                   <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                    {bodySkipped ? 'Analyze face only (Basic Scan)' : 'Analyze without profile data (Basic Scan)'}
+                    Analyze face only (Basic Scan)
                   </p>
                 </div>
               </button>

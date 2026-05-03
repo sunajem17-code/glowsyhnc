@@ -1,0 +1,113 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+
+  <!-- Gold radial glow top-left -->
+  <radialGradient id="glow1" cx="30%" cy="30%" r="60%">
+    <stop offset="0%" stop-color="#C6A85C" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#C6A85C" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+
+  <!-- Gold radial glow bottom-right -->
+  <radialGradient id="glow2" cx="80%" cy="80%" r="50%">
+    <stop offset="0%" stop-color="#C6A85C" stop-opacity="0.10"/>
+    <stop offset="100%" stop-color="#C6A85C" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="315" x2="1200" y2="315" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+  <line x1="600" y1="0" x2="600" y2="630" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+
+  <!-- Left content area -->
+  <!-- Logo mark -->
+  <rect x="80" y="100" width="52" height="52" rx="14" fill="rgba(198,168,92,0.12)" stroke="rgba(198,168,92,0.30)" stroke-width="1.5"/>
+  <text x="106" y="133" font-family="Georgia, serif" font-size="26" font-weight="700" fill="#C6A85C" text-anchor="middle">A</text>
+
+  <!-- Brand name -->
+  <text x="80" y="200" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="rgba(198,168,92,0.7)" letter-spacing="4">ASCENDUS</text>
+
+  <!-- Main headline -->
+  <text x="80" y="280" font-family="Arial, sans-serif" font-size="62" font-weight="800" fill="#F0EDE8" letter-spacing="-2">Free AI</text>
+  <text x="80" y="355" font-family="Arial, sans-serif" font-size="62" font-weight="800" fill="#C6A85C" letter-spacing="-2">Face Rating</text>
+  <text x="80" y="430" font-family="Arial, sans-serif" font-size="62" font-weight="800" fill="#F0EDE8" letter-spacing="-2">&amp; Looksmax Plan</text>
+
+  <!-- Sub-headline -->
+  <text x="80" y="490" font-family="Arial, sans-serif" font-size="22" fill="rgba(240,237,232,0.5)" letter-spacing="-0.3">Celebrity lookalike · 4 pillar score · 12-week action plan</text>
+
+  <!-- CTA pill -->
+  <rect x="80" y="524" width="230" height="50" rx="25" fill="#C6A85C"/>
+  <text x="195" y="554" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#0A0A0A" text-anchor="middle" letter-spacing="-0.2">Get Your Free Score →</text>
+
+  <!-- Divider -->
+  <line x1="620" y1="60" x2="620" y2="570" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Right: mock score card -->
+  <rect x="670" y="80" width="450" height="470" rx="24" fill="#111111" stroke="rgba(198,168,92,0.22)" stroke-width="1.5"/>
+
+  <!-- Card header -->
+  <rect x="670" y="80" width="450" height="140" rx="24" fill="#161616"/>
+  <rect x="670" y="180" width="450" height="40" fill="#161616"/>
+
+  <!-- Score label -->
+  <text x="710" y="122" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="rgba(240,237,232,0.3)" letter-spacing="2">GLOW SCORE</text>
+
+  <!-- Pro badge -->
+  <rect x="1050" y="108" width="54" height="22" rx="11" fill="rgba(198,168,92,0.15)" stroke="rgba(198,168,92,0.30)" stroke-width="1"/>
+  <text x="1077" y="123" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#C6A85C" text-anchor="middle">✦ PRO</text>
+
+  <!-- Score number -->
+  <text x="710" y="188" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#C6A85C" letter-spacing="-3">7.4</text>
+  <text x="800" y="188" font-family="Arial, sans-serif" font-size="18" fill="rgba(240,237,232,0.45)">/10 · Top 18%</text>
+
+  <!-- Separator line -->
+  <line x1="690" y1="215" x2="1100" y2="215" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Pillar bars -->
+  <!-- Harmony -->
+  <text x="710" y="255" font-family="Arial, sans-serif" font-size="13" fill="rgba(240,237,232,0.55)">Harmony</text>
+  <text x="1090" y="255" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#34C759" text-anchor="end">7.8</text>
+  <rect x="710" y="262" width="370" height="4" rx="2" fill="rgba(255,255,255,0.06)"/>
+  <rect x="710" y="262" width="289" height="4" rx="2" fill="#34C759"/>
+
+  <!-- Angularity -->
+  <text x="710" y="300" font-family="Arial, sans-serif" font-size="13" fill="rgba(240,237,232,0.55)">Angularity</text>
+  <text x="1090" y="300" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#F5A623" text-anchor="end">6.2</text>
+  <rect x="710" y="307" width="370" height="4" rx="2" fill="rgba(255,255,255,0.06)"/>
+  <rect x="710" y="307" width="229" height="4" rx="2" fill="#F5A623"/>
+
+  <!-- Features -->
+  <text x="710" y="345" font-family="Arial, sans-serif" font-size="13" fill="rgba(240,237,232,0.55)">Features</text>
+  <text x="1090" y="345" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#34C759" text-anchor="end">8.1</text>
+  <rect x="710" y="352" width="370" height="4" rx="2" fill="rgba(255,255,255,0.06)"/>
+  <rect x="710" y="352" width="300" height="4" rx="2" fill="#34C759"/>
+
+  <!-- Dimorphism -->
+  <text x="710" y="390" font-family="Arial, sans-serif" font-size="13" fill="rgba(240,237,232,0.55)">Dimorphism</text>
+  <text x="1090" y="390" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#34C759" text-anchor="end">7.1</text>
+  <rect x="710" y="397" width="370" height="4" rx="2" fill="rgba(255,255,255,0.06)"/>
+  <rect x="710" y="397" width="263" height="4" rx="2" fill="#34C759"/>
+
+  <!-- Separator -->
+  <line x1="690" y1="425" x2="1100" y2="425" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Celebrity section -->
+  <text x="710" y="454" font-family="Arial, sans-serif" font-size="12" fill="rgba(240,237,232,0.3)" letter-spacing="1.5">CELEBRITY MATCH</text>
+
+  <!-- Avatar circles -->
+  <rect x="710" y="466" width="46" height="46" rx="10" fill="#1A1A1A" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="733" y="494" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#C6A85C" text-anchor="middle">Z</text>
+
+  <rect x="764" y="466" width="46" height="46" rx="10" fill="#1A1A1A" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="787" y="494" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#C6A85C" text-anchor="middle">H</text>
+
+  <rect x="818" y="466" width="46" height="46" rx="10" fill="#1A1A1A" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="841" y="494" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#C6A85C" text-anchor="middle">R</text>
+
+  <text x="878" y="485" font-family="Arial, sans-serif" font-size="13" font-weight="600" fill="#F0EDE8">Zac Efron</text>
+  <text x="878" y="503" font-family="Arial, sans-serif" font-size="11" fill="rgba(240,237,232,0.35)">71% match</text>
+
+  <!-- Bottom text -->
+  <text x="600" y="605" font-family="Arial, sans-serif" font-size="14" fill="rgba(240,237,232,0.2)" text-anchor="middle" letter-spacing="0.5">ascendus.store</text>
+</svg>

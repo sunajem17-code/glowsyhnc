@@ -56,7 +56,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       mode: 'subscription',
       line_items: [{ price: PRICES[plan], quantity: 1 }],
       subscription_data: {
-        ...(noTrial ? {} : { trial_period_days: 2 }),
+        ...(noTrial ? {} : { trial_period_days: 7 }),
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },

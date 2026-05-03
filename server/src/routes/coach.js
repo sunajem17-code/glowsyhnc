@@ -9,7 +9,7 @@ function getClient() {
 }
 
 function buildSystemPrompt(scanContext) {
-  const { glowScore, faceScore, bodyScore, presentationScore, faceData, bodyData, presentationData, userProfile } = scanContext || {}
+  const { glowScore, faceScore, presentationScore, faceData, presentationData, userProfile } = scanContext || {}
 
   let prompt = `You are the Ascendus AI Coach — a knowledgeable, encouraging friend who helps men maximize their physical appearance and confidence. You have access to the user's latest scan data. You're warm, real, and genuinely invested in their progress.
 
@@ -81,14 +81,11 @@ POSTURE PROTOCOL (use when posture score < 7 or user mentions posture):
 
   if (glowScore != null) {
     prompt += `\n\nUSER'S SCAN DATA (use this to give personalized advice):
-Overall Glow Score: ${glowScore}/10
-Face Score: ${faceScore}/10 | Body Score: ${bodyScore}/10 | Presentation Score: ${presentationScore}/10`
+Overall Score: ${glowScore}/10
+Face Score: ${faceScore}/10 | Presentation Score: ${presentationScore}/10`
 
     if (faceData) {
       prompt += `\nFace breakdown — Symmetry: ${faceData.symmetry}/10 | Jawline: ${faceData.jawline}/10 | Skin Clarity: ${faceData.skinClarity}/10 | Eyes: ${faceData.eyeArea}/10 | Harmony: ${faceData.overallHarmony}/10`
-    }
-    if (bodyData) {
-      prompt += `\nBody breakdown — Posture: ${bodyData.posture}/10 | Muscle Tone: ${bodyData.muscleTone}/10 | Body Composition: ${bodyData.bodyComposition}/10 | Proportions: ${bodyData.proportions}/10`
     }
     if (presentationData) {
       prompt += `\nPresentation — Grooming: ${presentationData.grooming}/10 | Style: ${presentationData.style}/10 | First Impression: ${presentationData.firstImpression}/10`
@@ -98,9 +95,6 @@ Face Score: ${faceScore}/10 | Body Score: ${bodyScore}/10 | Presentation Score: 
     const areas = []
     if (faceData?.skinClarity < 6) areas.push('skin clarity')
     if (faceData?.jawline < 6) areas.push('jawline definition')
-    if (bodyData?.posture < 6) areas.push('posture')
-    if (bodyData?.muscleTone < 6) areas.push('muscle tone')
-    if (bodyData?.bodyComposition < 6) areas.push('body composition')
     if (presentationData?.grooming < 6) areas.push('grooming')
     if (presentationData?.style < 6) areas.push('style')
 
@@ -108,12 +102,8 @@ Face Score: ${faceScore}/10 | Body Score: ${bodyScore}/10 | Presentation Score: 
       prompt += `\nKey improvement areas: ${areas.join(', ')}`
     }
 
-    if (userProfile) {
-      if (userProfile.heightCm && userProfile.weightKg) {
-        const bmi = (userProfile.weightKg / ((userProfile.heightCm / 100) ** 2)).toFixed(1)
-        prompt += `\nUser stats — Height: ${userProfile.heightCm}cm | Weight: ${userProfile.weightKg}kg | BMI: ${bmi}`
-      }
-      if (userProfile.goal) prompt += ` | Goal: ${userProfile.goal}`
+    if (userProfile?.goal) {
+      prompt += `\nUser goal: ${userProfile.goal}`
     }
   }
 

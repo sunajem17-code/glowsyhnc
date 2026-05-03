@@ -7,7 +7,6 @@ import useStore from '../store/useStore'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
-import { postureGrade } from '../utils/analysis'
 
 const RESCAN_DAYS = 14
 
@@ -33,7 +32,6 @@ export default function Dashboard() {
   const latestScan = scans[0]
   const rawGlowScore = latestScan?.glowScore ?? 0
   const glowScore = rawGlowScore > 10 ? Math.round(rawGlowScore) / 10 : rawGlowScore
-  const posture = latestScan?.bodyData?.posture ?? 0
   const skin = latestScan?.faceData?.skinClarity ?? 0
   const umaxScore = latestScan?.umaxScore ?? null
   const tier = latestScan?.tier ?? null
@@ -254,8 +252,8 @@ export default function Dashboard() {
       <motion.div {...fadeUp(0.12)} className="grid grid-cols-3 gap-2.5 mb-4">
         {[
           {
-            label: 'Posture',
-            value: posture ? postureGrade(posture) : '—',
+            label: 'Face',
+            value: latestScan?.faceData?.aestheticScore != null ? latestScan.faceData.aestheticScore.toFixed(1) : '—',
             icon: Activity,
             color: '#C6A85C',
             bg: 'rgba(198,168,92,0.08)',

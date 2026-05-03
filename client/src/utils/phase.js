@@ -1,10 +1,8 @@
-// Phase assignment based on body score from AI scan
-export function assignPhase(bodyScore, goal) {
-  if (!bodyScore) return 'TRANSFORM'
-  if (bodyScore < 4.0) return 'LEAN'
-  if (bodyScore >= 6.5 && goal === 'Style & Grooming') return 'REFINE'
-  if (bodyScore > 6.0 && goal === 'Face & Jawline') return 'SCULPT'
-  if (bodyScore >= 6.5) return 'REFINE'
+// Phase assignment based on user goal
+export function assignPhase(faceScore, goal) {
+  if (goal === 'Style & Grooming') return 'REFINE'
+  if (goal === 'Face & Jawline') return 'SCULPT'
+  if (faceScore != null && faceScore >= 7.0) return 'REFINE'
   return 'TRANSFORM'
 }
 

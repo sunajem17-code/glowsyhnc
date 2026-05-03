@@ -23,7 +23,7 @@ const CANCEL_REASONS = [
 ]
 
 const LOSES = [
-  { icon: '📊', label: 'Complete body analysis (12 metrics)' },
+  { icon: '📐', label: 'Detailed face metrics (6 pillars + profile)' },
   { icon: '⭐', label: 'Celebrity lookalike matching' },
   { icon: '🗺️', label: 'Your 12-week transformation plan' },
   { icon: '📈', label: 'Progress tracking & before/after' },
@@ -738,7 +738,7 @@ export default function Profile() {
               <p className="text-[13px] font-body mb-5" style={{ color: TEXT_DIM }}>
                 {latestScan
                   ? `My Ascendus score is ${latestScan.glowScore}/100 — track your glow-up at ascendus.store`
-                  : 'Track your full-body glow-up at ascendus.store'}
+                  : 'Track your glow-up at ascendus.store'}
               </p>
 
               <div className="grid grid-cols-3 gap-3 mb-4">
@@ -755,7 +755,7 @@ export default function Profile() {
                     emoji: '💬',
                     bg: '#0D1F12',
                     border: 'rgba(37,211,102,0.2)',
-                    action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out Ascendus — the full-body glow-up tracker ascendus.store`)}`, '_blank'),
+                    action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out Ascendus — the AI appearance tracker ascendus.store`)}`, '_blank'),
                   },
                   {
                     label: 'Instagram',
@@ -860,7 +860,7 @@ export default function Profile() {
                     key: 'savePhotos',
                     icon: Eye,
                     label: 'Save Scan Photos',
-                    desc: 'Keep face and body photos stored locally for progress comparisons.',
+                    desc: 'Keep face photos stored locally for progress comparisons.',
                   },
                   {
                     key: 'faceDataRetention',

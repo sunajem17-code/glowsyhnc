@@ -26,10 +26,8 @@ function buildScanContext(latestScan, userProfile) {
   return {
     glowScore: latestScan.glowScore,
     faceScore: latestScan.faceScore,
-    bodyScore: latestScan.bodyScore,
     presentationScore: latestScan.presentationScore,
     faceData: latestScan.faceData,
-    bodyData: latestScan.bodyData,
     presentationData: latestScan.presentationData,
     userProfile,
   }
@@ -267,7 +265,7 @@ export default function AICoach() {
               {[
                 'Personalized advice from YOUR scan data',
                 'Unlimited chat — no tokens, no limits',
-                'Jawline, skin, body & style protocols',
+                'Jawline, skin, hair & style protocols',
                 'Updated with every new scan',
               ].map((f, i) => (
                 <li key={i} className="flex items-start gap-2">

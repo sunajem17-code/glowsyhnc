@@ -19,7 +19,7 @@ const TEXT = '#F0EDE8'
 const TEXT_DIM = '#4A4642'
 
 const FEATURES = [
-  { name: 'Face + Body Scan', free: '1/month', premium: 'Unlimited' },
+  { name: 'Face Scan', free: '1/month', premium: 'Unlimited' },
   { name: 'Glow Score + Sub-Scores', free: true, premium: true },
   { name: 'Basic Recommendations', free: true, premium: true },
   { name: 'Full 12-Week Action Plan', free: 'First only', premium: true },
@@ -183,10 +183,10 @@ export default function Premium() {
             letterSpacing: '0.01em',
           }}
         >
-          {subscribingTrial ? 'Opening checkout…' : '✦ Start 2-Day Free Trial'}
+          {subscribingTrial ? 'Opening checkout…' : '✦ Start 7-Day Free Trial'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-4" style={{ color: TEXT_DIM }}>
-          Then $7.99/mo · Cancel anytime before trial ends
+          $0 today · then $7.99/mo · cancel anytime before trial ends
         </p>
 
         {/* Divider */}

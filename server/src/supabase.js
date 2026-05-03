@@ -135,6 +135,56 @@ async function setScanCache(imageHash, result) {
   }
 }
 
+// ── Scan history helpers ──────────────────────────────────────────────────────
+// Append-only log of completed scans per user (table: scan_history).
+// Table DDL: server/migrations/002_create_scan_history.sql
+
+/**
+ * Persist one scan result row.  Fire-and-forget safe — call with .catch().
+ */
+async function saveScanHistory(userId, { overallScore, faceScore, groomingScore, tier, celebrityMatch }) {
+  const sb = getSupabase()
+  if (!sb) return
+  try {
+    const { error } = await sb.from('scan_history').insert({
+      user_id:        userId,
+      overall_score:  overallScore,
+      face_score:     faceScore     ?? null,
+      grooming_score: groomingScore ?? null,
+      tier:           tier          ?? null,
+      celebrity_match: celebrityMatch ?? null,
+    })
+    if (error) console.warn('[Supabase] scan_history insert error:', error.message)
+  } catch (err) {
+    console.warn('[Supabase] scan_history insert failed (non-fatal):', err.message)
+  }
+}
+
+/**
+ * Fetch the most recent `limit` scans for a user, newest first.
+ * Returns [] if Supabase is unavailable or the user has no history.
+ */
+async function getScanHistory(userId, limit = 12) {
+  const sb = getSupabase()
+  if (!sb || !userId) return []
+  try {
+    const { data, error } = await sb
+      .from('scan_history')
+      .select('id, overall_score, face_score, grooming_score, tier, celebrity_match, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) {
+      console.warn('[Supabase] scan_history fetch error:', error.message)
+      return []
+    }
+    return data || []
+  } catch (err) {
+    console.warn('[Supabase] scan_history fetch failed (non-fatal):', err.message)
+    return []
+  }
+}
+
 module.exports = {
   getSupabase,
   getOrCreateUser,
@@ -145,4 +195,6 @@ module.exports = {
   isConfigured,
   getScanCache,
   setScanCache,
+  saveScanHistory,
+  getScanHistory,
 }

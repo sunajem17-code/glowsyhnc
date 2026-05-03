@@ -1,24 +1,134 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Area, AreaChart,
+  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Video, Lock } from 'lucide-react'
+import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
-import GlowScoreRing from '../components/GlowScoreRing'
-import { postureGrade } from '../utils/analysis'
+import { api } from '../utils/api'
 
 const METRIC_TABS = [
-  { key: 'glowScore', label: 'Overall', color: '#C6A85C' },
-  { key: 'faceScore', label: 'Face', color: '#F5A623' },
-  { key: 'bodyScore', label: 'Body', color: '#74B9FF' },
-  { key: 'posture', label: 'Posture', color: '#E07A5F' },
+  { key: 'glowScore',     label: 'Overall',  color: '#C6A85C' },
+  { key: 'faceScore',     label: 'Face',     color: '#F5A623' },
+  { key: 'groomingScore', label: 'Grooming', color: '#E07A5F' },
 ]
 
+// ── Canvas share card ─────────────────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+function drawShareCard(canvas, firstScan, latestScan) {
+  const W = 600, H = 300
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+
+  const diff     = latestScan.overall_score - firstScan.overall_score
+  const diffStr  = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
+  const fmtDate  = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+
+  // Background
+  ctx.fillStyle = '#121212'
+  ctx.fillRect(0, 0, W, H)
+
+  // Gold top bar
+  ctx.fillStyle = '#C6A85C'
+  ctx.fillRect(0, 0, W, 5)
+
+  // ── Left card (first scan) ────────────────────────────────────────────────
+  ctx.fillStyle = '#1E1E1E'
+  roundRect(ctx, 18, 18, 220, 222, 14)
+  ctx.fill()
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#888'
+  ctx.font = '600 11px Inter, system-ui, sans-serif'
+  ctx.fillText('FIRST SCAN', 128, 52)
+
+  ctx.fillStyle = '#C6A85C'
+  ctx.font = 'bold 54px Inter, system-ui, sans-serif'
+  ctx.fillText(firstScan.overall_score.toFixed(1), 128, 118)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 13px Inter, system-ui, sans-serif'
+  ctx.fillText(firstScan.tier || '', 128, 146)
+
+  ctx.fillStyle = '#666'
+  ctx.font = '11px Inter, system-ui, sans-serif'
+  ctx.fillText(fmtDate(firstScan.created_at), 128, 168)
+
+  // ── Center (improvement) ──────────────────────────────────────────────────
+  ctx.textAlign = 'center'
+
+  // Arrow circle
+  ctx.strokeStyle = '#C6A85C'
+  ctx.lineWidth   = 2
+  ctx.beginPath()
+  ctx.arc(300, 100, 30, 0, Math.PI * 2)
+  ctx.stroke()
+
+  ctx.fillStyle = '#C6A85C'
+  ctx.font = 'bold 28px Inter, system-ui, sans-serif'
+  ctx.fillText('↑', 300, 112)
+
+  ctx.fillStyle = diff >= 0 ? '#C6A85C' : '#E07A5F'
+  ctx.font = 'bold 20px Inter, system-ui, sans-serif'
+  ctx.fillText(diffStr, 300, 156)
+
+  ctx.fillStyle = '#888'
+  ctx.font = '11px Inter, system-ui, sans-serif'
+  ctx.fillText('points', 300, 174)
+
+  // ── Right card (latest scan) ──────────────────────────────────────────────
+  ctx.fillStyle = '#1E1E1E'
+  roundRect(ctx, 362, 18, 220, 222, 14)
+  ctx.fill()
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#C6A85C'
+  ctx.font = '600 11px Inter, system-ui, sans-serif'
+  ctx.fillText('NOW', 472, 52)
+
+  ctx.fillStyle = '#C6A85C'
+  ctx.font = 'bold 54px Inter, system-ui, sans-serif'
+  ctx.fillText(latestScan.overall_score.toFixed(1), 472, 118)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 13px Inter, system-ui, sans-serif'
+  ctx.fillText(latestScan.tier || '', 472, 146)
+
+  ctx.fillStyle = '#666'
+  ctx.font = '11px Inter, system-ui, sans-serif'
+  ctx.fillText(fmtDate(latestScan.created_at), 472, 168)
+
+  // ── Bottom branding bar ───────────────────────────────────────────────────
+  ctx.fillStyle = '#C6A85C'
+  ctx.fillRect(0, H - 34, W, 34)
+
+  ctx.fillStyle = '#121212'
+  ctx.font = 'bold 12px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('ascendus.store', 18, H - 11)
+
+  ctx.textAlign = 'right'
+  ctx.fillText('Track your glow up ✨', W - 18, H - 11)
+}
+
+// ── ComparisonSlider (kept for premium before/after) ─────────────────────────
 function ComparisonSlider({ before, after }) {
   const [sliderPos, setSliderPos] = useState(50)
   const containerRef = useRef()
@@ -37,19 +147,17 @@ function ComparisonSlider({ before, after }) {
       onMouseMove={handleMove}
       onTouchMove={handleMove}
     >
-      {/* Before (full width) */}
       <img src={before} alt="before" className="absolute inset-0 w-full h-full object-cover" />
-      {/* After (clipped) */}
       <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-        <img src={after} alt="after" className="absolute inset-0 h-full object-cover" style={{ width: `${100 / (sliderPos / 100)}%` }} />
+        <img src={after} alt="after" className="absolute inset-0 h-full object-cover"
+          style={{ width: `${100 / (sliderPos / 100)}%` }} />
       </div>
-      {/* Divider */}
-      <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg" style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
+      <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
+        style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
           <ArrowLeftRight size={14} className="text-[#C6A85C]" />
         </div>
       </div>
-      {/* Labels */}
       <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/50 rounded-lg">
         <p className="text-white text-xs font-body">Before</p>
       </div>
@@ -60,48 +168,105 @@ function ComparisonSlider({ before, after }) {
   )
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
 export default function Progress() {
-  const navigate = useNavigate()
-  const { scans, streak, isPremium } = useStore()
-  const [metricTab, setMetricTab] = useState(0)
-  const [selectedScan, setSelectedScan] = useState(null)
+  const navigate  = useNavigate()
+  const { scans, streak, isPremium, token } = useStore()
 
-  // Build chart data
-  const chartData = [...scans].reverse().map((s, i) => ({
-    label: `Scan ${i + 1}`,
-    date: new Date(s.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    glowScore: s.glowScore,
-    faceScore: s.faceTotalScore,
-    bodyScore: s.bodyTotalScore,
-    posture: s.bodyData?.posture ?? 0,
+  const [history, setHistory]   = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [metricTab, setMetricTab] = useState(0)
+  const [sharing, setSharing]   = useState(false)
+  const canvasRef = useRef()
+
+  const isDemo = !token || token === 'demo-token'
+
+  // ── Fetch scan history from API ───────────────────────────────────────────
+  useEffect(() => {
+    if (isDemo) { setLoading(false); return }
+    api.user.scanHistory()
+      .then(({ history: h }) => setHistory(h || []))
+      .catch(() => setHistory([]))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  // ── Derived chart data (newest → oldest so chart reads left-to-right) ─────
+  const chartData = [...history].reverse().map((s, i) => ({
+    label:        `Scan ${i + 1}`,
+    date:         new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    glowScore:    Number(s.overall_score),
+    faceScore:    s.face_score     != null ? Number(s.face_score)     : null,
+    groomingScore: s.grooming_score != null ? Number(s.grooming_score) : null,
   }))
 
-  // Demo data if no scans
-  const hasData = chartData.length > 0
-  const demoData = [
-    { label: 'Wk 1', date: 'Jan 1', glowScore: 52, faceScore: 5.8, bodyScore: 5.2, posture: 5.5 },
-    { label: 'Wk 2', date: 'Jan 8', glowScore: 56, faceScore: 6.1, bodyScore: 5.5, posture: 5.8 },
-    { label: 'Wk 4', date: 'Jan 22', glowScore: 62, faceScore: 6.5, bodyScore: 6.0, posture: 6.2 },
-    { label: 'Wk 6', date: 'Feb 5', glowScore: 67, faceScore: 6.8, bodyScore: 6.4, posture: 6.8 },
-    { label: 'Wk 8', date: 'Feb 19', glowScore: 72, faceScore: 7.2, bodyScore: 6.9, posture: 7.1 },
-    { label: 'Now', date: 'Mar 5', glowScore: 78, faceScore: 7.6, bodyScore: 7.3, posture: 7.5 },
-  ]
-  const displayData = hasData ? chartData : demoData
-  const activeMetric = METRIC_TABS[metricTab]
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const firstScan  = history.length > 0 ? history[history.length - 1] : null
+  const latestScan = history.length > 0 ? history[0] : null
+  const bestScore  = history.length > 0 ? Math.max(...history.map(h => Number(h.overall_score))) : null
+  const improvement = firstScan && latestScan
+    ? (Number(latestScan.overall_score) - Number(firstScan.overall_score)).toFixed(1)
+    : null
+  const improvementNum = improvement !== null ? parseFloat(improvement) : null
 
-  const latestScan = scans[0]
-  const previousScan = scans[1]
-  const delta = latestScan && previousScan ? latestScan.glowScore - previousScan.glowScore : null
+  const hasEnoughData = history.length >= 2
+  const activeMetric  = METRIC_TABS[metricTab]
 
+  // ── Share card handler ────────────────────────────────────────────────────
+  const handleShare = useCallback(async () => {
+    if (!firstScan || !latestScan || sharing) return
+    setSharing(true)
+    try {
+      await document.fonts.ready
+      const canvas = canvasRef.current
+      drawShareCard(canvas, firstScan, latestScan)
+
+      const diff    = Number(latestScan.overall_score) - Number(firstScan.overall_score)
+      const diffStr = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
+
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], 'glow-up.png', { type: 'image/png' })
+        try {
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files:  [file],
+              title:  'My Glow Up',
+              text:   `I improved ${diffStr} points on Ascendus! 🔥 ascendus.store`,
+            })
+          } else {
+            const url = URL.createObjectURL(blob)
+            const a   = document.createElement('a')
+            a.href    = url
+            a.download = 'glow-up.png'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+          }
+        } catch (shareErr) {
+          // User cancelled share — not an error
+          if (shareErr.name !== 'AbortError') console.warn('Share failed:', shareErr)
+        }
+        setSharing(false)
+      }, 'image/png')
+    } catch (err) {
+      console.error('Share card failed:', err)
+      setSharing(false)
+    }
+  }, [firstScan, latestScan, sharing])
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <MotionPage className="px-4">
+      {/* Hidden canvas used only to generate the share image */}
+      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
+
       <PageHeader title="Your Progress" subtitle="Track your glow-up journey" />
 
-      {/* Overview Cards */}
+      {/* ── Overview cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Total Scans', value: scans.length || '—', icon: '📸' },
-          { label: 'Best Score', value: scans.length > 0 ? Math.max(...scans.map(s => s.glowScore)) : '—', icon: '🏆' },
+          { label: 'Total Scans', value: history.length || scans.length || '—', icon: '📸' },
+          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: '🏆' },
           { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : '—', icon: '🔥' },
         ].map(({ label, value, icon }) => (
           <div key={label} className="card text-center py-3">
@@ -112,68 +277,159 @@ export default function Progress() {
         ))}
       </div>
 
-      {/* Chart */}
-      <div className="card mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
-          {delta !== null && (
-            <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${delta >= 0 ? 'bg-[#C6A85C]/10 text-[#C6A85C]' : 'bg-red-50 text-warning dark:bg-red-900/20'}`}>
-              {delta >= 0 ? '+' : ''}{delta} pts
-            </span>
-          )}
+      {/* ── Chart / Empty state ───────────────────────────────────────────── */}
+      {loading ? (
+        <div className="card mb-4 flex items-center justify-center py-12">
+          <div className="w-6 h-6 border-2 border-[#C6A85C] border-t-transparent rounded-full animate-spin" />
         </div>
-
-        {/* Metric tabs */}
-        <div className="flex gap-2 mb-3">
-          {METRIC_TABS.map((m, i) => (
-            <button
-              key={m.key}
-              onClick={() => setMetricTab(i)}
-              className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
-                metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
-              }`}
-              style={metricTab === i ? { background: m.color } : {}}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={displayData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={activeMetric.color} stopOpacity={0.25} />
-                <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-            <Tooltip
-              contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }}
-              formatter={(v) => [typeof v === 'number' ? v.toFixed(1) : v, activeMetric.label]}
-            />
-            <Area
-              type="monotone"
-              dataKey={activeMetric.key}
-              stroke={activeMetric.color}
-              strokeWidth={2.5}
-              fill="url(#areaGrad)"
-              dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }}
-              activeDot={{ r: 6, fill: activeMetric.color }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-
-        {!hasData && (
-          <p className="text-center text-[10px] text-secondary font-body mt-1">
-            Showing sample data — take your first scan to track real progress
+      ) : !hasEnoughData ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card mb-4 flex flex-col items-center gap-3 py-10 text-center"
+        >
+          <span className="text-4xl">📈</span>
+          <p className="font-heading font-bold text-base text-primary">
+            {history.length === 0
+              ? 'Complete your first scan to start tracking your glow up'
+              : 'Take one more scan to unlock your progress chart'}
           </p>
-        )}
-      </div>
+          <p className="text-xs text-secondary font-body max-w-[220px]">
+            Your score history will appear here after two scans
+          </p>
+          <button
+            onClick={() => navigate('/scan')}
+            className="mt-1 px-5 py-2 bg-[#C6A85C] rounded-xl text-sm font-heading font-bold text-white"
+          >
+            Start a Scan →
+          </button>
+        </motion.div>
+      ) : (
+        <>
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[
+              { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: '🌱' },
+              { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: '⭐' },
+              {
+                label: 'Improvement',
+                value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
+                icon:  improvementNum >= 0 ? '📈' : '📉',
+                color: improvementNum >= 0 ? 'text-[#C6A85C]' : 'text-warning',
+              },
+            ].map(({ label, value, icon, color }) => (
+              <div key={label} className="card text-center py-3">
+                <p className="text-xl mb-0.5">{icon}</p>
+                <p className={`font-mono font-bold text-lg ${color || 'text-primary'}`}>{value}</p>
+                <p className="text-[10px] text-secondary font-body">{label}</p>
+              </div>
+            ))}
+          </div>
 
-      {/* Photo Timeline */}
+          {/* Chart */}
+          <div className="card mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
+              <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${
+                improvementNum >= 0
+                  ? 'bg-[#C6A85C]/10 text-[#C6A85C]'
+                  : 'bg-red-50 text-warning dark:bg-red-900/20'
+              }`}>
+                {improvementNum >= 0 ? '+' : ''}{improvement} pts
+              </span>
+            </div>
+
+            {/* Metric tabs */}
+            <div className="flex gap-2 mb-3 flex-wrap">
+              {METRIC_TABS.map((m, i) => (
+                <button
+                  key={m.key}
+                  onClick={() => setMetricTab(i)}
+                  className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
+                    metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
+                  }`}
+                  style={metricTab === i ? { background: m.color } : {}}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor={activeMetric.color} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }}
+                  axisLine={false} tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }}
+                  axisLine={false} tickLine={false}
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }}
+                  formatter={(v) => [v != null ? Number(v).toFixed(1) : '—', activeMetric.label]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={activeMetric.key}
+                  stroke={activeMetric.color}
+                  strokeWidth={2.5}
+                  fill="url(#areaGrad)"
+                  connectNulls
+                  dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }}
+                  activeDot={{ r: 6, fill: activeMetric.color }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Share My Glow Up */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card mb-4 overflow-hidden"
+          >
+            {/* Gold accent bar */}
+            <div className="h-1 -mx-4 -mt-4 mb-4 bg-gradient-to-r from-[#C6A85C] to-[#F5D98E]" />
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
+                <Share2 size={20} className="text-[#C6A85C]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
+                <p className="text-xs text-secondary font-body truncate">
+                  {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
+                </p>
+              </div>
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0"
+              >
+                {sharing ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Download size={13} />
+                    Share
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+
+      {/* ── Photo timeline (uses local store photos) ─────────────────────── */}
       {scans.length > 0 && (
         <div className="mb-4">
           <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
@@ -182,14 +438,7 @@ export default function Progress() {
           </h2>
           <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
             {scans.slice(0, isPremium ? undefined : 4).map((scan, i) => (
-              <motion.button
-                key={scan.id}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedScan(selectedScan?.id === scan.id ? null : scan)}
-                className={`flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 transition-colors ${
-                  selectedScan?.id === scan.id ? 'border-[#C6A85C]' : 'border-transparent'
-                }`}
-              >
+              <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 border-transparent">
                 <div className="relative">
                   <img
                     src={scan.facePhotoUrl || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
@@ -205,9 +454,8 @@ export default function Progress() {
                     {new Date(scan.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </p>
                 </div>
-              </motion.button>
+              </div>
             ))}
-
             {!isPremium && scans.length > 4 && (
               <button
                 onClick={() => navigate('/premium')}
@@ -221,12 +469,12 @@ export default function Progress() {
         </div>
       )}
 
-      {/* Side-by-side comparison (premium) */}
+      {/* ── Before & After comparison (premium photo slider) ─────────────── */}
       {scans.length >= 2 && (
         <div className="mb-4">
           <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
             <ArrowLeftRight size={16} className="text-secondary" />
-            Before & After
+            Before &amp; After
           </h2>
           {isPremium ? (
             <ComparisonSlider
@@ -239,49 +487,32 @@ export default function Progress() {
               className="card border-2 border-dashed border-amber-accent/40 bg-amber-50/50 dark:bg-amber-900/10 flex flex-col items-center gap-3 py-8 cursor-pointer"
             >
               <Lock size={24} className="text-amber-accent" />
-              <p className="font-heading font-bold text-sm text-primary">Before & After Comparison</p>
+              <p className="font-heading font-bold text-sm text-primary">Before &amp; After Comparison</p>
               <p className="text-xs text-secondary font-body text-center">Drag-slider photo comparison is a Premium feature.</p>
-              <span className="px-4 py-2 bg-amber-accent rounded-xl text-xs font-heading font-bold text-charcoal">
-                Unlock Premium
-              </span>
+              <span className="px-4 py-2 bg-amber-accent rounded-xl text-xs font-heading font-bold text-charcoal">Unlock Premium</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Transformation Reel */}
-      <div
-        onClick={() => isPremium ? navigate('/compare') : navigate('/premium')}
-        className="card mb-4 flex items-center gap-3 cursor-pointer active:opacity-70 transition-opacity"
-      >
-        <div className="w-12 h-12 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
-          <Video size={22} className="text-[#C6A85C]" />
-        </div>
-        <div className="flex-1">
-          <p className="font-heading font-bold text-sm text-primary">Transformation Reel</p>
-          <p className="text-xs text-secondary font-body">Auto-generate a shareable glow-up video</p>
-        </div>
-        {!isPremium ? (
-          <span className="px-2.5 py-1 bg-amber-accent rounded-lg text-[10px] font-heading font-bold text-charcoal">
-            Premium
-          </span>
-        ) : (
-          <button
-            onClick={e => { e.stopPropagation(); navigate('/compare') }}
-            className="px-3 py-1.5 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white"
-          >
-            Generate
-          </button>
-        )}
-      </div>
-
-      {/* Milestone highlights */}
-      {scans.length >= 2 && (
+      {/* ── Milestones ────────────────────────────────────────────────────── */}
+      {hasEnoughData && (
         <div className="mb-6">
           <h2 className="font-heading font-bold text-base text-primary mb-3">🏆 Milestones</h2>
           {[
-            { icon: '🎯', text: `First scan completed`, date: scans[scans.length - 1] ? new Date(scans[scans.length - 1].scanDate).toLocaleDateString() : '' },
-            scans.length >= 2 && { icon: '📈', text: `Score improved by ${scans[0].glowScore - scans[scans.length - 1].glowScore} points` },
+            {
+              icon: '🎯',
+              text: 'First scan completed',
+              date: new Date(firstScan.created_at).toLocaleDateString(),
+            },
+            improvementNum > 0 && {
+              icon: '📈',
+              text: `Score improved by ${improvement} points`,
+            },
+            bestScore >= 7.5 && {
+              icon: '⭐',
+              text: `Reached ${bestScore.toFixed(1)} — ${latestScan.tier || 'elite tier'}`,
+            },
           ].filter(Boolean).map((m, i) => (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
               <span className="text-xl">{m.icon}</span>

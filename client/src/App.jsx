@@ -23,6 +23,7 @@ import Compare from './pages/Compare'
 import AICoach from './pages/AICoach'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PremiumSplash from './pages/PremiumSplash'
+import Landing from './pages/Landing'
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -56,12 +57,14 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [isAuthenticated])
 
-  if (!splashDone) {
+  // Skip splash entirely for unauthenticated users — they land on the SEO landing
+  // page directly, which is better for conversion AND Google crawling.
+  if (!splashDone && isAuthenticated) {
     return <Splash onDone={() => setSplashDone(true)} />
   }
 
-  // Show premium splash once per session for Pro users
-  if (splashDone && isAuthenticated && isPremium && !proSplashDone) {
+  // Show premium splash once per session for Pro users (only after main splash)
+  if (isAuthenticated && isPremium && !proSplashDone) {
     return (
       <AnimatePresence>
         <PremiumSplash onDone={() => {
@@ -80,6 +83,11 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
+
+          {/* Landing page for unauthenticated visitors — beats path="*" by specificity */}
+          {!isAuthenticated && (
+            <Route path="/" element={<Landing />} />
+          )}
 
           {!hasOnboarded ? (
             <Route path="*" element={<PremiumOnboarding />} />

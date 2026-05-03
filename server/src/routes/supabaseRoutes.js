@@ -37,10 +37,9 @@ router.post('/scans', auth, async (req, res) => {
     if (!sbUserId) return res.status(500).json({ error: 'Failed to sync user to Supabase' })
 
     const {
-      overallScore, tier, faceScore, bodyScore, bodyCategory, groomingScore,
+      overallScore, tier, faceScore, groomingScore,
       harmony, angularity, features, dimorphism, potentialScore,
-      celebrityMatches, faceImageUrl, bodyImageUrl,
-      bodyFatEstimate, shoulderWaistRatio, postureGrade,
+      celebrityMatches, faceImageUrl,
       hairstyleRec1, hairstyleRec2, hairstyleRec3,
       hairTypeDetected, faceShape,
     } = req.body
@@ -53,8 +52,6 @@ router.post('/scans', auth, async (req, res) => {
         overall_score:               overallScore,
         tier,
         face_score:                  faceScore,
-        body_score:                  bodyScore,
-        body_category:               bodyCategory,
         grooming_score:              groomingScore,
         harmony,
         angularity,
@@ -68,10 +65,6 @@ router.post('/scans', auth, async (req, res) => {
         celebrity_match_3:           celebrityMatches?.[2]?.celebrity   ?? null,
         celebrity_match_3_similarity: celebrityMatches?.[2]?.similarity ?? null,
         face_image_url:              faceImageUrl  ?? null,
-        body_image_url:              bodyImageUrl  ?? null,
-        body_fat_estimate:           bodyFatEstimate ?? null,
-        shoulder_waist_ratio:        shoulderWaistRatio ?? null,
-        posture_grade:               postureGrade  ?? null,
         hairstyle_recommendation_1:  hairstyleRec1 ?? null,
         hairstyle_recommendation_2:  hairstyleRec2 ?? null,
         hairstyle_recommendation_3:  hairstyleRec3 ?? null,
@@ -88,7 +81,6 @@ router.post('/scans', auth, async (req, res) => {
       user_id:       sbUserId,
       scan_id:       scan.id,
       overall_score: overallScore,
-      body_score:    bodyScore,
       face_score:    faceScore,
     })
 
