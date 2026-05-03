@@ -181,6 +181,10 @@ const useStore = create(
       userProfile: null,
       setUserProfile: (profile) => set({ userProfile: profile }),
 
+      // AI Coach free usage (3 lifetime messages for non-pro users)
+      freeCoachMessages: 0,
+      incrementFreeCoachMessages: () => set(state => ({ freeCoachMessages: state.freeCoachMessages + 1 })),
+
       // Achievements
       achievements: [], // array of achievement keys that have been unlocked
       pendingAchievement: null, // key of achievement to celebrate (shown once then cleared)
@@ -247,6 +251,7 @@ const useStore = create(
         scanCount: state.scanCount,
         currentScan: state.currentScan,
         achievements: state.achievements,
+        freeCoachMessages: state.freeCoachMessages,
       }),
     }
   )

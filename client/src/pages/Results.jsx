@@ -10,6 +10,7 @@ import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
 import ShareCardModal from '../components/ShareCardModal'
+import ProLock from '../components/ProLock'
 import { scoreColor } from '../utils/analysis'
 
 const TIER_COLORS = {
@@ -555,10 +556,7 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
     }
   }
 
-  // Free users see 1 full card; the rest are blurred with an upgrade gate
-  const VISIBLE_FREE = 1
-  const visibleProducts = isPremium ? products : products.slice(0, VISIBLE_FREE)
-  const lockedProducts  = isPremium ? []       : products.slice(VISIBLE_FREE)
+  // Free users see no products — the entire stack is locked behind Pro
 
   function amazonUrl(searchQuery) {
     return `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`
@@ -592,113 +590,85 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
             transition={{ duration: 0.22 }}
             className="overflow-hidden"
           >
-            {/* Intro blurb */}
-            <p className="text-[10px] text-secondary font-body mb-3 leading-snug">
-              Products matched to your scan — selected based on your detected weak areas and skin issues.
-            </p>
+            {/* Free users: fully locked — no product preview */}
+            {!isPremium ? (
+              <ProLock
+                solid
+                onUpgrade={onUpgrade}
+                label="Your Personalized Product Stack"
+                description="AI-matched products based on your scan weaknesses and skin issues."
+                className="mt-1"
+              />
+            ) : (
+              <>
+                {/* Intro blurb — Pro */}
+                <p className="text-[10px] text-secondary font-body mb-3 leading-snug">
+                  Products matched to your scan — selected based on your detected weak areas and skin issues.
+                </p>
 
-            {/* Loading skeleton */}
-            {loading && (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <div className="w-9 h-9 rounded-xl flex-shrink-0" style={{ background: 'rgba(198,168,92,0.1)' }} />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 rounded w-3/4" style={{ background: 'rgba(198,168,92,0.15)' }} />
-                      <div className="h-2 rounded w-full" style={{ background: 'rgba(255,255,255,0.04)' }} />
-                      <div className="h-2 rounded w-1/2" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                {/* Loading skeleton */}
+                {loading && (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <div className="w-9 h-9 rounded-xl flex-shrink-0" style={{ background: 'rgba(198,168,92,0.1)' }} />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 rounded w-3/4" style={{ background: 'rgba(198,168,92,0.15)' }} />
+                          <div className="h-2 rounded w-full" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                          <div className="h-2 rounded w-1/2" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-center gap-1.5 py-1">
+                      <div className="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#C6A85C', borderTopColor: 'transparent' }} />
+                      <span className="text-[10px] text-secondary font-body">Personalizing your stack…</span>
                     </div>
                   </div>
-                ))}
-                <div className="flex items-center justify-center gap-1.5 py-1">
-                  <div className="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#C6A85C', borderTopColor: 'transparent' }} />
-                  <span className="text-[10px] text-secondary font-body">Personalizing your stack…</span>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* No results */}
-            {!loading && fetched && products.length === 0 && (
-              <p className="text-[11px] text-secondary font-body text-center py-4">
-                No recommendations available right now — try again after your next scan.
-              </p>
-            )}
+                {/* No results */}
+                {!loading && fetched && products.length === 0 && (
+                  <p className="text-[11px] text-secondary font-body text-center py-4">
+                    No recommendations available right now — try again after your next scan.
+                  </p>
+                )}
 
-            {/* Product cards (visible to all) */}
-            {!loading && visibleProducts.map((product, i) => (
-              <motion.a
-                key={i}
-                href={amazonUrl(product.searchQuery || product.name)}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-start gap-3 p-3 rounded-xl mb-2 no-underline active:opacity-70 transition-opacity group"
-                style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.14)' }}
-              >
-                {/* Icon */}
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(198,168,92,0.12)' }}>
-                  <ShoppingBag size={16} style={{ color: '#C6A85C' }} />
-                </div>
-                {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-heading font-bold text-[12px] text-primary leading-snug mb-0.5 flex items-center gap-1">
-                    {product.name}
-                    <ExternalLink size={9} className="text-secondary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </p>
-                  <p className="text-[10px] text-secondary font-body leading-snug">{product.description}</p>
-                </div>
-                {/* Amazon CTA */}
-                <span
-                  className="flex-shrink-0 text-[9px] font-heading font-bold px-2 py-1 rounded-lg self-center"
-                  style={{ background: '#FF9900', color: '#000' }}
-                >
-                  Amazon
-                </span>
-              </motion.a>
-            ))}
-
-            {/* Locked products (free users) */}
-            {!loading && lockedProducts.length > 0 && (
-              <div className="relative rounded-2xl overflow-hidden mt-1">
-                {/* Blurred ghost cards */}
-                <div className="blur-sm pointer-events-none select-none opacity-40 space-y-2">
-                  {lockedProducts.map((product, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.14)' }}>
-                      <div className="w-9 h-9 rounded-xl flex-shrink-0" style={{ background: 'rgba(198,168,92,0.12)' }} />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-heading font-bold text-[12px] text-primary">{product.name}</p>
-                        <p className="text-[10px] text-secondary font-body">{product.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Upgrade overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl" style={{ background: 'rgba(18,18,18,0.82)', backdropFilter: 'blur(4px)' }}>
-                  <Lock size={18} className="mb-2" style={{ color: '#C6A85C' }} />
-                  <p className="font-heading font-bold text-sm text-primary mb-0.5">
-                    {lockedProducts.length} more product{lockedProducts.length !== 1 ? 's' : ''} in your stack
-                  </p>
-                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-6">
-                    Unlock your full AI-curated product stack with Pro
-                  </p>
-                  <button
-                    onClick={onUpgrade}
-                    className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black"
-                    style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}
+                {/* Product cards */}
+                {!loading && products.map((product, i) => (
+                  <motion.a
+                    key={i}
+                    href={amazonUrl(product.searchQuery || product.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-start gap-3 p-3 rounded-xl mb-2 no-underline active:opacity-70 transition-opacity group"
+                    style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.14)' }}
                   >
-                    Upgrade to Pro →
-                  </button>
-                </div>
-              </div>
-            )}
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(198,168,92,0.12)' }}>
+                      <ShoppingBag size={16} style={{ color: '#C6A85C' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-heading font-bold text-[12px] text-primary leading-snug mb-0.5 flex items-center gap-1">
+                        {product.name}
+                        <ExternalLink size={9} className="text-secondary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </p>
+                      <p className="text-[10px] text-secondary font-body leading-snug">{product.description}</p>
+                    </div>
+                    <span className="flex-shrink-0 text-[9px] font-heading font-bold px-2 py-1 rounded-lg self-center" style={{ background: '#FF9900', color: '#000' }}>
+                      Amazon
+                    </span>
+                  </motion.a>
+                ))}
 
-            {/* Pro: affiliate disclaimer */}
-            {!loading && fetched && products.length > 0 && (
-              <p className="text-[9px] text-secondary font-body text-center mt-2 opacity-50">
-                Links open Amazon search · Ascendus may earn from qualifying purchases
-              </p>
+                {/* Affiliate disclaimer */}
+                {!loading && fetched && products.length > 0 && (
+                  <p className="text-[9px] text-secondary font-body text-center mt-2 opacity-50">
+                    Links open Amazon search · Ascendus may earn from qualifying purchases
+                  </p>
+                )}
+              </>
             )}
           </motion.div>
         )}
@@ -1477,31 +1447,60 @@ export default function Results() {
               return (
                 <div key={key} className="py-3 border-b border-default last:border-0">
                   <div className="flex items-center gap-3 mb-1.5">
-                    <div
-                      className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0"
-                      style={{
-                        color,
-                        background: score >= 7 ? 'rgba(52,199,89,0.12)' : score >= 5 ? 'rgba(245,166,35,0.12)' : 'rgba(224,122,95,0.12)',
-                      }}
-                    >
-                      {score.toFixed(1)}
-                    </div>
+                    {/* Score badge — blurred for free */}
+                    {isPremium ? (
+                      <div
+                        className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0"
+                        style={{
+                          color,
+                          background: score >= 7 ? 'rgba(52,199,89,0.12)' : score >= 5 ? 'rgba(245,166,35,0.12)' : 'rgba(224,122,95,0.12)',
+                        }}
+                      >
+                        {score.toFixed(1)}
+                      </div>
+                    ) : (
+                      <div
+                        className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0 select-none cursor-pointer"
+                        style={{
+                          color,
+                          background: 'rgba(245,166,35,0.12)',
+                          filter: 'blur(5px)',
+                        }}
+                        onClick={() => navigate('/premium')}
+                      >
+                        {score.toFixed(1)}
+                      </div>
+                    )}
                     <div className="flex-1">
                       <div className="flex items-baseline gap-2">
                         <p className="text-sm font-heading font-bold text-primary">{label}</p>
                         <p className="text-[9px] text-secondary font-body">{detail}</p>
                       </div>
-                      <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full"
-                          style={{ background: color }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${pct}%` }}
-                          transition={{ duration: 1, ease: 'easeOut' }}
-                        />
-                      </div>
+                      {/* Progress bar — blurred for free */}
+                      {isPremium ? (
+                        <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ background: color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 1, ease: 'easeOut' }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden cursor-pointer select-none"
+                          style={{ filter: 'blur(3px)' }}
+                          onClick={() => navigate('/premium')}
+                        >
+                          <div
+                            className="h-full rounded-full"
+                            style={{ background: color, width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color }}>
+                    <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: isPremium ? color : 'transparent' }}>
                       /10
                     </span>
                   </div>
@@ -1768,26 +1767,71 @@ export default function Results() {
                 {match.celebrity?.charAt(0) ?? '?'}
               </div>
               <div className="flex-1">
+                {/* Name always visible */}
                 <p className="text-sm font-heading font-bold text-primary">{match.celebrity}</p>
+                {/* Shared traits — blurred for free */}
                 {(match.shared_traits || match.reason) && (
-                  <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C', opacity: 0.8 }}>
-                    {match.shared_traits || match.reason}
-                  </p>
+                  isPremium ? (
+                    <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C', opacity: 0.8 }}>
+                      {match.shared_traits || match.reason}
+                    </p>
+                  ) : (
+                    <p
+                      className="text-[10px] font-body mt-0.5 select-none"
+                      style={{ color: '#C6A85C', opacity: 0.5, filter: 'blur(4px)' }}
+                    >
+                      {match.shared_traits || match.reason}
+                    </p>
+                  )
                 )}
-                <div className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${match.similarity}%` }}
-                    transition={{ duration: 1, ease: 'easeOut', delay: i * 0.15 }}
-                  />
-                </div>
+                {/* Similarity bar — blurred for free */}
+                {isPremium ? (
+                  <div className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${match.similarity}%` }}
+                      transition={{ duration: 1, ease: 'easeOut', delay: i * 0.15 }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden select-none cursor-pointer"
+                    style={{ filter: 'blur(3px)' }}
+                    onClick={() => navigate('/premium')}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)', width: `${match.similarity}%` }}
+                    />
+                  </div>
+                )}
               </div>
-              <span className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0">{match.similarity}%</span>
+              {/* Similarity % — blurred for free */}
+              {isPremium ? (
+                <span className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0">{match.similarity}%</span>
+              ) : (
+                <span
+                  className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0 select-none cursor-pointer"
+                  style={{ filter: 'blur(5px)' }}
+                  onClick={() => navigate('/premium')}
+                >
+                  {match.similarity}%
+                </span>
+              )}
             </div>
           ))}
         </div>
+        {!isPremium && (
+          <button
+            onClick={() => navigate('/premium')}
+            className="mt-3 w-full py-2 rounded-xl text-[11px] font-heading font-bold flex items-center justify-center gap-1.5"
+            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)', color: '#C6A85C' }}
+          >
+            🔒 Unlock similarity % and shared traits with PRO
+          </button>
+        )}
       </Section>
 
       {/* ── Skin Analysis ────────────────────────────────────────── */}

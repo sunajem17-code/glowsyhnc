@@ -8,6 +8,7 @@ import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock } from 'lu
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
+import ProLock from '../components/ProLock'
 import { api } from '../utils/api'
 
 const METRIC_TABS = [
@@ -306,126 +307,100 @@ export default function Progress() {
         </motion.div>
       ) : (
         <>
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[
-              { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: '🌱' },
-              { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: '⭐' },
-              {
-                label: 'Improvement',
-                value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
-                icon:  improvementNum >= 0 ? '📈' : '📉',
-                color: improvementNum >= 0 ? 'text-[#C6A85C]' : 'text-warning',
-              },
-            ].map(({ label, value, icon, color }) => (
-              <div key={label} className="card text-center py-3">
-                <p className="text-xl mb-0.5">{icon}</p>
-                <p className={`font-mono font-bold text-lg ${color || 'text-primary'}`}>{value}</p>
-                <p className="text-[10px] text-secondary font-body">{label}</p>
+          {isPremium ? (
+            <>
+              {/* Stats row — Pro */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: '🌱' },
+                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: '⭐' },
+                  {
+                    label: 'Improvement',
+                    value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
+                    icon:  improvementNum >= 0 ? '📈' : '📉',
+                    color: improvementNum >= 0 ? 'text-[#C6A85C]' : 'text-warning',
+                  },
+                ].map(({ label, value, icon, color }) => (
+                  <div key={label} className="card text-center py-3">
+                    <p className="text-xl mb-0.5">{icon}</p>
+                    <p className={`font-mono font-bold text-lg ${color || 'text-primary'}`}>{value}</p>
+                    <p className="text-[10px] text-secondary font-body">{label}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Chart */}
-          <div className="card mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
-              <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${
-                improvementNum >= 0
-                  ? 'bg-[#C6A85C]/10 text-[#C6A85C]'
-                  : 'bg-red-50 text-warning dark:bg-red-900/20'
-              }`}>
-                {improvementNum >= 0 ? '+' : ''}{improvement} pts
-              </span>
-            </div>
-
-            {/* Metric tabs */}
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {METRIC_TABS.map((m, i) => (
-                <button
-                  key={m.key}
-                  onClick={() => setMetricTab(i)}
-                  className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
-                    metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
-                  }`}
-                  style={metricTab === i ? { background: m.color } : {}}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor={activeMetric.color} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }}
-                  axisLine={false} tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }}
-                  axisLine={false} tickLine={false}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip
-                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }}
-                  formatter={(v) => [v != null ? Number(v).toFixed(1) : '—', activeMetric.label]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey={activeMetric.key}
-                  stroke={activeMetric.color}
-                  strokeWidth={2.5}
-                  fill="url(#areaGrad)"
-                  connectNulls
-                  dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }}
-                  activeDot={{ r: 6, fill: activeMetric.color }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Share My Glow Up */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card mb-4 overflow-hidden"
-          >
-            {/* Gold accent bar */}
-            <div className="h-1 -mx-4 -mt-4 mb-4 bg-gradient-to-r from-[#C6A85C] to-[#F5D98E]" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
-                <Share2 size={20} className="text-[#C6A85C]" />
+              {/* Chart — Pro */}
+              <div className="card mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
+                  <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${
+                    improvementNum >= 0
+                      ? 'bg-[#C6A85C]/10 text-[#C6A85C]'
+                      : 'bg-red-50 text-warning dark:bg-red-900/20'
+                  }`}>
+                    {improvementNum >= 0 ? '+' : ''}{improvement} pts
+                  </span>
+                </div>
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {METRIC_TABS.map((m, i) => (
+                    <button
+                      key={m.key}
+                      onClick={() => setMetricTab(i)}
+                      className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
+                        metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
+                      }`}
+                      style={metricTab === i ? { background: m.color } : {}}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%"   stopColor={activeMetric.color} stopOpacity={0.25} />
+                        <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }} formatter={(v) => [v != null ? Number(v).toFixed(1) : '—', activeMetric.label]} />
+                    <Area type="monotone" dataKey={activeMetric.key} stroke={activeMetric.color} strokeWidth={2.5} fill="url(#areaGrad)" connectNulls dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6, fill: activeMetric.color }} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
-                <p className="text-xs text-secondary font-body truncate">
-                  {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
-                </p>
-              </div>
-              <button
-                onClick={handleShare}
-                disabled={sharing}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0"
-              >
-                {sharing ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Download size={13} />
-                    Share
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
+
+              {/* Share My Glow Up — Pro */}
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card mb-4 overflow-hidden">
+                <div className="h-1 -mx-4 -mt-4 mb-4 bg-gradient-to-r from-[#C6A85C] to-[#F5D98E]" />
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
+                    <Share2 size={20} className="text-[#C6A85C]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
+                    <p className="text-xs text-secondary font-body truncate">
+                      {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
+                    </p>
+                  </div>
+                  <button onClick={handleShare} disabled={sharing} className="flex items-center gap-1.5 px-3 py-2 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0">
+                    {sharing ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Download size={13} />Share</>}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          ) : (
+            /* Free users: locked progress graph + share card */
+            <ProLock
+              solid
+              onUpgrade={() => navigate('/premium')}
+              label="Progress Graph & Share Card"
+              description="Track your score over time and share your glow-up with Pro."
+              className="mb-4"
+            />
+          )}
         </>
       )}
 
@@ -436,36 +411,36 @@ export default function Progress() {
             <Calendar size={16} className="text-secondary" />
             Scan History
           </h2>
-          <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
-            {scans.slice(0, isPremium ? undefined : 4).map((scan, i) => (
-              <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 border-transparent">
-                <div className="relative">
-                  <img
-                    src={scan.facePhotoUrl || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
-                    alt={`Scan ${i + 1}`}
-                    className="w-24 h-24 object-cover"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
-                    <p className="text-white text-[9px] font-mono font-bold">{scan.glowScore}</p>
+          {isPremium ? (
+            <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
+              {scans.map((scan, i) => (
+                <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 border-transparent">
+                  <div className="relative">
+                    <img
+                      src={scan.facePhotoUrl || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
+                      alt={`Scan ${i + 1}`}
+                      className="w-24 h-24 object-cover"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
+                      <p className="text-white text-[9px] font-mono font-bold">{scan.glowScore}</p>
+                    </div>
+                  </div>
+                  <div className="bg-card px-1.5 py-1">
+                    <p className="text-[9px] text-secondary font-body text-center">
+                      {new Date(scan.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
                   </div>
                 </div>
-                <div className="bg-card px-1.5 py-1">
-                  <p className="text-[9px] text-secondary font-body text-center">
-                    {new Date(scan.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {!isPremium && scans.length > 4 && (
-              <button
-                onClick={() => navigate('/premium')}
-                className="flex-shrink-0 w-24 h-28 rounded-2xl border-2 border-dashed border-amber-accent/40 flex flex-col items-center justify-center gap-1"
-              >
-                <Lock size={16} className="text-amber-accent" />
-                <p className="text-[9px] font-heading font-bold text-amber-accent">See all</p>
-              </button>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <ProLock
+              solid
+              onUpgrade={() => navigate('/premium')}
+              label="Scan History"
+              description="All your scan photos and score history, in one place."
+            />
+          )}
         </div>
       )}
 
@@ -482,15 +457,12 @@ export default function Progress() {
               after={scans[0]?.facePhotoUrl || 'https://placehold.co/400x400/C6A85C/white?text=After'}
             />
           ) : (
-            <div
-              onClick={() => navigate('/premium')}
-              className="card border-2 border-dashed border-amber-accent/40 bg-amber-50/50 dark:bg-amber-900/10 flex flex-col items-center gap-3 py-8 cursor-pointer"
-            >
-              <Lock size={24} className="text-amber-accent" />
-              <p className="font-heading font-bold text-sm text-primary">Before &amp; After Comparison</p>
-              <p className="text-xs text-secondary font-body text-center">Drag-slider photo comparison is a Premium feature.</p>
-              <span className="px-4 py-2 bg-amber-accent rounded-xl text-xs font-heading font-bold text-charcoal">Unlock Premium</span>
-            </div>
+            <ProLock
+              solid
+              onUpgrade={() => navigate('/premium')}
+              label="Before & After Comparison"
+              description="Drag-slider photo comparison of your first scan vs. your latest."
+            />
           )}
         </div>
       )}

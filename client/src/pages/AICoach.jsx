@@ -136,11 +136,16 @@ function MessageBubble({ msg, isNew }) {
   )
 }
 
+const FREE_COACH_LIMIT = 3
+
 export default function AICoach() {
   const navigate = useNavigate()
-  const { scans, isPremium, userProfile } = useStore()
+  const { scans, isPremium, userProfile, freeCoachMessages, incrementFreeCoachMessages } = useStore()
   const latestScan = scans[0]
   const scanContext = buildScanContext(latestScan, userProfile)
+
+  const freeMessagesLeft = isPremium ? Infinity : Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages ?? 0))
+  const freeCoachLocked  = !isPremium && freeMessagesLeft <= 0
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -155,20 +160,28 @@ export default function AICoach() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Initial greeting from AI on mount (Pro only)
+  // Initial greeting on mount
   useEffect(() => {
-    if (!isPremium || !latestScan || messages.length > 0) return
-    const greeting = latestScan
-      ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
-      : `No scan data yet. Run a scan first, then I can give you personalized advice.`
-    setMessages([{ role: 'assistant', content: greeting }])
+    if (messages.length > 0) return
+    if (latestScan) {
+      const greeting = isPremium
+        ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
+        : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} — make them count. Ask me anything.`
+      setMessages([{ role: 'assistant', content: greeting }])
+    } else if (isPremium) {
+      setMessages([{ role: 'assistant', content: 'No scan data yet. Run a scan first, then I can give you personalized advice.' }])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, latestScan])
 
   async function sendMessage(text) {
     const msgText = (text || input).trim()
-    if (!msgText || loading) return
+    if (!msgText || loading || freeCoachLocked) return
     setInput('')
     setError('')
+
+    // Increment free usage counter before sending
+    if (!isPremium) incrementFreeCoachMessages()
 
     const userMsg = { role: 'user', content: msgText }
     const nextMessages = [...messages, userMsg]
@@ -202,93 +215,7 @@ export default function AICoach() {
     }
   }
 
-  // ── Free user paywall ──────────────────────────────────────────────────────
-  if (!isPremium) {
-    return (
-      <MotionPage className="flex flex-col h-full">
-        {/* Header */}
-        <div
-          className="px-4 pt-12 pb-4 flex items-center gap-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-        >
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
-          >
-            <Sparkles size={18} style={{ color: GOLD }} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-heading font-bold text-[18px] text-primary">AI Coach</h1>
-              <span
-                className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
-                style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
-              >
-                PRO
-              </span>
-            </div>
-            <p className="font-body text-[11px] text-secondary">Personalized advice from your scan data</p>
-          </div>
-        </div>
-
-        {/* Teaser chat */}
-        <div className="flex-1 overflow-hidden px-4 pt-5 relative">
-          <div className="space-y-0">
-            {DEMO_TEASER.map((msg, i) => (
-              <MessageBubble key={i} msg={msg} isNew={false} />
-            ))}
-          </div>
-
-          {/* Gradient fade-out */}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-            style={{ background: 'linear-gradient(to top, var(--bg) 30%, transparent)' }}
-          />
-        </div>
-
-        {/* Paywall CTA */}
-        <div className="px-4 pb-8 pt-4 flex-shrink-0">
-          <div
-            className="rounded-2xl p-5"
-            style={{
-              background: 'linear-gradient(135deg, rgba(198,168,92,0.1) 0%, rgba(198,168,92,0.04) 100%)',
-              border: '1px solid rgba(198,168,92,0.22)',
-            }}
-          >
-            <div className="flex items-center gap-2.5 mb-3">
-              <Sparkles size={16} style={{ color: GOLD }} />
-              <p className="font-heading font-bold text-[15px]" style={{ color: GOLD }}>
-                Unlock AI Coach with Pro
-              </p>
-            </div>
-            <ul className="space-y-1.5 mb-4">
-              {[
-                'Personalized advice from YOUR scan data',
-                'Unlimited chat — no tokens, no limits',
-                'Jawline, skin, hair & style protocols',
-                'Updated with every new scan',
-              ].map((f, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span style={{ color: GOLD, fontSize: 11, marginTop: 2 }}>✓</span>
-                  <span className="font-body text-[13px] text-secondary">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={() => navigate('/premium')}
-              className="w-full py-3.5 rounded-xl font-heading font-bold text-[14px] flex items-center justify-center gap-2"
-              style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8893A 100%)`, color: '#0A0A0A' }}
-            >
-              Upgrade to Pro
-              <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
-      </MotionPage>
-    )
-  }
-
-  // ── Pro chat UI ────────────────────────────────────────────────────────────
+  // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
@@ -312,15 +239,19 @@ export default function AICoach() {
                 className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
                 style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
               >
-                PRO
+                {isPremium ? 'PRO' : 'FREE'}
               </span>
             </div>
             <p className="font-body text-[11px] text-secondary">
-              {latestScan ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded` : 'No scan yet'}
+              {isPremium
+                ? (latestScan ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded` : 'No scan yet')
+                : freeCoachLocked
+                  ? 'Free limit reached — upgrade for unlimited'
+                  : `${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} remaining`}
             </p>
           </div>
         </div>
-        {messages.length > 1 && (
+        {messages.length > 1 && !freeCoachLocked && (
           <button
             onClick={() => setMessages([])}
             className="p-2 rounded-xl"
@@ -333,6 +264,36 @@ export default function AICoach() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
+        {/* Free usage counter banner */}
+        {!isPremium && !freeCoachLocked && freeMessagesLeft <= FREE_COACH_LIMIT && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl mb-4"
+            style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}
+          >
+            <div className="flex gap-1">
+              {Array.from({ length: FREE_COACH_LIMIT }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: i < freeMessagesLeft ? GOLD : 'rgba(255,255,255,0.15)' }}
+                />
+              ))}
+            </div>
+            <p className="font-body text-[11px] flex-1" style={{ color: `${GOLD}CC` }}>
+              {freeMessagesLeft} of {FREE_COACH_LIMIT} free questions left
+            </p>
+            <button
+              onClick={() => navigate('/premium')}
+              className="text-[10px] font-heading font-bold px-2 py-1 rounded-lg"
+              style={{ background: GOLD, color: '#0A0A0A' }}
+            >
+              Go Pro
+            </button>
+          </motion.div>
+        )}
+
         {messages.length === 0 && !loading && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -389,47 +350,86 @@ export default function AICoach() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input bar */}
-      <div
-        className="px-4 py-3 flex-shrink-0"
-        style={{
-          background: 'var(--card)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        }}
-      >
-        <div
-          className="flex items-end gap-2 px-4 py-2.5 rounded-2xl"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask your coach…"
-            rows={1}
-            className="flex-1 bg-transparent outline-none resize-none font-body text-[14px]"
+      {/* Input bar — or paywall when free limit reached */}
+      {freeCoachLocked ? (
+        <div className="px-4 pb-8 pt-3 flex-shrink-0">
+          <div
+            className="rounded-2xl p-4"
             style={{
-              color: 'rgba(255,255,255,0.9)',
-              maxHeight: 100,
-              lineHeight: '1.5',
-            }}
-          />
-          <button
-            onClick={() => sendMessage()}
-            disabled={!input.trim() || loading}
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
-            style={{
-              background: input.trim() && !loading
-                ? `linear-gradient(135deg, ${GOLD} 0%, #A8893A 100%)`
-                : 'rgba(255,255,255,0.06)',
+              background: 'linear-gradient(135deg, rgba(198,168,92,0.1) 0%, rgba(198,168,92,0.04) 100%)',
+              border: '1px solid rgba(198,168,92,0.22)',
             }}
           >
-            <Send size={14} style={{ color: input.trim() && !loading ? '#0A0A0A' : 'rgba(255,255,255,0.25)' }} />
-          </button>
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <Lock size={15} style={{ color: GOLD }} />
+              <p className="font-heading font-bold text-[14px]" style={{ color: GOLD }}>
+                Upgrade for unlimited answers
+              </p>
+            </div>
+            <ul className="space-y-1 mb-3">
+              {[
+                'Unlimited chat — no tokens, no limits',
+                'Personalized protocols from your scan',
+                'Updated with every new scan',
+              ].map((f, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span style={{ color: GOLD, fontSize: 11, marginTop: 2 }}>✓</span>
+                  <span className="font-body text-[12px] text-secondary">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => navigate('/premium')}
+              className="w-full py-3 rounded-xl font-heading font-bold text-[13px] flex items-center justify-center gap-2"
+              style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8893A 100%)`, color: '#0A0A0A' }}
+            >
+              Upgrade to Pro
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="px-4 py-3 flex-shrink-0"
+          style={{
+            background: 'var(--card)',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          }}
+        >
+          <div
+            className="flex items-end gap-2 px-4 py-2.5 rounded-2xl"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask your coach…"
+              rows={1}
+              className="flex-1 bg-transparent outline-none resize-none font-body text-[14px]"
+              style={{
+                color: 'rgba(255,255,255,0.9)',
+                maxHeight: 100,
+                lineHeight: '1.5',
+              }}
+            />
+            <button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || loading}
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
+              style={{
+                background: input.trim() && !loading
+                  ? `linear-gradient(135deg, ${GOLD} 0%, #A8893A 100%)`
+                  : 'rgba(255,255,255,0.06)',
+              }}
+            >
+              <Send size={14} style={{ color: input.trim() && !loading ? '#0A0A0A' : 'rgba(255,255,255,0.25)' }} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

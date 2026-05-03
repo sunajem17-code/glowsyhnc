@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, Chev
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
+import ProLock from '../components/ProLock'
 import { PHASE_META } from '../utils/phase'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -232,7 +233,8 @@ export default function ActionPlan() {
   }, [allTasks])
 
   const weekTasks = tasksByWeek[selectedWeek] ?? []
-  const weekDetailLocked = !isPremium && selectedWeek > 2
+  // Free users only see Week 1 in full — weeks 2-12 are gated behind ProLock
+  const weekContentLocked = !isPremium && selectedWeek > 1
   const phase = WEEK_PHASES[selectedWeek]
   const phaseStyle = PHASE_COLORS[phase] ?? { color: '#1A6B5C', bg: 'rgba(26,107,92,0.1)' }
   const phaseMeta = PHASE_META[assignedPhase ?? 'TRANSFORM']
@@ -338,64 +340,87 @@ export default function ActionPlan() {
         ))}
       </div>
 
-      {/* Pro detail banner for weeks 3+ */}
-      {weekDetailLocked && (
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-3 border border-amber-accent/25 bg-amber-50/50 dark:bg-amber-900/10">
-          <Lock size={13} className="text-amber-accent flex-shrink-0" />
-          <p className="text-[11px] text-secondary font-body flex-1">
-            Task protocols visible with <span className="font-bold text-amber-accent">Pro</span>. Tap any task to see the full instructions.
-          </p>
-          <button onClick={() => navigate('/premium')} className="px-2.5 py-1 rounded-lg text-[10px] font-heading font-bold text-black flex-shrink-0" style={{ background: '#F5A623' }}>
-            Upgrade
-          </button>
-        </div>
-      )}
-
       <div>
-        {filteredTasks.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-2xl mb-2">
-              {activeTab === 'All' ? '🎉' : CATEGORY_CONFIG[activeTab.toLowerCase() === 'appeal' ? 'grooming' : activeTab.toLowerCase()]?.emoji ?? '📋'}
-            </p>
-            <p className="text-secondary text-sm font-body">
-              {activeTab === 'All'
-                ? 'No tasks assigned this week.'
-                : `No ${activeTab.toLowerCase()} tasks this week.`}
-            </p>
-          </div>
-        )}
+        {/* ── Weeks 2-12 gated for free users ────────────────────── */}
+        {weekContentLocked ? (
+          <ProLock
+            onUpgrade={() => navigate('/premium')}
+            label="Your plan continues here — unlock weeks 2–12"
+            blurAmount="7px"
+            className="mb-3"
+          >
+            {/* Blurred ghost tasks as preview */}
+            <div className="space-y-2.5">
+              {(weekTasks.length > 0 ? weekTasks : [1,2,3,4].map(i => ({ id: i }))).slice(0, 4).map((task, i) => (
+                <div key={i} className="card">
+                  <div className="flex items-start gap-3">
+                    <Circle size={22} className="text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-heading font-semibold text-primary">
+                        {task.title ?? `Week ${selectedWeek} Task ${i + 1}`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {task.duration > 0 && (
+                          <span className="text-[10px] text-secondary font-body">{task.duration} min</span>
+                        )}
+                        {task.frequency && (
+                          <span className="text-[10px] text-secondary font-body capitalize">{task.frequency}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ProLock>
+        ) : (
+          <>
+            {filteredTasks.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-2xl mb-2">
+                  {activeTab === 'All' ? '🎉' : CATEGORY_CONFIG[activeTab.toLowerCase() === 'appeal' ? 'grooming' : activeTab.toLowerCase()]?.emoji ?? '📋'}
+                </p>
+                <p className="text-secondary text-sm font-body">
+                  {activeTab === 'All'
+                    ? 'No tasks assigned this week.'
+                    : `No ${activeTab.toLowerCase()} tasks this week.`}
+                </p>
+              </div>
+            )}
 
-        {/* Active tasks */}
-        <AnimatePresence>
-          {activeTasks.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={toggleTask}
-              detailLocked={weekDetailLocked}
-              onUpgrade={() => navigate('/premium')}
-            />
-          ))}
-        </AnimatePresence>
-
-        {/* Completed tasks */}
-        {doneTasks.length > 0 && (
-          <div className="mt-4">
-            <p className="text-xs font-heading font-bold text-secondary uppercase tracking-wide mb-2">
-              Done ({doneTasks.length})
-            </p>
+            {/* Active tasks */}
             <AnimatePresence>
-              {doneTasks.map(task => (
+              {activeTasks.map(task => (
                 <TaskCard
                   key={task.id}
                   task={task}
                   onToggle={toggleTask}
-                  detailLocked={weekDetailLocked}
+                  detailLocked={false}
                   onUpgrade={() => navigate('/premium')}
                 />
               ))}
             </AnimatePresence>
-          </div>
+
+            {/* Completed tasks */}
+            {doneTasks.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-heading font-bold text-secondary uppercase tracking-wide mb-2">
+                  Done ({doneTasks.length})
+                </p>
+                <AnimatePresence>
+                  {doneTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onToggle={toggleTask}
+                      detailLocked={false}
+                      onUpgrade={() => navigate('/premium')}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </>
         )}
 
         {/* Week 12 rescan CTA */}
