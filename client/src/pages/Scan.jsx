@@ -79,32 +79,41 @@ function FaceGuide() {
 }
 
 
-// Side-profile silhouette: head facing right, with markers for nose/chin/jaw
+// Side-profile silhouette: anatomical head facing right (forehead, nose, chin clearly visible)
 function SideGuide({ size = 'normal' }) {
   const scale = size === 'small' ? 0.72 : 1
   const W = Math.round(110 * scale)
   const H = Math.round(165 * scale)
   return (
     <svg width={W} height={H} viewBox="0 0 110 165">
-      {/* Head shape — right-facing profile */}
+      {/* Skull / back of head — solid gold, left side */}
       <path
-        d="M 52 14 C 80 14 98 32 100 56 C 102 78 94 98 80 110 C 68 120 56 124 44 118 C 32 111 26 96 26 80 C 26 52 34 24 52 14 Z"
-        fill="none" stroke="#C6A85C" strokeWidth="2" strokeDasharray="7,4" opacity="0.85"
+        d="M 50 12
+           C 38 8 18 18 13 36
+           C 10 52 10 72 14 90
+           C 16 100 22 110 30 118
+           C 38 126 50 134 60 137
+           C 68 138 76 134 82 126
+           C 86 118 88 110 86 103
+           C 84 96 83 90 83 85
+           C 83 80 88 74 104 72
+           C 108 66 106 56 96 50
+           C 88 44 82 36 80 28
+           C 78 20 70 14 60 12
+           C 56 11 52 12 50 12 Z"
+        fill="none"
+        stroke="#C9A84C"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.92"
       />
-      {/* Nose projection */}
-      <path d="M 100 58 L 114 66 L 106 71" fill="none" stroke="#C6A85C" strokeWidth="1.8" opacity="0.75"/>
-      {/* Nose-bridge marker */}
-      <line x1="96" y1="36" x2="110" y2="40" stroke="#F5A623" strokeWidth="1" strokeDasharray="4,3" opacity="0.65"/>
-      {/* Chin projection marker */}
-      <line x1="52" y1="117" x2="52" y2="135" stroke="#F5A623" strokeWidth="1" strokeDasharray="4,3" opacity="0.65"/>
-      {/* Jawline marker */}
-      <line x1="30" y1="100" x2="16" y2="114" stroke="#F5A623" strokeWidth="1" strokeDasharray="4,3" opacity="0.65"/>
-      {/* Labels */}
-      <text x="58"  y="146" fill="#F5A623" fontSize="7.5" opacity="0.7" textAnchor="middle">CHIN</text>
-      <text x="10"  y="128" fill="#F5A623" fontSize="7.5" opacity="0.7" textAnchor="middle">JAW</text>
-      <text x="109" y="35"  fill="#F5A623" fontSize="7.5" opacity="0.7" textAnchor="start">NB</text>
-      {/* "Face this way →" arrow */}
-      <text x="84" y="12" fill="#C6A85C" fontSize="14" opacity="0.8">→</text>
+      {/* Nose bridge annotation */}
+      <line x1="93" y1="52" x2="108" y2="47" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.55"/>
+      {/* Chin projection annotation */}
+      <line x1="65" y1="138" x2="65" y2="152" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.55"/>
+      {/* "Face right" direction indicator */}
+      <text x="66" y="11" fill="#C9A84C" fontSize="12" opacity="0.85" fontWeight="bold">→</text>
     </svg>
   )
 }
@@ -179,23 +188,39 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
                     <line x1="10"  y1="120" x2="170" y2="120" stroke="white" strokeWidth="0.5" opacity="0.3"/>
                   </svg>
                 ) : (
-                  /* Side-profile guide — head facing right */
-                  <svg width="170" height="220" viewBox="0 0 170 220" className="opacity-65">
+                  /* Side-profile guide — anatomical head facing right */
+                  <svg width="170" height="220" viewBox="0 0 170 220" className="opacity-72">
+                    {/* Full side-profile silhouette — solid gold, no dashes */}
                     <path
-                      d="M 70 22 C 108 22 130 46 132 76 C 134 104 122 126 104 140 C 90 151 74 155 60 147 C 44 138 36 120 36 100 C 36 64 46 32 70 22 Z"
-                      fill="none" stroke="#C6A85C" strokeWidth="2.5" strokeDasharray="11,6"
+                      d="M 76 18
+                         C 58 12 28 28 20 54
+                         C 15 78 15 108 22 134
+                         C 26 150 34 164 46 176
+                         C 58 186 76 196 92 198
+                         C 104 198 116 192 124 180
+                         C 132 170 134 158 130 148
+                         C 128 138 126 128 126 120
+                         C 126 112 132 106 150 100
+                         C 154 94 148 82 134 72
+                         C 124 62 116 50 112 38
+                         C 108 26 100 16 88 14
+                         C 84 13 78 18 76 18 Z"
+                      fill="none"
+                      stroke="#C9A84C"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      opacity="0.9"
                     />
-                    {/* Nose tip */}
-                    <path d="M 132 78 L 152 88 L 140 95" fill="none" stroke="#C6A85C" strokeWidth="2.2" opacity="0.85"/>
-                    {/* Nose-bridge guide */}
-                    <line x1="126" y1="46" x2="148" y2="52" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.7"/>
-                    {/* Chin guide */}
-                    <line x1="70"  y1="146" x2="70"  y2="170" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.7"/>
-                    {/* Cross */}
-                    <line x1="85"  y1="10"  x2="85"  y2="210" stroke="white" strokeWidth="0.5" opacity="0.25"/>
-                    <line x1="10"  y1="88"  x2="160" y2="88"  stroke="white" strokeWidth="0.5" opacity="0.25"/>
+                    {/* Nose bridge annotation */}
+                    <line x1="132" y1="74" x2="150" y2="68" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6"/>
+                    {/* Chin annotation */}
+                    <line x1="92" y1="198" x2="92" y2="214" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6"/>
+                    {/* Subtle crosshairs */}
+                    <line x1="85"  y1="10"  x2="85"  y2="210" stroke="white" strokeWidth="0.5" opacity="0.18"/>
+                    <line x1="10"  y1="106" x2="160" y2="106" stroke="white" strokeWidth="0.5" opacity="0.18"/>
                     {/* "Face right" arrow */}
-                    <text x="148" y="64" fill="#C6A85C" fontSize="22" opacity="0.9">→</text>
+                    <text x="134" y="56" fill="#C9A84C" fontSize="22" opacity="0.9" fontWeight="bold">→</text>
                   </svg>
                 )}
               </div>
@@ -286,15 +311,33 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
 
       <div className="grid grid-cols-2 gap-3 mb-1">
         <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
-        <button onClick={() => setCameraOpen(true)}
-          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-card border-2 border-dashed border-[#C6A85C] active:scale-95 transition-transform">
-          <Camera size={20} className="text-[#C6A85C]" />
-          <span className="text-xs font-heading font-bold text-[#C6A85C]">Take Photo</span>
+        {/* Take Photo — solid gold border */}
+        <button
+          onClick={() => setCameraOpen(true)}
+          className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
+          style={{
+            background: 'rgba(201,168,76,0.06)',
+            border: '2px solid #C9A84C',
+            borderRadius: 12,
+            boxShadow: '0 0 12px rgba(201,168,76,0.3)',
+          }}
+        >
+          <Camera size={20} style={{ color: '#C9A84C' }} />
+          <span className="text-xs font-heading font-bold text-white">Take Photo</span>
         </button>
-        <button onClick={() => uploadRef.current?.click()}
-          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-card border-2 border-dashed border-default active:scale-95 transition-transform">
-          <Upload size={20} className="text-secondary" />
-          <span className="text-xs font-heading font-bold text-secondary">Upload Photo</span>
+        {/* Upload Photo — identical gold border, no greyed-out look */}
+        <button
+          onClick={() => uploadRef.current?.click()}
+          className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
+          style={{
+            background: 'rgba(201,168,76,0.06)',
+            border: '2px solid #C9A84C',
+            borderRadius: 12,
+            boxShadow: '0 0 12px rgba(201,168,76,0.3)',
+          }}
+        >
+          <Upload size={20} style={{ color: '#C9A84C' }} />
+          <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
         </button>
       </div>
     </div>
@@ -733,6 +776,7 @@ export default function Scan() {
           {/* Step 2: side profile */}
           {step === 2 && (
             <>
+              {/* Full Scan — solid gold border + glow */}
               <button
                 onClick={() => startAnalysis(false)}
                 className="btn-amber"
@@ -741,15 +785,24 @@ export default function Scan() {
               >
                 {sidePhoto ? '✦ Full Scan — Analyze Now' : 'Take or upload side profile first'}
               </button>
+              {/* Skip Side Profile — thicker gold border, 16px vertical padding, glow */}
               <button
                 onClick={() => startAnalysis(true)}
-                className="w-full mt-3 py-4 rounded-xl flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
-                style={{ border: '1.5px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)' }}
+                className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
+                style={{
+                  border: '3px solid #C9A84C',
+                  background: 'rgba(201,168,76,0.04)',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  boxShadow: '0 0 16px rgba(201,168,76,0.4)',
+                }}
               >
                 <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
                 <div className="text-left">
-                  <p className="font-heading font-bold text-[14px] text-white leading-tight">Skip Side Profile</p>
-                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                  <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
+                    Skip Side Profile
+                  </p>
+                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
                     Analyze face only (Basic Scan)
                   </p>
                 </div>

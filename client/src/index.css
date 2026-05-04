@@ -125,6 +125,22 @@
     box-shadow: none;
   }
 
+  /* Amber gold — scan CTA */
+  .btn-amber {
+    @apply w-full py-4 rounded-2xl font-heading font-bold text-[15px] tracking-wide transition-all duration-200 active:scale-[0.97];
+    color: #0A0A0A;
+    background: linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%);
+    box-shadow: 0 4px 20px rgba(201,168,76,0.35), 0 0 12px rgba(201,168,76,0.25);
+    border: 2px solid #C9A84C;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-amber:disabled {
+    opacity: 0.45;
+    box-shadow: none;
+    border-color: rgba(201,168,76,0.35);
+  }
+
   /* Dark — secondary action */
   .btn-teal {
     @apply w-full py-4 rounded-2xl font-heading font-bold text-[15px] tracking-wide transition-all duration-200 active:scale-[0.97];
