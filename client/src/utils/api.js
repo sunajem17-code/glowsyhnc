@@ -118,6 +118,9 @@ export const api = {
     count: () => request('/referral/count'),
     claimTrial: () => request('/referral/claim-trial', { method: 'POST' }),
   },
+  promo: {
+    redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
+  },
   supabase: {
     // Persist a completed scan + tasks to Supabase. Fire-and-forget safe.
     saveScan:     (data)        => request('/supabase/scans',          { method: 'POST',  body: JSON.stringify(data) }),

@@ -11,7 +11,7 @@ import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 
 const ANALYSIS_STEPS = [
-  { label: 'Scanning facial structure...', emoji: '🎯' },
+  { label: 'Finding your strengths...', emoji: '🎯' },
   { label: 'Matching celebrity lookalikes...', emoji: '⭐' },
   { label: 'Calculating your score...', emoji: '⚡' },
   { label: 'Building your roadmap...', emoji: '🗺️' },
@@ -30,7 +30,7 @@ function GenderSelector({ selected, onSelect }) {
         <div className="grid grid-cols-2 gap-4">
           {[
             { key: 'male',   emoji: '♂️', label: 'Male',   tiers: 'Normie → Chadlite → Chad → Gigachad', metrics: 'Jaw, V-taper, canthal tilt, brow ridge', color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
-            { key: 'female', emoji: '♀️', label: 'Female', tiers: 'LTB → MTB → HTB → Stacylite → Stacy', metrics: 'Cheekbones, skin, lip harmony, eye area',   color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
+            { key: 'female', emoji: '♀️', label: 'Female', tiers: 'Mid Becky → High Becky → Stacy → Eve → True Eve', metrics: 'Cheekbones, skin, lip harmony, eye area',   color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
           ].map(({ key, emoji, label, tiers, color, bg }) => (
             <motion.button
               key={key}

@@ -11,6 +11,7 @@ import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
 import ShareCardModal from '../components/ShareCardModal'
 import ProLock from '../components/ProLock'
+import PromoModal from '../components/PromoModal'
 import { scoreColor } from '../utils/analysis'
 
 const TIER_COLORS = {
@@ -596,14 +597,14 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
                 solid
                 onUpgrade={onUpgrade}
                 label="Your Personalized Product Stack"
-                description="AI-matched products based on your scan weaknesses and skin issues."
+                description="AI-matched products based on your scan results and skin analysis."
                 className="mt-1"
               />
             ) : (
               <>
                 {/* Intro blurb — Pro */}
                 <p className="text-[10px] text-secondary font-body mb-3 leading-snug">
-                  Products matched to your scan — selected based on your detected weak areas and skin issues.
+                  Products matched to your scan — selected based on your improvement areas and skin analysis.
                 </p>
 
                 {/* Loading skeleton */}
@@ -831,9 +832,10 @@ function ProGate({ onUpgrade }) {
 
 function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const navigate = useNavigate()
-  const [plan, setPlan]     = useState('monthly')
+  const [plan, setPlan]       = useState('monthly')
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError]     = useState('')
+  const [showPromo, setShowPromo] = useState(false)
 
   // ── Personalisation — find worst pillar ──────────────────────────────────
   const PILLAR_LABELS = {
@@ -854,11 +856,11 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const gap       = ((Number(potential) - (glowScore ?? 5)).toFixed(1))
 
   const hookHeadline = worstLabel && worstScore != null && worstScore < 6.5
-    ? `Your ${worstLabel} scored ${worstScore.toFixed(1)} — it's pulling your score down.`
+    ? `Your ${worstLabel} has the most room to grow — and it's your fastest path to +${scoreDrag} pts.`
     : `You're ${gap} points below your potential.`
 
   const hookSub = worstLabel && worstScore != null && worstScore < 6.5
-    ? `This single pillar is costing you ~${scoreDrag} points. Pro unlocks the exact protocol to fix it.`
+    ? `One focused pillar. Pro unlocks the exact protocol to raise it.`
     : `Your full breakdown and 12-week protocol are waiting.`
 
   // ── Direct checkout ───────────────────────────────────────────────────────
@@ -882,7 +884,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
 
   const locked = [
     worstLabel && worstScore != null && worstScore < 6.5
-      ? { icon: '🎯', label: `Fix Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
+      ? { icon: '🎯', label: `Maximize Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
       : { icon: '📈', label: 'Score Projection', sub: `Your potential: ${potential}/10 · roadmap included` },
     { icon: '⭐', label: 'Celebrity Lookalikes', sub: '3 AI matches with % similarity' },
     { icon: '📐', label: 'Full Face Metrics', sub: '6 detailed scores + AI descriptors' },
@@ -1039,7 +1041,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           <p className="text-center text-[11px] font-body mb-3" style={{ color: '#EF4444' }}>{error}</p>
         )}
 
-        {/* Dismiss — uses their actual score as guilt anchor */}
+        {/* Dismiss */}
         <button
           onClick={onClose}
           type="button"
@@ -1049,7 +1051,27 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
         </button>
 
+        {/* Promo code link */}
+        <button
+          onClick={() => setShowPromo(true)}
+          type="button"
+          className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(198,168,92,0.45)' }}
+        >
+          Have a promo code?
+        </button>
+
       </div>
+
+      {/* Promo modal */}
+      <AnimatePresence>
+        {showPromo && (
+          <PromoModal
+            onClose={() => setShowPromo(false)}
+            onSuccess={onClose}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
@@ -1128,7 +1150,7 @@ export default function Results() {
     skinScore >= 7.5  ? 'Clear'         :
     skinScore >= 6.0  ? 'Good'          :
     skinScore >= 4.5  ? 'Fair'          :
-    skinScore >= 3.5  ? 'Blemish-Prone' : 'Problematic'
+    skinScore >= 3.5  ? 'Blemish-Prone' : 'Needs Attention'
   // Only flag issues for scores that actually indicate a problem.
   // Clear skin (7.5+) gets NO problem tags — only maintenance messaging.
   const skinIssues = skinScore == null ? [] : [
@@ -1304,7 +1326,33 @@ export default function Results() {
           <div className="mb-4 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: `${col}0D`, border: `1px solid ${col}25` }}>
             <span className="text-[13px]">📊</span>
             <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              Your score places you in the <span className="font-bold" style={{ color: col }}>{pct}</span> of men on Ascendus
+              Your score places you in the <span className="font-bold" style={{ color: col }}>{pct}</span> of users on Ascendus
+            </p>
+          </div>
+        )
+      })()}
+
+      {/* ── Motivational one-liner — strongest pillar ────────────── */}
+      {pillars && (() => {
+        const best = Object.entries(pillars).reduce((a, b) => (a[1] > b[1] ? a : b))
+        const PILLAR_LABELS_MOT = { harmony: 'Harmony', angularity: 'Angularity', features: 'Features', dimorphism: gender === 'female' ? 'Femininity' : 'Dimorphism' }
+        const bestLabel = PILLAR_LABELS_MOT[best[0]] ?? best[0]
+        const bestScore = best[1]
+        const MOTIV_LINES = {
+          harmony:    'Your facial balance is already working for you — maximize it with targeted symmetry and posture work.',
+          angularity: 'Your bone structure is already working for you — lean out to reveal its full potential.',
+          features:   'Your individual features are already working for you — refine the details for maximum impact.',
+          dimorphism: gender === 'female'
+            ? 'Your femininity score is already working for you — skincare and grooming will amplify it further.'
+            : 'Your masculine presence is already working for you — build on this foundation consistently.',
+        }
+        const motivLine = MOTIV_LINES[best[0]] ?? `Your ${bestLabel} is already working for you — here's how to maximize it.`
+        return (
+          <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2.5"
+            style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.2)' }}>
+            <span className="text-[14px] flex-shrink-0 mt-0.5">⭐</span>
+            <p className="font-body text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <span className="font-bold" style={{ color: '#C6A85C' }}>{bestLabel} {bestScore.toFixed(1)}</span>{' '}— {motivLine}
             </p>
           </div>
         )
@@ -1327,8 +1375,8 @@ export default function Results() {
           >
             <span className="text-[15px] flex-shrink-0">⚠</span>
             <p className="font-body text-[11px] leading-relaxed flex-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Your <span className="font-bold" style={{ color: '#E07A5F' }}>{label} ({score.toFixed(1)})</span> is your biggest score drag
-              {' — '}<span className="font-bold" style={{ color: '#34C759' }}>fixing it adds ~+{impact} pts</span>
+              Your <span className="font-bold" style={{ color: '#C6A85C' }}>{label} ({score.toFixed(1)})</span> is your biggest growth opportunity
+              {' — '}<span className="font-bold" style={{ color: '#34C759' }}>targeting it adds ~+{impact} pts</span>
               <span style={{ color: '#C6A85C' }}> · See how →</span>
             </p>
           </button>
@@ -1622,7 +1670,7 @@ export default function Results() {
                 descriptions: {
                   'strong':   'Strong jaw projection — highly attractive from the side. One of the top masculine structural traits.',
                   'moderate': 'Moderate jaw projection — solid structural base. Mewing and chewing hard foods can improve this over time.',
-                  'weak':     'Weak jaw projection — the jaw recedes behind the nose. Mewing, dental work, or corrective surgery addresses this.',
+                  'weak':     'Jaw projection has improvement potential — the jaw recedes slightly behind the nose. Mewing, dental work, or corrective surgery addresses this.',
                   'recessed': 'Recessed jaw (retrognathia) — the chin and jaw sit back significantly. Orthognathic surgery is the definitive fix.',
                 },
                 color: '#F5A623',
@@ -1635,8 +1683,8 @@ export default function Results() {
                   'ideal':      'Ideal chin projection — chin tip aligns with or slightly behind the lower lip when viewed from the side.',
                   'strong':     'Strong chin projection — prominent and forward. A highly attractive masculine trait from the side.',
                   'moderate':   'Moderate chin projection — slightly behind ideal. Chin exercises and mewing can marginally improve over time.',
-                  'weak':       'Weak chin projection — chin recesses behind the lower lip. Chin filler or implant is the fastest solution.',
-                  'recessed':   'Significantly recessed chin — noticeably soft from the side. This is capping your profile score the most.',
+                  'weak':       'Chin projection has improvement potential — chin recesses slightly behind the lower lip. Chin filler or implant is the fastest solution.',
+                  'recessed':   'Chin has significant improvement potential — sits back from ideal profile position. Addressing this unlocks the most profile score gain.',
                 },
                 color: '#34C759',
               },

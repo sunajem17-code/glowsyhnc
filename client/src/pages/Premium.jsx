@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, X, ChevronLeft, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
+import PromoModal from '../components/PromoModal'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
 const GOLD = '#C6A85C'
@@ -45,6 +46,7 @@ export default function Premium() {
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [showPromo, setShowPromo] = useState(false)
 
   const [searchParams] = useSearchParams()
 
@@ -218,6 +220,15 @@ export default function Premium() {
           <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{checkoutError}</p>
         )}
 
+        {/* Promo code link */}
+        <button
+          onClick={() => setShowPromo(true)}
+          className="w-full mb-4 font-body text-[12px] text-center transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(198,168,92,0.5)' }}
+        >
+          Have a promo code?
+        </button>
+
         {sessionExpired && (
           <div className="mb-3 rounded-xl p-4 text-center" style={{ background: '#1A1A1A', border: '1px solid rgba(198,168,92,0.2)' }}>
             <p className="text-[12px] font-body mb-3" style={{ color: '#F0EDE8' }}>
@@ -354,6 +365,19 @@ export default function Premium() {
           <button onClick={() => window.location.href = '/privacy'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Privacy Policy</button>
         </p>
       </div>
+
+      {/* Promo modal */}
+      <AnimatePresence>
+        {showPromo && (
+          <PromoModal
+            onClose={() => setShowPromo(false)}
+            onSuccess={() => {
+              setShowPromo(false)
+              navigate(-1)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

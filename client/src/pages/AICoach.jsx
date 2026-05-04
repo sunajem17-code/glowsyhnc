@@ -16,7 +16,7 @@ const STARTER_PROMPTS = [
 ]
 
 const DEMO_TEASER = [
-  { role: 'assistant', content: "Your scan is loaded. Your biggest opportunity is jawline definition - it's dragging your face score below 7.", locked: false },
+  { role: 'assistant', content: "Your scan is loaded. Your biggest growth opportunity is jawline definition — targeting this is your fastest path to 7+.", locked: false },
   { role: 'user', content: 'What should I do about it?', locked: false },
   { role: 'assistant', content: 'Unlock AI Coach to get your personalized jawline protocol and full improvement plan.', locked: true },
 ]

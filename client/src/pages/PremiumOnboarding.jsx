@@ -1069,7 +1069,7 @@ const BMI_TIERS = [
     color: '#EF4444',
     bg: 'rgba(239,68,68,0.09)',
     border: 'rgba(239,68,68,0.28)',
-    impact: 'Body fat is the single biggest factor dragging your score. It hides your facial bone structure, jawline, and neck — three of the highest-weight metrics in your rating.',
+    impact: 'Body fat reduction is your highest-impact lever. Leaning out reveals facial bone structure, jawline, and neck definition — three of the highest-weight metrics in your rating.',
   },
 ]
 
@@ -1324,7 +1324,7 @@ function Slide2() {
     'Generic advice',
   ]
   const withItems = [
-    'AI identifies exact weak points',
+    'AI identifies your top growth opportunities',
     'Personalized fix for each one',
     'Tracks real improvement',
     'Specific to YOUR face',
