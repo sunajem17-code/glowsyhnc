@@ -65,6 +65,7 @@ app.use('/api/coach',       require('./routes/coach'))
 app.use('/api/hair',        require('./routes/hair'))
 app.use('/api/referral',    require('./routes/referral'))
 app.use('/api/promo',       require('./routes/promo'))
+app.use('/webhooks',        require('./routes/email-webhooks'))
 
 // Health checks
 app.get('/',           (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))

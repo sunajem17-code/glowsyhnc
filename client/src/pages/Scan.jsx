@@ -29,9 +29,9 @@ function GenderSelector({ selected, onSelect }) {
         </p>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { key: 'male',   emoji: '♂️', label: 'Male',   tiers: 'Normie → Chadlite → Chad → Gigachad', metrics: 'Jaw, V-taper, canthal tilt, brow ridge', color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
-            { key: 'female', emoji: '♀️', label: 'Female', tiers: 'Mid Becky → High Becky → Stacy → Eve → True Eve', metrics: 'Cheekbones, skin, lip harmony, eye area',   color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
-          ].map(({ key, emoji, label, tiers, color, bg }) => (
+            { key: 'male',   emoji: '♂️', label: 'Male',   color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
+            { key: 'female', emoji: '♀️', label: 'Female', color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
+          ].map(({ key, emoji, label, color, bg }) => (
             <motion.button
               key={key}
               whileTap={{ scale: 0.96 }}
@@ -41,7 +41,6 @@ function GenderSelector({ selected, onSelect }) {
             >
               <span className="text-4xl">{emoji}</span>
               <p className="font-heading font-bold text-base text-primary">{label}</p>
-              <p className="text-[10px] text-secondary font-body leading-relaxed text-center">{tiers}</p>
               {selected === key && (
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
                   className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: color }}>

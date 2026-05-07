@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Your Week {{week_number}} Recap</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #e0e0e0; }
+  .wrapper { max-width: 560px; margin: 0 auto; padding: 40px 16px; }
+  .logo { font-size: 22px; font-weight: 900; letter-spacing: -0.03em; color: #1ddc8b; margin-bottom: 8px; }
+  .week-label { font-size: 12px; color: #8888a0; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 28px; }
+  .card { background: #13131a; border: 1px solid #1e1e2e; border-radius: 16px; padding: 28px; margin-bottom: 16px; }
+  .headline { font-size: 22px; font-weight: 800; color: #ffffff; line-height: 1.2; margin-bottom: 6px; letter-spacing: -0.02em; }
+  .subtext { font-size: 14px; color: #8888a0; line-height: 1.6; }
+  .big-score { font-size: 64px; font-weight: 900; color: #1ddc8b; line-height: 1; letter-spacing: -0.04em; }
+  .score-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .delta { font-size: 18px; font-weight: 700; }
+  .delta-up { color: #1ddc8b; }
+  .delta-down { color: #ef4444; }
+  .delta-flat { color: #8888a0; }
+  .streak { font-size: 13px; color: #8888a0; }
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+  .metric { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 10px; padding: 14px; }
+  .metric-label { font-size: 11px; color: #8888a0; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .metric-score { font-size: 22px; font-weight: 800; color: #ffffff; }
+  .metric-delta { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .bar-wrap { background: #1e1e2e; border-radius: 4px; height: 5px; margin-top: 8px; }
+  .bar-fill { height: 5px; border-radius: 4px; background: linear-gradient(90deg, #1ddc8b, #0fa870); }
+  .timeline { margin-top: 4px; }
+  .timeline-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #1a1a26; }
+  .timeline-row:last-child { border-bottom: none; }
+  .t-week { font-size: 11px; color: #555566; width: 50px; flex-shrink: 0; }
+  .t-bar-wrap { flex: 1; background: #1e1e2e; border-radius: 3px; height: 4px; }
+  .t-bar { height: 4px; border-radius: 3px; background: #1ddc8b; }
+  .t-score { font-size: 12px; font-weight: 700; color: #1ddc8b; width: 36px; text-align: right; flex-shrink: 0; }
+  .tip-card { background: rgba(29,220,139,0.06); border: 1px solid rgba(29,220,139,0.2); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .tip-label { font-size: 11px; font-weight: 700; color: #1ddc8b; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .tip-text { font-size: 14px; color: #c0c0d0; line-height: 1.6; }
+  .cta { display: block; background: linear-gradient(135deg, #1ddc8b, #0fa870); color: #000000; text-decoration: none; text-align: center; font-weight: 800; font-size: 16px; padding: 16px 32px; border-radius: 12px; margin-bottom: 12px; letter-spacing: -0.01em; }
+  .footer { text-align: center; font-size: 11px; color: #444455; line-height: 1.8; margin-top: 24px; }
+  .footer a { color: #555566; text-decoration: none; }
+  .section-title { font-size: 11px; font-weight: 700; color: #8888a0; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="logo">ASCENDUS</div>
+  <div class="week-label">Week {{week_number}} Recap</div>
+
+  <!-- Score Hero -->
+  <div class="card">
+    <p class="headline">Your score this week</p>
+    <div class="big-score">{{current_score}}</div>
+    <div class="score-meta">
+      <span class="delta {{delta_class}}">{{delta_arrow}} {{score_delta}}</span>
+      <span class="streak">🔥 {{streak_weeks}}-week streak</span>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="metrics-grid">
+      <div class="metric">
+        <div class="metric-label">Jawline</div>
+        <div class="metric-score">{{jawline_score}}</div>
+        <div class="metric-delta {{jawline_delta_class}}">{{jawline_delta_arrow}} {{jawline_delta}}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{jawline_pct}}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Skin</div>
+        <div class="metric-score">{{skin_score}}</div>
+        <div class="metric-delta {{skin_delta_class}}">{{skin_delta_arrow}} {{skin_delta}}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{skin_pct}}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Eyes</div>
+        <div class="metric-score">{{eye_score}}</div>
+        <div class="metric-delta {{eye_delta_class}}">{{eye_delta_arrow}} {{eye_delta}}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{eye_pct}}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Grooming</div>
+        <div class="metric-score">{{grooming_score}}</div>
+        <div class="metric-delta {{grooming_delta_class}}">{{grooming_delta_arrow}} {{grooming_delta}}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{grooming_pct}}%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Timeline -->
+  <div class="card">
+    <div class="section-title">Progress History</div>
+    <div class="timeline">
+      {{weekly_history}}
+    </div>
+  </div>
+
+  <!-- Weekly Tip -->
+  <div class="tip-card">
+    <div class="tip-label">💡 This Week's Focus</div>
+    <div class="tip-text">{{weekly_tip}}</div>
+  </div>
+
+  <!-- CTA -->
+  <a class="cta" href="https://ascendus.store/dashboard?ref=weekly_email&utm_source=resend&utm_medium=email&utm_campaign=weekly_recap&utm_content={{user_id}}">
+    View Full Dashboard →
+  </a>
+
+  <div class="footer">
+    <p>Week {{week_number}} · Ascendus Progress Report</p>
+    <p><a href="https://ascendus.store/unsubscribe?uid={{user_id}}">Unsubscribe</a> · <a href="https://ascendus.store/privacy">Privacy</a></p>
+    <p style="margin-top:8px;">© 2026 Ascendus · Toronto, ON</p>
+  </div>
+</div>
+</body>
+</html>

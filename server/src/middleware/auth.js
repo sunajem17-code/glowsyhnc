@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken')
 
-if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET env var is required')
-const JWT_SECRET = process.env.JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET || 'glowsync-dev-secret'
 
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization

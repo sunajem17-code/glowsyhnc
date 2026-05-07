@@ -119,7 +119,7 @@ export default function Landing() {
     },
   }
 
-  const handleStart = () => navigate('/auth')
+  const handleStart = () => navigate('/auth?mode=signup')
 
   return (
     <div style={{ background: SURFACE, color: TEXT, minHeight: '100vh' }}>

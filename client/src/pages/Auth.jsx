@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -8,19 +8,32 @@ import logo from '../assets/ascendus-icon.png'
 
 export default function Auth() {
   const navigate = useNavigate()
-  const setHasOnboarded = useStore(s => s.setHasOnboarded)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [searchParams] = useSearchParams()
+  const { setAuth } = useStore()
+
+  const [mode, setMode] = useState(() => searchParams.get('mode') === 'signup' ? 'signup' : 'login')
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { setAuth, resetOnboarding } = useStore()
+
+  function switchMode(next) {
+    setMode(next)
+    setError('')
+    setForm({ name: '', email: '', password: '' })
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const data = await api.auth.login({ email: form.email, password: form.password })
+      let data
+      if (mode === 'signup') {
+        data = await api.auth.register({ name: form.name, email: form.email, password: form.password })
+      } else {
+        data = await api.auth.login({ email: form.email, password: form.password })
+      }
       setAuth(data.user, data.token)
     } catch (err) {
       const isNetworkError =
@@ -60,6 +73,8 @@ export default function Auth() {
     bg-transparent border focus:border-[#C6A85C]
   `
 
+  const isSignup = mode === 'signup'
+
   return (
     <div
       className="page-scroll-full flex flex-col"
@@ -75,21 +90,25 @@ export default function Auth() {
           <img src={logo} alt="Ascendus" style={{ height: 52, mixBlendMode: 'lighten' }} />
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-        >
-          <h1
-            className="font-heading font-bold text-[34px] leading-[1.1] text-primary mb-2.5"
-            style={{ letterSpacing: '-0.02em' }}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={mode}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
           >
-            Welcome{'\n'}back.
-          </h1>
-          <p className="text-secondary font-body text-[15px]">
-            Continue where you left off.
-          </p>
-        </motion.div>
+            <h1
+              className="font-heading font-bold text-[34px] leading-[1.1] text-primary mb-2.5"
+              style={{ letterSpacing: '-0.02em' }}
+            >
+              {isSignup ? 'Create your\naccount.' : 'Welcome\nback.'}
+            </h1>
+            <p className="text-secondary font-body text-[15px]">
+              {isSignup ? 'Start your free analysis today.' : 'Continue where you left off.'}
+            </p>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Form */}
@@ -100,6 +119,36 @@ export default function Auth() {
         onSubmit={handleSubmit}
         className="flex-1 px-6 space-y-3"
       >
+        <AnimatePresence>
+          {isSignup && (
+            <motion.div
+              key="name-field"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <label className="text-[11px] font-body font-medium text-secondary mb-1.5 block uppercase tracking-wide">
+                Name
+              </label>
+              <input
+                type="text"
+                placeholder="Your name"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                className={inputClass}
+                style={{
+                  color: 'var(--text-primary)',
+                  borderColor: 'var(--border-strong)',
+                  background: 'var(--card)',
+                }}
+                required={isSignup}
+                autoComplete="name"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div>
           <label className="text-[11px] font-body font-medium text-secondary mb-1.5 block uppercase tracking-wide">
             Email
@@ -116,6 +165,7 @@ export default function Auth() {
               background: 'var(--card)',
             }}
             required
+            autoComplete="email"
           />
         </div>
 
@@ -126,7 +176,7 @@ export default function Auth() {
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'}
-              placeholder="Your password"
+              placeholder={isSignup ? 'Create a password' : 'Your password'}
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               className={inputClass + ' pr-12'}
@@ -136,6 +186,8 @@ export default function Auth() {
                 background: 'var(--card)',
               }}
               required
+              minLength={isSignup ? 6 : undefined}
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
             />
             <button
               type="button"
@@ -145,6 +197,9 @@ export default function Auth() {
               {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
+          {isSignup && (
+            <p className="text-[11px] text-secondary font-body mt-1.5">Minimum 6 characters</p>
+          )}
         </div>
 
         <AnimatePresence>
@@ -169,7 +224,9 @@ export default function Auth() {
             style={{ color: '#0A0A0A' }}
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading
+              ? (isSignup ? 'Creating account…' : 'Signing in…')
+              : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
 
           <div className="flex items-center gap-3">
@@ -189,16 +246,33 @@ export default function Auth() {
         </div>
       </motion.form>
 
-      {/* New user prompt */}
+      {/* Mode toggle */}
       <div className="px-6 py-10 text-center">
-        <span className="text-sm text-secondary font-body">Don't have an account? </span>
-        <button
-          onClick={() => { resetOnboarding(); navigate('/') }}
-          className="text-sm font-heading font-bold"
-          style={{ color: '#C6A85C' }}
-        >
-          Sign Up
-        </button>
+        {isSignup ? (
+          <>
+            <span className="text-sm text-secondary font-body">Already have an account? </span>
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="text-sm font-heading font-bold"
+              style={{ color: '#C6A85C' }}
+            >
+              Sign In
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm text-secondary font-body">Don't have an account? </span>
+            <button
+              type="button"
+              onClick={() => switchMode('signup')}
+              className="text-sm font-heading font-bold"
+              style={{ color: '#C6A85C' }}
+            >
+              Sign Up
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

@@ -16,3 +16,5 @@ client/.env
 data/
 dist/
 .DS_Store
+.vercel
+.env*.local

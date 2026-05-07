@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { captureEmailUTM } from './utils/affiliate-tracker'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
@@ -42,6 +43,9 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
+
+  // Capture email UTM params on every load (for email click attribution)
+  useEffect(() => { captureEmailUTM() }, [])
 
   // Check if pro trial has expired on load
   useEffect(() => {
@@ -89,13 +93,15 @@ export default function App() {
             <Route path="/" element={<Landing />} />
           )}
 
+          {/* Auth always accessible — must be outside hasOnboarded gate */}
+          <Route path="/auth" element={
+            isAuthenticated ? <Navigate to="/" replace /> : <Auth />
+          } />
+
           {!hasOnboarded ? (
             <Route path="*" element={<PremiumOnboarding />} />
           ) : (
             <>
-              <Route path="/auth" element={
-                isAuthenticated ? <Navigate to="/" replace /> : <Auth />
-              } />
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
               }>
