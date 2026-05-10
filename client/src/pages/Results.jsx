@@ -12,6 +12,7 @@ import MotionPage from '../components/MotionPage'
 import ShareCardModal from '../components/ShareCardModal'
 import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
+import PotentialViewer from '../components/PotentialViewer'
 import { scoreColor } from '../utils/analysis'
 
 const TIER_COLORS = {
@@ -1081,7 +1082,8 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
 export default function Results() {
   const navigate = useNavigate()
   const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, userProfile } = useStore()
-  const [showShareCard, setShowShareCard] = useState(false)
+  const [showShareCard,   setShowShareCard]   = useState(false)
+  const [showPotential,   setShowPotential]   = useState(false)
   const [revealDone, setRevealDone] = useState(false)
 
   // Show reveal only on first load for a fresh scan (within last 10s)
@@ -2122,6 +2124,37 @@ export default function Results() {
 
       {/* ── CTAs ──────────────────────────────────────────────────── */}
       <div className="space-y-3 pt-1" style={{ paddingBottom: !isPremium && !showPaywall ? '112px' : '32px' }}>
+
+        {/* See Your Potential — Pro only */}
+        {isPremium ? (
+          <button
+            onClick={() => setShowPotential(true)}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{
+              background: 'linear-gradient(135deg, rgba(52,199,89,0.15) 0%, rgba(52,199,89,0.08) 100%)',
+              border: '1.5px solid rgba(52,199,89,0.45)',
+              color: '#34C759',
+              boxShadow: '0 4px 20px rgba(52,199,89,0.15)',
+            }}
+          >
+            <Sparkles size={16} />
+            See Your Potential
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowPaywall(true)}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              color: 'rgba(255,255,255,0.35)',
+            }}
+          >
+            <Lock size={14} style={{ color: '#C6A85C' }} />
+            See Your Potential — Upgrade to unlock
+          </button>
+        )}
+
         <button
           onClick={() => setShowShareCard(true)}
           className="w-full py-4 rounded-2xl font-heading font-bold text-base text-black flex items-center justify-center gap-2"
@@ -2177,6 +2210,18 @@ export default function Results() {
         </div>
       </div>
     )}
+
+    {/* ── Potential Viewer ──────────────────────────────────────── */}
+    <AnimatePresence>
+      {showPotential && isPremium && (
+        <PotentialViewer
+          scan={currentScan}
+          facePhotoUrl={pendingFacePhoto ?? currentScan?.facePhotoUrl}
+          gender={gender ?? 'male'}
+          onClose={() => setShowPotential(false)}
+        />
+      )}
+    </AnimatePresence>
 
     {/* ── Share Card Modal ──────────────────────────────────────── */}
     <AnimatePresence>

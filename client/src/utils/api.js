@@ -121,6 +121,9 @@ export const api = {
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
   },
+  potential: {
+    analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),
+  },
   supabase: {
     // Persist a completed scan + tasks to Supabase. Fire-and-forget safe.
     saveScan:     (data)        => request('/supabase/scans',          { method: 'POST',  body: JSON.stringify(data) }),
