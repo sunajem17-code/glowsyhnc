@@ -30,6 +30,9 @@ router.post('/submit', authMiddleware, (req, res) => {
     if (score === undefined || score === null) {
       return res.status(400).json({ error: 'score required' })
     }
+    if (typeof score !== 'number' || score < 0 || score > 100) {
+      return res.status(400).json({ error: 'score must be a number between 0 and 100' })
+    }
     // Use the authenticated userId as the username — users cannot spoof other users
     const username = req.userId
     const weekStart = getWeekStart()

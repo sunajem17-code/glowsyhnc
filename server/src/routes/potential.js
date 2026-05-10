@@ -82,11 +82,15 @@ Rules:
 
   try {
     const client = getClient()
+    const model = 'claude-haiku-4-5'
+    console.log('POTENTIAL: calling Claude with model:', model)
+    console.log('POTENTIAL: prompt length:', prompt.length)
     const message = await client.messages.create({
-      model:      'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 300,
       messages:   [{ role: 'user', content: prompt }],
     })
+    console.log('POTENTIAL: raw response:', JSON.stringify(message.content))
 
     const raw     = message.content[0]?.text?.trim() ?? ''
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
@@ -118,6 +122,9 @@ Rules:
     })
   } catch (err) {
     console.error('[Potential] Claude error:', err.message)
+    console.error('[Potential] Status:', err.status)
+    console.error('[Potential] Error type:', err.error?.type)
+    console.error('[Potential] Error detail:', JSON.stringify(err.error ?? err, null, 2))
     return res.status(500).json({ error: 'AI analysis failed — please try again' })
   }
 })

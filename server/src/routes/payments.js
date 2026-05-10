@@ -6,7 +6,8 @@ const { getUserById, updateUserById, getSupabase } = require('../supabase')
 
 const router = express.Router()
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_KEY_HERE', {
+if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY env var is required')
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
   maxNetworkRetries: 1,
 })

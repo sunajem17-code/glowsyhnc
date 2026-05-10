@@ -316,7 +316,7 @@ Return ONLY this JSON — no markdown, nothing else:
 
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
-// Uses claude-haiku-4-5-20251001. Now accepts gender to provide appropriate pools.
+// Uses claude-haiku-4-5. Now accepts gender to provide appropriate pools.
 // Includes automatic fallback retry when generic/unknown names are detected.
 async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male') {
   const client  = getClient()
@@ -427,7 +427,7 @@ Return ONLY this JSON — no markdown, nothing else:
   let parsed
   try {
     const primaryResp = await client.messages.create({
-      model:      'claude-haiku-4-5-20251001',
+      model:      'claude-haiku-4-5',
       max_tokens: 800,
       system:     systemPrompt,
       messages: [{
@@ -458,7 +458,7 @@ Return ONLY this JSON — no markdown, nothing else:
     console.log('[celeb] Generic/unknown name detected — retrying with fallback prompt...')
     try {
       const fallbackResp = await client.messages.create({
-        model:      'claude-haiku-4-5-20251001',
+        model:      'claude-haiku-4-5',
         max_tokens: 800,
         system:     fallbackSystemPrompt,
         messages: [{

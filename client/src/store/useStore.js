@@ -13,9 +13,10 @@ const useStore = create(
         user,
         token,
         isAuthenticated: true,
-        // Check both subscriptionTier and is_pro so webhook-activated accounts work immediately
-        isPremium: user?.subscriptionTier === 'premium' || user?.is_pro === true,
+        // isPremium is derived at runtime — never trust persisted localStorage value
+        isPremium: false,
       }),
+      setPremium: (val) => set({ isPremium: val }),
       logout: () => set({
         user: null,
         token: null,

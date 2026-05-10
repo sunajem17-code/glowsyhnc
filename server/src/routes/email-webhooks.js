@@ -72,7 +72,8 @@ router.post('/weekly-recap', requireSecret, async (req, res) => {
 router.post('/track-click', async (req, res) => {
   try {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress
-    const result = await trackAffiliateClick({ ...req.body, ip })
+    const { ref, source, campaign } = req.body
+    const result = await trackAffiliateClick({ ref, source, campaign, ip })
     return res.json(result)
   } catch (err) {
     console.error('track-click error:', err.message)
@@ -81,7 +82,7 @@ router.post('/track-click', async (req, res) => {
 })
 
 // ── POST /webhooks/resend-events — Resend webhook ─────────────────────────────
-router.post('/resend-events', async (req, res) => {
+router.post('/resend-events', requireSecret, async (req, res) => {
   // Resend sends events like email.opened, email.clicked
   const event = req.body
 

@@ -260,6 +260,8 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
     let cancelled = false
     ;(async () => {
       try {
+        console.log('POTENTIAL: calling api.potential.analyze')
+        console.log('POTENTIAL: BASE URL will be:', import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
         const data = await api.potential.analyze({
           pillars,
           faceScore:     scan?.aiScore?.faceScore,
@@ -269,6 +271,8 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
         })
         if (!cancelled) { setResult(data); setPhase('done') }
       } catch (err) {
+        console.error('POTENTIAL ERROR:', err)
+        console.error('POTENTIAL ERROR message:', err.message)
         if (!cancelled) {
           setErrMsg(err.message || 'Analysis failed — please try again')
           setPhase('error')

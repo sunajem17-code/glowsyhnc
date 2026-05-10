@@ -9,7 +9,7 @@ const db = require('../db')
 
 const router = express.Router()
 
-const VALID_CODE = 'SOHAIL'
+const VALID_CODE = process.env.PROMO_CODE || 'SOHAIL'
 const PRO_MONTHS = 3
 
 router.post('/redeem', authMiddleware, async (req, res) => {
