@@ -11,10 +11,10 @@ const path            = require('path')
 const crypto          = require('crypto')
 
 const resend  = new Resend(process.env.RESEND_API_KEY)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
+const supabase = supabaseKey
+  ? createClient(process.env.SUPABASE_URL, supabaseKey)
+  : null
 
 const FROM = 'Ascendus <noreply@ascendus.store>'
 const TEMPLATES = {
