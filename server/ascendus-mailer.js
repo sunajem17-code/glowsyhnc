@@ -10,7 +10,10 @@ const fs              = require('fs')
 const path            = require('path')
 const crypto          = require('crypto')
 
-const resend  = new Resend(process.env.RESEND_API_KEY)
+// Lazy init — avoids crash at startup if env vars not yet loaded
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
 const supabase = supabaseKey
   ? createClient(process.env.SUPABASE_URL, supabaseKey)
@@ -107,7 +110,7 @@ async function sendUpgradeNudge(userId) {
   })
 
   // 5. Send
-  const { data: sent, error: se } = await resend.emails.send({
+  const { data: sent, error: se } = await getResend().emails.send({
     from:    FROM,
     to:      profile.email,
     subject: `${firstName}, your Ascendus report is still locked 🔒`,
@@ -230,7 +233,7 @@ async function sendWeeklyRecap(userId) {
   })
 
   // 8. Send
-  const { data: sent, error: se } = await resend.emails.send({
+  const { data: sent, error: se } = await getResend().emails.send({
     from:    FROM,
     to:      profile.email,
     subject: `Week ${curr.week_number} recap: you scored ${Number(curr.current_score).toFixed(1)}/10`,
