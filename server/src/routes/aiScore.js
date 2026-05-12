@@ -318,9 +318,62 @@ Return ONLY this JSON — no markdown, nothing else:
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
 // Uses claude-haiku-4-5. Now accepts gender to provide appropriate pools.
 // Includes automatic fallback retry when generic/unknown names are detected.
-async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male') {
+async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male', faceResult = null, computedScores = null) {
   const client  = getClient()
   const isFemale = gender === 'female'
+
+  // ── Build score context block so Claude can use actual metrics for matching ──
+  let scoreBlock = ''
+  if (faceResult && computedScores) {
+    const { final, tier, harmony, angularity, features, dimorphism } = computedScores
+    const fs = faceResult.facial_structure ?? 'unknown'
+    const ht = faceResult.hair_type ?? 'unknown'
+    const dimLabel = isFemale ? 'Femininity' : 'Masculinity'
+    const sexLabel = isFemale ? 'feminine' : 'masculine'
+
+    const harmonyDesc  = harmony    >= 8 ? 'highly symmetric, well-proportioned'           : harmony    >= 6 ? 'above-average facial balance'         : 'some asymmetry or imbalance'
+    const angularDesc  = angularity >= 8 ? 'sharp defined jaw and prominent cheekbones'    : angularity >= 6 ? 'moderate bone definition'             : 'soft or rounded bone structure'
+    const featuresDesc = features   >= 8 ? 'standout individual features'                  : features   >= 6 ? 'above-average feature quality'         : 'average individual features'
+    const dimorphDesc  = dimorphism >= 8 ? `strongly ${sexLabel}`                          : dimorphism >= 6 ? `moderately ${sexLabel}`                : `mildly ${sexLabel} or androgynous`
+
+    const maleAngularRule = angularity < 5
+      ? '- Angularity < 5 → ONLY match to soft-faced, round-featured celebrities. NEVER pick sharp-jawed actors.'
+      : angularity >= 8
+        ? '- Angularity ≥ 8 → ONLY match to sharply angular celebrities with defined jaws and prominent cheekbones.'
+        : '- Angularity 5–7 → moderate definition; avoid the extremes on both ends.'
+    const maleDimRule = dimorphism < 5
+      ? '- Dimorphism < 5 → androgynous/soft → Timothée Chalamet / Harry Styles / K-pop tier. NEVER return Hemsworth or Cavill.'
+      : dimorphism >= 8
+        ? '- Dimorphism ≥ 8 → highly masculine → Henry Cavill / Chris Hemsworth / Michael B. Jordan tier.'
+        : '- Dimorphism 5–7 → moderate masculinity → mid-tier masculine celebrities.'
+    const femaleDimRule = dimorphism < 5
+      ? '- Femininity < 5 → stronger/masculine female features → avoid hyper-feminine matches.'
+      : dimorphism >= 8
+        ? '- Femininity ≥ 8 → highly feminine → match only to celebrities with delicate, feminine bone structure.'
+        : '- Femininity 5–7 → balanced; avoid extremes.'
+    const scoreRule = final < 5
+      ? '- Overall score < 5 → match to lesser-known or B-tier celebrities; do NOT match to elite A-listers.'
+      : final >= 8
+        ? '- Overall score ≥ 8 → match only to top-tier celebrities known for strong aesthetics.'
+        : '- Overall score 5–7 → mid-tier celebrity matches; avoid both extreme ends.'
+
+    scoreBlock = `
+══ THIS PERSON'S SCORE PROFILE — use to guide every match ══
+Overall Score: ${final}/10  (Tier: ${tier})
+• Harmony    (facial balance):    ${harmony}/10    — ${harmonyDesc}
+• Angularity (bone structure):    ${angularity}/10 — ${angularDesc}
+• Features   (individual quality): ${features}/10  — ${featuresDesc}
+• ${dimLabel} (sex characteristics): ${dimorphism}/10 — ${dimorphDesc}
+• Face type: ${fs} | Hair: ${ht}
+
+SCORE-BASED MATCHING RULES — NON-NEGOTIABLE:
+${maleAngularRule}
+${isFemale ? femaleDimRule : maleDimRule}
+- Harmony ≥ 8 → match to celebrities known for symmetrical, well-proportioned faces.
+${scoreRule}
+
+`
+  }
 
   // ── Helper: detect if any returned name is generic or unrecognisable ────────
   function isGenericOrUnknown(parsed) {
@@ -384,7 +437,7 @@ ${isFemale ? `FEMALE POOLS — use ONLY these female celebrities. Match skin ton
   SOUTH ASIAN: Hrithik Roshan, Ranveer Singh, Shahid Kapoor, Tiger Shroff, Vidyut Jammwal,
     Dev Patel, Riz Ahmed`}
 
-══ STEP 1: MEASURE THESE TRAITS FIRST ══
+${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST ══
 1. SKIN TONE: pale / light / medium / tan / brown / dark-brown / deep-dark
 2. FACE SHAPE: oval / round / square / oblong / diamond / heart / triangle
 3. JAW: sharp-angular / moderate / soft-rounded / wide-square / recessed
@@ -434,7 +487,7 @@ Return ONLY this JSON — no markdown, nothing else:
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
-          { type: 'text',  text: `Analyze this person's facial features — bone structure, eye shape, jawline, skin tone, and overall aesthetic. Match them to the most visually similar real celebrity, model, athlete, or public figure. Do not default to the most famous person — find the most accurate facial match. If they resemble a model more than an actor, say the model. Return ONLY the JSON.` },
+          { type: 'text',  text: `[Seed: ${Math.random().toString(36).slice(2, 10)}] Analyze this person's face using the score profile above. The scores reveal their EXACT bone structure, facial balance, and sex characteristics — use them to narrow your pool to celebrities with the SAME structural profile. Do NOT default to the most famous person; find the most accurate structural match. If they resemble a model or athlete more than an actor, return the model/athlete. Return ONLY the JSON.` },
         ],
       }],
     })
@@ -614,8 +667,10 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       console.log('[aiScore] Starting face → celebrity (staggered 1000ms)...')
       console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
       faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
+      // Compute scores immediately after face scoring so celeb matching can use them
+      const computedScores = calculateFinalScore(faceResult, gender)
       await stagger()
-      celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender), 'celebrity').catch(err => {
+      celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, faceResult, computedScores), 'celebrity').catch(err => {
         console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
         return null
       })
@@ -631,8 +686,8 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
           .join(' | ')
       : 'unavailable')
 
-    // Final score: pure code — no AI involvement
-    const { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = calculateFinalScore(faceResult, gender)
+    // Final score: pure code — no AI involvement (computedScores already calculated above)
+    const { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
     console.log('[aiScore] Final:', final, tier)
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
 
