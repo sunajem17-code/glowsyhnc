@@ -6,6 +6,64 @@ if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_')) {
 } else {
   console.log('✅ Stripe key loaded: sk_***')
 }
+
+// ── Built-in email scheduler (replaces Make.com) ──────────────────────────────
+try {
+  const cron = require('node-cron')
+  const { sendUpgradeNudge, sendWeeklyRecap } = require('../ascendus-mailer')
+  const { createClient } = require('@supabase/supabase-js')
+
+  const schedSupabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
+  )
+
+  async function runDailyNudge() {
+    console.log('⏰ Running daily nudge job...')
+    try {
+      const { data: users, error } = await schedSupabase.from('free_users_day3').select('user_id')
+      if (error) { console.error('Nudge job fetch error:', error.message); return }
+      if (!users?.length) { console.log('Nudge job: no eligible users'); return }
+      let sent = 0, skipped = 0, failed = 0
+      for (const { user_id } of users) {
+        try {
+          const r = await sendUpgradeNudge(user_id)
+          r.success ? sent++ : skipped++
+        } catch (e) { console.error('Nudge error for', user_id, e.message); failed++ }
+        await new Promise(r => setTimeout(r, 300))
+      }
+      console.log(`✅ Daily nudge done: ${sent} sent, ${skipped} skipped, ${failed} failed`)
+    } catch (e) { console.error('Nudge job error:', e.message) }
+  }
+
+  async function runWeeklyRecaps() {
+    console.log('⏰ Running weekly recap job...')
+    try {
+      const { data: users, error } = await schedSupabase
+        .from('profiles').select('id').eq('plan', 'pro')
+      if (error) { console.error('Weekly recap fetch error:', error.message); return }
+      if (!users?.length) { console.log('Weekly recap: no pro users'); return }
+      let sent = 0, skipped = 0, failed = 0
+      for (const { id } of users) {
+        try {
+          const r = await sendWeeklyRecap(id)
+          r.success ? sent++ : skipped++
+        } catch (e) { failed++ }
+        await new Promise(r => setTimeout(r, 300))
+      }
+      console.log(`✅ Weekly recap done: ${sent} sent, ${skipped} skipped, ${failed} failed`)
+    } catch (e) { console.error('Weekly recap job error:', e.message) }
+  }
+
+  // Daily nudge at 9:00 AM UTC
+  cron.schedule('0 9 * * *', runDailyNudge, { timezone: 'UTC' })
+  // Weekly recap every Monday at 9:00 AM UTC
+  cron.schedule('0 9 * * 1', runWeeklyRecaps, { timezone: 'UTC' })
+
+  console.log('✅ Email scheduler started (daily nudge 9AM UTC, weekly recap Mon 9AM UTC)')
+} catch (e) {
+  console.warn('⚠️  Email scheduler not started:', e.message)
+}
 const express = require('express')
 const cors    = require('cors')
 const helmet  = require('helmet')
