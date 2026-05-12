@@ -81,6 +81,39 @@ router.post('/track-click', async (req, res) => {
   }
 })
 
+// ── POST /webhooks/run-daily-nudge — all-in-one: fetch users + send nudges ────
+// Make.com calls this with just the webhook secret — no Supabase key needed
+router.post('/run-daily-nudge', requireSecret, async (req, res) => {
+  try {
+    const { data: users, error } = await supabase
+      .from('free_users_day3')
+      .select('user_id')
+
+    if (error) return res.status(500).json({ error: error.message })
+    if (!users || users.length === 0) return res.json({ sent: 0, message: 'No eligible users' })
+
+    const results = []
+    for (const { user_id } of users) {
+      try {
+        const r = await sendUpgradeNudge(user_id)
+        results.push({ user_id, ...r })
+      } catch (err) {
+        results.push({ user_id, error: err.message })
+      }
+      await new Promise(r => setTimeout(r, 300))
+    }
+
+    const sent    = results.filter(r => r.success).length
+    const skipped = results.filter(r => r.skipped).length
+    const failed  = results.filter(r => r.error).length
+    console.log(`📧 Daily nudge run: ${sent} sent, ${skipped} skipped, ${failed} failed`)
+    return res.json({ sent, skipped, failed, total: users.length, results })
+  } catch (err) {
+    console.error('run-daily-nudge error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 // ── POST /webhooks/resend-events — Resend webhook ─────────────────────────────
 router.post('/resend-events', requireSecret, async (req, res) => {
   // Resend sends events like email.opened, email.clicked
