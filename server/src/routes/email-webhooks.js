@@ -9,10 +9,10 @@ const router  = express.Router()
 const { sendUpgradeNudge, sendWeeklyRecap, trackAffiliateClick } = require('../../ascendus-mailer')
 const { createClient } = require('@supabase/supabase-js')
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
+const supabase = supabaseKey
+  ? createClient(process.env.SUPABASE_URL, supabaseKey)
+  : null
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function requireSecret(req, res, next) {
