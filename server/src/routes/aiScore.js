@@ -658,7 +658,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
 
     // Acquire concurrency slot only now — cache hits above never need it
     await acquireSlot()
-    let faceResult, celebResult
+    let faceResult, celebResult, computedScores
 
     try {
       // 1000 ms stagger between API calls
@@ -668,7 +668,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
       faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
       // Compute scores immediately after face scoring so celeb matching can use them
-      const computedScores = calculateFinalScore(faceResult, gender)
+      computedScores = calculateFinalScore(faceResult, gender)
       await stagger()
       celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, faceResult, computedScores), 'celebrity').catch(err => {
         console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
