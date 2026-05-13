@@ -18,7 +18,7 @@ const db  = require('../db')
 const { getSupabase, getUserById } = require('../supabase')
 const { createLimiter } = require('./ratelimit')
 
-const JWT_SECRET = process.env.JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET || 'glowsync-dev-secret'
 
 // ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
 const checkClaude = {
