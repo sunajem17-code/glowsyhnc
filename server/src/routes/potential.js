@@ -139,4 +139,52 @@ Rules:
   }
 })
 
+// ── POST /api/potential/glow-up — OpenAI face enhancement ────────────────────
+router.post('/glow-up', verifyToken, requirePro, async (req, res) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return res.status(500).json({ error: 'OpenAI not configured' })
+
+    const { faceImage, improvements = [], gender = 'male' } = req.body
+    if (!faceImage) return res.status(400).json({ error: 'faceImage required' })
+
+    const OpenAI = require('openai')
+    const { toFile } = require('openai')
+    const client = new OpenAI({ apiKey })
+
+    // Strip data URL prefix and convert to buffer
+    const base64 = faceImage.replace(/^data:image\/\w+;base64,/, '')
+    const buf    = Buffer.from(base64, 'base64')
+    const file   = await toFile(buf, 'face.png', { type: 'image/png' })
+
+    // Build enhancement prompt from their specific improvements
+    const improvementStr = improvements.length
+      ? improvements.slice(0, 2).join('; ')
+      : 'clearer skin and sharper jawline'
+
+    const prompt = gender === 'female'
+      ? `Enhance this woman's appearance with flawless clear skin, defined cheekbones, bright eyes, perfectly groomed brows and hair. ${improvementStr}. Keep her exact identity, facial structure and features. Photorealistic portrait, soft natural lighting.`
+      : `Enhance this man's appearance with clear skin, sharp defined jawline, bright eyes, well-groomed hair and brows. ${improvementStr}. Keep his exact identity, facial structure and features. Photorealistic portrait, natural lighting.`
+
+    console.log('[GlowUp] Calling OpenAI image edit...')
+    const response = await client.images.edit({
+      model:  'gpt-image-1',
+      image:  file,
+      prompt,
+      size:   '1024x1024',
+      n:      1,
+    })
+
+    // gpt-image-1 returns base64 in response.data[0].b64_json
+    const b64 = response.data[0]?.b64_json
+    if (!b64) return res.status(500).json({ error: 'No image returned from OpenAI' })
+
+    console.log('[GlowUp] Image generated successfully')
+    return res.json({ image: `data:image/png;base64,${b64}` })
+  } catch (err) {
+    console.error('[GlowUp] Error:', err.message, err.status)
+    return res.status(500).json({ error: 'Image enhancement failed — please try again' })
+  }
+})
+
 module.exports = router

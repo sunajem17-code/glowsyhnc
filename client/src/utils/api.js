@@ -123,6 +123,7 @@ export const api = {
   },
   potential: {
     analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),
+    glowUp:  (data) => request('/potential/glow-up',  { method: 'POST', body: JSON.stringify(data) }),
   },
   supabase: {
     // Persist a completed scan + tasks to Supabase. Fire-and-forget safe.

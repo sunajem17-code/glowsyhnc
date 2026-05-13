@@ -242,12 +242,14 @@ async function drawPotentialCard({ canvas, photoUrl, glowScore, tier, result, ge
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose }) {
-  const [phase,   setPhase]   = useState('loading') // loading | done | error
-  const [result,  setResult]  = useState(null)
-  const [errMsg,  setErrMsg]  = useState('')
-  const [preview, setPreview] = useState(null)
-  const [sharing, setSharing] = useState(false)
-  const [genCard, setGenCard] = useState(false)
+  const [phase,      setPhase]      = useState('loading') // loading | done | error
+  const [result,     setResult]     = useState(null)
+  const [errMsg,     setErrMsg]     = useState('')
+  const [preview,    setPreview]    = useState(null)
+  const [sharing,    setSharing]    = useState(false)
+  const [genCard,    setGenCard]    = useState(false)
+  const [glowImage,  setGlowImage]  = useState(null)  // AI-enhanced face
+  const [glowLoading,setGlowLoading]= useState(false)
   const canvasRef = useRef(null)
 
   const glowScore = scan?.glowScore != null
@@ -260,8 +262,6 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
     let cancelled = false
     ;(async () => {
       try {
-        console.log('POTENTIAL: calling api.potential.analyze')
-        console.log('POTENTIAL: BASE URL will be:', import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
         const data = await api.potential.analyze({
           pillars,
           faceScore:     scan?.aiScore?.faceScore,
@@ -270,10 +270,23 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
           glowScore,
           currentTier:   scan?.tier ?? scan?.aiScore?.tier ?? null,
         })
-        if (!cancelled) { setResult(data); setPhase('done') }
+        if (!cancelled) {
+          setResult(data)
+          setPhase('done')
+          // Kick off glow-up image generation after analysis loads
+          if (facePhotoUrl) {
+            setGlowLoading(true)
+            api.potential.glowUp({
+              faceImage:    facePhotoUrl,
+              improvements: data.improvements,
+              gender:       gender ?? scan?.gender ?? 'male',
+            }).then(r => {
+              if (!cancelled && r?.image) setGlowImage(r.image)
+            }).catch(() => {}).finally(() => { if (!cancelled) setGlowLoading(false) })
+          }
+        }
       } catch (err) {
-        console.error('POTENTIAL ERROR:', err)
-        console.error('POTENTIAL ERROR message:', err.message)
+        console.error('POTENTIAL ERROR:', err.message)
         if (!cancelled) {
           setErrMsg(err.message || 'Analysis failed — please try again')
           setPhase('error')
@@ -444,10 +457,18 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
 
                 {/* Right — Potential */}
                 <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1', background: '#111' }}>
-                  {facePhotoUrl
-                    ? <img src={facePhotoUrl} alt="Potential" className="w-full h-full object-cover"
-                        style={{ filter: 'brightness(1.12) contrast(1.08) saturate(1.15)' }} />
-                    : <div className="w-full h-full bg-[#1A1A1A]" />
+                  {glowLoading && !glowImage && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-10" style={{ background: '#111' }}>
+                      <Loader2 size={28} className="animate-spin mb-2" style={{ color: GREEN }} />
+                      <p className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.4)' }}>Generating glow-up...</p>
+                    </div>
+                  )}
+                  {glowImage
+                    ? <img src={glowImage} alt="Potential" className="w-full h-full object-cover" />
+                    : facePhotoUrl && !glowLoading
+                      ? <img src={facePhotoUrl} alt="Potential" className="w-full h-full object-cover"
+                          style={{ filter: 'brightness(1.12) contrast(1.08) saturate(1.15)' }} />
+                      : !glowLoading && <div className="w-full h-full bg-[#1A1A1A]" />
                   }
                   {/* Green tint overlay */}
                   <div className="absolute inset-0" style={{ background: 'rgba(52,199,89,0.10)' }} />
