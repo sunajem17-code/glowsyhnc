@@ -30,7 +30,7 @@ function lowestPillars(pillars, n = 2, gender = 'male') {
 
 // POST /api/potential/analyze
 router.post('/analyze', verifyToken, requirePro, claudeLimit, async (req, res) => {
-  const { pillars, faceScore, groomingScore, gender = 'male', glowScore } = req.body
+  const { pillars, faceScore, groomingScore, gender = 'male', glowScore, currentTier } = req.body
 
   // ── Build score context ────────────────────────────────────────────────────
   const lines = []
@@ -51,13 +51,23 @@ router.post('/analyze', verifyToken, requirePro, claudeLimit, async (req, res) =
     : 'overall balance'
 
   const isFemale = gender === 'female'
-  const tierOptions = isFemale
-    ? 'Mid Tier Becky, High Tier Becky, Stacy, Eve, True Eve'
-    : 'High Tier Normie, Chadlite, Chad, Gigachad'
+
+  // Only include tiers strictly ABOVE the current tier so potential never goes down
+  const MALE_TIERS   = ['Sub 3', 'Low Tier Normie', 'Mid Tier Normie', 'High Tier Normie', 'Chadlite', 'Chad', 'Adam Lite', 'True Adam']
+  const FEMALE_TIERS = ['Sub 3', 'Low Tier Becky', 'Mid Tier Becky', 'High Tier Becky', 'Stacy', 'Eve', 'Eve Lite', 'True Eve']
+  const allTiers = isFemale ? FEMALE_TIERS : MALE_TIERS
+  const currentIdx = currentTier ? allTiers.findIndex(t => t.toLowerCase() === currentTier.toLowerCase()) : -1
+  // Potential must be at least one tier above current; if already at top, keep same tier
+  const minIdx = Math.max(currentIdx, 0)
+  const aboveTiers = allTiers.slice(minIdx + 1)
+  const tierOptions = aboveTiers.length
+    ? aboveTiers.join(', ')
+    : allTiers[allTiers.length - 1] // already at top tier
 
   const prompt = `You are an expert aesthetic consultant. A ${isFemale ? 'female' : 'male'} user has these facial analysis scores:
 
 ${lines.join('\n')}
+Current tier: ${currentTier || 'unknown'}
 
 Lowest scoring areas: ${lowestStr}
 
@@ -69,14 +79,14 @@ Return a JSON object with exactly these 4 fields — no other text, no markdown:
     "Under 8 words — specific actionable improvement for area 2",
     "Under 8 words — specific actionable improvement for area 3"
   ],
-  "potential_tier": "One tier name from: ${tierOptions}",
+  "potential_tier": "One tier name from this list ONLY: ${tierOptions}",
   "timeline": "Realistic timeframe e.g. '8–12 weeks' or '3–6 months'",
   "headline": "Punchy sentence under 12 words about their potential"
 }
 
 Rules:
 - Each improvement must be specific (e.g. "Get to 13% body fat to reveal jawline" not "lose weight")
-- potential_tier must be a realistic but motivating upgrade from their current score
+- potential_tier MUST be chosen from the provided list — never use a tier below or equal to current tier
 - headline must feel personal and achievable, not hype
 - Return ONLY valid JSON — no code fences, no explanation`
 

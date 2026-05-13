@@ -268,6 +268,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
           groomingScore: scan?.aiScore?.groomingScore,
           gender:        gender ?? scan?.gender ?? 'male',
           glowScore,
+          currentTier:   scan?.tier ?? scan?.aiScore?.tier ?? null,
         })
         if (!cancelled) { setResult(data); setPhase('done') }
       } catch (err) {
@@ -444,7 +445,8 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
                 {/* Right — Potential */}
                 <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1', background: '#111' }}>
                   {facePhotoUrl
-                    ? <img src={facePhotoUrl} alt="Potential" className="w-full h-full object-cover" />
+                    ? <img src={facePhotoUrl} alt="Potential" className="w-full h-full object-cover"
+                        style={{ filter: 'brightness(1.12) contrast(1.08) saturate(1.15)' }} />
                     : <div className="w-full h-full bg-[#1A1A1A]" />
                   }
                   {/* Green tint overlay */}
