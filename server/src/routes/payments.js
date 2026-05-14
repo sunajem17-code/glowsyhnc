@@ -182,7 +182,7 @@ async function handleWebhook(req, res) {
     const subscriptionId = session.subscription || null
     const customerEmail  = session.customer_details?.email || session.customer_email || '(none)'
     console.log('[Webhook] checkout.session.completed | session.id:', session.id)
-    console.log('[Webhook]   customer:', session.customer, '| email:', customerEmail)
+    console.log('[Webhook]   customer:', session.customer, '| email:', customerEmail ? customerEmail.replace(/(.{2}).+(@.+)/, '$1***$2') : '(none)')
     console.log('[Webhook]   subscriptionId:', subscriptionId)
     console.log('[Webhook]   session.metadata:', JSON.stringify(session.metadata))
 

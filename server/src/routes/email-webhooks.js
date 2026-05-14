@@ -6,7 +6,11 @@
 
 const express = require('express')
 const router  = express.Router()
+const { createLimiter } = require('../middleware/ratelimit')
 const { sendUpgradeNudge, sendWeeklyRecap, trackAffiliateClick } = require('../../ascendus-mailer')
+
+// 20 clicks per IP per hour — prevents affiliate click spam
+const clickLimiter = createLimiter('track-click', 20, '1 h', 60 * 60 * 1000)
 const { createClient } = require('@supabase/supabase-js')
 
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
@@ -68,10 +72,12 @@ router.post('/weekly-recap', requireSecret, async (req, res) => {
   }
 })
 
-// ── POST /webhooks/track-click — no auth needed ───────────────────────────────
+// ── POST /webhooks/track-click — rate-limited (20/hr per IP) ─────────────────
 router.post('/track-click', async (req, res) => {
   try {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
+    const allowed = await clickLimiter(ip)
+    if (!allowed) return res.status(429).json({ error: 'too_many_requests' })
     const { ref, source, campaign } = req.body
     const result = await trackAffiliateClick({ ref, source, campaign, ip })
     return res.json(result)

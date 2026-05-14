@@ -299,8 +299,8 @@ router.post('/upload-image', auth, async (req, res) => {
 })
 
 // ── GET /supabase/status ───────────────────────────────────────────────────────
-// Health check: is Supabase configured and reachable?
-router.get('/status', async (req, res) => {
+// Health check: is Supabase configured and reachable? Auth required — never expose config info publicly.
+router.get('/status', auth, async (req, res) => {
   if (!isConfigured()) {
     return res.json({ configured: false, message: 'Add SUPABASE_URL and SUPABASE_SERVICE_KEY to server/.env' })
   }
