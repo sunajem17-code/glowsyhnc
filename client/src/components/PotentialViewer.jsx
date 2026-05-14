@@ -280,6 +280,13 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
               faceImage:    facePhotoUrl,
               improvements: data.improvements,
               gender:       gender ?? scan?.gender ?? 'male',
+              scanData: {
+                overallScore:  scan?.glowScore ?? scan?.umaxScore,
+                groomingScore: scan?.aiScore?.groomingScore,
+                faceSubScores: scan?.aiScore?.faceSubScores,
+                keyWeaknesses: scan?.aiScore?.keyWeaknesses,
+                pillars:       scan?.pillars ?? scan?.aiScore?.pillars,
+              },
             }).then(r => {
               if (!cancelled && r?.image) setGlowImage(r.image)
             }).catch(() => {}).finally(() => { if (!cancelled) setGlowLoading(false) })

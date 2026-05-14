@@ -139,48 +139,98 @@ Rules:
   }
 })
 
-// ── POST /api/potential/glow-up — OpenAI face enhancement ────────────────────
+// ── POST /api/potential/glow-up — Claude writes the prompt, OpenAI renders it ─
 router.post('/glow-up', verifyToken, requirePro, async (req, res) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return res.status(500).json({ error: 'OpenAI not configured' })
+    const openaiKey    = process.env.OPENAI_API_KEY
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    if (!openaiKey)    return res.status(500).json({ error: 'OpenAI not configured' })
+    if (!anthropicKey) return res.status(500).json({ error: 'Anthropic not configured' })
 
-    const { faceImage, improvements = [], gender = 'male' } = req.body
+    const {
+      faceImage,
+      improvements  = [],
+      gender        = 'male',
+      scanData      = {},   // { overallScore, faceSubScores, keyWeaknesses, pillars, groomingScore }
+    } = req.body
     if (!faceImage) return res.status(400).json({ error: 'faceImage required' })
 
-    const OpenAI = require('openai')
-    const { toFile } = require('openai')
-    const client = new OpenAI({ apiKey })
+    // ── Step 1: Claude analyzes the face + scan data → writes a precise OpenAI prompt ──
+    const anthropic  = getClient()
+    const isFemale   = gender === 'female'
 
-    // Strip data URL prefix and convert to buffer
+    const weaknesses = scanData.keyWeaknesses?.join(', ') || improvements.join(', ') || 'general appearance'
+    const subScores  = scanData.faceSubScores  ?? {}
+    const pillars    = scanData.pillars         ?? {}
+
+    const scoreLines = []
+    if (scanData.overallScore  != null) scoreLines.push(`Overall: ${scanData.overallScore}/10`)
+    if (scanData.groomingScore != null) scoreLines.push(`Grooming: ${scanData.groomingScore}/10`)
+    if (subScores.skinClarity  != null) scoreLines.push(`Skin clarity: ${subScores.skinClarity}/10`)
+    if (subScores.jawlineDefinition != null) scoreLines.push(`Jawline definition: ${subScores.jawlineDefinition}/10`)
+    if (subScores.eyeArea      != null) scoreLines.push(`Eye area: ${subScores.eyeArea}/10`)
+    if (subScores.symmetry     != null) scoreLines.push(`Symmetry: ${subScores.symmetry}/10`)
+    if (pillars.harmony        != null) scoreLines.push(`Harmony: ${pillars.harmony}/10`)
+    if (pillars.angularity     != null) scoreLines.push(`Angularity: ${pillars.angularity}/10`)
+
+    const claudePrompt = `You are an image enhancement director. Look at this ${isFemale ? "woman's" : "man's"} face photo and their appearance scan scores:
+
+${scoreLines.join('\n')}
+Key weaknesses to fix: ${weaknesses}
+Specific improvements needed: ${improvements.join('; ')}
+
+Your job: write a single, ultra-specific image editing prompt (max 120 words) for OpenAI's image model that describes EXACTLY what this person would look like at their full potential.
+
+Rules:
+- Reference specific visible features you can see in their photo (e.g. "clear the acne on the left cheek", "sharpen the jawline which currently lacks definition", "brighten the under-eye area")
+- Address EVERY low-scoring area with a concrete visual fix
+- Keep their exact face shape, bone structure, eye color, and identity — only enhance don't transform
+- Include: skin quality fix, grooming improvements, lighting enhancement
+- Photorealistic portrait, same angle as original photo
+- Do NOT mention scores or numbers — only visual descriptions
+- Output ONLY the prompt text, nothing else`
+
+    console.log('[GlowUp] Step 1: Claude writing enhancement prompt...')
+    const claudeMsg = await anthropic.messages.create({
+      model:      'claude-haiku-4-5',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: faceImage.replace(/^data:image\/\w+;base64,/, '') } },
+          { type: 'text',  text: claudePrompt },
+        ],
+      }],
+    })
+
+    const enhancementPrompt = claudeMsg.content[0]?.text?.trim() ?? ''
+    console.log('[GlowUp] Claude prompt:', enhancementPrompt)
+
+    // ── Step 2: OpenAI renders the enhanced face ───────────────────────────────
+    const OpenAI     = require('openai')
+    const { toFile } = require('openai')
+    const openai     = new OpenAI({ apiKey: openaiKey })
+
     const base64 = faceImage.replace(/^data:image\/\w+;base64,/, '')
     const buf    = Buffer.from(base64, 'base64')
     const file   = await toFile(buf, 'face.png', { type: 'image/png' })
 
-    // Build enhancement prompt from their specific improvements
-    const improvementStr = improvements.length
-      ? improvements.slice(0, 2).join('; ')
-      : 'clearer skin and sharper jawline'
+    const finalPrompt = `${enhancementPrompt} Maintain exact identity. Photorealistic, same angle, natural lighting.`
 
-    const prompt = gender === 'female'
-      ? `Enhance this woman's appearance with flawless clear skin, defined cheekbones, bright eyes, perfectly groomed brows and hair. ${improvementStr}. Keep her exact identity, facial structure and features. Photorealistic portrait, soft natural lighting.`
-      : `Enhance this man's appearance with clear skin, sharp defined jawline, bright eyes, well-groomed hair and brows. ${improvementStr}. Keep his exact identity, facial structure and features. Photorealistic portrait, natural lighting.`
-
-    console.log('[GlowUp] Calling OpenAI image edit...')
-    const response = await client.images.edit({
+    console.log('[GlowUp] Step 2: OpenAI rendering enhanced image...')
+    const response = await openai.images.edit({
       model:  'gpt-image-1',
       image:  file,
-      prompt,
+      prompt: finalPrompt,
       size:   '1024x1024',
       n:      1,
     })
 
-    // gpt-image-1 returns base64 in response.data[0].b64_json
     const b64 = response.data[0]?.b64_json
     if (!b64) return res.status(500).json({ error: 'No image returned from OpenAI' })
 
-    console.log('[GlowUp] Image generated successfully')
-    return res.json({ image: `data:image/png;base64,${b64}` })
+    console.log('[GlowUp] Done — image generated')
+    return res.json({ image: `data:image/png;base64,${b64}`, prompt: enhancementPrompt })
   } catch (err) {
     console.error('[GlowUp] Error:', err.message, err.status)
     return res.status(500).json({ error: 'Image enhancement failed — please try again' })
