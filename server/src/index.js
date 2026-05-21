@@ -94,6 +94,7 @@ app.use(cors({
     if (origin.startsWith('http://localhost:')) return callback(null, true)
     if (origin.endsWith('.vercel.app')) return callback(null, true)
     if (origin === 'https://ascendus.store' || origin === 'https://www.ascendus.store') return callback(null, true)
+    if (origin === 'capacitor://localhost' || origin === 'ionic://localhost') return callback(null, true)
     if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true)
     callback(new Error(`CORS blocked: ${origin}`))
   },
