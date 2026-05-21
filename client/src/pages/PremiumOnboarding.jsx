@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -675,10 +675,10 @@ function StepGender({ data, onChange, onNext, onBack }) {
 
 // ── STEP 5: Goal ──────────────────────────────────────────────────────────────
 const GOAL_OPTIONS = [
-  { key: 'dating',      emoji: '❤️', label: 'Dating & Relationships',  desc: 'Attract more attention and build confidence with partners' },
-  { key: 'career',      emoji: '💼', label: 'Career & Networking',     desc: 'Command presence and make strong first impressions' },
-  { key: 'confidence',  emoji: '🛡️', label: 'Self-Confidence',         desc: 'Feel good in your own skin and carry yourself better' },
-  { key: 'appearance',  emoji: '✨', label: 'Overall Appearance',      desc: 'Optimize every aspect of how you look and present' },
+  { key: 'dating',      Icon: Heart,    label: 'Dating & Relationships',  desc: 'Attract more attention and build confidence with partners' },
+  { key: 'career',      Icon: Briefcase, label: 'Career & Networking',     desc: 'Command presence and make strong first impressions' },
+  { key: 'confidence',  Icon: Shield,   label: 'Self-Confidence',         desc: 'Feel good in your own skin and carry yourself better' },
+  { key: 'appearance',  Icon: Sparkles, label: 'Overall Appearance',      desc: 'Optimize every aspect of how you look and present' },
 ]
 
 function StepGoal({ data, onChange, onNext, onBack }) {
@@ -695,7 +695,7 @@ function StepGoal({ data, onChange, onNext, onBack }) {
           </p>
         </div>
 
-        {GOAL_OPTIONS.map(({ key, emoji, label, desc }) => {
+        {GOAL_OPTIONS.map(({ key, Icon, label, desc }) => {
           const isSelected = data.goal === key
           return (
             <motion.button
@@ -708,7 +708,7 @@ function StepGoal({ data, onChange, onNext, onBack }) {
                 border: `1.5px solid ${isSelected ? G : BORDER}`,
               }}
             >
-              <span className="text-2xl flex-shrink-0">{emoji}</span>
+              <Icon size={22} style={{ color: isSelected ? G : 'rgba(255,255,255,0.5)' }} className="flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-heading font-bold text-[14px] leading-tight" style={{ color: isSelected ? G : TEXT }}>
                   {label}
@@ -744,12 +744,12 @@ function StepGoal({ data, onChange, onNext, onBack }) {
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
 const FOCUS_OPTIONS = [
-  { key: 'jawline',   emoji: '🦴', label: 'Jawline & Chin' },
-  { key: 'skin',      emoji: '✨', label: 'Skin Quality' },
-  { key: 'eyes',      emoji: '👁️', label: 'Eyes & Brows' },
-  { key: 'symmetry',  emoji: '⚖️', label: 'Overall Symmetry' },
-  { key: 'body',      emoji: '💪', label: 'Body & Physique' },
-  { key: 'hair',      emoji: '💇', label: 'Hair & Grooming' },
+  { key: 'jawline',   Icon: Bone,      label: 'Jawline & Chin' },
+  { key: 'skin',      Icon: Sparkles,  label: 'Skin Quality' },
+  { key: 'eyes',      Icon: ScanLine,  label: 'Eyes & Brows' },
+  { key: 'symmetry',  Icon: Scale,     label: 'Overall Symmetry' },
+  { key: 'body',      Icon: Dumbbell,  label: 'Body & Physique' },
+  { key: 'hair',      Icon: Scissors,  label: 'Hair & Grooming' },
 ]
 
 function StepImprovementFocus({ data, onChange, onNext, onBack }) {
@@ -786,7 +786,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {FOCUS_OPTIONS.map(({ key, emoji, label }) => {
+          {FOCUS_OPTIONS.map(({ key, Icon, label }) => {
             const isSelected = selected.includes(key)
             return (
               <motion.button
@@ -799,7 +799,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
                   border: `1.5px solid ${isSelected ? G : BORDER}`,
                 }}
               >
-                <span className="text-xl flex-shrink-0">{emoji}</span>
+                <Icon size={18} style={{ color: isSelected ? G : 'rgba(255,255,255,0.5)' }} className="flex-shrink-0" />
                 <p className="font-heading font-semibold text-[13px] flex-1 leading-tight" style={{ color: isSelected ? G : TEXT }}>
                   {label}
                 </p>
@@ -1157,7 +1157,7 @@ function calculatePhase(goal, heightCm, weightKg) {
 
 const PHASE_INFO = {
   CUT: {
-    emoji: '🔥',
+    PhaseIcon: Flame,
     label: 'CUT',
     color: '#EF4444',
     bg: 'rgba(239,68,68,0.08)',
@@ -1167,7 +1167,7 @@ const PHASE_INFO = {
     actions: ['500 cal/day deficit', '0.8–1g protein per lb', 'Cardio 3× per week', 'Strength training 4× per week'],
   },
   BULK: {
-    emoji: '💪',
+    PhaseIcon: Dumbbell,
     label: 'BULK',
     color: '#3B82F6',
     bg: 'rgba(59,130,246,0.08)',
@@ -1177,7 +1177,7 @@ const PHASE_INFO = {
     actions: ['250–300 cal/day surplus', '0.8–1g protein per lb', 'Compound lifts 4–5× per week', 'Focus on progressive overload'],
   },
   RECOMP: {
-    emoji: '⚡',
+    PhaseIcon: Zap,
     label: 'RECOMP',
     color: '#C6A85C',
     bg: 'rgba(198,168,92,0.08)',
@@ -1187,7 +1187,7 @@ const PHASE_INFO = {
     actions: ['Maintenance calories (±100)', '1g protein per lb bodyweight', 'Strength training 4× per week', 'Track weekly photos for progress'],
   },
   MAINTENANCE: {
-    emoji: '🎯',
+    PhaseIcon: Target,
     label: 'MAINTENANCE',
     color: '#34C759',
     bg: 'rgba(52,199,89,0.08)',
@@ -1212,7 +1212,7 @@ function StepPhaseResult({ data, onFinish }) {
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-6"
         >
-          <div className="text-5xl mb-4">{info.emoji}</div>
+          <div className="mb-4 flex justify-center"><info.PhaseIcon size={52} style={{ color: info.color }} /></div>
           <div
             className="inline-block px-6 py-2.5 rounded-full font-heading font-bold text-[13px] uppercase tracking-widest mb-5"
             style={{ background: info.bg, border: `1.5px solid ${info.border}`, color: info.color }}
