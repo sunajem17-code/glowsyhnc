@@ -499,8 +499,8 @@ function StepAgeGate({ data, onChange, onNext, onBack }) {
 
         <div className="grid grid-cols-2 gap-4">
           {[
-            { key: true,  label: '17 or older', emoji: '✅', color: '#34C759', bg: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.28)' },
-            { key: false, label: 'Under 17',    emoji: '🔒', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' },
+            { key: true,  label: '17 or older', emoji: '✓', color: '#34C759', bg: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.28)' },
+            { key: false, label: 'Under 17',    emoji: '✕', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' },
           ].map(({ key, label, emoji, color, bg, border }) => {
             const isSelected = data.ageConfirmed === key
             return (
