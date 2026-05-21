@@ -1,6 +1,9 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
-const { verifyToken, claudeLimit, requirePro } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
+const db = require('../db')
+
+const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
@@ -112,12 +115,26 @@ Face Score: ${faceScore}/10 | Presentation Score: ${presentationScore}/10`
 }
 
 // POST /api/coach/message
-// verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
-router.post('/message', verifyToken, requirePro, claudeLimit, async (req, res) => {
+router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) => {
   const { messages, scanContext } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages array required' })
+  }
+
+  // Free users: enforce 3-message lifetime limit (tracked server-side)
+  if (!req.isPro && !req.isDemo) {
+    const row = db.prepare('SELECT coach_messages_used FROM users WHERE id = ?').get(req.userId)
+    const used = row?.coach_messages_used ?? 0
+    if (used >= FREE_COACH_LIMIT) {
+      return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
+    }
+    db.prepare('UPDATE users SET coach_messages_used = coach_messages_used + 1 WHERE id = ?').run(req.userId)
+  }
+
+  // Demo users: block entirely
+  if (req.isDemo) {
+    return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   }
 
   // Limit conversation history to last 20 messages to control tokens
