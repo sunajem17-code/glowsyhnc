@@ -103,7 +103,7 @@ async function getSubscriptionTier(userId) {
     }
   }
   // Fall back to SQLite (local dev)
-  const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at FROM users WHERE id = ?').get(userId)
+  const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at, is_pro FROM users WHERE id = ?').get(userId)
   const trialActive =
     row?.subscription_tier === 'trial' &&
     row.pro_trial_expires_at &&
@@ -111,7 +111,7 @@ async function getSubscriptionTier(userId) {
   return {
     tier:        row?.subscription_tier || 'free',
     trialExpires: row?.pro_trial_expires_at || null,
-    isPro:       row?.subscription_tier === 'premium' || trialActive,
+    isPro:       row?.subscription_tier === 'premium' || trialActive || row?.is_pro === 1,
   }
 }
 
