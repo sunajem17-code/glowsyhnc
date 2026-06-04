@@ -4,6 +4,9 @@ const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
 const { getUserById, updateUserById, getSupabase } = require('../supabase')
 
+// NOTE: This endpoint is for web purchases only.
+// iOS uses Apple In-App Purchases via RevenueCat (@revenuecat/purchases-capacitor).
+// Do NOT call these endpoints from the iOS app — Apple will reject the app.
 const router = express.Router()
 
 if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY env var is required')
@@ -57,7 +60,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       mode: 'subscription',
       line_items: [{ price: PRICES[plan], quantity: 1 }],
       subscription_data: {
-        ...(noTrial ? {} : { trial_period_days: 7 }),
+        ...(noTrial ? {} : { trial_period_days: 3 }),
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },

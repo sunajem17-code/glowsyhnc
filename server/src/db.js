@@ -119,6 +119,7 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT",
   "ALTER TABLE users ADD COLUMN is_pro INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN coach_messages_used INTEGER DEFAULT 0",
+  "ALTER TABLE users ADD COLUMN apple_sub TEXT",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }

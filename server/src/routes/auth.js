@@ -132,4 +132,65 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 })
 
+// ── POST /api/auth/apple ──────────────────────────────────────────────────────
+router.post('/apple', authLimiter, async (req, res) => {
+  const { identityToken, name, email } = req.body
+  if (!identityToken) return res.status(400).json({ error: 'identityToken required' })
+
+  try {
+    // Decode Apple JWT payload (base64) — sub is the stable Apple user ID
+    const payload = JSON.parse(Buffer.from(identityToken.split('.')[1], 'base64').toString())
+    const appleSub = payload.sub
+    const appleEmail = email || payload.email || `${appleSub}@privaterelay.appleid.com`
+
+    const sb = getSupabase()
+
+    if (sb) {
+      // Check if user already exists by apple_sub or email
+      const { data: existing } = await sb
+        .from('users')
+        .select('*')
+        .or(`apple_sub.eq.${appleSub},email.eq.${appleEmail}`)
+        .maybeSingle()
+
+      if (existing) {
+        // Update apple_sub if missing
+        if (!existing.apple_sub) {
+          await sb.from('users').update({ apple_sub: appleSub }).eq('id', existing.id)
+        }
+        const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at }
+        return res.json({ user: safe, token: signToken(existing.id, existing.email) })
+      }
+
+      // Create new user
+      const id = uuid()
+      const userName = name || 'Ascendus User'
+      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      const newUser = await createUser({
+        id, email: appleEmail, name: userName,
+        password_hash: null, apple_sub: appleSub,
+        referral_code: ownCode, referral_count: 0,
+        subscription_tier: 'free', created_at: new Date().toISOString(),
+      })
+      const safe = { id: newUser.id, name: newUser.name, email: newUser.email, subscriptionTier: 'free', createdAt: newUser.created_at }
+      return res.json({ user: safe, token: signToken(newUser.id, newUser.email) })
+    }
+
+    // SQLite fallback
+    let user = db.prepare('SELECT * FROM users WHERE apple_sub = ? OR email = ?').get(appleSub, appleEmail)
+    if (!user) {
+      const id = uuid()
+      const userName = name || 'Ascendus User'
+      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)').run(id, userName, appleEmail, appleSub, '', ownCode, 'free', new Date().toISOString())
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
+    }
+    const safe = { id: user.id, name: user.name, email: user.email, subscriptionTier: user.subscription_tier || 'free', createdAt: user.created_at }
+    return res.json({ user: safe, token: signToken(user.id, user.email) })
+  } catch (err) {
+    console.error('[Auth] Apple sign in error:', err.message)
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
 module.exports = router
