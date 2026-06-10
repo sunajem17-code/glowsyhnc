@@ -5,6 +5,7 @@ const db = require('../db')
 const { signToken } = require('../middleware/auth')
 const { getSupabase, getUserByEmail, createUser } = require('../supabase')
 const { createLimiter } = require('../middleware/ratelimit')
+const { verifyAppleToken } = require('../utils/appleAuth')
 
 const router = express.Router()
 
@@ -137,16 +138,26 @@ router.post('/apple', authLimiter, async (req, res) => {
   const { identityToken, name, email } = req.body
   if (!identityToken) return res.status(400).json({ error: 'identityToken required' })
 
+  let payload
   try {
-    // Decode Apple JWT payload (base64) — sub is the stable Apple user ID
-    const payload = JSON.parse(Buffer.from(identityToken.split('.')[1], 'base64').toString())
+    // Verify Apple's RS256 signature + issuer + audience. NEVER trust an
+    // unverified decode — the claims would be attacker-controlled.
+    payload = await verifyAppleToken(identityToken)
+  } catch (err) {
+    console.warn('[Auth] Apple token verification failed:', err.message)
+    return res.status(401).json({ error: 'Invalid Apple identity token' })
+  }
+
+  try {
     const appleSub = payload.sub
-    const appleEmail = email || payload.email || `${appleSub}@privaterelay.appleid.com`
+    // Trust the email from the verified token over any client-supplied value.
+    const appleEmail = payload.email || email || `${appleSub}@privaterelay.appleid.com`
 
     const sb = getSupabase()
 
     if (sb) {
-      // Check if user already exists by apple_sub or email
+      // Look up by verified apple_sub first, then by verified email. Values come
+      // from the cryptographically verified token, so no filter-injection risk.
       const { data: existing } = await sb
         .from('users')
         .select('*')

@@ -1,6 +1,15 @@
 const jwt = require('jsonwebtoken')
 
-const JWT_SECRET = process.env.JWT_SECRET || 'glowsync-dev-secret'
+// JWT_SECRET signs every auth token. The old hardcoded fallback
+// ('glowsync-dev-secret') is committed to git — if it were ever used in
+// production, anyone could forge a token for any user. Refuse to run with it
+// outside local dev, and never allow a missing secret in production.
+const IS_PROD = process.env.NODE_ENV === 'production'
+const JWT_SECRET = process.env.JWT_SECRET || (IS_PROD ? null : 'glowsync-dev-secret')
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET env var is required in production — set it in Railway')
+}
 
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization
@@ -24,4 +33,4 @@ function signToken(userId, email) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' })
 }
 
-module.exports = { authMiddleware, signToken }
+module.exports = { authMiddleware, signToken, JWT_SECRET }

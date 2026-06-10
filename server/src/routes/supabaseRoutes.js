@@ -189,15 +189,30 @@ router.patch('/tasks/:id', auth, async (req, res) => {
     const sb = getSupabase()
     const { isCompleted } = req.body
 
-    const { error } = await sb
+    // Resolve the caller's Supabase user id so they can only touch their own
+    // tasks. Without this, any authenticated user could toggle anyone's task
+    // by guessing its UUID (IDOR).
+    const email = getUserEmail(req.userId)
+    if (!email) return res.status(404).json({ error: 'User not found' })
+    const { data: sbUser } = await sb
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+    if (!sbUser) return res.status(404).json({ error: 'User not found' })
+
+    const { data: updated, error } = await sb
       .from('plan_tasks')
       .update({
         is_completed: !!isCompleted,
         completed_at: isCompleted ? new Date().toISOString() : null,
       })
       .eq('id', req.params.id)
+      .eq('user_id', sbUser.id) // ownership scope
+      .select('id')
 
     if (error) throw error
+    if (!updated?.length) return res.status(404).json({ error: 'Task not found' })
     res.json({ ok: true })
   } catch (err) {
     console.error('[Supabase] Update task failed:', err.message)
