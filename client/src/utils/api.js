@@ -8,13 +8,23 @@ async function request(path, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   }
+
+  // AI scoring can take 20–40s — give it 130s. All other calls get 15s.
+  const isAiCall = path.startsWith('/ai/')
+  const timeoutMs = isAiCall ? 130_000 : 15_000
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   let res
   try {
-    res = await fetch(`${BASE}${path}`, { ...options, headers })
+    res = await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal })
   } catch (networkErr) {
-    // fetch() itself threw — server is unreachable
+    clearTimeout(timeoutId)
+    // fetch() itself threw — server is unreachable or timed out
+    if (networkErr.name === 'AbortError') throw new Error('Request timed out. Please check your connection.')
     throw new Error('Server unavailable')
   }
+  clearTimeout(timeoutId)
   if (!res.ok) {
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
@@ -56,6 +66,7 @@ export const api = {
   auth: {
     register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    appleSignIn: (data) => request('/auth/apple', { method: 'POST', body: JSON.stringify(data) }),
   },
   user: {
     profile: () => request('/user/profile'),
