@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X, Gift } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 
@@ -105,12 +105,12 @@ export default function PromoModal({ onClose, onSuccess }) {
               animate={{ opacity: 1, y: 0 }}
               className="text-center py-4"
             >
-              <p className="text-[32px] mb-3">🎉</p>
+              <Gift size={32} className="mb-3" style={{ color: '#C6A85C' }} />
               <p className="font-heading font-bold text-[15px] text-white mb-1">
-                3 months of Pro unlocked!
+                Lifetime Pro unlocked!
               </p>
               <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                All Pro features are now active
+                All Pro features are yours forever
               </p>
             </motion.div>
           ) : (

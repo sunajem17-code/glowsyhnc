@@ -1,5 +1,5 @@
 // ─── Promo code redemption ────────────────────────────────────────────────────
-// One valid code: SOHAIL → grants 3 months of Pro access.
+// SOHAIL → grants lifetime Pro access (no expiry).
 // Each user may redeem a promo code exactly once.
 
 const express = require('express')
@@ -10,12 +10,10 @@ const db = require('../db')
 const router = express.Router()
 
 const VALID_CODE = process.env.PROMO_CODE || 'SOHAIL'
-const PRO_MONTHS = 3
 
 router.post('/redeem', authMiddleware, async (req, res) => {
   const { code } = req.body
 
-  // ── Validate code ──────────────────────────────────────────────────────────
   if (!code || typeof code !== 'string') {
     return res.status(400).json({ error: 'Invalid promo code' })
   }
@@ -33,7 +31,6 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Promo code already redeemed' })
   }
 
-  // SQLite fallback check
   if (!sbUser) {
     try {
       const row = db.prepare('SELECT promo_redeemed FROM users WHERE id = ?').get(req.userId)
@@ -43,42 +40,36 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     } catch {}
   }
 
-  // ── Grant 3 months of Pro ──────────────────────────────────────────────────
-  const promoExpiresAt = new Date()
-  promoExpiresAt.setMonth(promoExpiresAt.getMonth() + PRO_MONTHS)
-  const expiresIso = promoExpiresAt.toISOString()
-
+  // ── Grant lifetime Pro — no expiry date ───────────────────────────────────
   const updates = {
     subscription_tier: 'premium',
     is_pro: true,
     promo_redeemed: true,
-    promo_expires_at: expiresIso,
+    promo_expires_at: null, // null = never expires
   }
 
-  // Supabase (primary)
   try {
     await updateUserById(req.userId, updates)
   } catch (err) {
     console.warn('[Promo] Supabase update failed:', err.message)
   }
 
-  // SQLite (fallback / belt-and-suspenders)
   try {
     db.prepare(`
       UPDATE users
-      SET subscription_tier = 'premium', promo_redeemed = 1, promo_expires_at = ?
+      SET subscription_tier = 'premium', is_pro = 1, promo_redeemed = 1, promo_expires_at = NULL
       WHERE id = ?
-    `).run(expiresIso, req.userId)
+    `).run(req.userId)
   } catch (err) {
     console.warn('[Promo] SQLite update failed (non-fatal):', err.message)
   }
 
-  console.log(`[Promo] SOHAIL redeemed by user ${req.userId} — Pro until ${expiresIso}`)
+  console.log(`[Promo] SOHAIL redeemed by user ${req.userId} — lifetime Pro granted`)
 
   return res.json({
     success: true,
-    message: '3 months of Pro access activated',
-    expiresAt: expiresIso,
+    message: 'Lifetime Pro access activated',
+    lifetime: true,
   })
 })
 

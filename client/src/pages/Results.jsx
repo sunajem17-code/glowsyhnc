@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
-import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock, ShoppingBag, ExternalLink, Sparkles } from 'lucide-react'
+import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Beef, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import logo from '../assets/ascendus-icon.png'
@@ -14,6 +14,7 @@ import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
 import PotentialViewer from '../components/PotentialViewer'
 import { scoreColor } from '../utils/analysis'
+import { isNative, purchasePro, restorePurchases } from '../utils/iap'
 
 const TIER_COLORS = {
   'Rising':         '#9CA3AF',
@@ -64,7 +65,7 @@ function ScoreReveal({ score, tier, onDone }) {
     if (phase === 'done') onDone()
   }, [phase, onDone])
 
-  const getScoreEmoji = (s) => s >= 8.5 ? '🔥' : s >= 7 ? '⚡' : s >= 5 ? '📈' : '💪'
+  const getScoreIcon = (s) => s >= 8.5 ? <Flame size={40} style={{ color: '#FF6B35' }} /> : s >= 7 ? <Zap size={40} style={{ color: '#F5A623' }} /> : s >= 5 ? <TrendingUp size={40} style={{ color: '#34C759' }} /> : <Dumbbell size={40} style={{ color: '#60A5FA' }} />
 
   return (
     <AnimatePresence>
@@ -114,7 +115,7 @@ function ScoreReveal({ score, tier, onDone }) {
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-6 text-center"
               >
-                <p className="text-[40px] mb-2">{getScoreEmoji(score ?? 0)}</p>
+                <div className="flex justify-center mb-2">{getScoreIcon(score ?? 0)}</div>
                 <div
                   className="inline-block px-6 py-2.5 rounded-full font-heading font-bold text-[15px] uppercase tracking-widest"
                   style={{
@@ -445,12 +446,12 @@ function getHairRec(hairType, faceShape) {
 }
 
 const HAIR_TYPE_OPTIONS = [
-  { value: 'straight', label: 'Straight',   emoji: '〰️' },
-  { value: 'wavy',     label: 'Wavy',        emoji: '〜' },
-  { value: 'curly',    label: 'Curly',       emoji: '🌀' },
-  { value: 'coily',    label: 'Coily/Afro',  emoji: '✨' },
-  { value: 'locs',     label: 'Locs',        emoji: '🔱' },
-  { value: 'bald',     label: 'Bald/Shaved', emoji: '⚡' },
+  { value: 'straight', label: 'Straight' },
+  { value: 'wavy',     label: 'Wavy' },
+  { value: 'curly',    label: 'Curly' },
+  { value: 'coily',    label: 'Coily/Afro' },
+  { value: 'locs',     label: 'Locs' },
+  { value: 'bald',     label: 'Bald/Shaved' },
 ]
 
 // ─── Score bar row ────────────────────────────────────────────────────────────
@@ -568,7 +569,7 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
     <div className="card mb-3">
       {/* Header / toggle */}
       <button className="w-full flex items-center gap-2 mb-1" onClick={handleOpen}>
-        <span className="text-base">🛍️</span>
+        <ShoppingBag size={16} />
         <h2 className="font-heading font-bold text-sm text-primary flex-1 text-left">Your Personalized Product Stack</h2>
         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(198,168,92,0.12)', color: '#C6A85C' }}>
           {isPremium ? 'AI PICKS' : 'AI PICKS'}
@@ -699,7 +700,7 @@ function FaceMetricBar({ label, score, descriptor, locked = false, onUpgrade }) 
           <div className="h-2 rounded-full overflow-hidden mb-1.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
             <div className="h-full rounded-full" style={{ width: '75%', background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
           </div>
-          <p className="text-[10px] text-secondary font-body">Placeholder descriptor for this metric</p>
+          <p className="text-[10px] text-secondary font-body">Upgrade to Pro to view this metric</p>
         </div>
         {/* lock overlay */}
         <div className="absolute inset-0 flex items-center justify-between px-2.5 rounded-lg"
@@ -746,12 +747,12 @@ function FaceMetricBar({ label, score, descriptor, locked = false, onUpgrade }) 
 
 // ─── Collapsible section ──────────────────────────────────────────────────────
 
-function Section({ title, emoji, children, defaultOpen = true, badge }) {
+function Section({ title, icon, children, defaultOpen = true, badge }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="card mb-3">
       <button className="w-full flex items-center gap-2 mb-1" onClick={() => setOpen(o => !o)}>
-        <span className="text-base">{emoji}</span>
+        <span className="flex-shrink-0">{icon}</span>
         <h2 className="font-heading font-bold text-sm text-primary flex-1 text-left">{title}</h2>
         {badge && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#C6A85C]/10 text-[#C6A85C]">{badge}</span>}
         {open ? <ChevronUp size={14} className="text-secondary" /> : <ChevronDown size={14} className="text-secondary" />}
@@ -833,6 +834,7 @@ function ProGate({ onUpgrade }) {
 
 function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const navigate = useNavigate()
+  const { setIsPremium } = useStore()
   const [plan, setPlan]       = useState('monthly')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -865,33 +867,43 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
     : `Your full breakdown and 12-week protocol are waiting.`
 
   // ── Direct checkout ───────────────────────────────────────────────────────
-  async function handleCheckout(noTrial = false) {
-    const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-    const token  = stored?.state?.token
-    if (!token || token === 'demo-token') {
-      navigate('/auth')
-      return
-    }
+  async function handleCheckout() {
     setLoading(true)
     setError('')
     try {
-      const { url } = await api.payments.createCheckout(plan, noTrial)
-      window.location.href = url
+      if (isNative()) {
+        // iOS: Apple In-App Purchase via RevenueCat
+        const result = await purchasePro(plan)
+        if (result?.success) {
+          setIsPremium(true)
+          navigate('/dashboard')
+        }
+      } else {
+        // Web: Stripe checkout
+        const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+        const token  = stored?.state?.token
+        if (!token || token === 'demo-token') { navigate('/auth'); return }
+        const { url } = await api.payments.createCheckout(plan, false)
+        window.location.href = url
+      }
     } catch (err) {
-      setError(err.message || 'Could not open checkout — please try again.')
+      const msg = (err?.message || '').toLowerCase()
+      if (!msg.includes('cancel')) {
+        setError('Unable to complete purchase. Please try again.')
+      }
       setLoading(false)
     }
   }
 
   const locked = [
     worstLabel && worstScore != null && worstScore < 6.5
-      ? { icon: '🎯', label: `Maximize Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
-      : { icon: '📈', label: 'Score Projection', sub: `Your potential: ${potential}/10 · roadmap included` },
-    { icon: '⭐', label: 'Celebrity Lookalikes', sub: '3 AI matches with % similarity' },
-    { icon: '📐', label: 'Full Face Metrics', sub: '6 detailed scores + AI descriptors' },
-    { icon: '✂️', label: 'Hairstyle Recommendations', sub: 'Face-shape matched styles + protocols' },
-    { icon: '🗺️', label: '12-Week Personalized Plan', sub: 'Built from your exact scan results' },
-    { icon: '🤖', label: 'AI Improvement Coach', sub: 'Unlimited questions about your results' },
+      ? { icon: <Target size={14} style={{ color: '#C6A85C' }} />, label: `Maximize Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
+      : { icon: <TrendingUp size={14} style={{ color: '#C6A85C' }} />, label: 'Score Projection', sub: `Your potential: ${potential}/10 · roadmap included` },
+    { icon: <Star size={14} style={{ color: '#C6A85C', fill: '#C6A85C' }} />, label: 'Celebrity Lookalikes', sub: '3 AI matches with % similarity' },
+    { icon: <Ruler size={14} style={{ color: '#C6A85C' }} />, label: 'Full Face Metrics', sub: '6 detailed scores + AI descriptors' },
+    { icon: <Scissors size={14} style={{ color: '#C6A85C' }} />, label: 'Hairstyle Recommendations', sub: 'Face-shape matched styles + protocols' },
+    { icon: <Map size={14} style={{ color: '#C6A85C' }} />, label: '12-Week Personalized Plan', sub: 'Built from your exact scan results' },
+    { icon: <Bot size={14} style={{ color: '#C6A85C' }} />, label: 'AI Improvement Coach', sub: 'Unlimited questions about your results' },
   ]
 
   return (
@@ -913,7 +925,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           <img src={logo} alt="Ascendus" style={{ height: 28, mixBlendMode: 'lighten' }} />
           <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full"
             style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.25)' }}>
-            <span style={{ color: '#C6A85C', fontSize: 10 }}>✦</span>
+            <Sparkles size={10} style={{ color: '#C6A85C' }} />
             <span className="text-[9px] font-heading font-bold uppercase tracking-widest" style={{ color: '#C6A85C' }}>Pro</span>
           </div>
         </div>
@@ -962,7 +974,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           {locked.map(({ icon, label, sub }) => (
             <div key={label} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="text-base flex-shrink-0">{icon}</span>
+              <span className="flex-shrink-0 flex items-center">{icon}</span>
               <div className="flex-1 min-w-0">
                 <p className="font-heading font-semibold text-[12px] text-white leading-snug">{label}</p>
                 <p className="font-body text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.33)' }}>{sub}</p>
@@ -1005,7 +1017,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         {/* Primary CTA — free trial */}
         <motion.button
           whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={() => handleCheckout(false)}
+          onClick={handleCheckout}
           disabled={loading}
           type="button"
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
@@ -1016,30 +1028,54 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
             letterSpacing: '0.01em',
           }}
         >
-          {loading ? 'Opening checkout…' : '✦ Start 7-Day Free Trial'}
+          {loading ? 'Opening checkout…' : 'Start 3-Day Free Trial'}
         </motion.button>
-        <p className="text-center text-[10px] font-body mb-3" style={{ color: 'rgba(255,255,255,0.22)' }}>
-          $0 today · then {plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$7.99/mo'} · cancel anytime
-        </p>
 
-        {/* Secondary CTA — pay now */}
-        <motion.button
-          whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={() => handleCheckout(true)}
-          disabled={loading}
-          type="button"
-          className="w-full py-3 rounded-xl font-heading font-bold text-[13px] mb-4 transition-all disabled:opacity-40"
-          style={{
-            background: 'rgba(198,168,92,0.08)',
-            border: '1px solid rgba(198,168,92,0.28)',
-            color: 'rgba(198,168,92,0.75)',
-          }}
-        >
-          Pay Now — No Trial
-        </motion.button>
+        {/* Apple IAP required disclosure */}
+        <div className="mt-1 mb-2 space-y-0.5">
+          <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.22)' }}>
+            {isNative()
+              ? 'Ascendus Pro is $7.99/month or $49.99/year. Payment charged to your Apple ID.'
+              : `$0 today · then ${plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$7.99/mo'} · cancel anytime`}
+          </p>
+          {isNative() && (
+            <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.18)' }}>
+              Renews automatically. Cancel in Apple ID Account Settings 24h before renewal.
+            </p>
+          )}
+        </div>
 
         {error && (
-          <p className="text-center text-[11px] font-body mb-3" style={{ color: '#EF4444' }}>{error}</p>
+          <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{error}</p>
+        )}
+
+        {/* Restore Purchases — required by Apple */}
+        {isNative() && (
+          <button
+            onClick={async () => {
+              setLoading(true)
+              setError('')
+              try {
+                const info = await restorePurchases()
+                if (info?.entitlements?.active?.['Ascendus Pro']) {
+                  setIsPremium(true)
+                  onClose()
+                } else {
+                  setError('No previous purchase found.')
+                }
+              } catch {
+                setError('Restore failed. Please try again.')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+            type="button"
+            className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-40"
+            style={{ color: 'rgba(198,168,92,0.5)' }}
+          >
+            Restore Purchases
+          </button>
         )}
 
         {/* Dismiss */}
@@ -1052,15 +1088,17 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
         </button>
 
-        {/* Promo code link */}
-        <button
-          onClick={() => setShowPromo(true)}
-          type="button"
-          className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70"
-          style={{ color: 'rgba(198,168,92,0.45)' }}
-        >
-          Have a promo code?
-        </button>
+        {/* Promo code link — web only */}
+        {!isNative() && (
+          <button
+            onClick={() => setShowPromo(true)}
+            type="button"
+            className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70"
+            style={{ color: 'rgba(198,168,92,0.45)' }}
+          >
+            Have a promo code?
+          </button>
+        )}
 
       </div>
 
@@ -1102,7 +1140,7 @@ export default function Results() {
   if (!currentScan) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-        <p className="text-5xl mb-4">📸</p>
+        <Camera size={48} className="mb-4" style={{ color: '#C6A85C' }} />
         <h2 className="font-heading font-bold text-xl text-primary mb-2">No scan yet</h2>
         <p className="text-secondary text-sm font-body mb-6">Take your first scan to see your results here.</p>
         <button onClick={() => navigate('/scan')} className="btn-primary max-w-xs">Start Scan</button>
@@ -1127,23 +1165,307 @@ export default function Results() {
   const hairRec = resolvedHT ? getHairRec(resolvedHT, facialStructure) : null
 
   // Celebrity matches — use AI data or fall back to structure-based defaults
-  const CELEB_FALLBACKS = {
+  // Massive pool covering actors, musicians, athletes, YouTubers, streamers, TikTokers, models, comedians
+  const CELEB_POOLS = {
     male: {
-      'strong':     [{ celebrity: 'Henry Cavill',    similarity: 81, shared_traits: 'Sharp jaw, high cheekbones, strong brow ridge' }, { celebrity: 'Brad Pitt',       similarity: 74, shared_traits: 'Defined cheekbones, square jaw, balanced thirds' }, { celebrity: 'Chris Hemsworth', similarity: 68, shared_traits: 'Wide jaw, angular structure, prominent brow' }],
-      'defined':    [{ celebrity: 'Zac Efron',        similarity: 73, shared_traits: 'Defined jaw, average cheekbones, balanced thirds' }, { celebrity: 'Tom Holland',      similarity: 67, shared_traits: 'Almond eyes, narrow jaw, oval face shape' }, { celebrity: 'Miles Teller',     similarity: 61, shared_traits: 'Oval face, average cheekbones, straight nose' }],
-      'average':    [{ celebrity: 'Chris Evans',      similarity: 76, shared_traits: 'Balanced facial thirds, straight nose, average jaw' }, { celebrity: 'Jake Gyllenhaal',  similarity: 69, shared_traits: 'Deep set eyes, oval face, medium cheekbones' }, { celebrity: 'John Krasinski',   similarity: 63, shared_traits: 'Square face, wide forehead, average cheekbones' }],
-      'soft/round': [{ celebrity: 'Jack Black',       similarity: 72, shared_traits: 'Round face shape, soft jaw, wide nose' }, { celebrity: 'Seth Rogen',       similarity: 65, shared_traits: 'Round cheeks, undefined jaw, close set eyes' }, { celebrity: 'Jonah Hill',       similarity: 60, shared_traits: 'Full face, soft jaw, round cheeks' }],
+      'strong': [
+        // Actors / Hollywood
+        { celebrity: 'Henry Cavill',       similarity: 79, shared_traits: 'Sharp defined jaw, prominent brow ridge, high cheekbones' },
+        { celebrity: 'Chris Hemsworth',    similarity: 76, shared_traits: 'Wide angular jaw, strong brow, square face shape' },
+        { celebrity: 'Brad Pitt',          similarity: 74, shared_traits: 'Defined cheekbones, square jaw, balanced facial thirds' },
+        { celebrity: 'Jacob Elordi',       similarity: 75, shared_traits: 'Defined jaw, sharp cheekbones, prominent brow ridge' },
+        { celebrity: 'Glen Powell',        similarity: 72, shared_traits: 'Square jaw, high cheekbones, angular face shape' },
+        { celebrity: 'Jon Bernthal',       similarity: 70, shared_traits: 'Angular jaw, deep-set eyes, defined bone structure' },
+        { celebrity: 'Tom Hardy',          similarity: 73, shared_traits: 'Wide square jaw, heavy brow ridge, broad face' },
+        { celebrity: 'Cillian Murphy',     similarity: 71, shared_traits: 'Sharp cheekbones, angular jaw, deep-set blue eyes' },
+        { celebrity: 'Joe Manganiello',    similarity: 72, shared_traits: 'Square jaw, heavy brow, angular bone structure' },
+        { celebrity: 'Matt Bomer',         similarity: 74, shared_traits: 'Sharp jaw, high cheekbones, symmetrical face' },
+        // Athletes
+        { celebrity: 'Cristiano Ronaldo',  similarity: 73, shared_traits: 'Square jaw, high cheekbones, angular face shape' },
+        { celebrity: 'Anthony Joshua',     similarity: 71, shared_traits: 'Broad jaw, prominent cheekbones, strong brow' },
+        { celebrity: 'Neymar',             similarity: 68, shared_traits: 'Angular jaw, high cheekbones, oval face' },
+        { celebrity: 'Israel Adesanya',    similarity: 69, shared_traits: 'Angular jaw, defined cheekbones, sharp face' },
+        { celebrity: 'Lewis Hamilton',     similarity: 70, shared_traits: 'Defined jaw, high cheekbones, angular structure' },
+        { celebrity: 'Kylian Mbappé',      similarity: 67, shared_traits: 'Angular jaw, prominent cheekbones, wide face' },
+        // Musicians
+        { celebrity: 'ASAP Rocky',         similarity: 70, shared_traits: 'Angular jaw, prominent cheekbones, oval face' },
+        { celebrity: 'Bad Bunny',          similarity: 68, shared_traits: 'Square jaw, wide face, defined bone structure' },
+        { celebrity: 'Travis Scott',       similarity: 67, shared_traits: 'Angular face, defined jaw, prominent cheekbones' },
+        // Models
+        { celebrity: 'David Gandy',        similarity: 74, shared_traits: 'Square jaw, defined cheekbones, angular face' },
+        { celebrity: 'Lucky Blue Smith',   similarity: 72, shared_traits: 'Sharp jaw, high cheekbones, prominent brow' },
+        { celebrity: 'Lazar Angelov',      similarity: 71, shared_traits: 'Square jaw, defined cheekbones, angular structure' },
+        { celebrity: 'Jon Kortajarena',    similarity: 73, shared_traits: 'Sharp jaw, high cheekbones, angular face' },
+        // YouTubers / Streamers / Creators
+        { celebrity: 'Devin Caherly',      similarity: 65, shared_traits: 'Angular jaw, defined cheekbones, square face' },
+        { celebrity: 'Jericho (TikTok)',   similarity: 63, shared_traits: 'Defined jaw, sharp features, angular structure' },
+      ],
+      'defined': [
+        // Actors
+        { celebrity: 'Zac Efron',          similarity: 73, shared_traits: 'Defined jaw, average cheekbones, balanced thirds' },
+        { celebrity: 'Tom Holland',         similarity: 68, shared_traits: 'Almond eyes, moderate jaw definition, oval face' },
+        { celebrity: 'Austin Butler',       similarity: 71, shared_traits: 'Defined cheekbones, oval face, straight nose bridge' },
+        { celebrity: 'Paul Mescal',         similarity: 67, shared_traits: 'Moderate jaw definition, even features, oval face' },
+        { celebrity: 'Timothée Chalamet',   similarity: 66, shared_traits: 'High cheekbones, soft-angular jaw, deep-set eyes' },
+        { celebrity: 'Richard Madden',      similarity: 70, shared_traits: 'Defined jawline, balanced facial thirds, square face' },
+        { celebrity: 'Kit Harington',       similarity: 69, shared_traits: 'Defined jaw, deep-set eyes, moderate cheekbones' },
+        { celebrity: 'Ryan Reynolds',       similarity: 71, shared_traits: 'Square jaw, high forehead, defined facial structure' },
+        { celebrity: 'Oscar Isaac',         similarity: 69, shared_traits: 'Strong cheekbones, angular jaw, olive skin' },
+        { celebrity: 'Pedro Alonso',        similarity: 67, shared_traits: 'Defined jaw, angular cheekbones, deep-set eyes' },
+        // Athletes
+        { celebrity: 'Devin Booker',        similarity: 69, shared_traits: 'Defined jaw, moderate cheekbones, balanced face' },
+        { celebrity: 'Ja Morant',           similarity: 67, shared_traits: 'Defined jaw, oval face, balanced thirds' },
+        { celebrity: 'Odell Beckham Jr.',   similarity: 68, shared_traits: 'Defined jaw, angular face, moderate cheekbones' },
+        { celebrity: 'Victor Wembanyama',   similarity: 65, shared_traits: 'Angular face, defined jaw, sharp features' },
+        { celebrity: 'Jalen Green',         similarity: 66, shared_traits: 'Defined jaw, balanced oval face, moderate structure' },
+        // Musicians
+        { celebrity: 'Harry Styles',        similarity: 68, shared_traits: 'Oval face, moderate jaw definition, wide-set eyes' },
+        { celebrity: 'The Weeknd',          similarity: 67, shared_traits: 'Oval face, defined jaw, moderate cheekbones' },
+        { celebrity: 'Drake',               similarity: 65, shared_traits: 'Oval face, defined jaw, balanced proportions' },
+        { celebrity: 'Maluma',              similarity: 70, shared_traits: 'Defined jaw, angular cheekbones, oval face' },
+        { celebrity: 'J Balvin',            similarity: 66, shared_traits: 'Defined jaw, balanced face, moderate structure' },
+        // Models / Fitness
+        { celebrity: 'Jeff Seid',           similarity: 70, shared_traits: 'Defined jaw, moderate cheekbones, balanced face' },
+        { celebrity: 'Steve Cook',          similarity: 68, shared_traits: 'Defined jaw, balanced thirds, oval face' },
+        { celebrity: 'Ryan Terry',          similarity: 67, shared_traits: 'Defined jaw, moderate bone structure, oval face' },
+        { celebrity: 'Tyler Cameron',       similarity: 69, shared_traits: 'Defined jaw, balanced face, moderate cheekbones' },
+        // Dev / International
+        { celebrity: 'Dev Patel',           similarity: 65, shared_traits: 'Angular features, defined jaw, almond eyes' },
+        { celebrity: 'Simu Liu',            similarity: 67, shared_traits: 'Defined jaw, moderate cheekbones, oval face' },
+        { celebrity: 'Steven Yeun',         similarity: 64, shared_traits: 'Oval face, defined jaw, moderate structure' },
+        { celebrity: 'Park Seo-jun',        similarity: 68, shared_traits: 'Defined jaw, high cheekbones, oval face' },
+        { celebrity: 'V (BTS)',             similarity: 66, shared_traits: 'Defined jaw, sharp cheekbones, almond eyes' },
+        // YouTubers / Streamers / Creators
+        { celebrity: 'Noah Beck',           similarity: 67, shared_traits: 'Defined jaw, high cheekbones, oval face' },
+        { celebrity: 'Vinnie Hacker',       similarity: 66, shared_traits: 'Defined jaw, oval face, moderate cheekbones' },
+        { celebrity: 'Chase Hudson',        similarity: 64, shared_traits: 'Oval face, defined jaw, moderate structure' },
+        { celebrity: 'Bryce Hall',          similarity: 65, shared_traits: 'Oval face, moderate jaw, balanced face' },
+        { celebrity: 'Tayler Holder',       similarity: 63, shared_traits: 'Defined jaw, oval face, balanced thirds' },
+        { celebrity: 'Jordan Barrett',      similarity: 68, shared_traits: 'Defined jaw, high cheekbones, angular face' },
+      ],
+      'average': [
+        // Actors
+        { celebrity: 'Chris Evans',         similarity: 72, shared_traits: 'Balanced facial thirds, straight nose, average jaw' },
+        { celebrity: 'Jake Gyllenhaal',     similarity: 69, shared_traits: 'Deep-set eyes, oval face, medium cheekbones' },
+        { celebrity: 'Pedro Pascal',        similarity: 67, shared_traits: 'Oval face, balanced features, moderate jaw' },
+        { celebrity: 'Adam Driver',         similarity: 65, shared_traits: 'Long face, prominent nose, evenly spaced features' },
+        { celebrity: 'John Boyega',         similarity: 66, shared_traits: 'Round-oval face, balanced features, medium jaw' },
+        { celebrity: 'Riz Ahmed',           similarity: 63, shared_traits: 'Oval face, medium jaw, balanced proportions' },
+        { celebrity: 'Mahershala Ali',      similarity: 68, shared_traits: 'Oval face, balanced thirds, moderate definition' },
+        { celebrity: 'Donald Glover',       similarity: 66, shared_traits: 'Oval face, balanced features, average structure' },
+        { celebrity: 'John Krasinski',      similarity: 64, shared_traits: 'Square face, wide forehead, average cheekbones' },
+        { celebrity: 'Miles Teller',        similarity: 63, shared_traits: 'Oval face, average cheekbones, straight nose' },
+        { celebrity: 'Lakeith Stanfield',   similarity: 65, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        // Athletes
+        { celebrity: 'Steph Curry',         similarity: 67, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'LeBron James',        similarity: 65, shared_traits: 'Oval face, wide forehead, average jaw' },
+        { celebrity: 'Trae Young',          similarity: 62, shared_traits: 'Oval face, balanced thirds, average structure' },
+        { celebrity: 'Lamine Yamal',        similarity: 63, shared_traits: 'Oval face, balanced features, young structure' },
+        { celebrity: 'Saquon Barkley',      similarity: 65, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        // Musicians
+        { celebrity: 'Post Malone',         similarity: 62, shared_traits: 'Oval face, close-set eyes, average jaw' },
+        { celebrity: 'Lil Baby',            similarity: 63, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        { celebrity: 'Polo G',              similarity: 64, shared_traits: 'Oval face, balanced features, average structure' },
+        { celebrity: 'Rod Wave',            similarity: 62, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        { celebrity: 'J. Cole',             similarity: 65, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Kendrick Lamar',      similarity: 63, shared_traits: 'Oval face, average structure, balanced thirds' },
+        { celebrity: 'Tyler the Creator',   similarity: 64, shared_traits: 'Round-oval face, wide-set eyes, average jaw' },
+        { celebrity: 'Frank Ocean',         similarity: 65, shared_traits: 'Oval face, balanced thirds, average structure' },
+        // YouTubers / Streamers / Creators
+        { celebrity: 'MrBeast',             similarity: 62, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        { celebrity: 'Logan Paul',          similarity: 65, shared_traits: 'Square-oval face, average jaw, wide forehead' },
+        { celebrity: 'KSI',                 similarity: 64, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        { celebrity: 'xQc',                 similarity: 61, shared_traits: 'Oval face, balanced features, average structure' },
+        { celebrity: 'Pokimane (male ref)', similarity: 62, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Typical Gamer',       similarity: 60, shared_traits: 'Oval face, balanced features, average structure' },
+        { celebrity: 'Valkyrae',            similarity: 61, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Corpse Husband',      similarity: 62, shared_traits: 'Oval face, deep-set eyes, average structure' },
+        { celebrity: 'NICKMERCS',           similarity: 61, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        { celebrity: 'SypherPK',            similarity: 60, shared_traits: 'Oval face, balanced features, average jaw' },
+        { celebrity: 'Yung Gravy',          similarity: 62, shared_traits: 'Oval face, average jaw, balanced thirds' },
+        // Comedians
+        { celebrity: 'Trevor Noah',         similarity: 65, shared_traits: 'Oval face, balanced thirds, moderate jaw' },
+        { celebrity: 'Hasan Piker',         similarity: 67, shared_traits: 'Oval face, moderate jaw, balanced thirds' },
+        { celebrity: 'Matt Rife',           similarity: 66, shared_traits: 'Oval face, balanced thirds, moderate jaw' },
+      ],
+      'soft/round': [
+        // Actors / Entertainment
+        { celebrity: 'Kevin Hart',          similarity: 68, shared_traits: 'Round face, soft jaw, wide-set eyes' },
+        { celebrity: 'Jonah Hill',          similarity: 63, shared_traits: 'Full face, soft jaw, round cheeks' },
+        { celebrity: 'Jack Black',          similarity: 65, shared_traits: 'Round face shape, soft jaw, wide nose' },
+        { celebrity: 'Seth Rogen',          similarity: 62, shared_traits: 'Round cheeks, undefined jaw, close-set eyes' },
+        { celebrity: 'Channing Tatum',      similarity: 67, shared_traits: 'Round full face, wide jaw, prominent chin' },
+        { celebrity: 'James Corden',        similarity: 61, shared_traits: 'Round face, full cheeks, soft jaw' },
+        // Musicians
+        { celebrity: 'Ed Sheeran',          similarity: 61, shared_traits: 'Round face, soft features, full cheeks' },
+        { celebrity: 'Niall Horan',         similarity: 63, shared_traits: 'Round face, soft jaw, average cheekbones' },
+        { celebrity: 'Sam Smith',           similarity: 62, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'Charlie Puth',        similarity: 63, shared_traits: 'Round-oval face, soft jaw, full cheeks' },
+        { celebrity: 'Shawn Mendes',        similarity: 65, shared_traits: 'Round face, full cheeks, moderate jaw' },
+        // YouTubers / Streamers / Creators
+        { celebrity: 'Kai Cenat',           similarity: 67, shared_traits: 'Round face, full cheeks, soft jaw definition' },
+        { celebrity: 'IShowSpeed',          similarity: 64, shared_traits: 'Round face, full cheeks, wide-set eyes' },
+        { celebrity: 'Druski',              similarity: 65, shared_traits: 'Round face, full cheeks, soft jaw, wide nose' },
+        { celebrity: 'Fanum',               similarity: 63, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'YourRAGE',            similarity: 62, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Duke Dennis',         similarity: 63, shared_traits: 'Round face, full cheeks, wide jaw' },
+        { celebrity: 'Agent 00',            similarity: 62, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'Zias',               similarity: 63, shared_traits: 'Round face, wide jaw, full cheeks' },
+        { celebrity: 'ImDontai',            similarity: 61, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'Caseoh',             similarity: 64, shared_traits: 'Full round face, wide jaw, full cheeks' },
+        { celebrity: 'HasanAbi',            similarity: 65, shared_traits: 'Round-oval face, moderate jaw, full cheeks' },
+        { celebrity: 'Markiplier',          similarity: 63, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'Jacksepticeye',       similarity: 61, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Dream',               similarity: 62, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'GeorgeNotFound',      similarity: 61, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Larray',              similarity: 62, shared_traits: 'Round face, soft jaw, full cheeks' },
+        // Comedians / Internet
+        { celebrity: 'Zach Galifianakis',   similarity: 60, shared_traits: 'Round face, full beard area, soft jaw' },
+        { celebrity: 'Gabriel Iglesias',    similarity: 61, shared_traits: 'Round full face, soft jaw, wide cheeks' },
+        { celebrity: 'Bert Kreischer',      similarity: 60, shared_traits: 'Round face, full cheeks, soft jaw' },
+      ],
     },
     female: {
-      'strong':     [{ celebrity: 'Angelina Jolie',   similarity: 83, shared_traits: 'High cheekbones, sharp jaw, deep set eyes' }, { celebrity: 'Megan Fox',        similarity: 76, shared_traits: 'Sharp jaw, almond eyes, high cheekbones' }, { celebrity: 'Charlize Theron',  similarity: 70, shared_traits: 'High cheekbones, angular jaw, oval face' }],
-      'defined':    [{ celebrity: 'Natalie Portman',  similarity: 80, shared_traits: 'Oval face, defined jaw, almond eyes' }, { celebrity: 'Emma Watson',       similarity: 73, shared_traits: 'Heart face shape, wide forehead, defined jaw' }, { celebrity: 'Zendaya',          similarity: 67, shared_traits: 'High cheekbones, oval face, almond eyes' }],
-      'average':    [{ celebrity: 'Jennifer Aniston', similarity: 77, shared_traits: 'Oval face, balanced thirds, straight nose' }, { celebrity: 'Anne Hathaway',     similarity: 70, shared_traits: 'Oval face, wide eyes, average cheekbones' }, { celebrity: 'Sandra Bullock',   similarity: 64, shared_traits: 'Heart face, high forehead, balanced features' }],
-      'soft/round': [{ celebrity: 'Adele',            similarity: 74, shared_traits: 'Round face shape, soft jaw, full cheeks' }, { celebrity: 'Rebel Wilson',      similarity: 67, shared_traits: 'Round face, soft jaw, wide cheeks' }, { celebrity: 'Melissa McCarthy', similarity: 61, shared_traits: 'Full face, soft jaw, round face shape' }],
+      'strong': [
+        // Actors / Hollywood
+        { celebrity: 'Angelina Jolie',      similarity: 79, shared_traits: 'High cheekbones, sharp jaw, deep-set eyes' },
+        { celebrity: 'Megan Fox',           similarity: 76, shared_traits: 'Sharp jaw, almond eyes, high cheekbones' },
+        { celebrity: 'Charlize Theron',     similarity: 73, shared_traits: 'High cheekbones, angular jaw, oval face' },
+        { celebrity: 'Cate Blanchett',      similarity: 71, shared_traits: 'High cheekbones, angular jaw, deep-set eyes' },
+        { celebrity: 'Eva Green',           similarity: 72, shared_traits: 'Angular jaw, deep-set eyes, prominent cheekbones' },
+        { celebrity: 'Monica Bellucci',     similarity: 73, shared_traits: 'Angular jaw, prominent cheekbones, almond eyes' },
+        // Models / Fashion
+        { celebrity: 'Bella Hadid',         similarity: 75, shared_traits: 'Angular jaw, prominent cheekbones, almond eyes' },
+        { celebrity: 'Naomi Campbell',      similarity: 74, shared_traits: 'High cheekbones, sharp jaw, prominent bone structure' },
+        { celebrity: 'Kendall Jenner',      similarity: 72, shared_traits: 'Angular jaw, high cheekbones, almond eyes' },
+        { celebrity: 'Hailey Bieber',       similarity: 70, shared_traits: 'Sharp jaw, high cheekbones, heart-shaped face' },
+        { celebrity: 'Gigi Hadid',          similarity: 71, shared_traits: 'Defined jaw, high cheekbones, oval face' },
+        { celebrity: 'Adriana Lima',        similarity: 72, shared_traits: 'Angular jaw, high cheekbones, almond eyes' },
+        { celebrity: 'Joan Smalls',         similarity: 70, shared_traits: 'Sharp jaw, high cheekbones, angular structure' },
+        { celebrity: 'Winnie Harlow',       similarity: 69, shared_traits: 'Angular jaw, high cheekbones, oval face' },
+        // Musicians / Artists
+        { celebrity: 'Rihanna',             similarity: 73, shared_traits: 'Angular jaw, high cheekbones, oval face' },
+        { celebrity: 'Beyoncé',             similarity: 71, shared_traits: 'Angular jaw, high cheekbones, oval face' },
+        { celebrity: 'Rosalía',             similarity: 70, shared_traits: 'Angular jaw, high cheekbones, almond eyes' },
+        // Influencers / Creators
+        { celebrity: 'Sommer Ray',          similarity: 67, shared_traits: 'Angular jaw, defined cheekbones, oval face' },
+        { celebrity: 'Ana Cheri',           similarity: 66, shared_traits: 'Defined jaw, high cheekbones, angular face' },
+      ],
+      'defined': [
+        // Actors
+        { celebrity: 'Natalie Portman',     similarity: 76, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        { celebrity: 'Emma Watson',         similarity: 72, shared_traits: 'Heart face shape, wide forehead, defined jaw' },
+        { celebrity: 'Zendaya',             similarity: 74, shared_traits: 'High cheekbones, oval face, almond eyes' },
+        { celebrity: 'Florence Pugh',       similarity: 70, shared_traits: 'Round-defined face, wide-set eyes, soft jawline' },
+        { celebrity: 'Anya Taylor-Joy',     similarity: 71, shared_traits: 'Wide-set eyes, defined jaw, heart-shaped face' },
+        { celebrity: 'Daisy Ridley',        similarity: 68, shared_traits: 'Oval face, defined jaw, wide-set eyes' },
+        { celebrity: 'Lupita Nyongo',       similarity: 70, shared_traits: 'Oval face, defined jaw, prominent cheekbones' },
+        { celebrity: 'Letitia Wright',      similarity: 67, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        // Musicians
+        { celebrity: 'Olivia Rodrigo',      similarity: 69, shared_traits: 'Heart-shaped face, defined jaw, wide eyes' },
+        { celebrity: 'Sabrina Carpenter',   similarity: 67, shared_traits: 'Round face, defined features, wide-set eyes' },
+        { celebrity: 'Billie Eilish',       similarity: 68, shared_traits: 'Oval face, wide-set eyes, defined jaw' },
+        { celebrity: 'Gracie Abrams',       similarity: 65, shared_traits: 'Oval face, defined features, almond eyes' },
+        { celebrity: 'Halle Bailey',        similarity: 69, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        { celebrity: 'SZA',                 similarity: 68, shared_traits: 'Oval face, defined jaw, high cheekbones' },
+        // K-pop / International
+        { celebrity: 'Gemma Chan',          similarity: 71, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        { celebrity: 'Lisa (BLACKPINK)',    similarity: 70, shared_traits: 'Oval face, defined features, almond eyes' },
+        { celebrity: 'Jennie (BLACKPINK)',  similarity: 69, shared_traits: 'Oval face, defined jaw, wide-set eyes' },
+        { celebrity: 'Jisoo (BLACKPINK)',   similarity: 68, shared_traits: 'Oval face, defined features, almond eyes' },
+        { celebrity: 'IU',                  similarity: 67, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        { celebrity: 'Tzuyu (TWICE)',       similarity: 66, shared_traits: 'Oval face, defined jaw, almond eyes' },
+        // Influencers / Models / Creators
+        { celebrity: 'Loren Gray',          similarity: 66, shared_traits: 'Oval face, defined jaw, wide-set eyes' },
+        { celebrity: 'Bryce Xavier (fem)', similarity: 64, shared_traits: 'Oval face, defined features, almond eyes' },
+        { celebrity: 'Bretman Rock',        similarity: 65, shared_traits: 'Oval face, defined jaw, almond eyes' },
+      ],
+      'average': [
+        // Actors
+        { celebrity: 'Jennifer Aniston',    similarity: 74, shared_traits: 'Oval face, balanced thirds, straight nose' },
+        { celebrity: 'Anne Hathaway',       similarity: 70, shared_traits: 'Oval face, wide eyes, average cheekbones' },
+        { celebrity: 'Sandra Bullock',      similarity: 67, shared_traits: 'Heart face, high forehead, balanced features' },
+        { celebrity: 'Reese Witherspoon',   similarity: 66, shared_traits: 'Heart face, small chin, wide forehead' },
+        { celebrity: 'Blake Lively',        similarity: 68, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Scarlett Johansson',  similarity: 69, shared_traits: 'Oval face, wide-set eyes, balanced thirds' },
+        { celebrity: 'Millie Bobby Brown',  similarity: 67, shared_traits: 'Oval face, wide-set eyes, balanced features' },
+        { celebrity: 'Sydney Sweeney',      similarity: 70, shared_traits: 'Oval face, wide-set eyes, balanced thirds' },
+        // Musicians
+        { celebrity: 'Selena Gomez',        similarity: 71, shared_traits: 'Round-oval face, wide eyes, balanced proportions' },
+        { celebrity: 'Camila Cabello',      similarity: 68, shared_traits: 'Oval face, wide eyes, balanced facial thirds' },
+        { celebrity: 'Dua Lipa',            similarity: 72, shared_traits: 'Oval face, full lips, balanced proportions' },
+        { celebrity: 'Ariana Grande',       similarity: 69, shared_traits: 'Oval face, almond eyes, balanced features' },
+        { celebrity: 'Jennifer Lopez',      similarity: 70, shared_traits: 'Oval face, high cheekbones, balanced thirds' },
+        { celebrity: 'Normani',             similarity: 68, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+        { celebrity: 'Tyla',                similarity: 67, shared_traits: 'Oval face, balanced features, medium cheekbones' },
+        { celebrity: 'Doja Cat',            similarity: 68, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Ari Lennox',          similarity: 66, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Jorja Smith',         similarity: 67, shared_traits: 'Oval face, balanced features, almond eyes' },
+        { celebrity: 'Megan Thee Stallion', similarity: 68, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        // K-pop / International
+        { celebrity: 'Rosé (BLACKPINK)',    similarity: 67, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+        { celebrity: 'Jihyo (TWICE)',       similarity: 66, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Nayeon (TWICE)',      similarity: 67, shared_traits: 'Oval face, balanced thirds, wide eyes' },
+        { celebrity: 'Jang Wonyoung',       similarity: 68, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+        { celebrity: 'Haifa Wehbe',         similarity: 67, shared_traits: 'Oval face, almond eyes, balanced proportions' },
+        // TikTokers / YouTubers / Streamers / Influencers
+        { celebrity: 'Alix Earle',          similarity: 68, shared_traits: 'Oval face, wide-set eyes, balanced thirds' },
+        { celebrity: 'Emma Chamberlain',    similarity: 66, shared_traits: 'Oval face, wide eyes, balanced features' },
+        { celebrity: 'Addison Rae',         similarity: 67, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Charli DAmelio',      similarity: 68, shared_traits: 'Oval face, wide-set eyes, balanced thirds' },
+        { celebrity: 'Dixie DAmelio',       similarity: 66, shared_traits: 'Oval face, balanced thirds, average jaw' },
+        { celebrity: 'Pokimane',            similarity: 65, shared_traits: 'Oval face, wide-set eyes, balanced thirds' },
+        { celebrity: 'Valkyrae',            similarity: 64, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+        { celebrity: 'Imane Anys',          similarity: 65, shared_traits: 'Oval face, balanced features, wide eyes' },
+        { celebrity: 'Liza Koshy',          similarity: 66, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Lilly Singh',         similarity: 65, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+        { celebrity: 'Rachel Zegler',       similarity: 67, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Hannah Meloche',      similarity: 64, shared_traits: 'Oval face, balanced thirds, wide eyes' },
+        // Models
+        { celebrity: 'Gabi Butler',         similarity: 63, shared_traits: 'Oval face, wide eyes, balanced thirds' },
+        { celebrity: 'Iskra Lawrence',      similarity: 65, shared_traits: 'Oval face, balanced features, average jaw' },
+        { celebrity: 'Nyma Tang',           similarity: 64, shared_traits: 'Oval face, balanced thirds, almond eyes' },
+      ],
+      'soft/round': [
+        // Musicians / Entertainment
+        { celebrity: 'Adele',               similarity: 70, shared_traits: 'Round face shape, soft jaw, full cheeks' },
+        { celebrity: 'Lizzo',               similarity: 65, shared_traits: 'Full round face, soft jaw, wide cheeks' },
+        { celebrity: 'Meghan Trainor',      similarity: 64, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Kelly Clarkson',      similarity: 63, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Rebel Wilson',        similarity: 65, shared_traits: 'Round face, soft jaw, wide cheeks' },
+        { celebrity: 'Chrissy Metz',        similarity: 62, shared_traits: 'Round full face, soft jaw, full cheeks' },
+        // TikTokers / YouTubers / Influencers
+        { celebrity: 'Nikita Dragun',       similarity: 65, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Trisha Paytas',       similarity: 63, shared_traits: 'Round face, full cheeks, soft jaw' },
+        { celebrity: 'Annie LeBlanc',       similarity: 64, shared_traits: 'Round face, soft jaw, wide-set eyes' },
+        { celebrity: 'Baby Ariel',          similarity: 63, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Brent Rivera (fem)',  similarity: 62, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'SSSniperWolf',        similarity: 64, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Amouranth',           similarity: 65, shared_traits: 'Round face, soft jaw, wide eyes' },
+        { celebrity: 'Hafu',                similarity: 63, shared_traits: 'Round face, soft jaw, almond eyes' },
+        { celebrity: 'QuarterJade',         similarity: 62, shared_traits: 'Round face, soft jaw, almond eyes' },
+        { celebrity: 'Kyedae',              similarity: 63, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Gloria Borger',       similarity: 60, shared_traits: 'Round face, soft jaw, full cheeks' },
+        // Models / Plus size
+        { celebrity: 'Ashley Graham',       similarity: 66, shared_traits: 'Round face, soft jaw, full cheeks' },
+        { celebrity: 'Tess Holliday',       similarity: 62, shared_traits: 'Round full face, soft jaw, wide cheeks' },
+        { celebrity: 'Hunter McGrady',      similarity: 63, shared_traits: 'Round face, soft jaw, full cheeks' },
+      ],
     },
   }
-  const resolvedMatches = (celebrityMatches ?? aiScore?.celebrityMatches) ||
-    CELEB_FALLBACKS[gender === 'female' ? 'female' : 'male'][facialStructure] ||
-    CELEB_FALLBACKS[gender === 'female' ? 'female' : 'male']['average']
+
+  function pickRandom3(pool) {
+    const shuffled = [...pool].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, 3)
+  }
+
+  const resolvedMatches = (() => {
+    const ai = celebrityMatches ?? aiScore?.celebrityMatches
+    if (ai?.length > 0) return ai
+    const g = gender === 'female' ? 'female' : 'male'
+    const pool = CELEB_POOLS[g][facialStructure] ?? CELEB_POOLS[g]['average']
+    return pickRandom3(pool)
+  })()
 
   // ─── Skin Analysis ──────────────────────────────────────────────────────────
   const skinScore = faceData?.skinClarity ?? null
@@ -1311,6 +1633,22 @@ export default function Results() {
         </button>
       </div>
 
+      {/* ── Citations / Medical Disclaimer ──────────────────────── */}
+      <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2"
+        style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.25)' }}>
+        <span className="text-[11px] flex-shrink-0" style={{ color: '#C6A85C' }}>ℹ</span>
+        <p className="text-[10px] font-body leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          For informational purposes only — not medical or clinical advice.
+          Analysis is AI-generated and draws on published guidelines from{' '}
+          <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>AAD</a>
+          ,{' '}
+          <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>NIH</a>
+          , and{' '}
+          <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>Healthline</a>
+          . Consult a qualified professional before making health decisions.
+        </p>
+      </div>
+
       {/* ── Overall Rating (hero) ─────────────────────────────────── */}
       <div className="mb-3">
         <UMaxScoreBadge
@@ -1326,7 +1664,7 @@ export default function Results() {
         const col = glowScore >= 7 ? '#34C759' : glowScore >= 5 ? '#C6A85C' : '#E07A5F'
         return (
           <div className="mb-4 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: `${col}0D`, border: `1px solid ${col}25` }}>
-            <span className="text-[13px]">📊</span>
+            <BarChart2 size={13} />
             <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
               Your score places you in the <span className="font-bold" style={{ color: col }}>{pct}</span> of users on Ascendus
             </p>
@@ -1352,7 +1690,7 @@ export default function Results() {
         return (
           <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2.5"
             style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.2)' }}>
-            <span className="text-[14px] flex-shrink-0 mt-0.5">⭐</span>
+            <Star size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#C6A85C', fill: '#C6A85C' }} />
             <p className="font-body text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
               <span className="font-bold" style={{ color: '#C6A85C' }}>{bestLabel} {bestScore.toFixed(1)}</span>{' '}— {motivLine}
             </p>
@@ -1375,7 +1713,7 @@ export default function Results() {
             className="w-full mb-4 px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-left active:opacity-70 transition-opacity"
             style={{ background: 'rgba(224,122,95,0.08)', border: '1px solid rgba(224,122,95,0.2)' }}
           >
-            <span className="text-[15px] flex-shrink-0">⚠</span>
+            <AlertTriangle size={15} className="flex-shrink-0" style={{ color: '#E07A5F' }} />
             <p className="font-body text-[11px] leading-relaxed flex-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
               Your <span className="font-bold" style={{ color: '#C6A85C' }}>{label} ({score.toFixed(1)})</span> is your biggest growth opportunity
               {' — '}<span className="font-bold" style={{ color: '#34C759' }}>targeting it adds ~+{impact} pts</span>
@@ -1395,7 +1733,7 @@ export default function Results() {
               : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }
           }
         >
-          {hasSideProfile ? '✦ Full Scan — Profile Analysis Included' : '◎ Basic Scan — Side Profile Not Included'}
+          {hasSideProfile ? 'Full Scan — Profile Analysis Included' : 'Basic Scan — Side Profile Not Included'}
         </div>
       </div>
 
@@ -1425,7 +1763,7 @@ export default function Results() {
 
       {/* ── Key Strengths & Weaknesses ────────────────────────────── */}
       {(aiScore?.keyStrengths?.length > 0 || aiScore?.keyWeaknesses?.length > 0) && (
-        <Section title="AI Analysis" emoji="🎯">
+        <Section title="AI Analysis" icon={<Target size={16} style={{ color: '#C6A85C' }} />}>
           {aiScore?.topImprovement && (
             <div className="mb-3 px-3 py-2.5 rounded-xl bg-[#C6A85C]/10 border border-[#C6A85C]/25">
               <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-[#C6A85C] mb-0.5">Top Priority</p>
@@ -1460,7 +1798,7 @@ export default function Results() {
 
       {/* ── The 4 Pillars ────────────────────────────────────────── */}
       {pillars && (
-        <Section title="The 4 Pillars" emoji="🏛️" defaultOpen={true}>
+        <Section title="The 4 Pillars" icon={<Columns size={16} style={{ color: '#C6A85C' }} />} defaultOpen={true}>
           <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
             Your aesthetic score is built on 4 core pillars — each worth 25% of your overall face rating.
           </p>
@@ -1574,7 +1912,7 @@ export default function Results() {
 
       {/* ── Face Metrics ─────────────────────────────────────────── */}
       {faceMetrics && (
-        <Section title="Face Metrics" emoji="📐" defaultOpen={false}>
+        <Section title="Face Metrics" icon={<Ruler size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false}>
           {(() => {
             const mascFemLabel = gender === 'female' ? 'Femininity' : 'Masculinity'
             const metrics = [
@@ -1611,7 +1949,7 @@ export default function Results() {
       )}
 
       {/* ── Face Feature Breakdown ────────────────────────────────── */}
-      <Section title="Face Feature Breakdown" emoji="👤" defaultOpen={false}>
+      <Section title="Face Feature Breakdown" icon={<User size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false}>
         <div className="space-y-0">
           {[
             { label: 'Facial Symmetry', score: faceData?.symmetry, note: 'Sleeping on your back, correcting dominant chewing side, and fixing posture all improve symmetry over time.' },
@@ -1628,7 +1966,7 @@ export default function Results() {
 
       {/* ── Profile Analysis (side profile scan) ────────────────── */}
       {hasSideProfile && profileData && (
-        <Section title="Profile Analysis" emoji="↗️" defaultOpen={false} badge="FULL">
+        <Section title="Profile Analysis" icon={<ArrowUpRight size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false} badge="FULL">
           {/* Profile score row */}
           <div className="flex items-center gap-3 mb-4 p-3 rounded-xl" style={{ background: 'rgba(52,199,89,0.07)', border: '1px solid rgba(52,199,89,0.18)' }}>
             <div className="text-center flex-shrink-0">
@@ -1741,7 +2079,7 @@ export default function Results() {
 
 
       {/* ── Hairstyle Recommendations ─────────────────────────────── */}
-      <Section title="Hairstyle Recommendations" emoji="✂️" defaultOpen={false}>
+      <Section title="Hairstyle Recommendations" icon={<Scissors size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false}>
         <div className="mb-2">
           {/* Hair type selector — shown when AI couldn't detect or user wants to override */}
           {(!resolvedHT || resolvedHT) && (
@@ -1766,7 +2104,7 @@ export default function Results() {
                       : { background: 'transparent', color: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.12)' }
                     }
                   >
-                    {opt.emoji} {opt.label}
+                    {opt.label}
                   </button>
                 ))}
               </div>
@@ -1806,7 +2144,7 @@ export default function Results() {
       </Section>
 
       {/* ── Celebrity Lookalikes ──────────────────────────────────── */}
-      <Section title="Celebrity Lookalikes" emoji="⭐" defaultOpen={false}>
+      <Section title="Celebrity Lookalikes" icon={<Star size={16} style={{ color: '#C6A85C', fill: '#C6A85C' }} />} defaultOpen={false}>
         <div className="space-y-0">
           {resolvedMatches.map((match, i) => (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
@@ -1879,14 +2217,14 @@ export default function Results() {
             className="mt-3 w-full py-2 rounded-xl text-[11px] font-heading font-bold flex items-center justify-center gap-1.5"
             style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)', color: '#C6A85C' }}
           >
-            🔒 Unlock similarity % and shared traits with PRO
+            <Lock size={12} style={{ color: '#C6A85C' }} /> Unlock similarity % and shared traits with PRO
           </button>
         )}
       </Section>
 
       {/* ── Skin Analysis ────────────────────────────────────────── */}
       {skinScore != null && (
-        <Section title="Skin Analysis" emoji="🧬" defaultOpen={false} badge="PRO">
+        <Section title="Skin Analysis" icon={<FlaskConical size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false} badge="PRO">
           {/* Free: score + category */}
           <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
             <div className="text-center flex-shrink-0">
@@ -1939,7 +2277,7 @@ export default function Results() {
                         <p className="text-[10px] text-secondary font-body leading-relaxed mb-1"><span className="font-bold text-primary">How:</span> {ing.how}</p>
                         <p className="text-[10px] text-secondary font-body leading-relaxed mb-1"><span className="font-bold text-primary">When:</span> {ing.when}</p>
                         <p className="text-[10px] text-secondary font-body leading-relaxed mb-1"><span className="font-bold text-primary">Timeline:</span> {ing.timeline}</p>
-                        {ing.warning && <p className="text-[10px] text-warning font-body leading-relaxed mb-1"><span className="font-bold">⚠ Note:</span> {ing.warning}</p>}
+                        {ing.warning && <p className="text-[10px] text-warning font-body leading-relaxed mb-1"><span className="font-bold flex items-center gap-1"><AlertTriangle size={11} /> Note:</span> {ing.warning}</p>}
                         <p className="text-[10px] font-body leading-relaxed mt-1.5" style={{ color: '#C6A85C' }}>Score impact: {ing.pillar}</p>
                       </div>
                     ))}
@@ -2001,7 +2339,7 @@ export default function Results() {
       />
 
       {/* ── Nutrition Plan ────────────────────────────────────────── */}
-      <Section title="Nutrition Plan" emoji="🥩" defaultOpen={false} badge="PRO">
+      <Section title="Nutrition Plan" icon={<Beef size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false} badge="PRO">
         {/* Free: calorie target + phase label */}
         <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
           <div className="text-center flex-shrink-0">
@@ -2105,19 +2443,19 @@ export default function Results() {
         {/* Wellness disclaimer */}
         <div className="px-4 py-3.5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[11px] font-body leading-relaxed text-secondary">
-            💛 <span className="font-semibold text-primary">Wellbeing:</span> These scores are tools for self-improvement, not measures of your worth. If you are struggling with body image or mental health, please speak to a professional.
+            <Heart size={14} style={{ color: '#F5A623', display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> <span className="font-semibold text-primary">Wellbeing:</span> These scores are tools for self-improvement, not measures of your worth. If you are struggling with body image or mental health, please speak to a professional.
           </p>
         </div>
         {/* AI disclosure */}
         <div className="px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[11px] font-body leading-relaxed text-secondary">
-            🤖 <span className="font-semibold text-primary">AI Analysis:</span> Scores are generated by AI and are estimates only — not medical or clinical assessments. Results may vary.
+            <Bot size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> <span className="font-semibold text-primary">AI Analysis:</span> Scores are generated by AI and are estimates only — not medical or clinical assessments. Results may vary.
           </p>
         </div>
         {/* Celebrity disclaimer */}
         <div className="px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[11px] font-body leading-relaxed text-secondary">
-            ⭐ <span className="font-semibold text-primary">Celebrity comparisons</span> are AI-generated estimates and do not imply any connection to or endorsement by the named individuals.
+            <Star size={14} style={{ color: '#C6A85C', fill: '#C6A85C', display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> <span className="font-semibold text-primary">Celebrity comparisons</span> are AI-generated estimates and do not imply any connection to or endorsement by the named individuals.
           </p>
         </div>
       </div>
@@ -2195,7 +2533,7 @@ export default function Results() {
               color: '#C6A85C',
             }}
           >
-            🎁 Share 5 Friends
+            <Gift size={14} style={{ display: 'inline', marginRight: 4 }} /> Share 5 Friends
           </button>
           <button
             onClick={() => setShowPaywall(true)}
