@@ -2,7 +2,7 @@ const express = require('express')
 const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
-const { getUserById, updateUserById, getSupabase } = require('../supabase')
+const { getUserById, updateUserById, getSupabase, isConfigured, isWebhookProcessed, markWebhookProcessed } = require('../supabase')
 
 // NOTE: This endpoint is for web purchases only.
 // iOS uses Apple In-App Purchases via RevenueCat (@revenuecat/purchases-capacitor).
@@ -27,8 +27,8 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
 
   // Look up user in Supabase (primary) or SQLite (fallback)
   let user = await getUserById(req.userId)
-  if (!user) user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
-  // Fallback: if account was lost (SQLite wipe before Supabase migration), use email from JWT
+  if (!user && !isConfigured()) user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
+  // Fallback: if account was lost, use email from JWT
   if (!user && req.userEmail) {
     user = { id: req.userId, email: req.userEmail }
   }
@@ -51,7 +51,9 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       }
       // Persist stripe_customer_id so we don't create duplicates
       try { await updateUserById(user.id, { stripe_customer_id: customerId }) } catch {}
-      try { db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, user.id) } catch {}
+      if (!isConfigured()) {
+        try { db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, user.id) } catch {}
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -180,6 +182,12 @@ async function handleWebhook(req, res) {
 
   console.log('[Webhook] Event type:', event.type, '| Event id:', event.id)
 
+  // Idempotency guard — Stripe delivers events at-least-once; skip duplicates
+  if (await isWebhookProcessed(event.id)) {
+    console.log('[Webhook] ⏭️  Already processed event id:', event.id, '— skipping')
+    return res.json({ received: true })
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     const subscriptionId = session.subscription || null
@@ -203,12 +211,14 @@ async function handleWebhook(req, res) {
       } catch (e) {
         console.error('[Webhook] ❌ Supabase update failed (checkout):', e.message)
       }
-      try {
-        db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
-          .run(subscriptionId, userId)
-        console.log('[Webhook] ✅ SQLite updated (checkout) for userId:', userId)
-      } catch (e) {
-        console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+      if (!isConfigured()) {
+        try {
+          db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
+            .run(subscriptionId, userId)
+          console.log('[Webhook] ✅ SQLite updated (checkout) for userId:', userId)
+        } catch (e) {
+          console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+        }
       }
     } else {
       console.error('[Webhook] ❌ All 4 fallbacks exhausted for checkout.session.completed — full session object:')
@@ -233,11 +243,13 @@ async function handleWebhook(req, res) {
       } catch (e) {
         console.error('[Webhook] ❌ Supabase update failed (invoice):', e.message)
       }
-      try {
-        db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId)
-        console.log('[Webhook] ✅ SQLite updated (invoice) for userId:', userId)
-      } catch (e) {
-        console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+      if (!isConfigured()) {
+        try {
+          db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId)
+          console.log('[Webhook] ✅ SQLite updated (invoice) for userId:', userId)
+        } catch (e) {
+          console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+        }
       }
     } else {
       console.error('[Webhook] ❌ All 4 fallbacks exhausted for invoice.payment_succeeded — full invoice object:')
@@ -250,9 +262,14 @@ async function handleWebhook(req, res) {
     console.log('[Webhook] subscription.deleted userId:', userId)
     if (userId) {
       try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false, stripe_subscription_id: null }) } catch {}
-      try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
+      if (!isConfigured()) {
+        try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
+      }
     }
   }
+
+  // Mark this event as processed so Stripe re-deliveries are skipped
+  await markWebhookProcessed(event.id, event.type)
 
   console.log('=== [Webhook] DONE — responded { received: true } ===')
   res.json({ received: true })
@@ -264,7 +281,7 @@ router.post('/webhook', handleWebhook)
 // Open Stripe Customer Portal (manage/cancel subscription)
 router.post('/portal', authMiddleware, async (req, res) => {
   let user = await getUserById(req.userId)
-  if (!user) user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId)
+  if (!user && !isConfigured()) user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   try {
@@ -287,11 +304,9 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
 // Check premium status (called after redirect back from Stripe)
 router.get('/status', authMiddleware, async (req, res) => {
-  let tier = 'free'
   const sbUser = await getUserById(req.userId).catch(() => null)
-  if (sbUser) {
-    tier = sbUser.subscription_tier || 'free'
-  } else {
+  let tier = sbUser?.subscription_tier || 'free'
+  if (!sbUser && !isConfigured()) {
     const row = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)
     tier = row?.subscription_tier || 'free'
   }

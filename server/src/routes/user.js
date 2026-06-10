@@ -2,17 +2,23 @@ const express = require('express')
 const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
-const { getUserById, getSupabase, getScanHistory } = require('../supabase')
+const { getUserById, getSupabase, getScanHistory, isConfigured, getStreakByUserId } = require('../supabase')
 
 const router = express.Router()
 
 router.get('/profile', authMiddleware, async (req, res) => {
-  // Supabase is source of truth for subscription/pro status
+  // Supabase is source of truth in production
   const sbUser = await getUserById(req.userId).catch(() => null)
 
-  // SQLite fallback for everything else (streak, local dev)
-  const localUser = db.prepare('SELECT id, email, name, avatar_url, subscription_tier, created_at FROM users WHERE id = ?').get(req.userId)
-  const streak = db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.userId)
+  // SQLite fallback for local dev only
+  const localUser = isConfigured()
+    ? null
+    : db.prepare('SELECT id, email, name, avatar_url, subscription_tier, created_at FROM users WHERE id = ?').get(req.userId)
+
+  // Streak: Supabase in production, SQLite in local dev
+  const streak = isConfigured()
+    ? await getStreakByUserId(req.userId)
+    : db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.userId)
 
   if (!sbUser && !localUser) return res.status(404).json({ error: 'User not found' })
 
@@ -31,10 +37,19 @@ router.get('/profile', authMiddleware, async (req, res) => {
   res.json({ user, streak })
 })
 
-router.put('/profile', authMiddleware, (req, res) => {
+router.put('/profile', authMiddleware, async (req, res) => {
   const { name, avatarUrl } = req.body
-  if (name) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.userId)
-  if (avatarUrl) db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.userId)
+  if (isConfigured()) {
+    const updates = {}
+    if (name) updates.name = name
+    if (avatarUrl) updates.avatar_url = avatarUrl
+    if (Object.keys(updates).length) {
+      try { const { updateUserById } = require('../supabase'); await updateUserById(req.userId, updates) } catch {}
+    }
+  } else {
+    if (name) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.userId)
+    if (avatarUrl) db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.userId)
+  }
   res.json({ success: true })
 })
 

@@ -185,6 +185,47 @@ async function getScanHistory(userId, limit = 12) {
   }
 }
 
+// ── Webhook idempotency helpers ───────────────────────────────────────────────
+// Prevents re-processing Stripe events when Stripe re-delivers them (at-least-once).
+
+async function isWebhookProcessed(eventId) {
+  const sb = getSupabase()
+  if (!sb) return false
+  try {
+    const { data } = await sb
+      .from('processed_webhook_events')
+      .select('event_id')
+      .eq('event_id', eventId)
+      .maybeSingle()
+    return !!data
+  } catch {
+    return false // fail open: process the event rather than silently drop it
+  }
+}
+
+async function markWebhookProcessed(eventId, eventType) {
+  const sb = getSupabase()
+  if (!sb) return
+  try {
+    await sb.from('processed_webhook_events').insert({ event_id: eventId, event_type: eventType })
+  } catch (err) {
+    console.warn('[Supabase] markWebhookProcessed failed (non-fatal):', err.message)
+  }
+}
+
+// ── Streak helper ─────────────────────────────────────────────────────────────
+
+async function getStreakByUserId(userId) {
+  const sb = getSupabase()
+  if (!sb || !userId) return null
+  try {
+    const { data } = await sb.from('streaks').select('*').eq('user_id', userId).maybeSingle()
+    return data
+  } catch {
+    return null
+  }
+}
+
 module.exports = {
   getSupabase,
   getOrCreateUser,
@@ -197,4 +238,7 @@ module.exports = {
   setScanCache,
   saveScanHistory,
   getScanHistory,
+  isWebhookProcessed,
+  markWebhookProcessed,
+  getStreakByUserId,
 }

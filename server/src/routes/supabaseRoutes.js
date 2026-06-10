@@ -1,19 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Supabase persistence routes
 // All routes require JWT auth. Service key stays server-side only.
+//
+// In production the JWT userId IS the Supabase UUID (both paths in auth.js use
+// the same UUID). We use req.userId directly instead of the old email-lookup
+// chain that hit SQLite synchronously on every request.
 // ─────────────────────────────────────────────────────────────────────────────
 const express = require('express')
 const { authMiddleware: auth } = require('../middleware/auth')
-const { getSupabase, getOrCreateUser, isConfigured } = require('../supabase')
-const db = require('../db')
+const { getSupabase, isConfigured, updateUserById } = require('../supabase')
 
 const router = express.Router()
-
-// Helper: get user email from SQLite by JWT userId
-function getUserEmail(userId) {
-  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(userId)
-  return row?.email ?? null
-}
 
 // Helper: 503 if Supabase not configured
 function requireSupabase(res) {
@@ -30,11 +27,8 @@ router.post('/scans', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
     const sb = getSupabase()
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-
-    const sbUserId = await getOrCreateUser(email, { gender: req.body.gender })
-    if (!sbUserId) return res.status(500).json({ error: 'Failed to sync user to Supabase' })
+    // req.userId is the Supabase UUID in production (same UUID used at registration)
+    const sbUserId = req.userId
 
     const {
       overallScore, tier, faceScore, groomingScore,
@@ -87,7 +81,6 @@ router.post('/scans', auth, async (req, res) => {
     // Save plan tasks if provided
     const { tasks } = req.body
     if (Array.isArray(tasks) && tasks.length) {
-      // Replace this user's tasks with the new plan
       await sb.from('plan_tasks').delete().eq('user_id', sbUserId)
       const rows = tasks.map(t => ({
         user_id:      sbUserId,
@@ -125,21 +118,10 @@ router.get('/scans', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
     const sb = getSupabase()
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-
-    const { data: sbUser } = await sb
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-
-    if (!sbUser) return res.json({ scans: [] })
-
     const { data: scans, error } = await sb
       .from('scans')
       .select('*')
-      .eq('user_id', sbUser.id)
+      .eq('user_id', req.userId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -156,21 +138,10 @@ router.get('/progress', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
     const sb = getSupabase()
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-
-    const { data: sbUser } = await sb
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-
-    if (!sbUser) return res.json({ progress: [] })
-
     const { data: progress, error } = await sb
       .from('progress')
       .select('*, scans(tier, body_category, created_at)')
-      .eq('user_id', sbUser.id)
+      .eq('user_id', req.userId)
       .order('date', { ascending: true })
 
     if (error) throw error
@@ -189,18 +160,6 @@ router.patch('/tasks/:id', auth, async (req, res) => {
     const sb = getSupabase()
     const { isCompleted } = req.body
 
-    // Resolve the caller's Supabase user id so they can only touch their own
-    // tasks. Without this, any authenticated user could toggle anyone's task
-    // by guessing its UUID (IDOR).
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-    const { data: sbUser } = await sb
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-    if (!sbUser) return res.status(404).json({ error: 'User not found' })
-
     const { data: updated, error } = await sb
       .from('plan_tasks')
       .update({
@@ -208,7 +167,7 @@ router.patch('/tasks/:id', auth, async (req, res) => {
         completed_at: isCompleted ? new Date().toISOString() : null,
       })
       .eq('id', req.params.id)
-      .eq('user_id', sbUser.id) // ownership scope
+      .eq('user_id', req.userId) // ownership scope — prevents IDOR
       .select('id')
 
     if (error) throw error
@@ -226,21 +185,10 @@ router.get('/tasks', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
     const sb = getSupabase()
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-
-    const { data: sbUser } = await sb
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-
-    if (!sbUser) return res.json({ tasks: [] })
-
     const { data: tasks, error } = await sb
       .from('plan_tasks')
       .select('*')
-      .eq('user_id', sbUser.id)
+      .eq('user_id', req.userId)
       .order('week_number', { ascending: true })
       .order('created_at', { ascending: true })
 
@@ -257,13 +205,6 @@ router.get('/tasks', auth, async (req, res) => {
 router.put('/user', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
-    const sb = getSupabase()
-    const email = getUserEmail(req.userId)
-    if (!email) return res.status(404).json({ error: 'User not found' })
-
-    const sbUserId = await getOrCreateUser(email)
-    if (!sbUserId) return res.status(500).json({ error: 'Failed to sync user' })
-
     const allowed = ['gender', 'height_cm', 'weight_kg', 'hair_type', 'assigned_phase', 'goal_type', 'improvement_focus', 'ai_consent', 'consent_at']
     const updates = {}
     for (const key of allowed) {
@@ -271,8 +212,7 @@ router.put('/user', auth, async (req, res) => {
     }
 
     if (Object.keys(updates).length) {
-      const { error } = await sb.from('users').update(updates).eq('id', sbUserId)
-      if (error) throw error
+      await updateUserById(req.userId, updates)
     }
 
     res.json({ ok: true })
@@ -314,7 +254,7 @@ router.post('/upload-image', auth, async (req, res) => {
 })
 
 // ── GET /supabase/status ───────────────────────────────────────────────────────
-// Health check: is Supabase configured and reachable? Auth required — never expose config info publicly.
+// Health check: is Supabase configured and reachable? Auth required.
 router.get('/status', auth, async (req, res) => {
   if (!isConfigured()) {
     return res.json({ configured: false, message: 'Add SUPABASE_URL and SUPABASE_SERVICE_KEY to server/.env' })

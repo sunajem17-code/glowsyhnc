@@ -4,7 +4,7 @@
 
 const express = require('express')
 const { authMiddleware } = require('../middleware/auth')
-const { getUserById, updateUserById } = require('../supabase')
+const { getUserById, updateUserById, isConfigured } = require('../supabase')
 const db = require('../db')
 
 const router = express.Router()
@@ -54,14 +54,16 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     console.warn('[Promo] Supabase update failed:', err.message)
   }
 
-  try {
-    db.prepare(`
-      UPDATE users
-      SET subscription_tier = 'premium', is_pro = 1, promo_redeemed = 1, promo_expires_at = NULL
-      WHERE id = ?
-    `).run(req.userId)
-  } catch (err) {
-    console.warn('[Promo] SQLite update failed (non-fatal):', err.message)
+  if (!isConfigured()) {
+    try {
+      db.prepare(`
+        UPDATE users
+        SET subscription_tier = 'premium', is_pro = 1, promo_redeemed = 1, promo_expires_at = NULL
+        WHERE id = ?
+      `).run(req.userId)
+    } catch (err) {
+      console.warn('[Promo] SQLite update failed (non-fatal):', err.message)
+    }
   }
 
   console.log(`[Promo] SOHAIL redeemed by user ${req.userId} — lifetime Pro granted`)
