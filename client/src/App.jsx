@@ -5,6 +5,7 @@ import { initRevenueCat } from './utils/iap'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
+import UpdatePrompt from './components/UpdatePrompt'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
@@ -94,6 +95,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <UpdatePrompt />
       <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
       <AnimatePresence mode="wait">
         <Routes>
