@@ -1,30 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
+import { initRevenueCat } from './utils/iap'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
-import Dashboard from './pages/Dashboard'
-import Scan from './pages/Scan'
-import Results from './pages/Results'
-import ActionPlan from './pages/ActionPlan'
-import Progress from './pages/Progress'
-import DailyCheckin from './pages/DailyCheckin'
-import Profile from './pages/Profile'
-import Premium from './pages/Premium'
-import HairMaxx from './pages/HairMaxx'
-import Leaderboard from './pages/Leaderboard'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import Terms from './pages/Terms'
-import Referral from './pages/Referral'
-import Compare from './pages/Compare'
-import AICoach from './pages/AICoach'
-import PaymentSuccess from './pages/PaymentSuccess'
-import PremiumSplash from './pages/PremiumSplash'
-import Landing from './pages/Landing'
+
+// Heavy routes — lazy loaded so the initial bundle only ships what's needed
+const Dashboard      = lazy(() => import('./pages/Dashboard'))
+const Scan           = lazy(() => import('./pages/Scan'))
+const Results        = lazy(() => import('./pages/Results'))
+const ActionPlan     = lazy(() => import('./pages/ActionPlan'))
+const Progress       = lazy(() => import('./pages/Progress'))
+const DailyCheckin   = lazy(() => import('./pages/DailyCheckin'))
+const Profile        = lazy(() => import('./pages/Profile'))
+const Premium        = lazy(() => import('./pages/Premium'))
+const HairMaxx       = lazy(() => import('./pages/HairMaxx'))
+const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
+const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'))
+const Terms          = lazy(() => import('./pages/Terms'))
+const Referral       = lazy(() => import('./pages/Referral'))
+const Compare        = lazy(() => import('./pages/Compare'))
+const AICoach        = lazy(() => import('./pages/AICoach'))
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
+const PremiumSplash  = lazy(() => import('./pages/PremiumSplash'))
+const Landing        = lazy(() => import('./pages/Landing'))
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -47,6 +50,9 @@ export default function App() {
   // Capture email UTM params on every load (for email click attribution)
   useEffect(() => { captureEmailUTM() }, [])
 
+  // Initialize RevenueCat on native platforms
+  useEffect(() => { initRevenueCat().catch(() => {}) }, [])
+
   // Check if pro trial has expired on load
   useEffect(() => {
     if (checkProTrial) checkProTrial()
@@ -60,6 +66,13 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [isAuthenticated])
+
+  // Network connectivity monitoring — graceful offline handling via browser API
+  useEffect(() => {
+    const handleOffline = () => console.warn('[Network] Device went offline')
+    window.addEventListener('offline', handleOffline)
+    return () => window.removeEventListener('offline', handleOffline)
+  }, [])
 
   // Skip splash entirely for unauthenticated users — they land on the SEO landing
   // page directly, which is better for conversion AND Google crawling.
@@ -81,6 +94,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
       <AnimatePresence mode="wait">
         <Routes>
           {/* Legal pages + payment return — always accessible */}
@@ -88,10 +102,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
 
-          {/* Landing page for unauthenticated visitors — beats path="*" by specificity */}
-          {!isAuthenticated && (
-            <Route path="/" element={<Landing />} />
-          )}
+          {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
           {/* Auth always accessible — must be outside hasOnboarded gate */}
           <Route path="/auth" element={
@@ -123,6 +134,7 @@ export default function App() {
           )}
         </Routes>
       </AnimatePresence>
+      </Suspense>
     </BrowserRouter>
   )
 }

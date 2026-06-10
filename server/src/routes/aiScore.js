@@ -50,7 +50,7 @@ function getClient() {
 // ── Concurrency queue ─────────────────────────────────────────────────────────
 // At most MAX_CONCURRENT scoring requests run simultaneously.
 // Additional requests are queued (FIFO) and run as slots free up.
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 30
 let _running = 0
 const _waiters = []
 

@@ -64,9 +64,10 @@ try {
 } catch (e) {
   console.warn('⚠️  Email scheduler not started:', e.message)
 }
-const express = require('express')
-const cors    = require('cors')
-const helmet  = require('helmet')
+const express     = require('express')
+const cors        = require('cors')
+const helmet      = require('helmet')
+const compression = require('compression')
 const path    = require('path')
 
 const app  = express()
@@ -81,6 +82,12 @@ app.post('/api/payments/webhook',
   paymentsRouter.handleWebhook,
 )
 console.log('✅ Stripe webhook registered at /api/payments/webhook (raw body)')
+
+// ── Compression (gzip) — must come before routes ──────────────────────────────
+app.use(compression())
+
+// ── Reduce JSON body limit (10mb is far too large — 2mb is plenty) ────────────
+// Note: express.json below is set to 2mb
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
@@ -100,7 +107,7 @@ app.use(cors({
   },
   credentials: true,
 }))
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded photos
