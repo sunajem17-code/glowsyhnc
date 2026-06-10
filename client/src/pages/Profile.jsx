@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Browser } from '@capacitor/browser'
+import { Capacitor } from '@capacitor/core'
+import { isNative } from '../utils/iap'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Shield, CreditCard, Share2, Trash2,
   ChevronRight, LogOut, Star, Award, Camera, X, Copy, Check, Eye, BarChart2, Database, Sparkles, ChevronDown,
+  User, Heart, Ruler, Map, TrendingUp, RefreshCw, Bot, MessageCircle, ArrowRight,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -23,12 +27,12 @@ const CANCEL_REASONS = [
 ]
 
 const LOSES = [
-  { icon: '📐', label: 'Detailed face metrics (6 pillars + profile)' },
-  { icon: '⭐', label: 'Celebrity lookalike matching' },
-  { icon: '🗺️', label: 'Your 12-week transformation plan' },
-  { icon: '📈', label: 'Progress tracking & before/after' },
-  { icon: '🔄', label: 'Unlimited monthly scans' },
-  { icon: '🤖', label: 'AI Improvement Coach' },
+  { icon: <Ruler size={16} style={{ color: '#C6A85C' }} />, label: 'Detailed face metrics (6 pillars + profile)' },
+  { icon: <Star size={16} style={{ color: '#C6A85C', fill: '#C6A85C' }} />, label: 'Celebrity lookalike matching' },
+  { icon: <Map size={16} style={{ color: '#C6A85C' }} />, label: 'Your 12-week transformation plan' },
+  { icon: <TrendingUp size={16} style={{ color: '#C6A85C' }} />, label: 'Progress tracking & before/after' },
+  { icon: <RefreshCw size={16} style={{ color: '#C6A85C' }} />, label: 'Unlimited monthly scans' },
+  { icon: <Bot size={16} style={{ color: '#C6A85C' }} />, label: 'AI Improvement Coach' },
 ]
 
 function CancelModal({ onClose }) {
@@ -44,8 +48,14 @@ function CancelModal({ onClose }) {
     setCancelling(true)
     setPortalError('')
     try {
-      const { url } = await api.payments.portal()
-      window.location.href = url // Stripe portal handles cancellation
+      if (isNative()) {
+        // iOS: Apple manages subscriptions — open Apple ID subscription settings
+        await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' })
+        setCancelling(false)
+      } else {
+        const { url } = await api.payments.portal()
+        window.location.href = url
+      }
     } catch (err) {
       setPortalError('Could not open billing portal. Please contact support@ascendus.com.')
       setCancelling(false)
@@ -90,7 +100,7 @@ function CancelModal({ onClose }) {
               {LOSES.map(({ icon, label }) => (
                 <div key={label} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span className="text-base">{icon}</span>
+                  <span className="flex-shrink-0 flex items-center">{icon}</span>
                   <p className="font-body text-[13px] text-white/75">{label}</p>
                 </div>
               ))}
@@ -196,7 +206,7 @@ function CancelModal({ onClose }) {
         {/* Step 3 — Done */}
         {step === 3 && (
           <div className="px-5 pt-3 pb-10 text-center">
-            <div className="text-4xl mb-4 mt-6">👋</div>
+            <div className="mb-4 mt-6"><User size={40} style={{ color: '#C6A85C' }} /></div>
             <h3 className="font-heading font-bold text-[18px] text-white mb-2">Subscription Cancelled</h3>
             <p className="font-body text-sm text-white/50 mb-6 leading-relaxed">
               You'll have access until the end of your current period.<br />
@@ -309,8 +319,13 @@ export default function Profile() {
     setCancellingDirect(true)
     setCancelDirectError('')
     try {
-      const { url } = await api.payments.portal()
-      window.location.href = url
+      if (isNative()) {
+        await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' })
+        setCancellingDirect(false)
+      } else {
+        const { url } = await api.payments.portal()
+        window.location.href = url
+      }
     } catch (err) {
       setCancelDirectError('Could not open billing portal. Try again or email support@ascendus.com.')
       setCancellingDirect(false)
@@ -500,7 +515,7 @@ export default function Profile() {
                   opacity: unlocked ? 1 : 0.4,
                 }}
               >
-                <span className="text-xl mb-1">{ach.emoji}</span>
+                <ach.Icon size={20} className="mb-1" style={{ color: unlocked ? ach.color : 'rgba(255,255,255,0.3)' }} />
                 <p className="font-heading font-bold text-[10px] leading-tight" style={{ color: unlocked ? ach.color : TEXT_DIM }}>
                   {ach.title}
                 </p>
@@ -530,7 +545,7 @@ export default function Profile() {
           />
           <div className="px-5 pt-5 pb-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-base font-mono" style={{ color: GOLD }}>✦</span>
+              <Sparkles size={14} style={{ color: GOLD }} />
               <span
                 className="text-[10px] font-heading font-bold uppercase tracking-widest"
                 style={{ color: GOLD }}
@@ -558,10 +573,10 @@ export default function Profile() {
                 letterSpacing: '0.01em',
               }}
             >
-              Start Free Trial →
+              Start Free Trial <ArrowRight size={15} style={{ display: 'inline', verticalAlign: 'middle' }} />
             </motion.button>
             <p className="text-center text-[10px] font-body mt-2.5" style={{ color: TEXT_DIM }}>
-              2-day free trial · Cancel anytime
+              3-day free trial · Cancel anytime
             </p>
           </div>
         </motion.div>
@@ -622,13 +637,25 @@ export default function Profile() {
         <SettingsRow
           icon={Shield}
           label="Privacy Policy"
-          onClick={() => navigate('/privacy')}
+          onClick={async () => {
+            if (Capacitor.isNativePlatform()) {
+              await Browser.open({ url: 'https://ascendus.store/privacy' })
+            } else {
+              navigate('/privacy')
+            }
+          }}
         />
         <div style={dividerStyle} />
         <SettingsRow
           icon={Shield}
           label="Terms of Service"
-          onClick={() => navigate('/terms')}
+          onClick={async () => {
+            if (Capacitor.isNativePlatform()) {
+              await Browser.open({ url: 'https://ascendus.store/terms' })
+            } else {
+              navigate('/terms')
+            }
+          }}
         />
       </motion.div>
 
@@ -752,26 +779,28 @@ export default function Profile() {
                   },
                   {
                     label: 'WhatsApp',
-                    emoji: '💬',
+                    Icon: MessageCircle,
+                    iconColor: '#25D366',
                     bg: '#0D1F12',
                     border: 'rgba(37,211,102,0.2)',
                     action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out Ascendus — the AI appearance tracker ascendus.store`)}`, '_blank'),
                   },
                   {
                     label: 'Instagram',
-                    emoji: '📸',
+                    Icon: Camera,
+                    iconColor: '#C13584',
                     bg: '#1A0D1A',
                     border: 'rgba(193,53,132,0.2)',
                     action: () => { copyLink(); alert('Link copied! Paste it in your Instagram bio or story.') },
                   },
-                ].map(({ label, emoji, bg, border, action }) => (
+                ].map(({ label, Icon, iconColor, emoji, bg, border, action }) => (
                   <button
                     key={label}
                     onClick={action}
                     className="flex flex-col items-center gap-2 py-4 rounded-2xl active:scale-95 transition-transform"
                     style={{ background: bg, border: `1px solid ${border}` }}
                   >
-                    <span className="text-xl">{emoji}</span>
+                    <span className="text-xl">{Icon ? <Icon size={22} style={{ color: iconColor }} /> : emoji}</span>
                     <span
                       className="text-[10px] font-heading font-bold"
                       style={{ color: 'rgba(255,255,255,0.6)' }}
@@ -1000,7 +1029,7 @@ export default function Profile() {
 
               {rated ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                  <p className="text-5xl mb-3">🙏</p>
+                  <Heart size={48} className="mb-3" style={{ color: '#C6A85C' }} />
                   <h3
                     className="font-heading font-bold text-xl mb-1"
                     style={{ color: TEXT, letterSpacing: '-0.01em' }}

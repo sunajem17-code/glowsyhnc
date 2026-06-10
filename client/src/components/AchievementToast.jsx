@@ -32,10 +32,10 @@ export default function AchievementToast() {
           }}
         >
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl"
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: `${ach.color}15`, border: `1px solid ${ach.color}30` }}
           >
-            {ach.emoji}
+            <ach.Icon size={20} style={{ color: ach.color }} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-heading font-bold text-[13px]" style={{ color: ach.color }}>

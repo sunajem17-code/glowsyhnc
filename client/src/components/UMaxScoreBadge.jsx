@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { ChevronDown, ChevronUp, Info, AlertTriangle } from 'lucide-react'
 import { getTier, getTiersForGender } from '../utils/analysis'
 
 // ─── Full Score Scale reference ───────────────────────────────────────────────
@@ -57,7 +57,7 @@ export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale =
         className="rounded-2xl border-2 px-4 py-4 flex flex-col items-center text-center"
         style={{ background: 'rgba(255,71,87,0.08)', borderColor: 'rgba(255,71,87,0.25)' }}
       >
-        <p className="text-2xl mb-2">⚠️</p>
+        <AlertTriangle size={28} className="mb-2" style={{ color: '#EF4444' }} />
         <p className="font-heading font-bold text-sm text-primary">Analysis incomplete</p>
         <p className="text-[11px] text-secondary font-body mt-1 leading-relaxed">
           Unable to calculate score. Please retake your scan with a clearer, well-lit photo.
@@ -76,7 +76,7 @@ export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale =
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border"
         style={{ background: tier.bg, borderColor: tier.border }}
       >
-        <span className="text-base">{tier.emoji}</span>
+        <tier.Icon size={16} style={{ color: tier.color }} />
         <div>
           <p className="font-mono font-bold text-sm leading-none" style={{ color: tier.color }}>
             {umaxScore.toFixed(1)}
@@ -104,7 +104,7 @@ export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale =
             {/* Tier label + score */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">{tier.emoji}</span>
+                <tier.Icon size={24} style={{ color: tier.color }} />
                 <div>
                   <p className="text-[10px] font-body text-secondary uppercase tracking-widest">
                     Overall Rating

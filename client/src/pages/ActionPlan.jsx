@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, ChevronLeft, ChevronRight, Zap } from 'lucide-react'
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, ChevronLeft, ChevronRight, Zap, ClipboardList, Target, Dumbbell, Sparkles, Salad, Scissors, Ruler, Shirt, Gift, Trophy } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -29,14 +29,14 @@ const PHASE_COLORS = {
 }
 
 const CATEGORY_CONFIG = {
-  face:      { emoji: '🎯', label: 'Face',      color: '#A29BFE' },
-  body:      { emoji: '💪', label: 'Body',      color: '#1A6B5C' },
-  skin:      { emoji: '✨', label: 'Skin',      color: '#F5A623' },
-  training:  { emoji: '🏋️', label: 'Training',  color: '#E07A5F' },
-  nutrition: { emoji: '🥗', label: 'Nutrition', color: '#34C759' },
-  grooming:  { emoji: '💈', label: 'Appeal',    color: '#2D9CDB' },
-  posture:   { emoji: '📐', label: 'Posture',   color: '#1A6B5C' },
-  style:     { emoji: '👔', label: 'Style',     color: '#9B8EA0' },
+  face:      { Icon: Target,   label: 'Face',      color: '#A29BFE' },
+  body:      { Icon: Dumbbell, label: 'Body',      color: '#1A6B5C' },
+  skin:      { Icon: Sparkles, label: 'Skin',      color: '#F5A623' },
+  training:  { Icon: Dumbbell, label: 'Training',  color: '#E07A5F' },
+  nutrition: { Icon: Salad,    label: 'Nutrition', color: '#34C759' },
+  grooming:  { Icon: Scissors, label: 'Appeal',    color: '#2D9CDB' },
+  posture:   { Icon: Ruler,    label: 'Posture',   color: '#1A6B5C' },
+  style:     { Icon: Shirt,    label: 'Style',     color: '#9B8EA0' },
 }
 
 const TABS = ['All', 'Face', 'Body', 'Skin', 'Training', 'Nutrition', 'Appeal', 'Posture']
@@ -61,7 +61,7 @@ function TaskCard({ task, onToggle, detailLocked, onUpgrade }) {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
               <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                <span className="text-xs">{cfg.emoji}</span>
+                <cfg.Icon size={12} style={{ color: cfg.color }} />
                 <span className="text-[10px] font-heading font-bold uppercase tracking-wide" style={{ color: cfg.color }}>
                   {cfg.label}
                 </span>
@@ -211,7 +211,7 @@ export default function ActionPlan() {
   if (!currentPlan) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-        <p className="text-4xl mb-4">📋</p>
+        <ClipboardList size={40} className="mb-4" style={{ color: '#C6A85C' }} />
         <h2 className="font-heading font-bold text-xl text-primary mb-2">No plan yet</h2>
         <p className="text-secondary text-sm font-body mb-6">Complete a full scan to generate your personalized 12-week plan.</p>
         <button onClick={() => navigate('/scan')} className="btn-primary max-w-xs">Start Your First Scan</button>
@@ -377,9 +377,14 @@ export default function ActionPlan() {
           <>
             {filteredTasks.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-2xl mb-2">
-                  {activeTab === 'All' ? '🎉' : CATEGORY_CONFIG[activeTab.toLowerCase() === 'appeal' ? 'grooming' : activeTab.toLowerCase()]?.emoji ?? '📋'}
-                </p>
+                <div className="flex justify-center mb-2">
+                  {(() => {
+                    if (activeTab === 'All') return <Gift size={24} style={{ color: '#C6A85C' }} />
+                    const cfg = CATEGORY_CONFIG[activeTab.toLowerCase() === 'appeal' ? 'grooming' : activeTab.toLowerCase()]
+                    if (cfg) return <cfg.Icon size={24} style={{ color: cfg.color }} />
+                    return <ClipboardList size={24} style={{ color: '#C6A85C' }} />
+                  })()}
+                </div>
                 <p className="text-secondary text-sm font-body">
                   {activeTab === 'All'
                     ? 'No tasks assigned this week.'

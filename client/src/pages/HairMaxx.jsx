@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, X, Lock, Copy, Check,
   Scissors, Star, StarOff, Camera, Upload, Loader2,
-  Sparkles, RotateCcw,
+  Sparkles, RotateCcw, Lightbulb,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
+import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import {
   FACE_SHAPES,
   HAIR_DENSITIES,
@@ -147,13 +148,34 @@ function ModeSelector({ onAI, onManual }) {
 function PhotoCapture({ onPhoto, onBack }) {
   const [preview, setPreview] = useState(null)
   const [file, setFile] = useState(null)
-  const cameraRef = useRef(null)
   const uploadRef = useRef(null)
 
   function handleFile(f) {
     if (!f) return
     setFile(f)
     setPreview(URL.createObjectURL(f))
+  }
+
+  async function handleCamera() {
+    if (isNative()) {
+      try {
+        const dataUrl = await takePhoto()
+        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
+      } catch {}
+    } else {
+      uploadRef.current?.click()
+    }
+  }
+
+  async function handleUpload() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhoto()
+        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
+      } catch {}
+    } else {
+      uploadRef.current?.click()
+    }
   }
 
   return (
@@ -192,7 +214,7 @@ function PhotoCapture({ onPhoto, onBack }) {
       {/* Buttons */}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={() => cameraRef.current?.click()}
+          onClick={handleCamera}
           className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
           style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
         >
@@ -200,7 +222,7 @@ function PhotoCapture({ onPhoto, onBack }) {
           Camera
         </button>
         <button
-          onClick={() => uploadRef.current?.click()}
+          onClick={handleUpload}
           className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
           style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
         >
@@ -209,13 +231,12 @@ function PhotoCapture({ onPhoto, onBack }) {
         </button>
       </div>
 
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
       <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
 
       {/* Tip */}
       <div className="px-4 py-3 rounded-xl" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
         <p className="text-xs font-body leading-relaxed" style={{ color: GOLD_DIM }}>
-          💡 Tips for best results: good front-facing lighting, hair pulled back from forehead, neutral expression
+          <Lightbulb size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Tips for best results: good front-facing lighting, hair pulled back from forehead, neutral expression
         </p>
       </div>
 
@@ -722,7 +743,17 @@ export default function HairMaxx() {
     setAiStep('loading')
     setAiError(null)
     try {
-      const { base64, mediaType } = await fileToBase64(file)
+      let base64, mediaType
+      if (typeof file === 'string' && file.startsWith('data:')) {
+        // Native camera returns a dataUrl
+        const [header, data] = file.split(',')
+        base64 = data
+        mediaType = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
+      } else {
+        const result = await fileToBase64(file)
+        base64 = result.base64
+        mediaType = result.mediaType
+      }
       const result = await api.hair.analyze({ imageData: base64, mediaType })
       setAiResult(result)
       setAiStep('results')

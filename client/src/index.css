@@ -43,9 +43,10 @@
     box-sizing: border-box;
   }
 
-  /* Force Apple Color Emoji rendering in iOS WKWebView */
-  .emoji, span.text-2xl, span.text-3xl, span.text-xl, span.text-5xl {
-    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif !important;
+  /* Force Apple Color Emoji fallback for emoji-bearing spans on iOS WKWebView.
+     Keep Inter first so text glyphs render correctly; emoji fonts fill the rest. */
+  .emoji, span.text-xl, span.text-2xl, span.text-3xl, span.text-4xl, span.text-5xl {
+    font-family: 'Inter', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif !important;
   }
 
   html, body, #root {
@@ -54,7 +55,7 @@
   }
 
   body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
     background-color: var(--bg);
     color: var(--text-primary);
     overscroll-behavior: none;

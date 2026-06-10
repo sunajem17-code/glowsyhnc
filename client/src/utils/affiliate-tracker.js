@@ -161,7 +161,7 @@ export function ProductRecommendations({ scores = {}, userId }) {
   return createElement('div', { className: 'affiliate-recs' },
     createElement('p', {
       style: { fontSize: 11, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }
-    }, `💡 Top picks to boost your ${lowestCat} score`),
+    }, `Top picks to boost your ${lowestCat} score`),
 
     ...products.map(([id, product]) =>
       createElement('div', {
@@ -173,7 +173,7 @@ export function ProductRecommendations({ scores = {}, userId }) {
           border: '1px solid var(--border)',
         }
       },
-        createElement('span', { style: { fontSize: 24 } }, product.icon),
+        createElement('span', { style: { fontSize: 24, fontFamily: "'Apple Color Emoji','Noto Color Emoji',sans-serif" } }, product.icon),
         createElement('div', { style: { flex: 1 } },
           createElement('p', { style: { fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 } }, product.name),
           createElement('p', { style: { fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 } }, product.reason),
@@ -185,7 +185,7 @@ export function ProductRecommendations({ scores = {}, userId }) {
             background: 'var(--gold)', color: '#000', fontWeight: 700,
             fontSize: 12, border: 'none', cursor: 'pointer',
           }
-        }, 'View →')
+        }, 'View >')
       )
     ),
 

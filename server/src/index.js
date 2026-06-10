@@ -132,6 +132,8 @@ app.use('/api/hair',        require('./routes/hair'))
 app.use('/api/referral',    require('./routes/referral'))
 app.use('/api/promo',       require('./routes/promo'))
 app.use('/api/potential',   require('./routes/potential'))
+app.use('/api/swipemaxx',   require('./routes/swipemaxx'))
+app.use('/api/community',   require('./routes/community'))
 app.use('/webhooks',        require('./routes/email-webhooks'))
 
 // Health checks

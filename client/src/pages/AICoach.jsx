@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, Lock, ChevronRight, RotateCcw } from 'lucide-react'
+import { Send, Sparkles, Lock, ChevronRight, RotateCcw, Check } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -264,6 +264,26 @@ export default function AICoach() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
+        {/* Citations / Medical Disclaimer */}
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-4"
+          style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.22)' }}
+        >
+          <span className="text-[12px] flex-shrink-0 mt-0.5" style={{ color: '#C6A85C' }}>ℹ</span>
+          <p className="font-body text-[10px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            For informational purposes only — not medical advice. Sources:{' '}
+            <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>Healthline</a>
+            ,{' '}
+            <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>NIH</a>
+            ,{' '}
+            <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>AAD</a>
+            . Consult a qualified professional before making any health decisions.
+          </p>
+        </motion.div>
+
         {/* Free usage counter banner */}
         {!isPremium && !freeCoachLocked && freeMessagesLeft <= FREE_COACH_LIMIT && (
           <motion.div
@@ -373,7 +393,7 @@ export default function AICoach() {
                 'Updated with every new scan',
               ].map((f, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span style={{ color: GOLD, fontSize: 11, marginTop: 2 }}>✓</span>
+                  <Check size={11} style={{ color: GOLD, marginTop: 2, flexShrink: 0 }} />
                   <span className="font-body text-[12px] text-secondary">{f}</span>
                 </li>
               ))}

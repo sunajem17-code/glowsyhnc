@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, Flame, Droplets, Dumbbell, Moon, Sun, Heart } from 'lucide-react'
+import { CheckCircle2, Circle, Flame, Droplets, Dumbbell, Moon, Sun, Heart, Sparkles, Star, Frown, Meh, SmilePlus, Smile, Laugh } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -86,9 +86,9 @@ export default function DailyCheckin() {
           <motion.div
             animate={{ rotate: [0, -10, 10, -10, 0] }}
             transition={{ delay: 0.3, duration: 0.5 }}
-            className="text-6xl mb-6"
+            className="mb-6 flex justify-center"
           >
-            {completionScore >= 4 ? '🔥' : completionScore >= 3 ? '💪' : '✅'}
+            {completionScore >= 4 ? <Flame size={56} style={{ color: '#FF6B35' }} /> : completionScore >= 3 ? <Dumbbell size={56} style={{ color: '#C6A85C' }} /> : <CheckCircle2 size={56} style={{ color: '#34C759' }} />}
           </motion.div>
           <h2 className="font-heading font-bold text-2xl text-primary mb-2">
             {completionScore >= 4 ? 'On fire!' : completionScore >= 3 ? 'Solid day!' : 'Check-in logged!'}
@@ -122,7 +122,7 @@ export default function DailyCheckin() {
           {/* Streak banner */}
           {streak.current > 0 && (
             <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 dark:bg-orange-900/20 rounded-2xl mb-4 border border-orange-200 dark:border-orange-800">
-              <span className="fire-icon">🔥</span>
+              <Flame size={20} className="fire-icon" style={{ color: '#FF6B35' }} />
               <p className="text-sm font-heading font-bold text-orange-600 dark:text-orange-400">
                 {streak.current}-day streak! Keep it going.
               </p>
@@ -168,7 +168,7 @@ export default function DailyCheckin() {
           {/* Skincare */}
           <div className="card mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">✨</span>
+              <Sparkles size={18} style={{ color: '#C6A85C' }} />
               <h3 className="font-heading font-bold text-sm text-primary">Skincare</h3>
             </div>
             <div className="flex gap-3">
@@ -207,7 +207,7 @@ export default function DailyCheckin() {
                 <Circle size={20} className="text-gray-300" />
               )}
               <span className={`font-heading font-semibold text-sm ${exerciseDone ? 'text-[#C6A85C]' : 'text-secondary'}`}>
-                {exerciseDone ? "Today's exercises done! 💪" : "Mark today's exercises complete"}
+                {exerciseDone ? <span className="flex items-center gap-1">Today's exercises done! <Dumbbell size={14} style={{ color: '#C6A85C' }} /></span> : "Mark today's exercises complete"}
               </span>
             </button>
           </div>
@@ -220,12 +220,12 @@ export default function DailyCheckin() {
             </div>
             <div className="flex gap-3 justify-center">
               {[
-                { val: 1, emoji: '😞', label: 'Low' },
-                { val: 2, emoji: '😕', label: 'Meh' },
-                { val: 3, emoji: '😐', label: 'OK' },
-                { val: 4, emoji: '🙂', label: 'Good' },
-                { val: 5, emoji: '😄', label: 'Great' },
-              ].map(({ val, emoji, label }) => (
+                { val: 1, Icon: Frown,    label: 'Low',   color: '#EF4444' },
+                { val: 2, Icon: Meh,      label: 'Meh',   color: '#F97316' },
+                { val: 3, Icon: SmilePlus, label: 'OK',   color: '#F5A623' },
+                { val: 4, Icon: Smile,    label: 'Good',  color: '#34C759' },
+                { val: 5, Icon: Laugh,    label: 'Great', color: '#C6A85C' },
+              ].map(({ val, Icon, label, color }) => (
                 <button
                   key={val}
                   onClick={() => setMood(val)}
@@ -234,9 +234,9 @@ export default function DailyCheckin() {
                   <motion.div
                     animate={{ scale: mood === val ? 1.3 : 1 }}
                     transition={{ type: 'spring', stiffness: 400 }}
-                    className={`text-2xl ${mood === val ? '' : 'opacity-40'}`}
+                    className={`${mood === val ? '' : 'opacity-40'}`}
                   >
-                    {emoji}
+                    <Icon size={24} style={{ color }} />
                   </motion.div>
                   <span className={`text-[9px] font-body ${mood === val ? 'text-primary font-semibold' : 'text-secondary'}`}>{label}</span>
                 </button>
@@ -259,7 +259,7 @@ export default function DailyCheckin() {
             disabled={completionScore === 0}
             className={`btn-primary mb-8 ${completionScore === 0 ? 'opacity-50' : ''}`}
           >
-            {completionScore === 5 ? '🔥 Perfect Day — Log Check-In!' : '✅ Log Today\'s Check-In'}
+            {completionScore === 5 ? <span className="flex items-center justify-center gap-1.5"><Flame size={16} style={{ color: '#FF6B35' }} /> Perfect Day — Log Check-In!</span> : <span className="flex items-center justify-center gap-1.5"><CheckCircle2 size={16} /> Log Today's Check-In</span>}
           </button>
         </div>
       )}

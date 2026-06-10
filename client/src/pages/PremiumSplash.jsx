@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
+import { Crown } from 'lucide-react'
 import useStore from '../store/useStore'
 import appIcon from '../assets/ascendus-icon-transparent.png'
 
@@ -136,7 +137,7 @@ export default function PremiumSplash({ onDone }) {
           marginBottom: 36,
         }}
       >
-        <span style={{ fontSize: 15 }}>👑</span>
+        <Crown size={15} style={{ color: 'inherit' }} />
         <span style={{
           fontFamily: "'Plus Jakarta Sans', sans-serif",
           fontSize: 12,

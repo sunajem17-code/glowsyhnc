@@ -53,4 +53,31 @@ router.post('/claim-trial', verifyToken, async (req, res) => {
   res.json({ ok: true, expiresAt })
 })
 
+// POST /api/referral/unlock-pro
+// Grant permanent Pro if user has >= 3 referrals (share-to-unlock flow)
+router.post('/unlock-pro', verifyToken, async (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Account required' })
+
+  const user = await getUser(req.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+
+  if (user.subscription_tier === 'premium' || user.is_pro) {
+    return res.json({ ok: true, isPremium: true, message: 'Already Pro' })
+  }
+
+  const count = user.referral_count || 0
+  if (count < 3) {
+    return res.status(403).json({
+      error: `Need 3 referrals to unlock Pro. You have ${count}.`,
+      referralCount: count,
+      needed: 3 - count,
+    })
+  }
+
+  try { await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true }) } catch {}
+  try { db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId) } catch {}
+
+  res.json({ ok: true, isPremium: true })
+})
+
 module.exports = router

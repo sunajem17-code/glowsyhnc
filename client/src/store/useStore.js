@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { checkProStatus, isNative } from '../utils/iap'
 
 const useStore = create(
   persist(
@@ -13,8 +14,13 @@ const useStore = create(
         user,
         token,
         isAuthenticated: true,
-        // isPremium is derived at runtime — never trust persisted localStorage value
-        isPremium: false,
+        // Hydrate from the user object immediately so paying users aren't briefly downgraded
+        // while the async RevenueCat / server check completes.
+        isPremium:
+          user?.subscriptionTier === 'premium' ||
+          user?.subscription_tier === 'premium' ||
+          user?.is_pro === true ||
+          false,
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => set({
@@ -30,6 +36,10 @@ const useStore = create(
         isPremium: false,
         pendingFacePhoto: null,
         pendingBodyPhoto: null,
+        hasOnboarded: false,
+        gender: null,
+        userProfile: null,
+        legalConsented: false,
       }),
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
 
@@ -137,10 +147,18 @@ const useStore = create(
         const { token, isAuthenticated } = get()
         if (!isAuthenticated || !token || token === 'demo-token') return
         try {
+          // 0. On iOS check RevenueCat entitlements first (source of truth for IAP)
+          try {
+            if (isNative()) {
+              const isPro = await checkProStatus()
+              if (isPro) set({ isPremium: true })
+            }
+          } catch { /* RevenueCat unavailable — fall through to server check */ }
+
           const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
           const base = `https://${API.replace(/^https?:\/\//, '')}/api`
 
-          // 1. Check payment status
+          // 1. Check payment status (web Stripe — no-op if RevenueCat already set pro)
           const statusRes = await fetch(`${base}/payments/status`, {
             headers: { Authorization: `Bearer ${token}` },
           })

@@ -126,8 +126,21 @@ export const api = {
     submit: (data) => request('/leaderboard/submit', { method: 'POST', body: JSON.stringify(data) }),
   },
   referral: {
-    count: () => request('/referral/count'),
+    count:     () => request('/referral/count'),
     claimTrial: () => request('/referral/claim-trial', { method: 'POST' }),
+    unlockPro: () => request('/referral/unlock-pro',   { method: 'POST' }),
+  },
+  swipemaxx: {
+    rank: (data) => request('/swipemaxx/rank', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  community: {
+    feed:           ()           => request('/community/feed'),
+    post:           (data)       => request('/community/post', { method: 'POST', body: JSON.stringify(data) }),
+    deletePost:     (id)         => request(`/community/post/${id}`, { method: 'DELETE' }),
+    like:           (id)         => request(`/community/post/${id}/like`, { method: 'POST' }),
+    comments:       (id)         => request(`/community/post/${id}/comments`),
+    addComment:     (id, data)   => request(`/community/post/${id}/comment`, { method: 'POST', body: JSON.stringify(data) }),
+    deleteComment:  (id)         => request(`/community/comment/${id}`, { method: 'DELETE' }),
   },
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),

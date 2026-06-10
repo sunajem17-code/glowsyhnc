@@ -29,6 +29,8 @@ const AICoach        = lazy(() => import('./pages/AICoach'))
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
 const PremiumSplash  = lazy(() => import('./pages/PremiumSplash'))
 const Landing        = lazy(() => import('./pages/Landing'))
+const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
+const Community      = lazy(() => import('./pages/Community'))
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -131,6 +133,8 @@ export default function App() {
                 <Route path="referral" element={<Referral />} />
                 <Route path="compare" element={<Compare />} />
                 <Route path="coach" element={<AICoach />} />
+                <Route path="swipemaxx" element={<SwipeMaxx />} />
+                <Route path="community" element={<Community />} />
               </Route>
             </>
           )}

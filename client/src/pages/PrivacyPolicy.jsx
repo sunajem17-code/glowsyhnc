@@ -73,7 +73,11 @@ export default function PrivacyPolicy() {
           <p className="mt-2"><strong style={{ color: TEXT }}>We do not sell, rent, or share your personal data with third parties for marketing purposes.</strong></p>
         </Section>
 
-        <Section title="3. AI & Biometric Data">
+        <Section title="3. Face Data">
+          <p>Ascendus does not store face data. When you submit a photo for analysis, it is transmitted directly to Anthropic's Claude AI API for real-time processing and is not retained by Ascendus after the analysis is complete. Photos are not saved to our servers or databases.</p>
+        </Section>
+
+        <Section title="4. AI & Biometric Data">
           <p>When you perform a scan, your photos are:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>Transmitted securely (HTTPS/TLS) to our server</li>
@@ -85,7 +89,7 @@ export default function PrivacyPolicy() {
           <p className="mt-2">Anthropic's privacy policy governs their processing of data sent to their API. Anthropic does not train models on API inputs. See: anthropic.com/privacy</p>
         </Section>
 
-        <Section title="4. Data Retention & Deletion">
+        <Section title="5. Data Retention & Deletion">
           <p>You can delete your data at any time:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li><strong style={{ color: TEXT }}>Delete scan data:</strong> Profile → Privacy Settings → Delete All Scan Data</li>
@@ -95,17 +99,19 @@ export default function PrivacyPolicy() {
           <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law. Deletion may take up to 30 days to propagate through all systems including automated backups.</p>
         </Section>
 
-        <Section title="5. Third-Party Services">
+        <Section title="6. Third-Party Services">
           <p>We use the following third-party services, each with their own privacy policies:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li><strong style={{ color: TEXT }}>Anthropic Claude API</strong> — AI photo analysis (anthropic.com/privacy)</li>
             <li><strong style={{ color: TEXT }}>Supabase</strong> — Database and file storage (supabase.com/privacy)</li>
-            <li><strong style={{ color: TEXT }}>Stripe</strong> — Payment processing (stripe.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Apple App Store / StoreKit</strong> — In-app purchase processing on iOS (apple.com/legal/privacy)</li>
+            <li><strong style={{ color: TEXT }}>RevenueCat</strong> — Subscription management on iOS (revenuecat.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Stripe</strong> — Payment processing on web (stripe.com/privacy)</li>
             <li><strong style={{ color: TEXT }}>Railway</strong> — Server hosting (railway.app/legal/privacy)</li>
           </ul>
         </Section>
 
-        <Section title="6. Your Rights (PIPEDA / GDPR / CCPA)">
+        <Section title="7. Your Rights (PIPEDA / GDPR / CCPA)">
           <p>Depending on your jurisdiction, you have the right to:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>Access the personal data we hold about you</li>
@@ -118,11 +124,11 @@ export default function PrivacyPolicy() {
           <p className="mt-2">To exercise any of these rights, contact: <strong style={{ color: TEXT }}>support@ascendus.com</strong></p>
         </Section>
 
-        <Section title="7. Children & Minors">
+        <Section title="8. Children & Minors">
           <p>Ascendus is not intended for users under 17 years of age. We do not knowingly collect personal information from minors. If you believe a minor has created an account, contact us immediately at support@ascendus.com and we will delete the data.</p>
         </Section>
 
-        <Section title="8. Security">
+        <Section title="9. Security">
           <p>We protect your data using industry-standard security practices:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>All data transmitted over HTTPS/TLS</li>
@@ -134,11 +140,11 @@ export default function PrivacyPolicy() {
           </ul>
         </Section>
 
-        <Section title="9. Governing Law">
+        <Section title="10. Governing Law">
           <p>This Privacy Policy is governed by the laws of Ontario, Canada, and the federal Personal Information Protection and Electronic Documents Act (PIPEDA). Disputes shall be resolved in the courts of Ontario.</p>
         </Section>
 
-        <Section title="10. Contact Us">
+        <Section title="11. Contact Us">
           <p>Privacy enquiries:</p>
           <p className="mt-1"><strong style={{ color: TEXT }}>Email:</strong> support@ascendus.com</p>
           <p><strong style={{ color: TEXT }}>Company:</strong> Ascendus Inc., Ontario, Canada</p>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -51,6 +52,57 @@ export default function Auth() {
           ? 'Server unavailable. Use "Try Demo" below to explore all features instantly — no account needed.'
           : err.message || 'Something went wrong. Please try again.'
       )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAppleSignIn() {
+    console.log('[APPLE AUTH] Button tapped')
+    console.log('[APPLE AUTH] Platform:', Capacitor.getPlatform())
+    setError('')
+    setLoading(true)
+    try {
+      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+
+      const options = {
+        clientId: 'com.ascendus.store',
+        redirectURI: 'https://ascendus.store/auth/apple/callback',
+        scopes: 'email name',
+        state: Date.now().toString(),
+        nonce: Math.random().toString(36).substring(2, 15),
+      }
+
+      console.log('[APPLE AUTH] Calling authorize with options:', JSON.stringify(options))
+      const result = await SignInWithApple.authorize(options)
+      console.log('[APPLE AUTH] Result:', JSON.stringify(result))
+
+      const token = result?.response?.identityToken
+      if (!token) throw new Error('No identity token returned')
+
+      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+      const res = await fetch(`${API_BASE}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityToken: token,
+          user: result.response.user,
+          email: result.response.email,
+          fullName: result.response.fullName,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Authentication failed')
+
+      setAuth(data.user, data.token)
+    } catch (err) {
+      console.error('[APPLE AUTH] Error:', err)
+      if (err?.code === 'SIGN_IN_CANCELLED' || err?.message?.includes('cancel') || err?.code === 1001) {
+        // User cancelled — do nothing
+      } else {
+        setError('Sign in with Apple failed. Please try email sign in instead.')
+      }
     } finally {
       setLoading(false)
     }
@@ -234,6 +286,19 @@ export default function Auth() {
             <span className="text-[11px] text-secondary font-body">or</span>
             <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           </div>
+
+          <button
+            type="button"
+            onClick={handleAppleSignIn}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-body text-sm font-semibold transition-all duration-200"
+            style={{ background: '#FFFFFF', color: '#000000', border: '1px solid rgba(0,0,0,0.12)' }}
+          >
+            <svg width="16" height="19" viewBox="0 0 16 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13.179 10.131c-.022-2.184 1.784-3.242 1.865-3.296-1.017-1.487-2.597-1.69-3.158-1.71-1.341-.137-2.626.799-3.306.799-.68 0-1.724-.783-2.838-.761-1.451.022-2.796.852-3.544 2.149-1.52 2.635-.389 6.526 1.086 8.659.724 1.041 1.583 2.207 2.711 2.165 1.093-.044 1.505-.699 2.824-.699 1.32 0 1.694.699 2.844.675 1.174-.019 1.913-1.055 2.626-2.1.833-1.202 1.174-2.37 1.192-2.43-.026-.011-2.277-.874-2.302-3.451zm-2.158-6.35C11.678 2.91 12.2 1.983 12.04 1c-.826.033-1.831.551-2.422 1.244-.532.614-1.001 1.598-.875 2.541.922.07 1.864-.468 2.278-1.004z" fill="#000000"/>
+            </svg>
+            Sign in with Apple
+          </button>
 
           <button
             type="button"

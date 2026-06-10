@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
+// SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
+import { Capacitor } from '@capacitor/core'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const G = '#C6A85C'
@@ -207,7 +209,7 @@ const SOCIAL_STATS = [
   { value: '78%', label: 'complete their plan' },
 ]
 
-function StepWelcome({ onCreateAccount, onSignIn }) {
+function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
   const navigate = useNavigate()
   return (
     <div className="flex flex-col h-full px-6 overflow-y-auto">
@@ -277,6 +279,18 @@ function StepWelcome({ onCreateAccount, onSignIn }) {
 
       <div className="pb-10 pt-4 space-y-3">
         <GoldBtn label="Create Account →" onClick={onCreateAccount} />
+        {Capacitor.isNativePlatform() && (
+          <button
+            onClick={onAppleSignIn}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-all flex items-center justify-center gap-2"
+            style={{ background: '#FFFFFF', color: '#000000', border: 'none' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="black">
+              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.29.07 2.19.79 3.03.81.96-.04 1.87-.78 3.09-.83 1.42-.07 2.72.54 3.69 1.78a5.12 5.12 0 0 0-2.14 4.28c.07 2.04 1.22 3.87 3.23 4.82-.4 1.08-.94 2.13-1.9 3zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+            Sign in with Apple
+          </button>
+        )}
         <button
           onClick={onSignIn}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-all"
@@ -296,7 +310,7 @@ function StepWelcome({ onCreateAccount, onSignIn }) {
 }
 
 // ── SIGN IN MODE (inline) ─────────────────────────────────────────────────────
-function SignInView({ onBack, onSuccess }) {
+function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -363,8 +377,28 @@ function SignInView({ onBack, onSuccess }) {
             </div>
           )}
 
-          <div className="pt-2">
+          <div className="pt-2 space-y-3">
             <GoldBtn label={loading ? 'Signing in…' : 'Sign In'} onClick={handleSignIn} loading={loading} />
+            {Capacitor.isNativePlatform() && onAppleSignIn && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                  <span className="text-[11px] font-body" style={{ color: DIM }}>or</span>
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                </div>
+                <button
+                  type="button"
+                  onClick={onAppleSignIn}
+                  className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-all flex items-center justify-center gap-2"
+                  style={{ background: '#FFFFFF', color: '#000000', border: 'none' }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="black">
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.39.07 2.36.74 3.18.8 1.22-.24 2.39-.93 3.7-.84 1.58.13 2.77.74 3.54 1.9-3.24 1.94-2.54 5.87.5 6.99-.58 1.59-1.36 3.15-2.92 4.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                  Sign in with Apple
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>
@@ -499,9 +533,9 @@ function StepAgeGate({ data, onChange, onNext, onBack }) {
 
         <div className="grid grid-cols-2 gap-4">
           {[
-            { key: true,  label: '17 or older', emoji: '✓', color: '#34C759', bg: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.28)' },
-            { key: false, label: 'Under 17',    emoji: '✕', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' },
-          ].map(({ key, label, emoji, color, bg, border }) => {
+            { key: true,  label: '17 or older', Icon: Check, color: '#34C759', bg: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.28)' },
+            { key: false, label: 'Under 17',    Icon: X,     color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' },
+          ].map(({ key, label, Icon, color, bg, border }) => {
             const isSelected = data.ageConfirmed === key
             return (
               <motion.button
@@ -514,7 +548,7 @@ function StepAgeGate({ data, onChange, onNext, onBack }) {
                   border: `1.5px solid ${isSelected ? border : BORDER}`,
                 }}
               >
-                <span className="text-3xl mb-3">{emoji}</span>
+                <Icon size={36} className="mb-3" style={{ color: isSelected ? color : 'rgba(255,255,255,0.4)' }} />
                 <p className="font-heading font-bold text-[14px]" style={{ color: isSelected ? color : TEXT }}>{label}</p>
               </motion.button>
             )
@@ -604,7 +638,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
 
         <div className="px-4 py-3.5 rounded-2xl mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}` }}>
           <p className="font-body text-[11px] leading-relaxed" style={{ color: DIM }}>
-            💛 <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Wellbeing reminder:</span> Scores are tools for self-improvement, not measures of your worth. If you struggle with body image, please speak to a mental health professional.
+            <Heart size={14} style={{ color: '#F5A623', display: 'inline', verticalAlign: 'middle', marginRight: 4, flexShrink: 0 }} /> <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Wellbeing reminder:</span> Scores are tools for self-improvement, not measures of your worth. If you struggle with body image, please speak to a mental health professional.
           </p>
         </div>
       </div>
@@ -644,7 +678,7 @@ function StepGender({ data, onChange, onNext, onBack }) {
               boxShadow: isMale ? '0 0 24px rgba(59,130,246,0.18)' : 'none',
             }}
           >
-            <span className="text-4xl mb-3">♂</span>
+            <User size={40} className="mb-3" style={{ color: isMale ? '#60A5FA' : TEXT }} />
             <p className="font-heading font-bold text-[18px]" style={{ color: isMale ? '#60A5FA' : TEXT }}>Male</p>
             <p className="font-body text-[11px] mt-1.5" style={{ color: DIM }}>Masculine model</p>
           </motion.button>
@@ -660,7 +694,7 @@ function StepGender({ data, onChange, onNext, onBack }) {
               boxShadow: isFemale ? '0 0 24px rgba(236,72,153,0.15)' : 'none',
             }}
           >
-            <span className="text-4xl mb-3">♀</span>
+            <UserRound size={40} className="mb-3" style={{ color: isFemale ? '#F472B6' : TEXT }} />
             <p className="font-heading font-bold text-[18px]" style={{ color: isFemale ? '#F472B6' : TEXT }}>Female</p>
             <p className="font-body text-[11px] mt-1.5" style={{ color: DIM }}>Feminine model</p>
           </motion.button>
@@ -870,7 +904,7 @@ function StepSocialProof({ onNext, onBack }) {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-2xl">🏆</span>
+            <Trophy size={22} style={{ color: '#C6A85C' }} />
             <span
               className="font-heading font-bold text-[13px] px-3 py-1 rounded-full"
               style={{ background: 'rgba(198,168,92,0.12)', color: G, border: `1px solid ${G_BORDER}` }}
@@ -1031,7 +1065,7 @@ const BMI_TIERS = [
     max: 18.5,
     label: 'Underweight',
     phase: 'BULK phase',
-    phaseEmoji: '💪',
+    PhaseIcon: Dumbbell,
     directive: '+300 cal surplus',
     color: '#3B82F6',
     bg: 'rgba(59,130,246,0.09)',
@@ -1042,7 +1076,7 @@ const BMI_TIERS = [
     max: 25,
     label: 'Healthy Weight',
     phase: 'RECOMP',
-    phaseEmoji: '⚡',
+    PhaseIcon: Zap,
     directive: 'Maintain calories',
     color: '#C6A85C',
     bg: 'rgba(198,168,92,0.09)',
@@ -1053,7 +1087,7 @@ const BMI_TIERS = [
     max: 30,
     label: 'Overweight',
     phase: 'CUT phase',
-    phaseEmoji: '🔥',
+    PhaseIcon: Flame,
     directive: '-500 cal deficit',
     color: '#F59E0B',
     bg: 'rgba(245,158,11,0.09)',
@@ -1064,7 +1098,7 @@ const BMI_TIERS = [
     max: Infinity,
     label: 'Obese',
     phase: 'CUT phase',
-    phaseEmoji: '🔥',
+    PhaseIcon: Flame,
     directive: '-500 to -750 cal deficit · urgent',
     color: '#EF4444',
     bg: 'rgba(239,68,68,0.09)',
@@ -1116,8 +1150,8 @@ function StepBMI({ data, onNext, onBack }) {
           style={{ background: tier.bg, border: `1px solid ${tier.border}` }}
         >
           <p className="font-body text-[11px] uppercase tracking-widest mb-1" style={{ color: tier.color }}>Recommended Phase</p>
-          <p className="font-heading font-bold text-[22px] mb-1" style={{ color: TEXT }}>
-            {tier.phaseEmoji} {tier.phase}
+          <p className="font-heading font-bold text-[22px] mb-1 flex items-center gap-2" style={{ color: TEXT }}>
+            <tier.PhaseIcon size={20} style={{ color: tier.color }} /> {tier.phase}
           </p>
           <p className="font-heading font-bold text-[13px]" style={{ color: tier.color }}>{tier.directive}</p>
         </motion.div>
@@ -1140,6 +1174,18 @@ function StepBMI({ data, onNext, onBack }) {
       </div>
 
       <div className="pb-10 pt-4">
+        <p style={{ fontSize: '12px', color: '#888', marginTop: '0px', marginBottom: '16px', lineHeight: 1.5 }}>
+          BMI classifications based on{' '}
+          <a href="https://www.who.int/news-room/fact-sheets/detail/obesity-and-overweight"
+             target="_blank" rel="noopener noreferrer" style={{ color: '#d4af37' }}>
+            World Health Organization guidelines
+          </a>
+          {' '}and{' '}
+          <a href="https://www.nhlbi.nih.gov/health/educational/lose_wt/BMI/bmicalc.htm"
+             target="_blank" rel="noopener noreferrer" style={{ color: '#d4af37' }}>
+            NIH Body Mass Index tables
+          </a>.
+        </p>
         <GoldBtn label="Continue →" onClick={onNext} />
       </div>
     </div>
@@ -1347,7 +1393,7 @@ function Slide2() {
               transition={{ delay: 0.1 + i * 0.08 }}
               className="flex items-start gap-2 mb-2"
             >
-              <span className="mt-0.5 flex-shrink-0" style={{ color: '#E05555', fontSize: 10 }}>✕</span>
+              <X size={10} className="mt-0.5 flex-shrink-0" style={{ color: '#E05555' }} />
               <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>{item}</p>
             </motion.div>
           ))}
@@ -1364,7 +1410,7 @@ function Slide2() {
               transition={{ delay: 0.1 + i * 0.08 }}
               className="flex items-start gap-2 mb-2"
             >
-              <span className="mt-0.5 flex-shrink-0" style={{ color: SLIDE_GOLD, fontSize: 10 }}>✓</span>
+              <Check size={10} className="mt-0.5 flex-shrink-0" style={{ color: SLIDE_GOLD }} />
               <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.80)' }}>{item}</p>
             </motion.div>
           ))}
@@ -1523,11 +1569,13 @@ export default function PremiumOnboarding() {
   const navigate = useNavigate()
   const {
     setUserProfile, setHasOnboarded, setLegalConsented,
-    setGender, setAssignedPhase, setUnits, units,
+    setGender, setAssignedPhase, setUnits, units, isAuthenticated, setAuth,
   } = useStore()
 
-  const [introDone, setIntroDone] = useState(false)
-  const [step, setStep] = useState(0)
+  // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
+  const [introDone, setIntroDone] = useState(true)
+  // If already authenticated, skip StepWelcome (0) and StepSignUp (1) — start at age gate
+  const [step, setStep] = useState(isAuthenticated ? 2 : 0)
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -1612,15 +1660,54 @@ export default function PremiumOnboarding() {
         <SignInView
           onBack={() => setSigningIn(false)}
           onSuccess={() => navigate('/')}
+          onAppleSignIn={handleAppleSignIn}
         />
       </div>
     )
+  }
+
+  async function handleAppleSignIn() {
+    if (!Capacitor.isNativePlatform()) return
+    try {
+      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+      const result = await SignInWithApple.authorize({
+        clientId: 'com.ascendus.store',
+        redirectURI: 'https://ascendus.store/auth/apple/callback',
+        scopes: 'email name',
+        state: Date.now().toString(),
+        nonce: Math.random().toString(36).substring(2, 15),
+      })
+      const token = result?.response?.identityToken
+      if (!token) throw new Error('No identity token returned')
+
+      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+      const res = await fetch(`${API_BASE}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityToken: token,
+          user: result.response.user,
+          email: result.response.email,
+          fullName: result.response.fullName,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Authentication failed')
+
+      setAuth(data.user, data.token)
+      // Skip signup steps — go straight to quiz
+      setStep(2)
+    } catch (err) {
+      if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
+      console.error('[APPLE AUTH] PremiumOnboarding error:', err)
+    }
   }
 
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
       onSignIn={() => setSigningIn(true)}
+      onAppleSignIn={handleAppleSignIn}
     />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}

@@ -41,7 +41,25 @@
       "Bash(curl -s -X POST https://glowsyhnc-production-e16b.up.railway.app/api/auth/register -H 'Content-Type: application/json' -d '{\"name\":\"Test User\",\"email\":\"verify___CMDSUB_OUTPUT__@ascendus.app\",\"password\":\"testpass123\"}')",
       "Bash(git -C /Users/suleimannajem/looksmaxing ls-files server/.env server/.env.save)",
       "Bash(git rm *)",
-      "Bash(git -C /Users/suleimannajem/looksmaxing add -A)"
+      "Bash(git -C /Users/suleimannajem/looksmaxing add -A)",
+      "Bash(node --check /Users/suleimannajem/looksmaxing/server/src/routes/potential.js)",
+      "Bash(npx cap *)",
+      "Bash(grep -P \"emoji|icon.*[^\\\\x00-\\\\x7F]|>[^\\\\x00-\\\\x7F]|[^\\\\x00-\\\\x7F]<|'[^\\\\x00-\\\\x7F]'|\\\\\"[^\\\\x00-\\\\x7F]\\\\\"|\\\\`[^\\\\x00-\\\\x7F]\")",
+      "Bash(node -e \"const db = require\\('./server/src/db'\\); const rows = db.prepare\\('SELECT id, email, subscription_tier, is_pro FROM users'\\).all\\(\\); console.log\\(JSON.stringify\\(rows, null, 2\\)\\)\")",
+      "Bash(xargs ls -la)",
+      "Bash(sed -i '' 's/DEVELOPMENT_TEAM = \"\"/DEVELOPMENT_TEAM = 86YG38447D/g' App.xcodeproj/project.pbxproj)",
+      "Bash(sed -i '' 's/DEVELOPMENT_TEAM = ;/DEVELOPMENT_TEAM = 86YG38447D;/g' App.xcodeproj/project.pbxproj)",
+      "Bash(xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination generic/platform=iOS clean build CODE_SIGN_IDENTITY=\"Apple Distribution\" DEVELOPMENT_TEAM=86YG38447D)",
+      "Bash(sudo xcode-select -s /Applications/Xcode.app/Contents/Developer)",
+      "Bash(xcodebuild -version)",
+      "Bash(ls /Applications/ | grep -i xcode)",
+      "Bash(/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination generic/platform=iOS -allowProvisioningUpdates build)",
+      "mcp__fb59a539-1507-42f6-ab4e-32daaaf2821c__execute_sql",
+      "mcp__fb59a539-1507-42f6-ab4e-32daaaf2821c__apply_migration",
+      "Bash(curl -s https://glowsyhnc-production-e16b.up.railway.app/api/scan/analyze -X POST -H \"Content-Type: application/json\" -H \"Authorization: Bearer test\" -d '{\"photo\":\"test\"}')",
+      "Bash(curl -s -X POST https://glowsyhnc-production-e16b.up.railway.app/api/ai/score -H 'Content-Type: application/json' -H 'Authorization: Bearer test' -d '{\"faceImage\":\"data:image/jpeg;base64,/9j/test\",\"gender\":\"male\"}')",
+      "Bash(agvtool new-version *)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer agvtool new-version -all 13)"
     ]
   }
 }

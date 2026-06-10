@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Helmet } from 'react-helmet-async'
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { Loader2, AlertCircle, RefreshCw, Crown, CheckCircle2, Trophy } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -17,7 +17,7 @@ function maskUsername(username) {
 }
 
 function RankBadge({ rank }) {
-  if (rank === 1) return <span className="text-xl">👑</span>
+  if (rank === 1) return <Crown size={20} style={{ color: '#C6A85C' }} />
   if (rank === 2) return (
     <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(192,192,192,0.15)' }}>
       <span className="font-mono font-bold text-[11px]" style={{ color: 'rgba(192,192,192,0.8)' }}>2</span>
@@ -113,7 +113,7 @@ export default function Leaderboard() {
         <meta name="keywords" content="looksmax leaderboard, glow up ranking, face rating leaderboard, most improved, appearance score rank" />
       </Helmet>
       <PageHeader
-        title="Most Improved 🏆"
+        title="Most Improved"
         subtitle="This week · Anonymous · Resets Monday"
       />
 
@@ -162,7 +162,7 @@ export default function Leaderboard() {
             animate={{ opacity: 1 }}
             className="flex items-center gap-2 py-2"
           >
-            <span className="text-base">✅</span>
+            <CheckCircle2 size={18} style={{ color: '#34C759' }} />
             <p className="text-sm font-heading font-bold" style={{ color: GOLD }}>Score submitted!</p>
           </motion.div>
         ) : (
@@ -233,7 +233,7 @@ export default function Leaderboard() {
         </div>
       ) : leaderboard.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <span className="text-4xl mb-3">🏆</span>
+          <Trophy size={40} className="mb-3" style={{ color: '#C6A85C' }} />
           <p className="text-sm font-heading font-bold text-primary mb-1">No entries yet</p>
           <p className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.35)' }}>Be the first to submit your score this week!</p>
         </div>

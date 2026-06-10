@@ -28,9 +28,9 @@ export default {
         },
       },
       fontFamily: {
-        heading: ['"Plus Jakarta Sans"', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        mono: ['"Space Grotesk"', 'sans-serif'],
+        heading: ['"Plus Jakarta Sans"', '"Apple Color Emoji"', '"Segoe UI Emoji"', '"Noto Color Emoji"', 'sans-serif'],
+        body: ['Inter', '"Apple Color Emoji"', '"Segoe UI Emoji"', '"Noto Color Emoji"', 'sans-serif'],
+        mono: ['"Space Grotesk"', '"Apple Color Emoji"', '"Segoe UI Emoji"', '"Noto Color Emoji"', 'sans-serif'],
       },
       animation: {
         'score-fill': 'scoreFill 1.5s ease-out forwards',

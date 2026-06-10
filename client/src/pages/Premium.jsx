@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, X, ChevronLeft, Lock } from 'lucide-react'
+import { Check, X, ChevronLeft, Lock, Users, Share2, CheckCircle, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
+import { isNative, purchasePro, restorePurchases, initRevenueCat } from '../utils/iap'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
 const GOLD = '#C6A85C'
@@ -41,14 +42,28 @@ const TESTIMONIALS = [
 export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
-  const [plan] = useState('monthly')
+  const [plan, setPlan] = useState('monthly')
   const [subscribingTrial, setSubscribingTrial] = useState(false)
   const [subscribingNow, setSubscribingNow] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
   const [showPromo, setShowPromo] = useState(false)
+  const [referralCount, setReferralCount] = useState(0)
+  const [referralCode, setReferralCode]   = useState(null)
+  const [unlocking, setUnlocking]         = useState(false)
+  const [unlockMsg, setUnlockMsg]         = useState('')
+  const [copied, setCopied]               = useState(false)
 
   const [searchParams] = useSearchParams()
+
+  useEffect(() => { initRevenueCat().catch(() => {}) }, [])
+
+  useEffect(() => {
+    api.referral.count()
+      .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (searchParams.get('success') === '1') {
@@ -58,30 +73,52 @@ export default function Premium() {
     }
   }, [searchParams, setIsPremium])
 
-  async function handleSubscribe(noTrial = false) {
-    // Demo users must create a real account first
-    const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-    const token = stored?.state?.token
-    if (!token || token === 'demo-token') {
-      setCheckoutError('Create a free account first to subscribe.')
-      return
-    }
-    if (noTrial) setSubscribingNow(true)
-    else setSubscribingTrial(true)
+  async function handleSubscribe() {
+    setSubscribingNow(true)
     setCheckoutError('')
     try {
-      const { url } = await api.payments.createCheckout(plan, noTrial)
-      window.location.href = url
-    } catch (err) {
-      const msg = err.message || ''
-      if (msg.toLowerCase().includes('session expired') || msg.toLowerCase().includes('user not found')) {
-        setSessionExpired(true)
-        setCheckoutError('')
+      if (isNative()) {
+        const result = await purchasePro(plan)
+        if (result?.success) setIsPremium(true)
       } else {
-        setCheckoutError(msg || 'Could not start checkout — please try again.')
+        const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+        const token = stored?.state?.token
+        if (!token || token === 'demo-token') {
+          setCheckoutError('Create a free account first to subscribe.')
+          setSubscribingNow(false)
+          return
+        }
+        const { url } = await api.payments.createCheckout(plan, false)
+        window.location.href = url
       }
+    } catch (err) {
+      const msg = err?.message || ''
+      const lower = msg.toLowerCase()
+      if (lower.includes('session expired') || lower.includes('user not found')) {
+        setSessionExpired(true)
+      } else if (!lower.includes('cancel')) {
+        setCheckoutError(msg || 'Unable to complete purchase. Please try again.')
+      }
+    } finally {
       setSubscribingNow(false)
-      setSubscribingTrial(false)
+    }
+  }
+
+  async function handleRestore() {
+    setRestoring(true)
+    setCheckoutError('')
+    try {
+      const info = await restorePurchases()
+      const isPro = !!info?.entitlements?.active?.['Ascendus Pro']
+      if (isPro) {
+        setIsPremium(true)
+      } else {
+        setCheckoutError('No previous purchase found.')
+      }
+    } catch (err) {
+      setCheckoutError('Restore failed. Please try again.')
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -89,6 +126,36 @@ export default function Premium() {
     if (typeof logout === 'function') logout()
     localStorage.removeItem('ascendus-storage')
     navigate('/auth')
+  }
+
+  async function handleUnlockPro() {
+    setUnlocking(true)
+    setUnlockMsg('')
+    try {
+      const { ok, isPremium: granted } = await api.referral.unlockPro()
+      if (ok && granted) {
+        setIsPremium(true)
+        setUnlockMsg('🎉 Pro unlocked! Enjoy.')
+      }
+    } catch (err) {
+      setUnlockMsg(err.message || 'Not enough referrals yet.')
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
+  async function handleCopyReferral() {
+    const link = referralCode
+      ? `https://ascendus.store/r/${referralCode}`
+      : 'https://ascendus.store'
+    const text = `I use Ascendus to track my glow-up — check it out 🔥 ${link}`
+    if (navigator.share) {
+      try { await navigator.share({ text, url: link }) } catch {}
+    } else {
+      await navigator.clipboard?.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   if (isPremium) {
@@ -170,64 +237,141 @@ export default function Premium() {
 
       <div className="px-4">
 
-        {/* ── Two-option CTA ──────────────────────────────────────────── */}
+        {/* ── Plan Toggle ──────────────────────────────────────────────── */}
+        <div
+          className="flex rounded-2xl p-1 mb-5"
+          style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
+        >
+          {[
+            { key: 'monthly', label: 'Monthly', price: '$7.99/mo' },
+            { key: 'yearly',  label: 'Yearly',  price: '$49.99/yr', badge: 'Save 48%' },
+          ].map(({ key, label, price, badge }) => (
+            <button
+              key={key}
+              onClick={() => setPlan(key)}
+              className="flex-1 py-3 rounded-xl flex flex-col items-center transition-all duration-200"
+              style={{
+                background: plan === key ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD_DARK})` : 'transparent',
+                color: plan === key ? '#0A0A0A' : TEXT_DIM,
+              }}
+            >
+              <span className="font-heading font-bold text-[13px]">{label}</span>
+              <span className="font-body text-[11px] mt-0.5">{price}</span>
+              {badge && plan === key && (
+                <span className="text-[9px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full bg-black/20">{badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
 
-        {/* Option 1: 2-day free trial (primary) */}
+        {/* ── Subscribe CTA ─────────────────────────────────────────────── */}
         <motion.button
-          whileTap={{ scale: subscribingTrial ? 1 : 0.97 }}
-          onClick={() => handleSubscribe(false)}
-          disabled={subscribingTrial || subscribingNow}
+          whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
+          onClick={handleSubscribe}
+          disabled={subscribingNow}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
             color: '#0A0A0A',
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
-            letterSpacing: '0.01em',
           }}
         >
-          {subscribingTrial ? 'Opening checkout…' : '✦ Start 7-Day Free Trial'}
-        </motion.button>
-        <p className="text-center text-[10px] font-body mb-4" style={{ color: TEXT_DIM }}>
-          $0 today · then $7.99/mo · cancel anytime before trial ends
-        </p>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px" style={{ background: BORDER }} />
-          <span className="text-[10px] font-body uppercase tracking-widest" style={{ color: TEXT_DIM }}>or</span>
-          <div className="flex-1 h-px" style={{ background: BORDER }} />
-        </div>
-
-        {/* Option 2: Pay now (no trial) */}
-        <motion.button
-          whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
-          onClick={() => handleSubscribe(true)}
-          disabled={subscribingNow || subscribingTrial}
-          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] mb-1 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40"
-          style={{
-            background: `rgba(198,168,92,0.10)`,
-            border: `1px solid ${GOLD_BORDER}`,
-            color: GOLD,
-          }}
-        >
-          {subscribingNow ? 'Opening checkout…' : 'Pay $7.99/mo Now'}
+          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-6" style={{ color: TEXT_DIM }}>
-          Start immediately · No trial · Cancel anytime
+          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
         </p>
 
         {checkoutError && (
           <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{checkoutError}</p>
         )}
 
-        {/* Promo code link */}
-        <button
-          onClick={() => setShowPromo(true)}
-          className="w-full mb-4 font-body text-[12px] text-center transition-opacity hover:opacity-70"
-          style={{ color: 'rgba(198,168,92,0.5)' }}
+        {/* Promo code link — web only (Apple IAP does not support external promo codes) */}
+        {!isNative() && (
+          <button
+            onClick={() => setShowPromo(true)}
+            className="w-full mb-4 font-body text-[12px] text-center transition-opacity hover:opacity-70"
+            style={{ color: 'rgba(198,168,92,0.5)' }}
+          >
+            Have a promo code?
+          </button>
+        )}
+
+        {/* ── Referral unlock section ──────────────────────────────────── */}
+        <div
+          className="rounded-2xl p-4 mb-5"
+          style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.2)' }}
         >
-          Have a promo code?
-        </button>
+          <div className="flex items-center gap-2 mb-2">
+            <Users size={15} style={{ color: GOLD }} />
+            <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
+              Share with 3 Friends — Get Pro Free
+            </p>
+          </div>
+          <p className="font-body text-[11px] mb-3" style={{ color: TEXT_DIM }}>
+            No credit card. Just share your referral link and unlock Pro when 3 friends join.
+          </p>
+
+          {/* Progress bar */}
+          <div className="flex items-center gap-2 mb-3">
+            {[1, 2, 3].map(n => (
+              <div
+                key={n}
+                className="flex-1 h-1.5 rounded-full overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.06)' }}
+              >
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: referralCount >= n ? '100%' : '0%' }}
+                  transition={{ duration: 0.6, delay: n * 0.1 }}
+                  className="h-full rounded-full"
+                  style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
+                />
+              </div>
+            ))}
+            <span className="font-mono font-bold text-[12px]" style={{ color: GOLD }}>
+              {referralCount}/3
+            </span>
+          </div>
+
+          {/* Share button */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleCopyReferral}
+            className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 mb-2.5"
+            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
+          >
+            <Share2 size={13} />
+            {copied ? 'Link copied!' : 'Share My Referral Link'}
+          </motion.button>
+
+          {/* Claim button */}
+          <motion.button
+            whileTap={{ scale: referralCount >= 3 ? 0.97 : 1 }}
+            onClick={handleUnlockPro}
+            disabled={unlocking || referralCount < 3}
+            className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 disabled:opacity-40"
+            style={{
+              background: referralCount >= 3
+                ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`
+                : '#1C1C1C',
+              color: referralCount >= 3 ? '#0A0A0A' : TEXT_DIM,
+              border: referralCount >= 3 ? 'none' : `1px solid ${BORDER}`,
+            }}
+          >
+            {unlocking
+              ? <><Loader2 size={13} className="animate-spin" /> Claiming…</>
+              : referralCount >= 3
+                ? <><CheckCircle size={13} /> Claim Free Pro</>
+                : `Claim Free Pro (${3 - referralCount} more friend${3 - referralCount !== 1 ? 's' : ''} needed)`}
+          </motion.button>
+
+          {unlockMsg && (
+            <p className="text-center text-[11px] font-body mt-2" style={{ color: unlockMsg.startsWith('🎉') ? '#34D399' : '#EF4444' }}>
+              {unlockMsg}
+            </p>
+          )}
+        </div>
 
         {sessionExpired && (
           <div className="mb-3 rounded-xl p-4 text-center" style={{ background: '#1A1A1A', border: '1px solid rgba(198,168,92,0.2)' }}>
@@ -343,9 +487,9 @@ export default function Premium() {
 
         {/* ── Final CTA ───────────────────────────────────────────────── */}
         <motion.button
-          whileTap={{ scale: subscribingTrial ? 1 : 0.97 }}
-          onClick={() => handleSubscribe(false)}
-          disabled={subscribingTrial || subscribingNow}
+          whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
+          onClick={handleSubscribe}
+          disabled={subscribingNow || restoring}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-1 transition-all duration-200 disabled:opacity-60"
           style={{
             background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
@@ -353,16 +497,38 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingTrial ? 'Opening checkout…' : '✦ Start 2-Day Free Trial →'}
+          {subscribingNow ? 'Opening checkout…' : 'Start 3-Day Free Trial'}
         </motion.button>
-        <p className="text-center text-[10px] font-body pb-4" style={{ color: TEXT_DIM }}>
-          $7.99/month after 2-day trial. Cancel anytime in Settings.
-        </p>
+
+        {/* Apple IAP required disclosure */}
+        <div className="mt-2 mb-4 px-1 space-y-1">
+          <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
+            Ascendus Pro is $7.99 USD/month or $49.99 USD/year.
+            {isNative() ? ' Payment will be charged to your Apple ID account.' : ''}
+          </p>
+          <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
+            Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
+            {isNative() ? ' Manage or cancel in your Apple ID Account Settings.' : ' Cancel anytime in Settings.'}
+          </p>
+        </div>
+
+        {/* Restore Purchases — required by Apple */}
+        {isNative() && (
+          <button
+            onClick={handleRestore}
+            disabled={restoring || subscribingNow}
+            className="w-full mb-3 font-body text-[12px] text-center transition-opacity hover:opacity-70 disabled:opacity-40"
+            style={{ color: 'rgba(198,168,92,0.6)' }}
+          >
+            {restoring ? 'Restoring…' : 'Restore Purchases'}
+          </button>
+        )}
+
         <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
           By subscribing you agree to our{' '}
-          <button onClick={() => window.location.href = '/terms'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Terms</button>
+          <button onClick={() => window.location.href = isNative() ? 'https://ascendus.store/terms' : '/terms'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Terms of Use</button>
           {' '}and{' '}
-          <button onClick={() => window.location.href = '/privacy'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Privacy Policy</button>
+          <button onClick={() => window.location.href = isNative() ? 'https://ascendus.store/privacy' : '/privacy'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Privacy Policy</button>
         </p>
       </div>
 

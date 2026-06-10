@@ -36,13 +36,13 @@ export default function Dashboard() {
   const umaxScore = latestScan?.umaxScore ?? null
   const tier = latestScan?.tier ?? null
 
+  // Normalize helper — scores stored as 0-100 get converted to 0-10
+  const normalizeScore = (raw) => raw > 10 ? Math.round(raw) / 10 : raw
+
   const chartData = [...scans].reverse().slice(-8).map((s, i) => ({
     week: `W${i + 1}`,
-    score: s.glowScore,
+    score: normalizeScore(s.glowScore),
   }))
-  if (chartData.length === 0) {
-    chartData.push(...[62, 65, 67, 70, 68, 72, 74, 78].map((s, i) => ({ week: `W${i + 1}`, score: s })))
-  }
 
   // Rescan countdown
   const lastScanDate = latestScan ? new Date(latestScan.analyzedAt) : null
@@ -106,7 +106,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>
-                  Get 7 days Pro free
+                  Get 3 days Pro free
                 </p>
                 <p className="font-body text-[11px] text-secondary leading-snug">
                   Refer {5 - (referralCount ?? 0)} more friend{5 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock
@@ -163,7 +163,11 @@ export default function Dashboard() {
                   </p>
                   {scans.length >= 2 && (
                     <p className="text-[12px] mt-1 font-body" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                      {glowScore - (scans[1]?.glowScore ?? glowScore) >= 0 ? '↑' : '↓'} {Math.abs(glowScore - (scans[1]?.glowScore ?? glowScore))} pts since last scan
+                      {(() => {
+                        const prev = normalizeScore(scans[1]?.glowScore ?? glowScore)
+                        const delta = glowScore - prev
+                        return `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta).toFixed(1)} pts since last scan`
+                      })()}
                     </p>
                   )}
                   <button
@@ -401,6 +405,14 @@ export default function Dashboard() {
               <TrendingUp size={12} /> Full view
             </button>
           </div>
+          {chartData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 gap-2">
+              <TrendingUp size={24} style={{ color: 'rgba(198,168,92,0.4)' }} />
+              <p className="text-[12px] font-body text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Complete your first scan to track progress
+              </p>
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height={88}>
             <LineChart data={chartData}>
               <defs>
@@ -434,6 +446,7 @@ export default function Dashboard() {
               />
             </LineChart>
           </ResponsiveContainer>
+          )}
         </div>
       </motion.div>
 

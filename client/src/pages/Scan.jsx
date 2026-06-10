@@ -2,19 +2,21 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowUpRight, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api } from '../utils/api'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
+import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
+import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 
 const ANALYSIS_STEPS = [
-  { label: 'Finding your strengths...', emoji: '🎯' },
-  { label: 'Matching celebrity lookalikes...', emoji: '⭐' },
-  { label: 'Calculating your score...', emoji: '⚡' },
-  { label: 'Building your roadmap...', emoji: '🗺️' },
+  { label: 'Finding your strengths...', Icon: Target },
+  { label: 'Matching celebrity lookalikes...', Icon: Star },
+  { label: 'Calculating your score...', Icon: Zap },
+  { label: 'Building your roadmap...', Icon: Map },
 ]
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -29,9 +31,9 @@ function GenderSelector({ selected, onSelect }) {
         </p>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { key: 'male',   emoji: '♂️', label: 'Male',   color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
-            { key: 'female', emoji: '♀️', label: 'Female', color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
-          ].map(({ key, emoji, label, color, bg }) => (
+            { key: 'male',   GenderIcon: User,      label: 'Male',   color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
+            { key: 'female', GenderIcon: UserRound,  label: 'Female', color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
+          ].map(({ key, GenderIcon, label, color, bg }) => (
             <motion.button
               key={key}
               whileTap={{ scale: 0.96 }}
@@ -39,7 +41,7 @@ function GenderSelector({ selected, onSelect }) {
               className="flex flex-col items-center gap-3 p-5 rounded-3xl border-2 transition-all duration-200"
               style={{ borderColor: selected === key ? color : 'var(--border)', background: selected === key ? bg : 'var(--card)' }}
             >
-              <span className="text-4xl">{emoji}</span>
+              <GenderIcon size={40} style={{ color }} />
               <p className="font-heading font-bold text-base text-primary">{label}</p>
               {selected === key && (
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
@@ -269,6 +271,40 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
 
+  async function handleCameraClick() {
+    if (isNative()) {
+      try {
+        const dataUrl = await takePhoto()
+        console.log('[SCAN] takePhoto result:', dataUrl ? 'got image' : 'null')
+        if (dataUrl) onPhoto(dataUrl, dataUrl)
+      } catch (err) {
+        console.error('[SCAN] takePhoto error:', err?.message, err)
+        if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
+          alert('Camera error: ' + (err?.message || 'Unknown error'))
+        }
+      }
+    } else {
+      setCameraOpen(true)
+    }
+  }
+
+  async function handleUploadClick() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhoto()
+        console.log('[SCAN] pickPhoto result:', dataUrl ? 'got image' : 'null')
+        if (dataUrl) onPhoto(dataUrl, dataUrl)
+      } catch (err) {
+        console.error('[SCAN] pickPhoto error:', err?.message, err)
+        if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
+          alert('Photo error: ' + (err?.message || 'Unknown error'))
+        }
+      }
+    } else {
+      uploadRef.current?.click()
+    }
+  }
+
   return (
     <div className="flex flex-col h-full px-4">
       {cameraOpen && (
@@ -312,7 +348,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
         <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
         {/* Take Photo — solid gold border */}
         <button
-          onClick={() => setCameraOpen(true)}
+          onClick={handleCameraClick}
           className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
           style={{
             background: 'rgba(201,168,76,0.06)',
@@ -326,7 +362,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
         </button>
         {/* Upload Photo — identical gold border, no greyed-out look */}
         <button
-          onClick={() => uploadRef.current?.click()}
+          onClick={handleUploadClick}
           className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
           style={{
             background: 'rgba(201,168,76,0.06)',
@@ -354,8 +390,8 @@ function AnalyzingScreen({ currentStep, slow }) {
         <motion.div animate={{ rotate: -360 }} transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
           className="absolute inset-3 rounded-full border-transparent" style={{ borderWidth: 3, borderStyle: 'solid', borderTopColor: 'rgba(245,166,35,0.7)' }} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <motion.span key={currentStep} initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-2xl">
-            {ANALYSIS_STEPS[currentStep]?.emoji ?? '✨'}
+          <motion.span key={currentStep} initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center justify-center">
+            {(() => { const S = ANALYSIS_STEPS[currentStep]?.Icon ?? Zap; return <S size={24} style={{ color: '#C6A85C' }} />; })()}
           </motion.span>
         </div>
       </div>
@@ -433,6 +469,7 @@ export default function Scan() {
   const [retryCountdown, setRetryCountdown] = useState(0)
   const [scanCapReached, setScanCapReached] = useState(false)
   const [scanCapPlan, setScanCapPlan]     = useState('free')
+  const [showConsent, setShowConsent]     = useState(() => !hasAIConsent())
 
   const startAnalysisRef = useRef(null)
 
@@ -447,7 +484,7 @@ export default function Scan() {
   if (isFreeScanBlocked) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-        <div className="text-5xl mb-4">🔒</div>
+        <div className="mb-4"><Lock size={48} style={{ color: '#C6A85C' }} /></div>
         <h2 className="font-heading font-bold text-xl text-primary mb-2">Scan Limit Reached</h2>
         <p className="text-secondary text-sm font-body mb-2">
           Free users get 1 scan per month. Your next free scan resets{' '}
@@ -456,7 +493,7 @@ export default function Scan() {
         <p className="text-secondary text-sm font-body mb-6">Upgrade to Pro for unlimited scans.</p>
         <button onClick={() => navigate('/premium')} className="btn-primary mb-3 max-w-xs">Unlock Unlimited Scans →</button>
         <button onClick={() => navigate('/referral')} className="text-sm font-heading font-bold" style={{ color: '#C6A85C' }}>
-          🎁 Or share with 5 friends for 7 days free
+          <span className="flex items-center gap-1.5"><Gift size={14} /> Or share with 5 friends for 3 days free</span>
         </button>
       </div>
     )
@@ -602,6 +639,15 @@ export default function Scan() {
 
   const isAnalyzing = step === 3
 
+  if (showConsent) {
+    return (
+      <AIConsentModal
+        onAgree={() => setShowConsent(false)}
+        onDecline={() => window.history.back()}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col h-full bg-page">
       <Helmet>
@@ -650,7 +696,7 @@ export default function Scan() {
               {/* Side-profile tips banner */}
               <div className="mx-4 mb-1 px-3 py-2 rounded-xl flex items-start gap-2.5"
                 style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.2)' }}>
-                <span className="text-base flex-shrink-0 mt-0.5">↗️</span>
+                <ArrowUpRight size={16} className="flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[11px] font-heading font-bold text-primary leading-snug">Unlocks Profile Analysis</p>
                   <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">
@@ -678,15 +724,21 @@ export default function Scan() {
 
       {/* Scan-cap upgrade modal */}
       {scanCapReached && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-8"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}>
-          <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-8"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setScanCapReached(false)}
+        >
+          <motion.div
+            initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', damping: 22, stiffness: 260 }}
             className="w-full max-w-sm rounded-3xl overflow-hidden"
-            style={{ background: 'var(--card)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ background: 'var(--card)', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }} />
             <div className="px-6 pt-6 pb-7 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl" style={{ background: 'rgba(201,168,76,0.12)' }}>🔒</div>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,168,76,0.12)' }}><Lock size={28} style={{ color: '#C6A85C' }} /></div>
               <div>
                 <h3 className="font-heading font-bold text-lg text-primary leading-snug">
                   {scanCapPlan === 'demo' ? 'Demo scan limit reached' : 'Free scan limit reached'}
@@ -694,11 +746,16 @@ export default function Scan() {
                 <p className="text-sm text-secondary font-body mt-2 leading-relaxed">
                   {scanCapPlan === 'demo'
                     ? 'Create a free account to get more scans, or upgrade to Pro for unlimited access.'
-                    : "You've hit your free scan limit for this period. Upgrade to Pro for unlimited scans."}
+                    : "You've used your free scan for this month. Upgrade to Pro for unlimited scans."}
                 </p>
               </div>
               <button onClick={() => { setScanCapReached(false); navigate('/premium') }} className="btn-amber w-full">Upgrade to Pro →</button>
-              <button onClick={() => setScanCapReached(false)} className="text-sm font-heading font-bold text-secondary active:opacity-60 transition-opacity">Remind me later</button>
+              <button
+                onClick={() => setScanCapReached(false)}
+                className="w-full py-3 text-sm font-heading font-bold text-secondary active:opacity-60 transition-opacity"
+              >
+                No thanks
+              </button>
             </div>
           </motion.div>
         </div>
@@ -759,8 +816,8 @@ export default function Scan() {
 
           {/* Step 0: gender */}
           {step === 0 && (
-            <button onClick={() => gender && setStep(1)} disabled={!gender} className={`btn-primary ${!gender ? 'opacity-50' : ''}`}>
-              {gender ? `Continue as ${gender === 'male' ? '♂ Male' : '♀ Female'} →` : 'Select to continue'}
+            <button onClick={() => gender && setStep(1)} disabled={!gender} className={`btn-primary flex items-center justify-center gap-2 ${!gender ? 'opacity-50' : ''}`}>
+              {gender ? <>Continue as {gender === 'male' ? 'Male' : 'Female'} <ArrowRight size={16} /></> : 'Select to continue'}
             </button>
           )}
 

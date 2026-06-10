@@ -110,6 +110,38 @@ db.exec(`
   );
 `)
 
+// Community tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS community_posts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    display_name TEXT DEFAULT 'Anonymous',
+    score_before REAL,
+    score_after REAL,
+    photo_url TEXT,
+    caption TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS community_likes (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(post_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS community_comments (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    display_name TEXT DEFAULT 'Anonymous',
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`)
+
 // Idempotent migrations — ignore if columns already exist
 const migrations = [
   "ALTER TABLE users ADD COLUMN referral_code TEXT",

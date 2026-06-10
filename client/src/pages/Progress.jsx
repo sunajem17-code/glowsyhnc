@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock } from 'lucide-react'
+import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -266,12 +266,12 @@ export default function Progress() {
       {/* ── Overview cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Total Scans', value: history.length || scans.length || '—', icon: '📸' },
-          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: '🏆' },
-          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : '—', icon: '🔥' },
+          { label: 'Total Scans', value: history.length || scans.length || '—', icon: <Camera size={20} style={{ color: '#C6A85C' }} /> },
+          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: <Trophy size={20} style={{ color: '#C6A85C' }} /> },
+          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : '—', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
         ].map(({ label, value, icon }) => (
           <div key={label} className="card text-center py-3">
-            <p className="text-xl mb-0.5">{icon}</p>
+            <div className="flex justify-center mb-0.5">{icon}</div>
             <p className="font-mono font-bold text-lg text-primary">{value}</p>
             <p className="text-[10px] text-secondary font-body">{label}</p>
           </div>
@@ -289,7 +289,7 @@ export default function Progress() {
           animate={{ opacity: 1, y: 0 }}
           className="card mb-4 flex flex-col items-center gap-3 py-10 text-center"
         >
-          <span className="text-4xl">📈</span>
+          <TrendingUp size={40} style={{ color: '#C6A85C' }} />
           <p className="font-heading font-bold text-base text-primary">
             {history.length === 0
               ? 'Complete your first scan to start tracking your glow up'
@@ -302,7 +302,7 @@ export default function Progress() {
             onClick={() => navigate('/scan')}
             className="mt-1 px-5 py-2 bg-[#C6A85C] rounded-xl text-sm font-heading font-bold text-white"
           >
-            Start a Scan →
+            Start a Scan
           </button>
         </motion.div>
       ) : (
@@ -312,17 +312,17 @@ export default function Progress() {
               {/* Stats row — Pro */}
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
-                  { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: '🌱' },
-                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: '⭐' },
+                  { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
+                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: <Star size={20} style={{ color: '#C6A85C', fill: '#C6A85C' }} /> },
                   {
                     label: 'Improvement',
                     value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
-                    icon:  improvementNum >= 0 ? '📈' : '📉',
+                    icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: '#C6A85C' }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
                     color: improvementNum >= 0 ? 'text-[#C6A85C]' : 'text-warning',
                   },
                 ].map(({ label, value, icon, color }) => (
                   <div key={label} className="card text-center py-3">
-                    <p className="text-xl mb-0.5">{icon}</p>
+                    <div className="flex justify-center mb-0.5">{icon}</div>
                     <p className={`font-mono font-bold text-lg ${color || 'text-primary'}`}>{value}</p>
                     <p className="text-[10px] text-secondary font-body">{label}</p>
                   </div>
@@ -470,24 +470,24 @@ export default function Progress() {
       {/* ── Milestones ────────────────────────────────────────────────────── */}
       {hasEnoughData && (
         <div className="mb-6">
-          <h2 className="font-heading font-bold text-base text-primary mb-3">🏆 Milestones</h2>
+          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2"><Trophy size={16} style={{ color: '#C6A85C' }} /> Milestones</h2>
           {[
             {
-              icon: '🎯',
+              icon: <Target size={20} style={{ color: '#C6A85C' }} />,
               text: 'First scan completed',
               date: new Date(firstScan.created_at).toLocaleDateString(),
             },
             improvementNum > 0 && {
-              icon: '📈',
+              icon: <TrendingUp size={20} style={{ color: '#34C759' }} />,
               text: `Score improved by ${improvement} points`,
             },
             bestScore >= 7.5 && {
-              icon: '⭐',
+              icon: <Star size={20} style={{ color: '#C6A85C', fill: '#C6A85C' }} />,
               text: `Reached ${bestScore.toFixed(1)} — ${latestScan.tier || 'elite tier'}`,
             },
           ].filter(Boolean).map((m, i) => (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
-              <span className="text-xl">{m.icon}</span>
+              <span className="flex-shrink-0">{m.icon}</span>
               <div>
                 <p className="text-sm font-body text-primary">{m.text}</p>
                 {m.date && <p className="text-[10px] text-secondary font-body">{m.date}</p>}

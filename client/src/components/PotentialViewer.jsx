@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Share2, Download, Loader2, Sparkles } from 'lucide-react'
+import { X, Share2, Download, Loader2, Sparkles, AlertTriangle, Timer } from 'lucide-react'
 import { api } from '../utils/api'
 
 // ─── Canvas helpers ───────────────────────────────────────────────────────────
@@ -411,7 +411,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
               exit={{ opacity: 0 }}
               className="flex flex-col items-center justify-center h-64 gap-4 text-center px-6"
             >
-              <p className="text-[32px]">⚠️</p>
+              <AlertTriangle size={32} style={{ color: '#EF4444' }} />
               <p className="font-heading font-bold text-[15px] text-white">Analysis failed</p>
               <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{errMsg}</p>
               <button
@@ -512,7 +512,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
               <div className="flex justify-center mb-5">
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full"
                   style={{ background: 'rgba(52,199,89,0.10)', border: '1px solid rgba(52,199,89,0.35)' }}>
-                  <span className="text-[12px]">⏱</span>
+                  <Timer size={12} />
                   <span className="font-body text-[11px] font-semibold" style={{ color: GREEN }}>
                     {result.timeline}
                   </span>
