@@ -65,102 +65,105 @@ function drawBar(ctx, x, y, w, h, val, max = 10) {
   }
 }
 
-// ─── Card draw — 1080 × 1920 ─────────────────────────────────────────────────
+// ─── Card draw — 1080 × 1620 (matches HTML card proportions) ─────────────────
 async function drawCard({ canvas, scan, facePhotoUrl }) {
   await document.fonts.ready
   const ctx = canvas.getContext('2d')
-  const W = 1080, H = 1920
+  const W = 1080, H = 1620
   canvas.width  = W
   canvas.height = H
 
-  const { umaxScore, glowScore, pillars: sp, aiScore, gender, previousScore } = scan
-  const score    = glowScore ?? (umaxScore != null ? umaxScore / 10 : null)
-  const pillars  = sp ?? aiScore?.pillars ?? null
+  const { umaxScore, glowScore, pillars: sp, aiScore, previousScore } = scan
+  const score     = glowScore ?? (umaxScore != null ? umaxScore / 10 : null)
+  const pillars   = sp ?? aiScore?.pillars ?? null
   const potential = Math.min(10, (score ?? 5) + 1.4)
-  const scoreDelta = (previousScore != null && score != null) ? +(score - previousScore).toFixed(1) : null
 
-  const GOLD   = '#C9A84C'
-  const GOLD2  = '#FFE47A'
-  const L      = 60
-  const R_PAD  = W - 60
-  const COL_W  = (W - L * 2 - 40) / 2
-  const CR     = 324          // face circle radius (declared early for bg glow)
-  const CX     = W / 2
-  const CY     = 78 + CR      // 402
+  const GOLD  = '#d4af37'
+  const GOLD2 = '#f5e17a'
+  const GOLD3 = '#c9922a'
+  const PAD   = 48            // card outer padding
+  const CR    = 195           // avatar radius (scaled from HTML 97.5px × ~2)
+  const CX    = W / 2
+  const CY    = 120 + CR
 
-  // ── Background ──────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#0A0A0A'
+  // ── Outer background ────────────────────────────────────────────────────────
+  ctx.fillStyle = '#111111'
   ctx.fillRect(0, 0, W, H)
 
-  // Radial gold glow — tighter, behind photo only
-  const rad = ctx.createRadialGradient(W / 2, CY, 0, W / 2, CY, CR + 120)
-  rad.addColorStop(0,   'rgba(201,168,76,0.22)')
-  rad.addColorStop(0.55,'rgba(201,168,76,0.06)')
-  rad.addColorStop(1,   'rgba(0,0,0,0)')
-  ctx.fillStyle = rad
+  // ── Card ────────────────────────────────────────────────────────────────────
+  const CARD_PAD = 36
+  const cardX = CARD_PAD, cardY = CARD_PAD
+  const cardW = W - CARD_PAD * 2, cardH = H - CARD_PAD * 2
+  const cardR = 60
+
+  // card shadow
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'
+  ctx.shadowBlur  = 80
+  ctx.shadowOffsetY = 24
+  rr(ctx, cardX, cardY, cardW, cardH, cardR)
+  ctx.fillStyle = '#0a0a0a'
+  ctx.fill()
+  ctx.restore()
+
+  // card bg + border
+  rr(ctx, cardX, cardY, cardW, cardH, cardR)
+  ctx.fillStyle = '#0a0a0a'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+  ctx.lineWidth = 2
+  rr(ctx, cardX, cardY, cardW, cardH, cardR)
+  ctx.stroke()
+
+  // radial gold glow top-center behind avatar
+  const glow = ctx.createRadialGradient(CX, CY, 0, CX, CY, CR + 180)
+  glow.addColorStop(0,   'rgba(212,175,55,0.18)')
+  glow.addColorStop(0.6, 'rgba(212,175,55,0.05)')
+  glow.addColorStop(1,   'rgba(0,0,0,0)')
+  ctx.save()
+  rr(ctx, cardX, cardY, cardW, cardH, cardR)
+  ctx.clip()
+  ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
-
-  // Subtle gold border around entire card
-  ctx.save()
-  ctx.strokeStyle = 'rgba(201,168,76,0.30)'
-  ctx.lineWidth   = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
   ctx.restore()
 
-  // Fine grid
-  ctx.save()
-  ctx.globalAlpha = 0.025
-  ctx.strokeStyle = GOLD
-  ctx.lineWidth   = 0.8
-  for (let x = 0; x <= W; x += 54) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
-  for (let y = 0; y <= H; y += 54) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
-  ctx.restore()
-
-  // ── Logo + ASCENDUS wordmark (top-right) ─────────────────────────────────────
+  // ── Topbar — logo left, ASCENDUS right ────────────────────────────────────
+  const topY = cardY + PAD
   try {
     const icon = await loadImage('/src/assets/ascendus-icon.png')
-    ctx.save()
-    ctx.globalAlpha = 0.92
-    ctx.drawImage(icon, W - 52 - 48, 20, 48, 48)
+    ctx.save(); ctx.globalAlpha = 0.90
+    ctx.drawImage(icon, cardX + PAD, topY - 8, 76, 76)
     ctx.restore()
   } catch {}
-  ctx.save()
+
   ctx.textAlign     = 'right'
-  ctx.font          = '600 28px "Plus Jakarta Sans", Arial'
+  ctx.font          = '800 44px "Plus Jakarta Sans", Inter, Arial'
   ctx.fillStyle     = GOLD
-  ctx.letterSpacing = '4px'
-  ctx.fillText('ASCENDUS', W - 52 - 56, 54)
+  ctx.letterSpacing = '8px'
+  ctx.fillText('ASCENDUS', cardX + cardW - PAD, topY + 50)
   ctx.letterSpacing = '0px'
-  ctx.restore()
 
-  // ── Face circle — R=324 (35% card height), cy=402 ───────────────────────────
-
-  // Pulse glow rings
-  for (let i = 4; i >= 1; i--) {
+  // ── Avatar ──────────────────────────────────────────────────────────────────
+  // Pulse rings
+  for (let i = 3; i >= 1; i--) {
     ctx.save()
-    ctx.globalAlpha = 0.04 * i
-    ctx.beginPath(); ctx.arc(CX, CY, CR + 16 + i * 14, 0, Math.PI * 2)
+    ctx.globalAlpha = 0.03 * i
+    ctx.beginPath(); ctx.arc(CX, CY, CR + 20 + i * 16, 0, Math.PI * 2)
     ctx.strokeStyle = GOLD; ctx.lineWidth = i === 1 ? 2 : 1; ctx.stroke()
     ctx.restore()
   }
 
-  // Gold ring — thicker with strong glow
+  // Conic gold ring
   ctx.save()
-  ctx.shadowColor = 'rgba(201,168,76,0.65)'
-  ctx.shadowBlur  = 36
+  ctx.shadowColor = 'rgba(212,175,55,0.55)'
+  ctx.shadowBlur  = 40
   const ringG = ctx.createLinearGradient(CX - CR, CY - CR, CX + CR, CY + CR)
-  ringG.addColorStop(0,   GOLD2)
-  ringG.addColorStop(0.5, GOLD)
-  ringG.addColorStop(1,   '#A8893A')
-  ctx.beginPath(); ctx.arc(CX, CY, CR + 14, 0, Math.PI * 2)
-  ctx.strokeStyle = ringG; ctx.lineWidth = 8; ctx.stroke()
-  ctx.restore()
-
-  // Inner accent ring
-  ctx.save()
-  ctx.globalAlpha = 0.22
-  ctx.beginPath(); ctx.arc(CX, CY, CR + 24, 0, Math.PI * 2)
-  ctx.strokeStyle = GOLD2; ctx.lineWidth = 1; ctx.stroke()
+  ringG.addColorStop(0,    GOLD2)
+  ringG.addColorStop(0.35, GOLD)
+  ringG.addColorStop(0.65, GOLD3)
+  ringG.addColorStop(1,    GOLD)
+  ctx.beginPath(); ctx.arc(CX, CY, CR + 10, 0, Math.PI * 2)
+  ctx.strokeStyle = ringG; ctx.lineWidth = 10; ctx.stroke()
   ctx.restore()
 
   // Photo
@@ -183,163 +186,143 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
 
   // Inner rim
   ctx.beginPath(); ctx.arc(CX, CY, CR, 0, Math.PI * 2)
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 3; ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 4; ctx.stroke()
 
-  // ── Tier badge + subtitle below photo ───────────────────────────────────────
+  // ── Tier + subtitle ──────────────────────────────────────────────────────────
   const tierName = (scan.tier ?? 'NORMIE').toUpperCase()
-  const tierY    = CY + CR + 72
+  const tierY    = CY + CR + 70
   ctx.textAlign = 'center'
-  ctx.font      = 'bold 72px "Plus Jakarta Sans", Arial'
-  const tierG   = ctx.createLinearGradient(W * 0.15, tierY, W * 0.85, tierY)
-  tierG.addColorStop(0,    '#FFE47A')
+  ctx.font      = '900 88px "Plus Jakarta Sans", Inter, Arial'
+  const tierG   = ctx.createLinearGradient(W * 0.2, tierY, W * 0.8, tierY)
+  tierG.addColorStop(0,    GOLD2)
   tierG.addColorStop(0.45, GOLD)
-  tierG.addColorStop(1,    '#A8893A')
+  tierG.addColorStop(1,    GOLD3)
   ctx.fillStyle = tierG
-  ctx.fillText(tierName, W / 2, tierY)
+  ctx.fillText(tierName, CX, tierY)
 
-  const subY = tierY + 44
-  ctx.font      = '400 28px "Plus Jakarta Sans", Arial'
+  ctx.font      = '400 34px "Plus Jakarta Sans", Inter, Arial'
   ctx.fillStyle = 'rgba(255,255,255,0.30)'
-  ctx.fillText('Your Results', W / 2, subY)
+  ctx.fillText('Your Results', CX, tierY + 50)
 
-  // ── Divider ──────────────────────────────────────────────────────────────────
-  const divY = subY + 44
-  const dg   = ctx.createLinearGradient(L, 0, R_PAD, 0)
-  dg.addColorStop(0,   'rgba(201,168,76,0)')
-  dg.addColorStop(0.3, 'rgba(201,168,76,0.5)')
-  dg.addColorStop(0.7, 'rgba(201,168,76,0.5)')
-  dg.addColorStop(1,   'rgba(201,168,76,0)')
-  ctx.strokeStyle = dg; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(L, divY); ctx.lineTo(R_PAD, divY); ctx.stroke()
+  // ── Score grid — 2 × 3 ───────────────────────────────────────────────────────
+  const gridTop  = tierY + 100
+  const COLS     = 2
+  const gap      = 18
+  const colW     = (cardW - PAD * 2 - gap * (COLS - 1)) / COLS
+  const boxH     = 200
+  const boxR     = 26
 
-  // ── Scores grid ──────────────────────────────────────────────────────────────
-  // Row 1: OVERALL (left) | POTENTIAL (right)  — large cards
-  const gridTop = divY + 44
-  const bigH    = 240
-  const gap     = 40
+  const SCORES = [
+    { label: 'Overall',    val: score,              badge: (scan.tier ?? '').toUpperCase() },
+    { label: 'Potential',  val: potential,           badge: null },
+    { label: 'Harmony',    val: pillars?.harmony    ?? null, badge: null },
+    { label: 'Angularity', val: pillars?.angularity ?? null, badge: null },
+    { label: 'Features',   val: pillars?.features   ?? null, badge: null },
+    { label: 'Dimorphism', val: pillars?.dimorphism ?? null, badge: null },
+  ]
 
-  function drawBigStat(label, value, x, y, w, opts = {}) {
-    // Cell bg
-    rr(ctx, x, y, w, bigH, 20)
-    ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1
-    rr(ctx, x, y, w, bigH, 20); ctx.stroke()
+  SCORES.forEach(({ label, val, badge }, i) => {
+    const col = i % 2
+    const row = Math.floor(i / 2)
+    const bx  = cardX + PAD + col * (colW + gap)
+    const by  = gridTop + row * (boxH + gap)
+
+    // Box bg
+    rr(ctx, bx, by, colW, boxH, boxR)
+    ctx.fillStyle = '#141414'; ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1
+    rr(ctx, bx, by, colW, boxH, boxR); ctx.stroke()
 
     // Label
     ctx.textAlign = 'left'
-    ctx.font      = '600 24px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = 'rgba(255,255,255,0.38)'
-    ctx.fillText(label, x + 28, y + 42)
+    ctx.font      = '600 22px "Plus Jakarta Sans", Inter, Arial'
+    ctx.fillStyle = '#4a4a4a'
+    ctx.fillText(label.toUpperCase(), bx + 28, by + 42)
 
-    // Number — larger
-    const numStr = value != null ? value.toFixed(1) : '—'
-    ctx.font      = 'bold 112px "Space Grotesk", "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillText(numStr, x + 28, y + 164)
+    // Value
+    const numStr = val != null ? val.toFixed(1) : '—'
+    ctx.font      = '900 86px "Plus Jakarta Sans", Inter, Arial'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText(numStr, bx + 28, by + 140)
 
     // /10
     const nw = ctx.measureText(numStr).width
-    ctx.font      = '500 36px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = GOLD
-    ctx.fillText('/10', x + 28 + nw + 8, y + 136)
+    ctx.font      = '500 30px "Plus Jakarta Sans", Inter, Arial'
+    ctx.fillStyle = '#444444'
+    ctx.fillText('/10', bx + 28 + nw + 6, by + 116)
 
-    // Score delta (rescan improvement)
-    if (opts.delta != null && opts.delta > 0) {
-      ctx.font      = 'bold 32px "Plus Jakarta Sans", Arial'
-      ctx.fillStyle = '#34C759'
-      ctx.fillText(`+${opts.delta.toFixed(1)}`, x + 28 + nw + 12, y + 172)
+    // Badge (tier name for overall)
+    if (badge) {
+      ctx.font      = '700 22px "Plus Jakarta Sans", Inter, Arial'
+      ctx.fillStyle = '#2ecc71'
+      ctx.fillText(badge, bx + 28, by + 165)
     }
 
-    // Sub-label (tier name under OVERALL)
-    if (opts.subLabel) {
-      ctx.font          = '600 20px "Plus Jakarta Sans", Arial'
-      ctx.fillStyle     = GOLD
-      ctx.letterSpacing = '1px'
-      ctx.fillText(opts.subLabel, x + 28, y + 192)
-      ctx.letterSpacing = '0px'
+    // Bar
+    const barY  = by + boxH - 22
+    const barW  = colW - 56
+    const barH  = 6
+    const pct   = val != null ? Math.max(0, Math.min(1, (val - 1) / 9)) : 0
+    // track
+    rr(ctx, bx + 28, barY, barW, barH, barH / 2)
+    ctx.fillStyle = '#1e1e1e'; ctx.fill()
+    // fill
+    if (pct > 0.02) {
+      const fw = Math.max(barH, barW * pct)
+      const bg = ctx.createLinearGradient(bx + 28, 0, bx + 28 + fw, 0)
+      bg.addColorStop(0, '#1a7a3a')
+      bg.addColorStop(1, '#2ecc71')
+      rr(ctx, bx + 28, barY, fw, barH, barH / 2)
+      ctx.fillStyle = bg; ctx.fill()
     }
-
-    // Bar — thinner
-    drawBar(ctx, x + 28, y + bigH - 22, w - 56, 7, value ?? 1)
-  }
-
-  const colL = L
-  const colR = L + COL_W + gap
-  drawBigStat('OVERALL',   score,     colL, gridTop, COL_W, {
-    delta: scoreDelta,
-    subLabel: (scan.tier ?? '').toUpperCase(),
-  })
-  drawBigStat('POTENTIAL', potential, colR, gridTop, COL_W)
-
-  // Row 2–3: 4 pillars in 2×2
-  const pilTop = gridTop + bigH + 28
-  const pilH   = 160
-
-  const PILLARS = [
-    { label: 'HARMONY',    val: pillars?.harmony    ?? 5.0 },
-    { label: 'ANGULARITY', val: pillars?.angularity ?? 5.0 },
-    { label: 'FEATURES',   val: pillars?.features   ?? 5.0 },
-    { label: 'DIMORPHISM', val: pillars?.dimorphism ?? 5.0 },
-  ]
-
-  function drawPillarCell(label, val, x, y, w) {
-    rr(ctx, x, y, w, pilH, 16)
-    ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1
-    rr(ctx, x, y, w, pilH, 16); ctx.stroke()
-
-    ctx.textAlign = 'left'
-    ctx.font      = '600 20px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = 'rgba(255,255,255,0.36)'
-    ctx.fillText(label, x + 24, y + 34)
-
-    const valStr = val.toFixed(1)
-    ctx.font      = 'bold 76px "Space Grotesk", Arial'
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillText(valStr, x + 24, y + 118)
-
-    const vw = ctx.measureText(valStr).width
-    ctx.font      = '500 26px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle = GOLD
-    ctx.fillText('/10', x + 24 + vw + 6, y + 96)
-
-    drawBar(ctx, x + 24, y + pilH - 18, w - 48, 6, val)
-  }
-
-  PILLARS.forEach(({ label, val }, i) => {
-    const col = i % 2 === 0 ? colL : colR
-    const row = Math.floor(i / 2)
-    drawPillarCell(label, val, col, pilTop + row * (pilH + 24), COL_W)
   })
 
-  // ── Footer ───────────────────────────────────────────────────────────────────
-  const footY = pilTop + 2 * (pilH + 24) + 60
+  // ── Divider ──────────────────────────────────────────────────────────────────
+  const divY = gridTop + 3 * (boxH + gap) + 20
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(cardX + PAD, divY); ctx.lineTo(cardX + cardW - PAD, divY); ctx.stroke()
 
-  // Thin divider
-  ctx.strokeStyle = 'rgba(201,168,76,0.20)'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(L, footY); ctx.lineTo(R_PAD, footY); ctx.stroke()
+  // ── Search CTA ───────────────────────────────────────────────────────────────
+  const ctaY = divY + 30
+  const ctaH = 130
+  const ctaX = cardX + PAD
 
-  // Footer: icon + "Scanned by Ascendus" + domain
-  const iconSize = 38
-  let iconDrawn = false
-  try {
-    const icon = await loadImage('/src/assets/ascendus-icon.png')
-    ctx.save(); ctx.globalAlpha = 0.70
-    ctx.drawImage(icon, W / 2 - 120, footY + 22, iconSize, iconSize)
-    ctx.restore()
-    iconDrawn = true
-  } catch {}
+  // CTA box bg
+  rr(ctx, ctaX, ctaY, cardW - PAD * 2, ctaH, 24)
+  ctx.fillStyle = '#111111'; ctx.fill()
+  ctx.strokeStyle = '#222222'; ctx.lineWidth = 2
+  rr(ctx, ctaX, ctaY, cardW - PAD * 2, ctaH, 24); ctx.stroke()
 
+  // Search icon (magnifying glass, drawn manually)
+  const sx = ctaX + 40, sy = ctaY + ctaH / 2
+  ctx.save()
+  ctx.globalAlpha = 0.4
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6
+  ctx.beginPath(); ctx.arc(sx, sy - 2, 22, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(sx + 16, sy + 14); ctx.lineTo(sx + 30, sy + 28); ctx.stroke()
+  ctx.restore()
+
+  // CTA text
   ctx.textAlign = 'left'
-  ctx.font      = '500 26px "Plus Jakarta Sans", Arial'
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  ctx.fillText('Scanned by Ascendus', W / 2 - 120 + (iconDrawn ? iconSize + 12 : 0), footY + 48)
+  ctx.font      = '700 30px "Plus Jakarta Sans", Inter, Arial'
+  ctx.fillStyle = 'rgba(255,255,255,0.70)'
+  ctx.fillText('Search on the App Store', ctaX + 90, ctaY + 46)
 
+  ctx.font      = '800 38px "Plus Jakarta Sans", Inter, Arial'
+  ctx.fillStyle = GOLD
+  ctx.fillText('"Ascendus"', ctaX + 90, ctaY + 88)
+
+  ctx.font      = '400 24px "Plus Jakarta Sans", Inter, Arial'
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  ctx.fillText('Find out your rating & unlock your potential', ctaX + 90, ctaY + 118)
+
+  // ── Footer domain ────────────────────────────────────────────────────────────
+  const footY = ctaY + ctaH + 36
   ctx.textAlign     = 'center'
-  ctx.font          = '600 24px "Plus Jakarta Sans", Arial'
+  ctx.font          = '600 30px "Plus Jakarta Sans", Inter, Arial'
   ctx.fillStyle     = GOLD
-  ctx.letterSpacing = '1px'
-  ctx.fillText('ascendus.store', W / 2, footY + 86)
+  ctx.letterSpacing = '2px'
+  ctx.fillText('ascendus.store', CX, footY)
   ctx.letterSpacing = '0px'
 }
 
@@ -462,8 +445,8 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
             animate={{ opacity: 1, scale: 1,    y: 0  }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              height: 'min(calc(100vh - 200px), calc(82vw * 16 / 9))',
-              aspectRatio: '9 / 16',
+              height: 'min(calc(100vh - 200px), calc(67vw * 3 / 2))',
+              aspectRatio: '2 / 3',
               width: 'auto',
               borderRadius: 16,
               overflow: 'hidden',
