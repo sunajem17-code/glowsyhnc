@@ -1,6 +1,17 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { X, Share2, Download, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { MALE_TIERS, FEMALE_TIERS } from '../utils/analysis'
+
+// Map tier label → { color, isTop, isMid }
+const ALL_TIERS = [...MALE_TIERS, ...FEMALE_TIERS]
+function tierMeta(label) {
+  const t = ALL_TIERS.find(t => t.label === label)
+  if (!t) return { color: '#ffffff', isTop: false, isMid: false }
+  const isTop = t.min >= 8.0
+  const isMid = t.min >= 6.0 && t.min < 8.0
+  return { color: t.color, isTop, isMid }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function rr(ctx, x, y, w, h, r) {
@@ -189,23 +200,24 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 4; ctx.stroke()
 
   // ── Tier + subtitle ──────────────────────────────────────────────────────────
-  const tierRaw  = (scan.tier ?? '').toUpperCase()
-  const tierName = tierRaw || (score >= 8.5 ? 'CHAD' : score >= 7 ? 'HANDSOME' : score >= 5.5 ? 'AVERAGE' : 'NORMIE')
+  const tierLabel = scan.tier ?? ''
+  const tierName  = tierLabel.toUpperCase() || 'NORMIE'
+  const { color: tierColor, isTop, isMid } = tierMeta(tierLabel)
+  const tierAccent = isTop ? GOLD : tierColor  // top tiers get gold treatment, others use their own color
   const tierY    = CY + CR + 70
-
-  // Tier colour — gold for top tiers, silver-white for mid, muted for lower
-  const TOP_TIERS = ['GIGACHAD','CHAD','TOP MODEL','MALE MODEL']
-  const MID_TIERS = ['HANDSOME','ABOVE AVERAGE','PRETTY BOY','HIGH TIER']
-  const tierAccent = TOP_TIERS.some(t => tierName.includes(t)) ? GOLD
-    : MID_TIERS.some(t => tierName.includes(t))              ? '#c8c8c8'
-    : 'rgba(255,255,255,0.45)'
 
   ctx.textAlign = 'center'
   ctx.font      = '900 88px "Plus Jakarta Sans", Inter, Arial'
   const tierG   = ctx.createLinearGradient(W * 0.2, tierY, W * 0.8, tierY)
-  tierG.addColorStop(0,    TOP_TIERS.some(t => tierName.includes(t)) ? GOLD2 : tierAccent)
-  tierG.addColorStop(0.45, tierAccent)
-  tierG.addColorStop(1,    TOP_TIERS.some(t => tierName.includes(t)) ? GOLD3 : tierAccent)
+  if (isTop) {
+    tierG.addColorStop(0,    GOLD2)
+    tierG.addColorStop(0.45, GOLD)
+    tierG.addColorStop(1,    GOLD3)
+  } else {
+    tierG.addColorStop(0,    tierColor + 'cc')
+    tierG.addColorStop(0.5,  tierColor)
+    tierG.addColorStop(1,    tierColor + 'cc')
+  }
   ctx.fillStyle = tierG
   ctx.fillText(tierName, CX, tierY)
 
