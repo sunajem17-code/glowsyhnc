@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2 } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 
-const GOLD    = '#C6A85C'
-const BORDER  = 'rgba(255,255,255,0.07)'
+const GOLD   = '#C6A85C'
+const BORDER = 'rgba(255,255,255,0.07)'
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -30,12 +30,70 @@ function Avatar({ name, size = 9 }) {
   )
 }
 
+// ── Photo picker ──────────────────────────────────────────────────────────────
+function fileToDataUrl(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader()
+    reader.onload  = e => res(e.target.result)
+    reader.onerror = rej
+    reader.readAsDataURL(file)
+  })
+}
+
+function PhotoPicker({ label, value, onChange }) {
+  const inputRef = useRef()
+  return (
+    <div className="flex-1">
+      <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5"
+        style={{ color: 'rgba(255,255,255,0.35)' }}>
+        {label}
+      </p>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center"
+        style={{
+          aspectRatio: '3/4',
+          background: value ? 'transparent' : '#1C1C1C',
+          border: `1.5px dashed ${value ? 'transparent' : 'rgba(255,255,255,0.12)'}`,
+        }}
+      >
+        {value ? (
+          <>
+            <img src={value} alt={label} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.35)' }}>
+              <Camera size={18} color="#fff" />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <Camera size={22} style={{ color: 'rgba(255,255,255,0.25)' }} />
+            <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>Tap to add</span>
+          </div>
+        )}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async e => {
+          const file = e.target.files?.[0]
+          if (file) onChange(await fileToDataUrl(file))
+          e.target.value = ''
+        }}
+      />
+    </div>
+  )
+}
+
 // ── Comments sheet ────────────────────────────────────────────────────────────
 function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
-  const [comments, setComments]   = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [text, setText]           = useState('')
-  const [sending, setSending]     = useState(false)
+  const [comments, setComments] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [text, setText]         = useState('')
+  const [sending, setSending]   = useState(false)
   const bottomRef = useRef()
 
   useEffect(() => {
@@ -72,16 +130,14 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
       className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl overflow-hidden"
       style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '75vh' }}
     >
-      {/* Handle */}
-      <div className="flex justify-center pt-3 pb-2">
+      <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
         <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
       </div>
-      <div className="flex items-center justify-between px-4 pb-3 border-b" style={{ borderColor: BORDER }}>
+      <div className="flex items-center justify-between px-4 pb-3 border-b flex-shrink-0" style={{ borderColor: BORDER }}>
         <p className="font-heading font-bold text-sm text-primary">Comments</p>
         <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
       </div>
 
-      {/* List */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
@@ -107,8 +163,8 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 py-3 flex items-center gap-3 border-t" style={{ borderColor: BORDER, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="px-4 py-3 flex items-center gap-3 border-t flex-shrink-0"
+        style={{ borderColor: BORDER, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <Avatar name={displayName} size={8} />
         <input
           value={text}
@@ -116,7 +172,8 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="Add a comment…"
           maxLength={500}
-          className="flex-1 bg-transparent font-body text-[13px] text-primary outline-none placeholder:text-secondary"
+          className="flex-1 bg-transparent font-body text-primary outline-none placeholder:text-secondary"
+          style={{ fontSize: 16 }}
         />
         <button onClick={send} disabled={!text.trim() || sending}>
           <Send size={18} style={{ color: text.trim() ? GOLD : 'rgba(255,255,255,0.2)' }} />
@@ -128,27 +185,39 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
 
 // ── Share glow-up modal ───────────────────────────────────────────────────────
 function ShareModal({ onClose, onPosted, user, scans }) {
-  const latestScan = scans[0]
-  const prevScan   = scans.find((s, i) => i > 0)
+  const latestScan  = scans[0]
+  const prevScan    = scans.find((_, i) => i > 0)
   const scoreAfter  = latestScan?.glowScore ?? null
   const scoreBefore = prevScan?.glowScore   ?? null
 
   const [displayName, setDisplayName] = useState(user?.name?.split(' ')[0] ?? 'Anonymous')
-  const [caption, setCaption]         = useState('')
-  const [sharePhoto, setSharePhoto]   = useState(false)
-  const [posting, setPosting]         = useState(false)
-  const [err, setErr]                 = useState('')
+  const [caption,     setCaption]     = useState('')
+  const [afterPhoto,  setAfterPhoto]  = useState(latestScan?.facePhotoUrl ?? null)
+  const [beforePhoto, setBeforePhoto] = useState(null)
+  const [posting,     setPosting]     = useState(false)
+  const [err,         setErr]         = useState('')
+
+  // Shrink modal when keyboard appears using visualViewport
+  const [vvH, setVvH] = useState(window.visualViewport?.height ?? window.innerHeight)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setVvH(vv.height)
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
 
   async function submit() {
-    if (!latestScan) { setErr("You need a scan first."); return }
-    setPosting(true)
-    setErr('')
+    if (!latestScan) { setErr('You need a scan first.'); return }
+    setPosting(true); setErr('')
     try {
       await api.community.post({
         displayName,
         scoreBefore: scoreBefore ?? scoreAfter,
         scoreAfter,
-        photoUrl: sharePhoto ? (latestScan.facePhotoUrl ?? null) : null,
+        photoUrl:       afterPhoto  || null,
+        beforePhotoUrl: beforePhoto || null,
         caption,
       })
       onPosted()
@@ -162,8 +231,8 @@ function ShareModal({ onClose, onPosted, user, scans }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ background: 'rgba(0,0,0,0.7)' }}
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: 'rgba(0,0,0,0.75)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <motion.div
@@ -171,68 +240,100 @@ function ShareModal({ onClose, onPosted, user, scans }) {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-        className="w-full rounded-t-3xl p-5 pb-8"
-        style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)' }}
+        className="w-full rounded-t-3xl flex flex-col"
+        style={{
+          background: '#1A1A1A',
+          border: '1px solid rgba(255,255,255,0.1)',
+          maxHeight: Math.min(vvH - 24, window.innerHeight * 0.92),
+        }}
       >
-        <div className="flex items-center justify-between mb-5">
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
           <p className="font-heading font-bold text-base text-primary">Share Your Glow-Up</p>
           <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
         </div>
 
-        {/* Score preview */}
-        {scoreAfter != null && (
-          <div
-            className="flex items-center gap-3 p-3 rounded-2xl mb-4"
-            style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}
-          >
-            <TrendingUp size={18} style={{ color: GOLD }} />
-            <div>
-              <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
-                {scoreBefore != null && scoreBefore !== scoreAfter
-                  ? `${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`
-                  : `Score: ${scoreAfter.toFixed(1)}`}
-              </p>
-              <p className="font-body text-[11px] text-secondary">This will be visible on your post</p>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+
+          {/* Score preview */}
+          {scoreAfter != null && (
+            <div className="flex items-center gap-3 p-3 rounded-2xl"
+              style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
+              <TrendingUp size={18} style={{ color: GOLD }} />
+              <div>
+                <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
+                  {scoreBefore != null && scoreBefore !== scoreAfter
+                    ? `${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`
+                    : `Score: ${scoreAfter.toFixed(1)}`}
+                </p>
+                <p className="font-body text-[11px] text-secondary">Visible on your post</p>
+              </div>
             </div>
+          )}
+
+          {/* Before / After photos */}
+          <div>
+            <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
+              Before &amp; After Photos
+            </p>
+            <div className="flex gap-3">
+              <PhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} />
+              <PhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  />
+            </div>
+            <p className="font-body text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
+              Optional — show your transformation
+            </p>
           </div>
-        )}
 
-        {/* Display name */}
-        <label className="block font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-1.5">
-          Display Name
-        </label>
-        <input
-          value={displayName}
-          onChange={e => setDisplayName(e.target.value.slice(0, 30))}
-          placeholder="Anonymous"
-          className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary mb-4 outline-none"
-          style={{ background: '#242424', border: BORDER }}
-        />
+          {/* Display name */}
+          <div>
+            <label className="block font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-1.5">
+              Display Name
+            </label>
+            <input
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value.slice(0, 30))}
+              placeholder="Anonymous"
+              className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none"
+              style={{ background: '#242424', border: `1px solid ${BORDER}`, fontSize: 16 }}
+            />
+          </div>
 
-        {/* Caption */}
-        <label className="block font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-1.5">
-          Caption (optional)
-        </label>
-        <textarea
-          value={caption}
-          onChange={e => setCaption(e.target.value.slice(0, 280))}
-          placeholder="What worked for you?"
-          rows={2}
-          className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary mb-4 outline-none resize-none"
-          style={{ background: '#242424', border: BORDER }}
-        />
+          {/* Caption */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary">
+                Caption <span style={{ color: 'rgba(255,255,255,0.2)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                {caption.length}/280
+              </span>
+            </div>
+            <textarea
+              value={caption}
+              onChange={e => setCaption(e.target.value.slice(0, 280))}
+              placeholder="What worked for you?"
+              rows={3}
+              className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none resize-none"
+              style={{ background: '#242424', border: `1px solid ${BORDER}`, fontSize: 16 }}
+            />
+          </div>
 
-        {err && <p className="text-[12px] font-body mb-3" style={{ color: '#EF4444' }}>{err}</p>}
+          {err && <p className="text-[12px] font-body" style={{ color: '#EF4444' }}>{err}</p>}
 
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={submit}
-          disabled={posting}
-          className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
-        >
-          {posting ? <><Loader2 size={15} className="animate-spin" /> Posting…</> : 'Share Glow-Up'}
-        </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={submit}
+            disabled={posting}
+            className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
+          >
+            {posting ? <><Loader2 size={15} className="animate-spin" /> Posting…</> : 'Share Glow-Up'}
+          </motion.button>
+
+          <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
+        </div>
       </motion.div>
     </motion.div>
   )
@@ -254,6 +355,9 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
     }
   }
 
+  const hasBefore = !!post.before_photo_url
+  const hasAfter  = !!post.photo_url
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -269,17 +373,12 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
           <p className="font-body text-[11px] text-secondary">{timeAgo(post.created_at)}</p>
         </div>
         {improvement !== null && (
-          <div
-            className="px-2.5 py-1 rounded-full"
-            style={{
-              background: improvement >= 0 ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
-              border: `1px solid ${improvement >= 0 ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.25)'}`,
-            }}
-          >
-            <span
-              className="font-heading font-bold text-[12px]"
-              style={{ color: improvement >= 0 ? '#34D399' : '#EF4444' }}
-            >
+          <div className="px-2.5 py-1 rounded-full" style={{
+            background: improvement >= 0 ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${improvement >= 0 ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.25)'}`,
+          }}>
+            <span className="font-heading font-bold text-[12px]"
+              style={{ color: improvement >= 0 ? '#34D399' : '#EF4444' }}>
               {sign}{improvement} pts
             </span>
           </div>
@@ -308,14 +407,28 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
         </div>
       )}
 
-      {/* Photo */}
-      {post.photo_url && (
-        <img
-          src={post.photo_url}
-          alt="Glow-up"
-          className="w-full object-cover"
-          style={{ maxHeight: 320 }}
-        />
+      {/* Before / After photos */}
+      {(hasBefore || hasAfter) && (
+        <div className={`px-3 pb-3 ${hasBefore && hasAfter ? 'grid grid-cols-2 gap-2' : ''}`}>
+          {hasBefore && (
+            <div className="relative rounded-xl overflow-hidden">
+              <img src={post.before_photo_url} alt="Before" className="w-full object-cover" style={{ maxHeight: 280 }} />
+              <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
+                style={{ background: 'rgba(0,0,0,0.55)' }}>
+                <span className="font-heading font-bold text-[11px] text-white tracking-wider">BEFORE</span>
+              </div>
+            </div>
+          )}
+          {hasAfter && (
+            <div className="relative rounded-xl overflow-hidden">
+              <img src={post.photo_url} alt="After" className="w-full object-cover" style={{ maxHeight: 280 }} />
+              <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
+                style={{ background: 'rgba(0,0,0,0.55)' }}>
+                <span className="font-heading font-bold text-[11px]" style={{ color: GOLD }}>AFTER</span>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Caption */}
@@ -327,7 +440,7 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
       <div className="flex items-center gap-1 px-3 py-3 border-t" style={{ borderColor: BORDER }}>
         <button
           onClick={() => onLike(post.id)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
           style={{ color: post.user_liked ? '#EF4444' : 'rgba(255,255,255,0.4)' }}
         >
           <Heart size={16} fill={post.user_liked ? '#EF4444' : 'none'} />
@@ -357,16 +470,14 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
 export default function Community() {
   const { user, scans } = useStore()
 
-  const [posts, setPosts]             = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [showShare, setShowShare]     = useState(false)
-  const [activePost, setActivePost]   = useState(null) // for comments
+  const [posts, setPosts]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [showShare, setShowShare]   = useState(false)
+  const [activePost, setActivePost] = useState(null)
 
   const displayName = user?.name?.split(' ')[0] ?? 'Anonymous'
 
-  useEffect(() => {
-    loadFeed()
-  }, [])
+  useEffect(() => { loadFeed() }, [])
 
   async function loadFeed() {
     setLoading(true)
@@ -380,9 +491,7 @@ export default function Community() {
     try {
       const { liked, likes } = await api.community.like(postId)
       setPosts(prev => prev.map(p =>
-        p.id === postId
-          ? { ...p, user_liked: liked ? 1 : 0, likes_count: likes }
-          : p
+        p.id === postId ? { ...p, user_liked: liked ? 1 : 0, likes_count: likes } : p
       ))
     } catch {}
   }
@@ -396,9 +505,7 @@ export default function Community() {
 
   function handleCommentAdded() {
     setPosts(prev => prev.map(p =>
-      p.id === activePost?.id
-        ? { ...p, comments_count: (p.comments_count || 0) + 1 }
-        : p
+      p.id === activePost?.id ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
     ))
   }
 
@@ -462,7 +569,6 @@ export default function Community() {
         ))
       )}
 
-      {/* Modals */}
       <AnimatePresence>
         {showShare && (
           <ShareModal

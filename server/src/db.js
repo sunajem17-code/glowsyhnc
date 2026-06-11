@@ -119,6 +119,7 @@ db.exec(`
     score_before REAL,
     score_after REAL,
     photo_url TEXT,
+    before_photo_url TEXT,
     caption TEXT DEFAULT '',
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -152,6 +153,7 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN is_pro INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN coach_messages_used INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN apple_sub TEXT",
+  "ALTER TABLE community_posts ADD COLUMN before_photo_url TEXT",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }

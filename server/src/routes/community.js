@@ -31,19 +31,20 @@ router.post('/post', authMiddleware, async (req, res) => {
   const allowed = await checkPostLimit(req.userId)
   if (!allowed) return res.status(429).json({ error: 'Slow down — too many posts today.' })
 
-  const { displayName, scoreBefore, scoreAfter, photoUrl, caption } = req.body
+  const { displayName, scoreBefore, scoreAfter, photoUrl, beforePhotoUrl, caption } = req.body
   const id = uuid()
 
   db.prepare(`
-    INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, caption)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, req.userId,
     (displayName || 'Anonymous').slice(0, 30),
-    scoreBefore ?? null,
-    scoreAfter  ?? null,
-    photoUrl    || null,
-    (caption    || '').slice(0, 280),
+    scoreBefore    ?? null,
+    scoreAfter     ?? null,
+    photoUrl       || null,
+    beforePhotoUrl || null,
+    (caption       || '').slice(0, 280),
   )
 
   const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(id)
