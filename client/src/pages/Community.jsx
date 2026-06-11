@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -339,21 +339,219 @@ function ShareModal({ onClose, onPosted, user, scans }) {
   )
 }
 
+// ── Load image helper (shared) ────────────────────────────────────────────────
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    const img = new window.Image()
+    if (src && !src.startsWith('data:')) img.crossOrigin = 'anonymous'
+    img.onload  = () => res(img)
+    img.onerror = () => rej(new Error('load'))
+    img.src = src
+  })
+}
+
+function rrCtx(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+}
+
+async function renderPostCard(post) {
+  const W = 1080, H = 1080
+  const c = document.createElement('canvas')
+  c.width = W; c.height = H
+  const ctx = c.getContext('2d')
+
+  // bg
+  ctx.fillStyle = '#0D0D0D'; ctx.fillRect(0, 0, W, H)
+
+  // card
+  rrCtx(ctx, 36, 36, W - 72, H - 72, 48)
+  ctx.fillStyle = '#141414'; ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1.5
+  rrCtx(ctx, 36, 36, W - 72, H - 72, 48); ctx.stroke()
+
+  // topbar
+  ctx.font = '800 38px Inter, Arial'; ctx.fillStyle = '#C6A85C'
+  ctx.textAlign = 'right'
+  ctx.fillText('ASCENDUS', W - 80, 110)
+
+  // username
+  ctx.textAlign = 'left'
+  ctx.font = '700 40px Inter, Arial'; ctx.fillStyle = '#ffffff'
+  ctx.fillText(post.display_name ?? 'Anonymous', 80, 110)
+
+  // score line
+  const hasBefore = !!post.before_photo_url
+  const hasAfter  = !!post.photo_url
+  const scoreText = post.score_before != null && post.score_after != null
+    ? `${post.score_before.toFixed(1)}  →  ${post.score_after.toFixed(1)}`
+    : post.score_after != null ? `Score: ${post.score_after.toFixed(1)}` : null
+  const improvement = post.score_before != null && post.score_after != null
+    ? post.score_after - post.score_before : null
+
+  if (scoreText) {
+    ctx.font = '700 56px Inter, Arial'
+    ctx.fillStyle = improvement != null && improvement >= 0 ? '#34D399' : '#EF4444'
+    ctx.textAlign = 'center'
+    ctx.fillText(scoreText, W / 2, 192)
+  }
+
+  // photo area
+  const photoTop  = 230
+  const photoH    = 640
+  const photoGap  = 20
+  const bothPhotos = hasBefore && hasAfter
+
+  async function drawPhoto(src, x, y, w, h, label, labelColor) {
+    try {
+      const img = await loadImg(src)
+      ctx.save()
+      rrCtx(ctx, x, y, w, h, 20); ctx.clip()
+      const scale = Math.max(w / img.width, h / img.height)
+      const dw = img.width * scale, dh = img.height * scale
+      ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh)
+      ctx.restore()
+      // label bar
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'
+      rrCtx(ctx, x, y + h - 52, w, 52, 0); ctx.fill()
+      ctx.font = '700 26px Inter, Arial'; ctx.fillStyle = labelColor
+      ctx.textAlign = 'center'; ctx.fillText(label, x + w / 2, y + h - 18)
+    } catch {}
+  }
+
+  if (bothPhotos) {
+    const hw = (W - 72 - 20 - photoGap) / 2
+    await drawPhoto(post.before_photo_url, 56, photoTop, hw, photoH, 'BEFORE', '#ffffff')
+    await drawPhoto(post.photo_url,        56 + hw + photoGap, photoTop, hw, photoH, 'AFTER', '#C6A85C')
+  } else if (hasAfter) {
+    await drawPhoto(post.photo_url, 56, photoTop, W - 112, photoH, 'AFTER', '#C6A85C')
+  } else if (hasBefore) {
+    await drawPhoto(post.before_photo_url, 56, photoTop, W - 112, photoH, 'BEFORE', '#ffffff')
+  }
+
+  // caption
+  if (post.caption) {
+    const captionY = photoTop + photoH + 48
+    ctx.font = '400 32px Inter, Arial'; ctx.fillStyle = 'rgba(255,255,255,0.7)'
+    ctx.textAlign = 'center'
+    const words = post.caption.split(' ')
+    let line = '', lines = []
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w
+      if (ctx.measureText(test).width > W - 160) { lines.push(line); line = w }
+      else line = test
+    }
+    lines.push(line)
+    lines.slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, captionY + i * 44))
+  }
+
+  // footer
+  ctx.font = '600 28px Inter, Arial'; ctx.fillStyle = '#C6A85C'
+  ctx.textAlign = 'center'; ctx.letterSpacing = '2px'
+  ctx.fillText('ascendus.store', W / 2, H - 58)
+  ctx.letterSpacing = '0px'
+
+  return c.toDataURL('image/jpeg', 0.92)
+}
+
+// ── Post share sheet ──────────────────────────────────────────────────────────
+function PostShareSheet({ post, onClose }) {
+  const [generating, setGenerating] = useState(false)
+  const [copied,     setCopied]     = useState(false)
+
+  async function shareAsImage() {
+    setGenerating(true)
+    try {
+      const dataUrl = await renderPostCard(post)
+      const blob = await (await fetch(dataUrl)).blob()
+      const file = new File([blob], 'ascendus-glowup.jpg', { type: 'image/jpeg' })
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: `${post.display_name}'s Glow-Up`, files: [file] })
+      } else {
+        const a = document.createElement('a')
+        a.href = dataUrl; a.download = 'ascendus-glowup.jpg'; a.click()
+      }
+    } catch (e) { if (e.name !== 'AbortError') console.error(e) }
+    finally { setGenerating(false); onClose() }
+  }
+
+  async function copyText() {
+    const text = post.score_before != null && post.score_after != null
+      ? `${post.display_name} went ${post.score_before.toFixed(1)} → ${post.score_after.toFixed(1)} on Ascendus! 🔥 ascendus.store`
+      : `Check out ${post.display_name}'s glow-up on Ascendus! 🔥 ascendus.store`
+    try { await navigator.clipboard.writeText(text) } catch {}
+    setCopied(true)
+    setTimeout(() => { setCopied(false); onClose() }, 1200)
+  }
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.5)' }}
+        onClick={onClose} />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl pb-safe"
+        style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex justify-center pt-3 pb-4">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+        <p className="px-5 pb-4 font-heading font-bold text-sm text-primary">Share Post</p>
+        <div className="px-4 flex flex-col gap-2">
+          <button
+            onClick={shareAsImage}
+            disabled={generating}
+            className="flex items-center gap-3 px-4 py-3.5 rounded-2xl w-full text-left"
+            style={{ background: '#242424', border: `1px solid ${BORDER}` }}
+          >
+            {generating
+              ? <Loader2 size={20} className="animate-spin flex-shrink-0" style={{ color: GOLD }} />
+              : <Image size={20} className="flex-shrink-0" style={{ color: GOLD }} />}
+            <div>
+              <p className="font-heading font-bold text-[13px] text-primary">Share as Image</p>
+              <p className="font-body text-[11px] text-secondary">Branded card with before/after photos</p>
+            </div>
+          </button>
+          <button
+            onClick={copyText}
+            className="flex items-center gap-3 px-4 py-3.5 rounded-2xl w-full text-left"
+            style={{ background: '#242424', border: `1px solid ${BORDER}` }}
+          >
+            {copied
+              ? <Check size={20} className="flex-shrink-0" style={{ color: '#34D399' }} />
+              : <Copy size={20} className="flex-shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }} />}
+            <div>
+              <p className="font-heading font-bold text-[13px] text-primary">{copied ? 'Copied!' : 'Copy Text'}</p>
+              <p className="font-body text-[11px] text-secondary">Score + link to share anywhere</p>
+            </div>
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-2xl font-heading font-bold text-sm mt-1"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}
+          >
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
 // ── Post card ─────────────────────────────────────────────────────────────────
 function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete }) {
+  const [showShareSheet, setShowShareSheet] = useState(false)
+
   const improvement = post.score_before != null && post.score_after != null
     ? (post.score_after - post.score_before).toFixed(1)
     : null
   const sign = improvement >= 0 ? '+' : ''
-
-  async function handleShare() {
-    const text = `${post.display_name} went ${post.score_before?.toFixed(1) ?? '?'} → ${post.score_after?.toFixed(1) ?? '?'} on Ascendus! 🔥 ascendus.store`
-    if (navigator.share) {
-      try { await navigator.share({ text }) } catch {}
-    } else {
-      navigator.clipboard?.writeText(text)
-    }
-  }
 
   const hasBefore = !!post.before_photo_url
   const hasAfter  = !!post.photo_url
@@ -455,13 +653,19 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
           <span className="font-body text-[12px]">{post.comments_count ?? 0}</span>
         </button>
         <button
-          onClick={handleShare}
+          onClick={() => setShowShareSheet(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl ml-auto"
           style={{ color: 'rgba(255,255,255,0.4)' }}
         >
           <Share2 size={16} />
         </button>
       </div>
+
+      <AnimatePresence>
+        {showShareSheet && (
+          <PostShareSheet post={post} onClose={() => setShowShareSheet(false)} />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
