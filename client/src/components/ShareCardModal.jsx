@@ -189,14 +189,23 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
   ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 4; ctx.stroke()
 
   // ── Tier + subtitle ──────────────────────────────────────────────────────────
-  const tierName = (scan.tier ?? 'NORMIE').toUpperCase()
+  const tierRaw  = (scan.tier ?? '').toUpperCase()
+  const tierName = tierRaw || (score >= 8.5 ? 'CHAD' : score >= 7 ? 'HANDSOME' : score >= 5.5 ? 'AVERAGE' : 'NORMIE')
   const tierY    = CY + CR + 70
+
+  // Tier colour — gold for top tiers, silver-white for mid, muted for lower
+  const TOP_TIERS = ['GIGACHAD','CHAD','TOP MODEL','MALE MODEL']
+  const MID_TIERS = ['HANDSOME','ABOVE AVERAGE','PRETTY BOY','HIGH TIER']
+  const tierAccent = TOP_TIERS.some(t => tierName.includes(t)) ? GOLD
+    : MID_TIERS.some(t => tierName.includes(t))              ? '#c8c8c8'
+    : 'rgba(255,255,255,0.45)'
+
   ctx.textAlign = 'center'
   ctx.font      = '900 88px "Plus Jakarta Sans", Inter, Arial'
   const tierG   = ctx.createLinearGradient(W * 0.2, tierY, W * 0.8, tierY)
-  tierG.addColorStop(0,    GOLD2)
-  tierG.addColorStop(0.45, GOLD)
-  tierG.addColorStop(1,    GOLD3)
+  tierG.addColorStop(0,    TOP_TIERS.some(t => tierName.includes(t)) ? GOLD2 : tierAccent)
+  tierG.addColorStop(0.45, tierAccent)
+  tierG.addColorStop(1,    TOP_TIERS.some(t => tierName.includes(t)) ? GOLD3 : tierAccent)
   ctx.fillStyle = tierG
   ctx.fillText(tierName, CX, tierY)
 
@@ -227,10 +236,12 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
     const bx  = cardX + PAD + col * (colW + gap)
     const by  = gridTop + row * (boxH + gap)
 
-    // Box bg
+    // Box bg — Overall box gets a subtle accent border
+    const isOverall = i === 0
     rr(ctx, bx, by, colW, boxH, boxR)
-    ctx.fillStyle = '#141414'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1
+    ctx.fillStyle = isOverall ? '#141208' : '#141414'; ctx.fill()
+    ctx.strokeStyle = isOverall ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.06)'
+    ctx.lineWidth = isOverall ? 1.5 : 1
     rr(ctx, bx, by, colW, boxH, boxR); ctx.stroke()
 
     // Label
@@ -254,11 +265,11 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
     // Badge (tier name for overall)
     if (badge) {
       ctx.font      = '700 22px "Plus Jakarta Sans", Inter, Arial'
-      ctx.fillStyle = '#2ecc71'
+      ctx.fillStyle = tierAccent
       ctx.fillText(badge, bx + 28, by + 165)
     }
 
-    // Bar
+    // Bar — colour reflects actual score value
     const barY  = by + boxH - 22
     const barW  = colW - 56
     const barH  = 6
@@ -267,11 +278,14 @@ async function drawCard({ canvas, scan, facePhotoUrl }) {
     rr(ctx, bx + 28, barY, barW, barH, barH / 2)
     ctx.fillStyle = '#1e1e1e'; ctx.fill()
     // fill
-    if (pct > 0.02) {
-      const fw = Math.max(barH, barW * pct)
+    if (pct > 0.02 && val != null) {
+      const fw  = Math.max(barH, barW * pct)
+      const col = barColor(val)
+      // darken version for gradient start
+      const dark = val >= 7 ? '#1a7a3a' : val >= 5 ? '#7a6a2a' : '#7a3020'
       const bg = ctx.createLinearGradient(bx + 28, 0, bx + 28 + fw, 0)
-      bg.addColorStop(0, '#1a7a3a')
-      bg.addColorStop(1, '#2ecc71')
+      bg.addColorStop(0, dark)
+      bg.addColorStop(1, col)
       rr(ctx, bx + 28, barY, fw, barH, barH / 2)
       ctx.fillStyle = bg; ctx.fill()
     }
