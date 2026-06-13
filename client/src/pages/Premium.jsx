@@ -42,7 +42,7 @@ const TESTIMONIALS = [
 export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
-  const [plan, setPlan] = useState('monthly')
+  const [plan, setPlan] = useState('yearly')
   const [subscribingTrial, setSubscribingTrial] = useState(false)
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [restoring, setRestoring] = useState(false)

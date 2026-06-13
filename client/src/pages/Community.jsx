@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -197,17 +197,19 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
   )
 }
 
-// ── Share glow-up modal ───────────────────────────────────────────────────────
+// ── Share modal (Glow-Up or Rate Me) ─────────────────────────────────────────
 function ShareModal({ onClose, onPosted, user, scans }) {
   const latestScan  = scans[0]
   const prevScan    = scans.find((_, i) => i > 0)
   const scoreAfter  = latestScan?.glowScore ?? null
   const scoreBefore = prevScan?.glowScore   ?? null
 
+  const [postType,    setPostType]    = useState('glow-up')
   const [displayName, setDisplayName] = useState(user?.name?.split(' ')[0] ?? 'Anonymous')
   const [caption,     setCaption]     = useState('')
   const [afterPhoto,  setAfterPhoto]  = useState(latestScan?.facePhotoUrl ?? null)
   const [beforePhoto, setBeforePhoto] = useState(null)
+  const [ratePhoto,   setRatePhoto]   = useState(null)
   const [posting,     setPosting]     = useState(false)
   const [err,         setErr]         = useState('')
 
@@ -223,17 +225,28 @@ function ShareModal({ onClose, onPosted, user, scans }) {
   }, [])
 
   async function submit() {
-    if (!latestScan) { setErr('You need a scan first.'); return }
+    if (postType === 'glow-up' && !latestScan) { setErr('You need a scan first.'); return }
+    if (postType === 'rate-me' && !ratePhoto)  { setErr('Add a photo to get rated.'); return }
     setPosting(true); setErr('')
     try {
-      await api.community.post({
-        displayName,
-        scoreBefore: scoreBefore ?? scoreAfter,
-        scoreAfter,
-        photoUrl:       afterPhoto  || null,
-        beforePhotoUrl: beforePhoto || null,
-        caption,
-      })
+      if (postType === 'glow-up') {
+        await api.community.post({
+          displayName,
+          scoreBefore: scoreBefore ?? scoreAfter,
+          scoreAfter,
+          photoUrl:       afterPhoto  || null,
+          beforePhotoUrl: beforePhoto || null,
+          caption,
+          postType: 'glow-up',
+        })
+      } else {
+        await api.community.post({
+          displayName,
+          photoUrl: ratePhoto,
+          caption,
+          postType: 'rate-me',
+        })
+      }
       onPosted()
     } catch (e) {
       setErr(e.message || 'Failed to post. Try again.')
@@ -263,42 +276,80 @@ function ShareModal({ onClose, onPosted, user, scans }) {
       >
         {/* Fixed header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
-          <p className="font-heading font-bold text-base text-primary">Share Your Glow-Up</p>
+          <p className="font-heading font-bold text-base text-primary">Share to Community</p>
           <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+        </div>
+
+        {/* Post type selector */}
+        <div className="px-5 pb-3 flex-shrink-0">
+          <div className="flex gap-2 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            {[{ id: 'glow-up', icon: <TrendingUp size={13} />, label: 'Glow-Up' }, { id: 'rate-me', icon: <Star size={13} />, label: 'Rate Me' }].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setPostType(t.id)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-heading font-bold text-[12px] transition-all"
+                style={postType === t.id
+                  ? { background: GOLD, color: '#0A0A0A' }
+                  : { color: 'rgba(255,255,255,0.4)' }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
 
-          {/* Score preview */}
-          {scoreAfter != null && (
-            <div className="flex items-center gap-3 p-3 rounded-2xl"
-              style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
-              <TrendingUp size={18} style={{ color: GOLD }} />
+          {postType === 'glow-up' ? (
+            <>
+              {/* Score preview */}
+              {scoreAfter != null && (
+                <div className="flex items-center gap-3 p-3 rounded-2xl"
+                  style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
+                  <TrendingUp size={18} style={{ color: GOLD }} />
+                  <div>
+                    <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
+                      {scoreBefore != null && scoreBefore !== scoreAfter
+                        ? `${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`
+                        : `Score: ${scoreAfter.toFixed(1)}`}
+                    </p>
+                    <p className="font-body text-[11px] text-secondary">Visible on your post</p>
+                  </div>
+                </div>
+              )}
+              {/* Before / After photos */}
               <div>
-                <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
-                  {scoreBefore != null && scoreBefore !== scoreAfter
-                    ? `${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`
-                    : `Score: ${scoreAfter.toFixed(1)}`}
+                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
+                  Before &amp; After Photos
                 </p>
-                <p className="font-body text-[11px] text-secondary">Visible on your post</p>
+                <div className="flex gap-3">
+                  <PhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} />
+                  <PhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  />
+                </div>
+                <p className="font-body text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
+                  Optional — show your transformation
+                </p>
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              {/* Rate Me — single photo + context blurb */}
+              <div className="p-3 rounded-2xl flex items-start gap-3"
+                style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}>
+                <Star size={16} style={{ color: GOLD, flexShrink: 0 }} />
+                <p className="font-body text-[12px] text-secondary leading-relaxed">
+                  Post your photo and get rated 1–10 by the community. Anonymous — only your display name is shown.
+                </p>
+              </div>
+              <div>
+                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">Your Photo</p>
+                <div className="w-1/2 mx-auto">
+                  <PhotoPicker label="Photo" value={ratePhoto} onChange={setRatePhoto} />
+                </div>
+              </div>
+            </>
           )}
-
-          {/* Before / After photos */}
-          <div>
-            <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
-              Before &amp; After Photos
-            </p>
-            <div className="flex gap-3">
-              <PhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} />
-              <PhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  />
-            </div>
-            <p className="font-body text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
-              Optional — show your transformation
-            </p>
-          </div>
 
           {/* Display name */}
           <div>
@@ -327,7 +378,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
             <textarea
               value={caption}
               onChange={e => setCaption(e.target.value.slice(0, 280))}
-              placeholder="What worked for you?"
+              placeholder={postType === 'rate-me' ? 'Add context (age, improvements made…)' : 'What worked for you?'}
               rows={3}
               className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none resize-none"
               style={{ background: '#242424', border: `1px solid ${BORDER}`, fontSize: 16 }}
@@ -343,7 +394,10 @@ function ShareModal({ onClose, onPosted, user, scans }) {
             className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
           >
-            {posting ? <><Loader2 size={15} className="animate-spin" /> Posting…</> : 'Share Glow-Up'}
+            {posting
+              ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
+              : postType === 'rate-me' ? <><Star size={14} /> Post for Rating</> : 'Share Glow-Up'
+            }
           </motion.button>
 
           <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
@@ -558,9 +612,83 @@ function PostShareSheet({ post, onClose }) {
   )
 }
 
+// ── Rate Me scoring UI ────────────────────────────────────────────────────────
+function RateMeScorer({ post, currentUserId, onRate }) {
+  const isOwn = post.user_id === currentUserId
+  const [hoveredScore, setHoveredScore] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const displayScore = hoveredScore ?? post.user_rating ?? null
+
+  async function handleScore(score) {
+    if (isOwn || submitting) return
+    setSubmitting(true)
+    try { await onRate(post.id, score) }
+    finally { setSubmitting(false) }
+  }
+
+  return (
+    <div className="px-4 pb-4">
+      {/* Avg + count */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-1">
+          <Star size={14} fill={GOLD} style={{ color: GOLD }} />
+          <span className="font-mono font-bold text-[15px]" style={{ color: GOLD }}>
+            {post.avg_rating != null ? Number(post.avg_rating).toFixed(1) : '—'}
+          </span>
+        </div>
+        <span className="font-body text-[11px] text-secondary">
+          {post.rating_count > 0 ? `${post.rating_count} vote${post.rating_count !== 1 ? 's' : ''}` : 'No ratings yet'}
+        </span>
+        {post.user_rating != null && !isOwn && (
+          <span className="ml-auto font-body text-[10px] px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}>
+            You: {post.user_rating}/10
+          </span>
+        )}
+      </div>
+
+      {/* 1–10 score buttons */}
+      {!isOwn && (
+        <div>
+          <p className="font-heading font-bold text-[10px] uppercase tracking-widest text-secondary mb-2">
+            {post.user_rating != null ? 'Change your rating' : 'Rate this person'}
+          </p>
+          <div className="grid grid-cols-10 gap-1">
+            {[1,2,3,4,5,6,7,8,9,10].map(n => {
+              const filled = displayScore != null && n <= displayScore
+              const isRated = post.user_rating === n
+              return (
+                <motion.button
+                  key={n}
+                  whileTap={{ scale: 0.9 }}
+                  onPointerEnter={() => setHoveredScore(n)}
+                  onPointerLeave={() => setHoveredScore(null)}
+                  onClick={() => handleScore(n)}
+                  disabled={submitting}
+                  className="aspect-square rounded-lg flex items-center justify-center font-heading font-bold text-[11px] transition-colors"
+                  style={{
+                    background: filled ? (n >= 8 ? 'rgba(52,199,89,0.25)' : n >= 5 ? 'rgba(198,168,92,0.25)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${filled ? (n >= 8 ? 'rgba(52,199,89,0.5)' : n >= 5 ? 'rgba(198,168,92,0.45)' : 'rgba(239,68,68,0.3)') : 'rgba(255,255,255,0.08)'}`,
+                    color: filled ? (n >= 8 ? '#34C759' : n >= 5 ? GOLD : '#E07A5F') : 'rgba(255,255,255,0.35)',
+                    outline: isRated ? `2px solid ${GOLD}` : 'none',
+                    outlineOffset: 1,
+                  }}
+                >
+                  {n}
+                </motion.button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Post card ─────────────────────────────────────────────────────────────────
-function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete }) {
+function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
+  const isRateMe = post.post_type === 'rate-me'
 
   const improvement = post.score_before != null && post.score_after != null
     ? (post.score_after - post.score_before).toFixed(1)
@@ -581,10 +709,18 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <Avatar name={post.display_name} />
         <div className="flex-1">
-          <p className="font-heading font-bold text-[13px] text-primary">{post.display_name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-heading font-bold text-[13px] text-primary">{post.display_name}</p>
+            {isRateMe && (
+              <span className="text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}>
+                RATE ME
+              </span>
+            )}
+          </div>
           <p className="font-body text-[11px] text-secondary">{timeAgo(post.created_at)}</p>
         </div>
-        {improvement !== null && (
+        {!isRateMe && improvement !== null && (
           <div className="px-2.5 py-1 rounded-full" style={{
             background: improvement >= 0 ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
             border: `1px solid ${improvement >= 0 ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.25)'}`,
@@ -602,8 +738,8 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
         )}
       </div>
 
-      {/* Score bar */}
-      {post.score_before != null && post.score_after != null && (
+      {/* Score bar (glow-up only) */}
+      {!isRateMe && post.score_before != null && post.score_after != null && (
         <div className="px-4 pb-3 flex items-center gap-3">
           <span className="font-mono text-[13px] text-secondary">{post.score_before.toFixed(1)}</span>
           <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -619,8 +755,17 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
         </div>
       )}
 
-      {/* Before / After photos */}
-      {(hasBefore || hasAfter) && (
+      {/* Rate Me photo (large, centered) */}
+      {isRateMe && hasAfter && (
+        <div className="px-3 pb-3">
+          <div className="rounded-xl overflow-hidden">
+            <img src={post.photo_url} alt="Rate Me" className="w-full object-cover" style={{ maxHeight: 340 }} />
+          </div>
+        </div>
+      )}
+
+      {/* Glow-up Before / After photos */}
+      {!isRateMe && (hasBefore || hasAfter) && (
         <div className={`px-3 pb-3 ${hasBefore && hasAfter ? 'grid grid-cols-2 gap-2' : ''}`}>
           {hasBefore && (
             <div className="relative rounded-xl overflow-hidden">
@@ -645,7 +790,12 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
 
       {/* Caption */}
       {post.caption && (
-        <p className="px-4 py-3 font-body text-[13px] text-primary leading-snug">{post.caption}</p>
+        <p className="px-4 py-2 font-body text-[13px] text-primary leading-snug">{post.caption}</p>
+      )}
+
+      {/* Rate Me scoring */}
+      {isRateMe && (
+        <RateMeScorer post={post} currentUserId={currentUserId} onRate={onRate} />
       )}
 
       {/* Actions */}
@@ -666,13 +816,15 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
           <MessageCircle size={16} />
           <span className="font-body text-[12px]">{post.comments_count ?? 0}</span>
         </button>
-        <button
-          onClick={() => setShowShareSheet(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl ml-auto"
-          style={{ color: 'rgba(255,255,255,0.4)' }}
-        >
-          <Share2 size={16} />
-        </button>
+        {!isRateMe && (
+          <button
+            onClick={() => setShowShareSheet(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl ml-auto"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
+          >
+            <Share2 size={16} />
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -727,13 +879,24 @@ export default function Community() {
     ))
   }
 
+  async function handleRate(postId, score) {
+    try {
+      const data = await api.community.rate(postId, score)
+      setPosts(prev => prev.map(p =>
+        p.id === postId
+          ? { ...p, avg_rating: data.avg_rating, rating_count: data.rating_count, user_rating: data.user_rating }
+          : p
+      ))
+    } catch {}
+  }
+
   return (
     <MotionPage className="px-4 pb-8">
       <div className="flex items-center justify-between pt-14 pb-5">
         <div>
           <p className="text-[11px] text-secondary font-body uppercase tracking-widest mb-0.5">Community</p>
           <h1 className="font-heading font-bold text-[26px] text-primary" style={{ letterSpacing: '-0.02em' }}>
-            Glow-Ups
+            Feed
           </h1>
         </div>
         <motion.button
@@ -742,7 +905,7 @@ export default function Community() {
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
           style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
         >
-          <Plus size={14} /> Share yours
+          <Plus size={14} /> Post
         </motion.button>
       </div>
 
@@ -783,6 +946,7 @@ export default function Community() {
             onLike={handleLike}
             onOpenComments={setActivePost}
             onDelete={handleDelete}
+            onRate={handleRate}
           />
         ))
       )}

@@ -1128,12 +1128,18 @@ export default function Results() {
   const isNewScan = currentScan && (Date.now() - new Date(currentScan.analyzedAt).getTime()) < 10000
   const [showReveal] = useState(() => !!isNewScan)
 
-  // Show paywall immediately for free users — after reveal if new scan, instantly otherwise
-  const [showPaywall, setShowPaywall] = useState(() => !isPremium && !!currentScan && !isNewScan)
+  // Show paywall after a short delay — let free users see their scores first
+  const [showPaywall, setShowPaywall] = useState(false)
 
   useEffect(() => {
-    if (!isPremium && currentScan && isNewScan && revealDone) {
-      setShowPaywall(true)
+    if (isPremium || !currentScan) return
+    if (isNewScan) {
+      // New scan: show paywall after reveal animation completes
+      if (revealDone) setShowPaywall(true)
+    } else {
+      // Returning to results: give them 3s to see scores before paywall
+      const t = setTimeout(() => setShowPaywall(true), 3000)
+      return () => clearTimeout(t)
     }
   }, [isPremium, currentScan, isNewScan, revealDone])
 

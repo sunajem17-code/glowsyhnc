@@ -143,6 +143,18 @@ db.exec(`
   );
 `)
 
+// Community ratings table for "Rate Me" posts
+db.exec(`
+  CREATE TABLE IF NOT EXISTS community_ratings (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    score INTEGER NOT NULL CHECK(score >= 1 AND score <= 10),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(post_id, user_id)
+  );
+`)
+
 // Idempotent migrations — ignore if columns already exist
 const migrations = [
   "ALTER TABLE users ADD COLUMN referral_code TEXT",
@@ -154,6 +166,7 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN coach_messages_used INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN apple_sub TEXT",
   "ALTER TABLE community_posts ADD COLUMN before_photo_url TEXT",
+  "ALTER TABLE community_posts ADD COLUMN post_type TEXT DEFAULT 'glow-up'",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }

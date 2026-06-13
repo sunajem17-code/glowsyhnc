@@ -44,10 +44,10 @@ export default function Dashboard() {
     score: normalizeScore(s.glowScore),
   }))
 
-  // Rescan countdown
+  // Rescan countdown — Pro users can always rescan
   const lastScanDate = latestScan ? new Date(latestScan.analyzedAt) : null
   const daysSinceScan = lastScanDate ? Math.floor((Date.now() - lastScanDate.getTime()) / 86400000) : null
-  const daysUntilRescan = daysSinceScan != null ? Math.max(0, RESCAN_DAYS - daysSinceScan) : null
+  const daysUntilRescan = isPremium ? 0 : (daysSinceScan != null ? Math.max(0, RESCAN_DAYS - daysSinceScan) : null)
   const rescanReady = daysUntilRescan === 0
 
   const pendingTasks = currentPlan?.tasks?.filter(t => !t.completed).slice(0, 3) ?? []

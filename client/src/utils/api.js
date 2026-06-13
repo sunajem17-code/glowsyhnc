@@ -120,6 +120,7 @@ export const api = {
   },
   hair: {
     analyze: (data) => request('/hair/analyze', { method: 'POST', body: JSON.stringify(data) }),
+    tryon:   (data) => request('/hair/tryon',   { method: 'POST', body: JSON.stringify(data) }),
   },
   leaderboard: {
     get: () => request('/leaderboard'),
@@ -141,6 +142,7 @@ export const api = {
     comments:       (id)         => request(`/community/post/${id}/comments`),
     addComment:     (id, data)   => request(`/community/post/${id}/comment`, { method: 'POST', body: JSON.stringify(data) }),
     deleteComment:  (id)         => request(`/community/comment/${id}`, { method: 'DELETE' }),
+    rate:           (id, score)  => request(`/community/post/${id}/rate`, { method: 'POST', body: JSON.stringify({ score }) }),
   },
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),

@@ -250,6 +250,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
   const [genCard,    setGenCard]    = useState(false)
   const [glowImage,  setGlowImage]  = useState(null)  // AI-enhanced face
   const [glowLoading,setGlowLoading]= useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   const canvasRef = useRef(null)
 
   const glowScore = scan?.glowScore != null
@@ -257,9 +258,12 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
     : null
   const pillars   = scan?.pillars ?? scan?.aiScore?.pillars ?? null
 
-  // ── Fetch Claude analysis on mount ────────────────────────────────────────
+  // ── Fetch Claude analysis on mount (and on retry) ─────────────────────────
   useEffect(() => {
     let cancelled = false
+    setResult(null)
+    setGlowImage(null)
+    setPhase('loading')
     ;(async () => {
       try {
         const data = await api.potential.analyze({
@@ -301,7 +305,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
       }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [retryCount])
 
   // ── Generate share card once result is ready ──────────────────────────────
   const generateCard = useCallback(async () => {
@@ -415,7 +419,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
               <p className="font-heading font-bold text-[15px] text-white">Analysis failed</p>
               <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{errMsg}</p>
               <button
-                onClick={() => { setPhase('loading'); setErrMsg('') }}
+                onClick={() => { setErrMsg(''); setRetryCount(c => c + 1) }}
                 className="mt-2 px-5 py-2.5 rounded-2xl font-heading font-bold text-[13px] text-black"
                 style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 100%)` }}
               >

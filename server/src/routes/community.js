@@ -15,13 +15,16 @@ router.get('/feed', authMiddleware, (req, res) => {
   const posts = db.prepare(`
     SELECT
       cp.*,
-      (SELECT COUNT(*) FROM community_likes  WHERE post_id = cp.id) AS likes_count,
+      (SELECT COUNT(*) FROM community_likes    WHERE post_id = cp.id) AS likes_count,
       (SELECT COUNT(*) FROM community_comments WHERE post_id = cp.id) AS comments_count,
-      (SELECT COUNT(*) FROM community_likes  WHERE post_id = cp.id AND user_id = ?) AS user_liked
+      (SELECT COUNT(*) FROM community_likes    WHERE post_id = cp.id AND user_id = ?) AS user_liked,
+      (SELECT COUNT(*) FROM community_ratings  WHERE post_id = cp.id) AS rating_count,
+      (SELECT ROUND(AVG(score), 1) FROM community_ratings WHERE post_id = cp.id) AS avg_rating,
+      (SELECT score FROM community_ratings WHERE post_id = cp.id AND user_id = ?) AS user_rating
     FROM community_posts cp
     ORDER BY cp.created_at DESC
     LIMIT 60
-  `).all(userId)
+  `).all(userId, userId)
 
   res.json({ posts })
 })
@@ -31,12 +34,13 @@ router.post('/post', authMiddleware, async (req, res) => {
   const allowed = await checkPostLimit(req.userId)
   if (!allowed) return res.status(429).json({ error: 'Slow down — too many posts today.' })
 
-  const { displayName, scoreBefore, scoreAfter, photoUrl, beforePhotoUrl, caption } = req.body
+  const { displayName, scoreBefore, scoreAfter, photoUrl, beforePhotoUrl, caption, postType } = req.body
+  const type = (postType === 'rate-me' ? 'rate-me' : 'glow-up')
   const id = uuid()
 
   db.prepare(`
-    INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption, post_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, req.userId,
     (displayName || 'Anonymous').slice(0, 30),
@@ -45,6 +49,7 @@ router.post('/post', authMiddleware, async (req, res) => {
     photoUrl       || null,
     beforePhotoUrl || null,
     (caption       || '').slice(0, 280),
+    type,
   )
 
   const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(id)
@@ -108,6 +113,33 @@ router.delete('/comment/:id', authMiddleware, (req, res) => {
   if (!comment) return res.status(404).json({ error: 'Not found' })
   db.prepare('DELETE FROM community_comments WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
+})
+
+// ── POST /api/community/post/:id/rate — submit or update a 1-10 rating ───────
+router.post('/post/:id/rate', authMiddleware, (req, res) => {
+  const postId = req.params.id
+  const post   = db.prepare('SELECT id, post_type FROM community_posts WHERE id = ?').get(postId)
+  if (!post)                      return res.status(404).json({ error: 'Post not found' })
+  if (post.post_type !== 'rate-me') return res.status(400).json({ error: 'This post does not accept ratings' })
+
+  const score = parseInt(req.body.score, 10)
+  if (isNaN(score) || score < 1 || score > 10) {
+    return res.status(400).json({ error: 'Score must be 1–10' })
+  }
+
+  // Upsert: update if user already rated, insert otherwise
+  const existing = db.prepare('SELECT id FROM community_ratings WHERE post_id = ? AND user_id = ?')
+    .get(postId, req.userId)
+  if (existing) {
+    db.prepare('UPDATE community_ratings SET score = ? WHERE post_id = ? AND user_id = ?')
+      .run(score, postId, req.userId)
+  } else {
+    db.prepare('INSERT INTO community_ratings (id, post_id, user_id, score) VALUES (?, ?, ?, ?)')
+      .run(uuid(), postId, req.userId, score)
+  }
+
+  const row = db.prepare('SELECT COUNT(*) AS c, ROUND(AVG(score), 1) AS avg FROM community_ratings WHERE post_id = ?').get(postId)
+  res.json({ rating_count: row.c, avg_rating: row.avg, user_rating: score })
 })
 
 module.exports = router
