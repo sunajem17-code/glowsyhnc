@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -284,7 +284,7 @@ function HairTryOnModal({ hairstyleName, headShape, hairType, facePhoto, onClose
   const [errMsg, setErrMsg]   = useState('')
   const [retryN, setRetryN]   = useState(0)
 
-  useState(() => {
+  useEffect(() => {
     let cancelled = false
     setPhase('loading'); setImage(null); setErrMsg('')
     ;(async () => {

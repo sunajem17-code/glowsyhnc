@@ -287,6 +287,7 @@ export default function Auth() {
             <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           </div>
 
+          {Capacitor.getPlatform() === 'ios' && (
           <button
             type="button"
             onClick={handleAppleSignIn}
@@ -299,6 +300,7 @@ export default function Auth() {
             </svg>
             Sign in with Apple
           </button>
+          )}
 
           <button
             type="button"

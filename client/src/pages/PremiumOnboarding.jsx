@@ -280,7 +280,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
 
       <div className="pb-10 pt-4 space-y-3">
         <GoldBtn label="Create Account →" onClick={onCreateAccount} />
-        {Capacitor.isNativePlatform() && (
+        {Capacitor.getPlatform() === 'ios' && (
           <button
             onClick={onAppleSignIn}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-all flex items-center justify-center gap-2"
@@ -380,7 +380,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
 
           <div className="pt-2 space-y-3">
             <GoldBtn label={loading ? 'Signing in…' : 'Sign In'} onClick={handleSignIn} loading={loading} />
-            {Capacitor.isNativePlatform() && onAppleSignIn && (
+            {Capacitor.getPlatform() === 'ios' && onAppleSignIn && (
               <>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
