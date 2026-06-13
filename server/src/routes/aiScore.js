@@ -661,19 +661,17 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     let faceResult, celebResult, computedScores
 
     try {
-      // 1000 ms stagger between API calls
-      const stagger = () => new Promise(r => setTimeout(r, 1000))
-
-      console.log('[aiScore] Starting face → celebrity (staggered 1000ms)...')
+      // Run face scoring and celebrity matching in parallel — cuts latency roughly in half
+      console.log('[aiScore] Starting face + celebrity in parallel...')
       console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-      faceResult = await withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face')
-      // Compute scores immediately after face scoring so celeb matching can use them
+      ;[faceResult, celebResult] = await Promise.all([
+        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face'),
+        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, null, null), 'celebrity').catch(err => {
+          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
+          return null
+        }),
+      ])
       computedScores = calculateFinalScore(faceResult, gender)
-      await stagger()
-      celebResult = await withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, faceResult, computedScores), 'celebrity').catch(err => {
-        console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-        return null
-      })
     } finally {
       releaseSlot()
     }

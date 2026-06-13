@@ -12,14 +12,21 @@ let _initialized = false
 export const isNative = () => Capacitor.isNativePlatform()
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-export async function initRevenueCat() {
+export async function initRevenueCat(userId) {
   if (!isNative()) return
-  if (_initialized) return
+  if (_initialized && !userId) return
   try {
     await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG })
-    await Purchases.configure({ apiKey: REVENUECAT_API_KEY })
-    _initialized = true
-    console.log('[RC] initialized with key:', REVENUECAT_API_KEY.slice(0, 12) + '...')
+    if (!_initialized) {
+      await Purchases.configure({ apiKey: REVENUECAT_API_KEY })
+      _initialized = true
+      console.log('[RC] initialized with key:', REVENUECAT_API_KEY.slice(0, 12) + '...')
+    }
+    // Link purchases to the logged-in user so they appear in RC dashboard
+    if (userId) {
+      await Purchases.logIn({ appUserID: userId })
+      console.log('[RC] logged in as:', userId)
+    }
   } catch (e) {
     console.error('[RC] init error:', e)
   }
@@ -111,9 +118,9 @@ export async function restorePurchases() {
 }
 
 // ── Status check ──────────────────────────────────────────────────────────────
-export async function checkProStatus() {
+export async function checkProStatus(userId) {
   if (!isNative()) return false
-  await initRevenueCat()
+  await initRevenueCat(userId ?? null)
   const result = await Purchases.getCustomerInfo()
   const isPro = !!result.customerInfo.entitlements.active?.[ENTITLEMENT_ID]
   console.log('[RC] checkProStatus:', isPro)

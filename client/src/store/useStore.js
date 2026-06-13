@@ -150,7 +150,8 @@ const useStore = create(
           // 0. On iOS check RevenueCat entitlements first (source of truth for IAP)
           try {
             if (isNative()) {
-              const isPro = await checkProStatus()
+              const { user: u } = get()
+              const isPro = await checkProStatus(u?.id ?? null)
               if (isPro) set({ isPremium: true })
             }
           } catch { /* RevenueCat unavailable — fall through to server check */ }
