@@ -34,8 +34,22 @@ function Avatar({ name, size = 9 }) {
 function fileToDataUrl(file) {
   return new Promise((res, rej) => {
     const reader = new FileReader()
-    reader.onload  = e => res(e.target.result)
     reader.onerror = rej
+    reader.onload = e => {
+      const img = new Image()
+      img.onerror = rej
+      img.onload = () => {
+        const MAX = 900
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const w = Math.round(img.width  * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        res(canvas.toDataURL('image/jpeg', 0.72))
+      }
+      img.src = e.target.result
+    }
     reader.readAsDataURL(file)
   })
 }
