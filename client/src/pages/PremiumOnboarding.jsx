@@ -18,8 +18,9 @@ const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.35)'
 
-// Steps with progress bar: 1-9. Step 10 = phase result (no progress)
-const TOTAL_QUIZ_STEPS = 10
+// Steps: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase
+// Progress bar: steps 1-5
+const TOTAL_QUIZ_STEPS = 5
 
 const pageVariants = {
   enter: (dir) => ({ x: dir > 0 ? 48 : -48, opacity: 0 }),
@@ -1055,7 +1056,69 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
   )
 }
 
-// ── STEP 8: BMI Result ────────────────────────────────────────────────────────
+// ── STEP 5: Height + Weight (combined) ───────────────────────────────────────
+function StepHeightWeight({ data, onChange, onNext, onBack, units }) {
+  const cm  = data.height || 175
+  const kg  = data.weight || 75
+  let feet  = Math.floor(cm / 30.48)
+  let inches = Math.round((cm / 30.48 - feet) * 12)
+  if (inches === 12) { feet += 1; inches = 0 }
+  const lbs = Math.round(kg * 2.205)
+
+  return (
+    <div className="flex flex-col h-full px-6">
+      <BackBtn onBack={onBack} />
+      <div className="flex-1 flex flex-col justify-center pt-20 gap-8">
+        <div>
+          <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+            Your body stats
+          </h1>
+          <p className="font-body text-[13px]" style={{ color: DIM }}>Used to calculate your BMI, training phase, and nutrition plan.</p>
+        </div>
+
+        <div className="space-y-6">
+          <Slider
+            label="Height"
+            unit={units === 'imperial' ? `${feet}'${inches}"` : 'cm'}
+            value={cm}
+            min={140}
+            max={220}
+            onChange={v => onChange('height', v)}
+          />
+          <Slider
+            label="Weight"
+            unit={units === 'imperial' ? 'lbs' : 'kg'}
+            value={kg}
+            displayValue={units === 'imperial' ? lbs : kg}
+            min={40}
+            max={180}
+            onChange={v => onChange('weight', v)}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {['metric', 'imperial'].map(u => (
+            <button key={u} onClick={() => onChange('_units', u)}
+              className="flex-1 py-2.5 rounded-xl font-heading font-bold text-[12px] capitalize"
+              style={{
+                background: units === u ? G_DIM : SURFACE,
+                border: `1px solid ${units === u ? G_BORDER : BORDER}`,
+                color: units === u ? G : DIM,
+              }}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="pb-10">
+        <GoldBtn label="Continue →" onClick={onNext} />
+      </div>
+    </div>
+  )
+}
+
+// ── STEP 8 (kept for reference, no longer used) ───────────────────────────────
 function calcBMI(heightCm, weightKg) {
   return weightKg / Math.pow(heightCm / 100, 2)
 }
@@ -1574,7 +1637,7 @@ export default function PremiumOnboarding() {
 
   // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
   const [introDone, setIntroDone] = useState(true)
-  // If already authenticated, skip StepWelcome (0) and StepSignUp (1) — start at age gate
+  // If already authenticated, skip Welcome (0) and SignUp (1) — start at consent
   const [step, setStep] = useState(isAuthenticated ? 2 : 0)
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
@@ -1634,7 +1697,6 @@ export default function PremiumOnboarding() {
       // Save goal_type, improvement_focus, and legal consent to Supabase (fire-and-forget)
       const profilePatch = {}
       if (formData.goal) profilePatch.goal_type = formData.goal
-      if (formData.improvementFocus?.length) profilePatch.improvement_focus = formData.improvementFocus
       // Persist consent audit trail server-side
       profilePatch.ai_consent = !!checks.aiConsent
       profilePatch.consent_at = new Date().toISOString()
@@ -1644,8 +1706,8 @@ export default function PremiumOnboarding() {
     navigate('/')
   }
 
-  // Progress bar: steps 1–9
-  const showProgress = step >= 1 && step <= 10
+  // Progress bar: steps 1–5
+  const showProgress = step >= 1 && step <= 5
   const progressPct = showProgress ? ((step - 1) / TOTAL_QUIZ_STEPS) * 100 : 0
 
   // Intro slides (shown before the quiz for new users)
@@ -1703,6 +1765,7 @@ export default function PremiumOnboarding() {
     }
   }
 
+  // 5-step flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
@@ -1711,9 +1774,6 @@ export default function PremiumOnboarding() {
     />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}
-    />,
-    <StepAgeGate key="age" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack}
     />,
     <StepConsent key="consent" checks={checks} onToggle={toggleCheck}
       onNext={goNext} onBack={goBack}
@@ -1724,18 +1784,8 @@ export default function PremiumOnboarding() {
     <StepGoal key="goal" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack}
     />,
-    <StepImprovementFocus key="focus" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack}
-    />,
-    <StepSocialProof key="social" onNext={goNext} onBack={goBack} />,
-    <StepHeight key="height" data={formData} onChange={updateField}
+    <StepHeightWeight key="heightweight" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} units={units}
-    />,
-    <StepWeight key="weight" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack} units={units}
-    />,
-    <StepBMI key="bmi" data={formData}
-      onNext={goNext} onBack={goBack}
     />,
     <StepPhaseResult key="phase" data={formData} onFinish={finish} />,
   ]
@@ -1756,7 +1806,7 @@ export default function PremiumOnboarding() {
       )}
 
       {/* Step counter */}
-      {showProgress && step < 11 && (
+      {showProgress && step < 6 && (
         <div className="absolute top-3 right-5 z-20">
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
             {step} / {TOTAL_QUIZ_STEPS}

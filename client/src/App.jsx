@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
+import { requestNotificationPermission, scheduleStreakReminder } from './utils/notifications'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
@@ -40,7 +41,7 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user } = useStore()
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -53,8 +54,8 @@ export default function App() {
   // Capture email UTM params on every load (for email click attribution)
   useEffect(() => { captureEmailUTM() }, [])
 
-  // Initialize RevenueCat on native platforms
-  useEffect(() => { initRevenueCat().catch(() => {}) }, [])
+  // Initialize RevenueCat — pass user ID when logged in so purchases are linked
+  useEffect(() => { initRevenueCat(user?.id ?? null).catch(() => {}) }, [user?.id])
 
   // Check if pro trial has expired on load
   useEffect(() => {
@@ -68,6 +69,14 @@ export default function App() {
     const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [isAuthenticated])
+
+  // Request notification permission + schedule streak reminder after login
+  useEffect(() => {
+    if (!isAuthenticated) return
+    requestNotificationPermission().then(granted => {
+      if (granted) scheduleStreakReminder().catch(() => {})
+    }).catch(() => {})
   }, [isAuthenticated])
 
   // Network connectivity monitoring — graceful offline handling via browser API

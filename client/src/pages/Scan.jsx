@@ -11,6 +11,7 @@ import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
+import { scheduleRescanNotification } from '../utils/notifications'
 
 const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -617,6 +618,8 @@ export default function Scan() {
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
+      // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
+      scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
       navigate('/results')
     } catch (err) {
       console.error('[Scan] AI scoring failed:', err)

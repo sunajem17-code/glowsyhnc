@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, Flame, Droplets, Dumbbell, Moon, Sun, Heart, Spar
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
+import { scheduleStreakReminder } from '../utils/notifications'
 
 const WATER_GOAL = 8
 
@@ -85,6 +86,9 @@ export default function DailyCheckin() {
         }),
       }).catch(() => { /* offline — streak syncs on next login */ })
     }
+
+    // Reschedule tomorrow's streak reminder (fire-and-forget)
+    scheduleStreakReminder().catch(() => {})
 
     setSubmitted(true)
   }
