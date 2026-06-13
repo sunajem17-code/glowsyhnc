@@ -25,7 +25,7 @@ function ToggleButton({ checked, onToggle, label, icon: Icon, color }) {
 
 export default function DailyCheckin() {
   const navigate = useNavigate()
-  const { addCheckin, todayCheckin, streak, updateStreak } = useStore()
+  const { addCheckin, todayCheckin, streak, updateStreak, token } = useStore()
 
   const today = new Date().toDateString()
   const alreadyDone = todayCheckin?.date === today
@@ -58,7 +58,7 @@ export default function DailyCheckin() {
     }
     addCheckin(checkin)
 
-    // Update streak
+    // Update streak locally
     const lastDate = streak.lastDate
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
@@ -68,6 +68,23 @@ export default function DailyCheckin() {
       longest: Math.max(streak.longest, isConsecutive ? streak.current + 1 : 1),
       lastDate: today,
     })
+
+    // Sync checkin to server (fire-and-forget — local state is source of truth for UI)
+    if (token && token !== 'demo-token') {
+      const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
+      const base = `https://${API.replace(/^https?:\/\//, '')}/api`
+      fetch(`${base}/checkin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          waterGlasses: water,
+          skincareAm,
+          skincarePm,
+          exercisesDone: exerciseDone,
+          moodScore: mood,
+        }),
+      }).catch(() => { /* offline — streak syncs on next login */ })
+    }
 
     setSubmitted(true)
   }

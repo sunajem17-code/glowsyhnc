@@ -708,8 +708,23 @@ export default function Scan() {
                   OPTIONAL
                 </span>
               </div>
+              {/* Pose guide chips */}
+              <div className="mx-4 mb-3 grid grid-cols-2 gap-2">
+                {[
+                  { icon: '→', text: 'Face right 90°' },
+                  { icon: '🧍', text: 'Stand straight up' },
+                  { icon: '💪', text: 'Arms at your sides' },
+                  { icon: '☀️', text: 'Natural lighting' },
+                ].map(({ icon, text }) => (
+                  <div key={text} className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                    <span className="text-sm">{icon}</span>
+                    <span className="text-[11px] font-body text-primary">{text}</span>
+                  </div>
+                ))}
+              </div>
               <PhotoUploadStep stepNum={2}
-                guide="Turn 90° to the right. Keep your face relaxed and neutral. 3–6 feet from camera."
+                guide="Turn 90° to the right. Stand straight — arms relaxed at sides. 3–6 feet from camera. Natural lighting."
                 photo={sidePhoto}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
             </motion.div>

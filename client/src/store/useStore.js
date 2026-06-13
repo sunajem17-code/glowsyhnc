@@ -175,6 +175,7 @@ const useStore = create(
           if (profileRes.ok) {
             const profile = await profileRes.json()
             const fresh = profile.user || profile
+            const serverStreak = profile.streak
             set(state => ({
               user: { ...state.user, ...fresh },
               isPremium:
@@ -182,6 +183,14 @@ const useStore = create(
                 fresh?.subscription_tier === 'premium' ||
                 fresh?.is_pro === true ||
                 state.isPremium, // never downgrade during a session without explicit action
+              // Sync streak from server — survives reinstalls / device switches
+              streak: serverStreak ? {
+                current: serverStreak.current_streak ?? state.streak.current,
+                longest: serverStreak.longest_streak ?? state.streak.longest,
+                lastDate: serverStreak.last_checkin_date
+                  ? new Date(serverStreak.last_checkin_date + 'T12:00:00').toDateString()
+                  : state.streak.lastDate,
+              } : state.streak,
             }))
           }
         } catch {
