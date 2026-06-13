@@ -74,7 +74,11 @@ export default function SwipeMaxx() {
   }
 
   function removePhoto(i) {
-    setPhotos(prev => prev.filter((_, idx) => idx !== i))
+    setPhotos(prev => {
+      const removed = prev[i]
+      if (removed?.url?.startsWith('blob:')) URL.revokeObjectURL(removed.url)
+      return prev.filter((_, idx) => idx !== i)
+    })
     setResult(null)
   }
 

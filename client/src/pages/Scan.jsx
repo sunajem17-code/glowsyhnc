@@ -506,7 +506,9 @@ export default function Scan() {
     const blob = await res.blob()
     return new Promise((resolve, reject) => {
       const img = new Image()
+      const blobUrl = URL.createObjectURL(blob)
       img.onload = () => {
+        URL.revokeObjectURL(blobUrl)
         const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
         const w = Math.round(img.width  * scale)
         const h = Math.round(img.height * scale)
@@ -515,8 +517,8 @@ export default function Scan() {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h)
         resolve(canvas.toDataURL('image/jpeg', 0.85))
       }
-      img.onerror = reject
-      img.src = URL.createObjectURL(blob)
+      img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Image load failed')) }
+      img.src = blobUrl
     })
   }
 

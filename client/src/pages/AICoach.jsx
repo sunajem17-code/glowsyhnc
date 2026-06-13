@@ -253,7 +253,16 @@ export default function AICoach() {
         </div>
         {messages.length > 1 && !freeCoachLocked && (
           <button
-            onClick={() => setMessages([])}
+            onClick={() => {
+              if (latestScan) {
+                const greeting = isPremium
+                  ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
+                  : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} — make them count. Ask me anything.`
+                setMessages([{ role: 'assistant', content: greeting }])
+              } else {
+                setMessages([])
+              }
+            }}
             className="p-2 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.04)' }}
           >
