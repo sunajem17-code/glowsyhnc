@@ -143,9 +143,14 @@ const useStore = create(
       setIsPremium: (v) => set({ isPremium: v }),
 
       // Refresh Pro status from server — call after payment, trial activation, or app foreground
+      // Throttled: won't re-run if called within 60s of the last successful refresh.
+      _lastProRefresh: 0,
       refreshProStatus: async () => {
-        const { token, isAuthenticated } = get()
+        const { token, isAuthenticated, _lastProRefresh } = get()
         if (!isAuthenticated || !token || token === 'demo-token') return
+        // Throttle: skip if we refreshed within the last 60 seconds
+        if (Date.now() - _lastProRefresh < 60_000) return
+        set({ _lastProRefresh: Date.now() })
         try {
           // 0. On iOS check RevenueCat entitlements first (source of truth for IAP)
           try {
@@ -158,20 +163,19 @@ const useStore = create(
 
           const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
           const base = `https://${API.replace(/^https?:\/\//, '')}/api`
+          const headers = { Authorization: `Bearer ${token}` }
 
-          // 1. Check payment status (web Stripe — no-op if RevenueCat already set pro)
-          const statusRes = await fetch(`${base}/payments/status`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
+          // Run both fetches in parallel — cuts startup time in half
+          const [statusRes, profileRes] = await Promise.all([
+            fetch(`${base}/payments/status`, { headers }),
+            fetch(`${base}/user/profile`,    { headers }),
+          ])
+
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
             if (isPremium) set({ isPremium: true })
           }
 
-          // 2. Refresh user profile so subscriptionTier + is_pro are current
-          const profileRes = await fetch(`${base}/user/profile`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
           if (profileRes.ok) {
             const profile = await profileRes.json()
             const fresh = profile.user || profile
@@ -182,8 +186,7 @@ const useStore = create(
                 fresh?.subscriptionTier === 'premium' ||
                 fresh?.subscription_tier === 'premium' ||
                 fresh?.is_pro === true ||
-                state.isPremium, // never downgrade during a session without explicit action
-              // Sync streak from server — survives reinstalls / device switches
+                state.isPremium,
               streak: serverStreak ? {
                 current: serverStreak.current_streak ?? state.streak.current,
                 longest: serverStreak.longest_streak ?? state.streak.longest,

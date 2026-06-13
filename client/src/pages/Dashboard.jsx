@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors, X, Gift, Clock, ArrowLeftRight } from 'lucide-react'
@@ -39,10 +39,12 @@ export default function Dashboard() {
   // Normalize helper — scores stored as 0-100 get converted to 0-10
   const normalizeScore = (raw) => raw > 10 ? Math.round(raw) / 10 : raw
 
-  const chartData = [...scans].reverse().slice(-8).map((s, i) => ({
-    week: `W${i + 1}`,
-    score: normalizeScore(s.glowScore),
-  }))
+  const chartData = useMemo(() =>
+    [...scans].reverse().slice(-8).map((s, i) => ({
+      week: `W${i + 1}`,
+      score: normalizeScore(s.glowScore),
+    }))
+  , [scans])
 
   // Rescan countdown — Pro users can always rescan
   const lastScanDate = latestScan ? new Date(latestScan.analyzedAt) : null

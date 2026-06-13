@@ -80,12 +80,16 @@
     height: calc(100vh - 72px);
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+    will-change: transform;
+    transform: translateZ(0);
   }
 
   .page-scroll-full {
     @apply overflow-y-auto overflow-x-hidden;
     height: 100vh;
     -webkit-overflow-scrolling: touch;
+    will-change: transform;
+    transform: translateZ(0);
   }
 
   /* ── Cards ───────────────────────────────────────────────────── */

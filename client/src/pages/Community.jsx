@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -19,7 +19,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-function Avatar({ name, size = 9 }) {
+const Avatar = memo(function Avatar({ name, size = 9 }) {
   return (
     <div
       className={`w-${size} h-${size} rounded-full flex items-center justify-center flex-shrink-0 font-heading font-bold text-sm`}
@@ -28,6 +28,12 @@ function Avatar({ name, size = 9 }) {
       {(name?.[0] ?? '?').toUpperCase()}
     </div>
   )
+})
+
+// Module-level animation variants (no object recreation per render)
+const CARD_VARIANTS = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
 }
 
 // ── Photo picker ──────────────────────────────────────────────────────────────
@@ -613,7 +619,7 @@ function PostShareSheet({ post, onClose }) {
 }
 
 // ── Rate Me scoring UI ────────────────────────────────────────────────────────
-function RateMeScorer({ post, currentUserId, onRate }) {
+const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate }) {
   const isOwn = post.user_id === currentUserId
   const [hoveredScore, setHoveredScore] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -683,10 +689,10 @@ function RateMeScorer({ post, currentUserId, onRate }) {
       )}
     </div>
   )
-}
+})
 
 // ── Post card ─────────────────────────────────────────────────────────────────
-function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onRate }) {
+const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const isRateMe = post.post_type === 'rate-me'
 
@@ -700,8 +706,9 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      variants={CARD_VARIANTS}
+      initial="initial"
+      animate="animate"
       className="rounded-2xl overflow-hidden mb-3"
       style={{ background: '#141414', border: BORDER }}
     >
@@ -759,7 +766,7 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
       {isRateMe && hasAfter && (
         <div className="px-3 pb-3">
           <div className="rounded-xl overflow-hidden">
-            <img src={post.photo_url} alt="Rate Me" className="w-full object-cover" style={{ maxHeight: 340 }} />
+            <img src={post.photo_url} alt="Rate Me" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 340 }} />
           </div>
         </div>
       )}
@@ -769,7 +776,7 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
         <div className={`px-3 pb-3 ${hasBefore && hasAfter ? 'grid grid-cols-2 gap-2' : ''}`}>
           {hasBefore && (
             <div className="relative rounded-xl overflow-hidden">
-              <img src={post.before_photo_url} alt="Before" className="w-full object-cover" style={{ maxHeight: 280 }} />
+              <img src={post.before_photo_url} alt="Before" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 280 }} />
               <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
                 style={{ background: 'rgba(0,0,0,0.55)' }}>
                 <span className="font-heading font-bold text-[11px] text-white tracking-wider">BEFORE</span>
@@ -778,7 +785,7 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
           )}
           {hasAfter && (
             <div className="relative rounded-xl overflow-hidden">
-              <img src={post.photo_url} alt="After" className="w-full object-cover" style={{ maxHeight: 280 }} />
+              <img src={post.photo_url} alt="After" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 280 }} />
               <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
                 style={{ background: 'rgba(0,0,0,0.55)' }}>
                 <span className="font-heading font-bold text-[11px]" style={{ color: GOLD }}>AFTER</span>
@@ -834,7 +841,7 @@ function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, on
       </AnimatePresence>
     </motion.div>
   )
-}
+})
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Community() {
@@ -857,29 +864,29 @@ export default function Community() {
     } catch {} finally { setLoading(false) }
   }
 
-  async function handleLike(postId) {
+  const handleLike = useCallback(async (postId) => {
     try {
       const { liked, likes } = await api.community.like(postId)
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, user_liked: liked ? 1 : 0, likes_count: likes } : p
       ))
     } catch {}
-  }
+  }, [])
 
-  async function handleDelete(postId) {
+  const handleDelete = useCallback(async (postId) => {
     try {
       await api.community.deletePost(postId)
       setPosts(prev => prev.filter(p => p.id !== postId))
     } catch {}
-  }
+  }, [])
 
-  function handleCommentAdded() {
+  const handleCommentAdded = useCallback(() => {
     setPosts(prev => prev.map(p =>
       p.id === activePost?.id ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
     ))
-  }
+  }, [activePost?.id])
 
-  async function handleRate(postId, score) {
+  const handleRate = useCallback(async (postId, score) => {
     try {
       const data = await api.community.rate(postId, score)
       setPosts(prev => prev.map(p =>
@@ -888,7 +895,7 @@ export default function Community() {
           : p
       ))
     } catch {}
-  }
+  }, [])
 
   return (
     <MotionPage className="px-4 pb-8">
