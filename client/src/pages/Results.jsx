@@ -16,13 +16,25 @@ import PotentialViewer from '../components/PotentialViewer'
 import { scoreColor } from '../utils/analysis'
 import { isNative, purchasePro, restorePurchases } from '../utils/iap'
 
+// Keys must match tier.label values from analysis.js MALE_TIERS / FEMALE_TIERS
 const TIER_COLORS = {
-  'Rising':         '#9CA3AF',
-  'Normie':         '#60A5FA',
-  'High Tier Normie': '#34D399',
-  'Chadlite':       '#F59E0B',
-  'Chad':           '#EF4444',
-  'Gigachad':       '#C6A85C',
+  // Male tiers
+  'Sub 3':               '#6B7280',
+  'Low Tier Normie':     '#9CA3AF',
+  'Mid Tier Normie':     '#60A5FA',
+  'High Tier Normie':    '#34D399',
+  'Chadlite':            '#F59E0B',
+  'Chad':                '#EF4444',
+  'Adam Lite':           '#DDA0FF',
+  'True Adam':           '#FFD700',
+  // Female tiers
+  'Low Tier Becky':      '#9CA3AF',
+  'Mid Tier Becky':      '#60A5FA',
+  'High Tier Becky':     '#34D399',
+  'Stacy':               '#F59E0B',
+  'Eve':                 '#EF4444',
+  'Eve Lite':            '#DDA0FF',
+  'True Eve':            '#FFD700',
 }
 
 function ScoreReveal({ score, tier, onDone }) {
@@ -465,7 +477,7 @@ const COLOR_MAP = {
 function ScoreRow({ label, score, note, detail, tip, isPremium, onUpgrade }) {
   const [open, setOpen] = useState(false)
   const c = COLOR_MAP[scoreColor(score)]
-  const pct = ((score - 1) / 9) * 100
+  const pct = Math.min(100, Math.max(0, ((score - 1) / 9) * 100))
 
   // Inline tip color based on score
   const tipColor = score >= 7 ? '#34C759' : score >= 5 ? '#F5A623' : '#E07A5F'
@@ -1119,6 +1131,47 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   )
 }
 
+// ─── Skincare ingredient protocols (module-level — stable across renders) ─────
+
+const SKIN_INGREDIENTS = {
+  acne: [{
+    name: 'Benzoyl Peroxide 2.5%',
+    why: 'Kills acne-causing bacteria (C. acnes) at the source. 2.5% is as effective as 10% with far less irritation.',
+    how: 'Apply thin layer to affected areas after cleansing. Start 3×/week, increase to daily as tolerated.',
+    when: 'PM only — causes photosensitivity.',
+    timeline: '2–4 weeks for reduction. 8–12 weeks for significant clearing.',
+    warning: 'Can bleach fabric. Patch test first. Do not use with tretinoin on same night.',
+    pillar: 'Clears skin texture — directly raises your Features score.',
+  }],
+  scarring: [
+    { name: 'Vitamin C (L-Ascorbic Acid 15%)', why: 'Inhibits melanin production — fades hyperpigmentation and post-acne marks.', how: 'Apply 3–4 drops to clean dry face. Let absorb 3 min before next step.', when: 'AM — boosts SPF protection and brightens through the day.', timeline: '4–8 weeks visible fading. Full effect in 12 weeks.', warning: 'Unstable — use within 3 months of opening. Store away from light.', pillar: 'Even skin tone reads as more symmetric — improves Harmony score.' },
+    { name: 'Alpha Arbutin 2%', why: 'Inhibits tyrosinase (the enzyme that makes dark spots) — gentler than kojic acid.', how: 'Apply 2 drops after toner, before moisturizer.', when: 'AM and PM.', timeline: '6–8 weeks for measurable lightening.', warning: 'Stack with Vitamin C for 2× effect.', pillar: 'Reduces the visual evidence of past breakouts — raises Features score.' },
+    { name: 'Retinol 0.3% → 0.5%', why: 'Speeds cell turnover — pushes scarred cells out and builds collagen beneath.', how: 'Rice-grain amount on full face. Start 1×/week, increase to 3× over 6 weeks.', when: 'PM only. Always use SPF next morning.', timeline: 'Visible texture change in 8–16 weeks. Best results at 6+ months.', warning: 'Purging is normal weeks 2–6. Do not combine with AHAs on same night.', pillar: 'Strongest OTC texture intervention — improves Features score long-term.' },
+  ],
+  oiliness: [{
+    name: 'Niacinamide 10%',
+    why: 'Regulates sebum production at the sebaceous gland level. Also reduces pore appearance.',
+    how: 'Apply 2–3 drops after cleansing, before moisturizer.',
+    when: 'AM and PM.',
+    timeline: '4–6 weeks for visible pore and oil reduction.',
+    warning: 'Do not layer with Vitamin C in the same routine — split AM/PM.',
+    pillar: 'Controls shine and pore size — improves skin texture score.',
+  }],
+  dark_circles: [
+    { name: 'Caffeine Eye Cream', why: 'Vasoconstrictor — constricts blood vessels under-eye to reduce dark circles and puffiness.', how: 'Tap gently with ring finger around orbital bone. Never pull the skin.', when: 'AM primarily. Can use PM too.', timeline: 'Immediate de-puffing. Consistent darkening reduction in 6–8 weeks.', warning: 'Will not fix structural dark circles (bone-related) — works on vascular/pigment type.', pillar: 'Improves Eye Area score — directly raises facial attractiveness.' },
+    { name: 'Sleep Consistency', why: '7–9 hours reduces cortisol-driven inflammation and blood vessel dilation that causes under-eye darkness.', how: 'Same bedtime and wake time daily including weekends.', when: 'Ongoing.', timeline: 'Visible within 5–7 days of consistent sleep.', warning: 'No product replaces sleep. This is the root fix.', pillar: 'Sleep affects every score — Eye Area, skin clarity, and jawline definition all improve.' },
+  ],
+  dullness: [{
+    name: 'AHA (Glycolic Acid 8% or Lactic Acid 10%)',
+    why: 'Exfoliates dead cell layer — reveals brighter, smoother skin underneath.',
+    how: 'Apply to dry face after cleansing. Leave 20 min then rinse or leave overnight.',
+    when: 'PM 2–3×/week. Never on same night as retinol.',
+    timeline: '2 weeks to notice glow. 6 weeks for significant brightness.',
+    warning: 'Mandatory SPF next morning — AHAs increase photosensitivity. Start 1×/week.',
+    pillar: 'Brightness directly improves perceived skin health — raises overall facial impression.',
+  }],
+}
+
 // ─── Main Results Page ────────────────────────────────────────────────────────
 
 export default function Results() {
@@ -1463,9 +1516,16 @@ export default function Results() {
     },
   }
 
-  function pickRandom3(pool) {
-    const shuffled = [...pool].sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, 3)
+  function seededPick3(pool, seed) {
+    // Deterministic shuffle using scan ID as seed — stable across re-renders
+    let s = seed
+    const arr = [...pool]
+    for (let i = arr.length - 1; i > 0; i--) {
+      s = (s * 1664525 + 1013904223) & 0xffffffff
+      const j = Math.abs(s) % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr.slice(0, 3)
   }
 
   const resolvedMatches = (() => {
@@ -1473,7 +1533,9 @@ export default function Results() {
     if (ai?.length > 0) return ai
     const g = gender === 'female' ? 'female' : 'male'
     const pool = CELEB_POOLS[g][facialStructure] ?? CELEB_POOLS[g]['average']
-    return pickRandom3(pool)
+    // Derive a numeric seed from the scan ID so picks are stable for this scan
+    const seed = (currentScan?.id ?? '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+    return seededPick3(pool, seed)
   })()
 
   // ─── Skin Analysis ──────────────────────────────────────────────────────────
@@ -1495,45 +1557,6 @@ export default function Results() {
   ].filter(Boolean)
   const skinIsClear = skinScore != null && skinScore >= 7.5
   const skinPotential = skinScore != null ? Math.min(10, skinScore + (skinScore < 5 ? 2.5 : skinScore < 7 ? 1.8 : 1.2)).toFixed(1) : null
-
-  const SKIN_INGREDIENTS = {
-    acne: [{
-      name: 'Benzoyl Peroxide 2.5%',
-      why: 'Kills acne-causing bacteria (C. acnes) at the source. 2.5% is as effective as 10% with far less irritation.',
-      how: 'Apply thin layer to affected areas after cleansing. Start 3×/week, increase to daily as tolerated.',
-      when: 'PM only — causes photosensitivity.',
-      timeline: '2–4 weeks for reduction. 8–12 weeks for significant clearing.',
-      warning: 'Can bleach fabric. Patch test first. Do not use with tretinoin on same night.',
-      pillar: 'Clears skin texture — directly raises your Features score.',
-    }],
-    scarring: [
-      { name: 'Vitamin C (L-Ascorbic Acid 15%)', why: 'Inhibits melanin production — fades hyperpigmentation and post-acne marks.', how: 'Apply 3–4 drops to clean dry face. Let absorb 3 min before next step.', when: 'AM — boosts SPF protection and brightens through the day.', timeline: '4–8 weeks visible fading. Full effect in 12 weeks.', warning: 'Unstable — use within 3 months of opening. Store away from light.', pillar: 'Even skin tone reads as more symmetric — improves Harmony score.' },
-      { name: 'Alpha Arbutin 2%', why: 'Inhibits tyrosinase (the enzyme that makes dark spots) — gentler than kojic acid.', how: 'Apply 2 drops after toner, before moisturizer.', when: 'AM and PM.', timeline: '6–8 weeks for measurable lightening.', warning: 'Stack with Vitamin C for 2× effect.', pillar: 'Reduces the visual evidence of past breakouts — raises Features score.' },
-      { name: 'Retinol 0.3% → 0.5%', why: 'Speeds cell turnover — pushes scarred cells out and builds collagen beneath.', how: 'Rice-grain amount on full face. Start 1×/week, increase to 3× over 6 weeks.', when: 'PM only. Always use SPF next morning.', timeline: 'Visible texture change in 8–16 weeks. Best results at 6+ months.', warning: 'Purging is normal weeks 2–6. Do not combine with AHAs on same night.', pillar: 'Strongest OTC texture intervention — improves Features score long-term.' },
-    ],
-    oiliness: [{
-      name: 'Niacinamide 10%',
-      why: 'Regulates sebum production at the sebaceous gland level. Also reduces pore appearance.',
-      how: 'Apply 2–3 drops after cleansing, before moisturizer.',
-      when: 'AM and PM.',
-      timeline: '4–6 weeks for visible pore and oil reduction.',
-      warning: 'Do not layer with Vitamin C in the same routine — split AM/PM.',
-      pillar: 'Controls shine and pore size — improves skin texture score.',
-    }],
-    dark_circles: [
-      { name: 'Caffeine Eye Cream', why: 'Vasoconstrictor — constricts blood vessels under-eye to reduce dark circles and puffiness.', how: 'Tap gently with ring finger around orbital bone. Never pull the skin.', when: 'AM primarily. Can use PM too.', timeline: 'Immediate de-puffing. Consistent darkening reduction in 6–8 weeks.', warning: 'Will not fix structural dark circles (bone-related) — works on vascular/pigment type.', pillar: 'Improves Eye Area score — directly raises facial attractiveness.' },
-      { name: 'Sleep Consistency', why: '7–9 hours reduces cortisol-driven inflammation and blood vessel dilation that causes under-eye darkness.', how: 'Same bedtime and wake time daily including weekends.', when: 'Ongoing.', timeline: 'Visible within 5–7 days of consistent sleep.', warning: 'No product replaces sleep. This is the root fix.', pillar: 'Sleep affects every score — Eye Area, skin clarity, and jawline definition all improve.' },
-    ],
-    dullness: [{
-      name: 'AHA (Glycolic Acid 8% or Lactic Acid 10%)',
-      why: 'Exfoliates dead cell layer — reveals brighter, smoother skin underneath.',
-      how: 'Apply to dry face after cleansing. Leave 20 min then rinse or leave overnight.',
-      when: 'PM 2–3×/week. Never on same night as retinol.',
-      timeline: '2 weeks to notice glow. 6 weeks for significant brightness.',
-      warning: 'Mandatory SPF next morning — AHAs increase photosensitivity. Start 1×/week.',
-      pillar: 'Brightness directly improves perceived skin health — raises overall facial impression.',
-    }],
-  }
 
   const skinAMRoutine = skinIsClear ? [
     'Gentle cleanser (CeraVe Hydrating or La Roche-Posay Toleriane)',
@@ -2090,9 +2113,8 @@ export default function Results() {
       {/* ── Hairstyle Recommendations ─────────────────────────────── */}
       <Section title="Hairstyle Recommendations" icon={<Scissors size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false}>
         <div className="mb-2">
-          {/* Hair type selector — shown when AI couldn't detect or user wants to override */}
-          {(!resolvedHT || resolvedHT) && (
-            <div className="mb-4">
+          {/* Hair type selector — always shown so user can select or override AI detection */}
+          <div className="mb-4">
               {aiDetectedHairType ? (
                 <p className="text-[10px] text-secondary font-body mb-2">
                   AI detected: <span style={{ color: '#C6A85C' }} className="font-semibold capitalize">{aiDetectedHairType}</span> · tap to change
@@ -2117,8 +2139,7 @@ export default function Results() {
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+          </div>
 
           {hairRec ? (
             <>

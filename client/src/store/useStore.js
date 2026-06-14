@@ -128,7 +128,7 @@ const useStore = create(
       // Pending scan photos (before analysis)
       pendingFacePhoto: null,
       setPendingFacePhoto: (url) => set({ pendingFacePhoto: url }),
-      clearPendingPhotos: () => set({ pendingFacePhoto: null }),
+      clearPendingPhotos: () => set({ pendingFacePhoto: null, pendingBodyPhoto: null }),
 
       // Gender (affects PSL tier labels + ideal ratios)
       gender: null, // null = not selected yet, 'male' | 'female'

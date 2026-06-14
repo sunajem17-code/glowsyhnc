@@ -115,6 +115,7 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/landing" element={<Landing />} />
 
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 

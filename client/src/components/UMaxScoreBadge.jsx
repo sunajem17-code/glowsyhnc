@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, ChevronUp, Info, AlertTriangle } from 'lucide-react'
 import { getTier, getTiersForGender } from '../utils/analysis'
@@ -29,17 +29,23 @@ function ScaleReference({ gender }) {
 
 function AnimatedNumber({ target }) {
   const [display, setDisplay] = useState(0)
-  useState(() => {
+  const rafRef = useRef(null)
+
+  useEffect(() => {
     let start = null
     const step = (ts) => {
       if (!start) start = ts
       const p = Math.min((ts - start) / 1400, 1)
       const ease = 1 - Math.pow(1 - p, 3)
       setDisplay(Math.round(ease * target * 10) / 10)
-      if (p < 1) requestAnimationFrame(step)
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(step)
+      }
     }
-    requestAnimationFrame(step)
-  })
+    rafRef.current = requestAnimationFrame(step)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [target])
+
   return <span>{display.toFixed(1)}</span>
 }
 

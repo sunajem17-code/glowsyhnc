@@ -20,15 +20,13 @@ export async function initRevenueCat(userId) {
     if (!_initialized) {
       await Purchases.configure({ apiKey: REVENUECAT_API_KEY })
       _initialized = true
-      console.log('[RC] initialized with key:', REVENUECAT_API_KEY.slice(0, 12) + '...')
     }
     // Link purchases to the logged-in user so they appear in RC dashboard
     if (userId) {
       await Purchases.logIn({ appUserID: userId })
-      console.log('[RC] logged in as:', userId)
     }
-  } catch (e) {
-    console.error('[RC] init error:', e)
+  } catch {
+    // RevenueCat init failure is non-fatal — purchases will still work on retry
   }
 }
 
@@ -64,9 +62,7 @@ export async function purchasePro(plan = 'monthly') {
     let offerings
     try {
       offerings = await Purchases.getOfferings()
-      console.log('[RC] offerings fetched, current:', offerings?.current?.identifier ?? 'none')
-    } catch (offerErr) {
-      console.error('[RC] getOfferings error:', offerErr)
+    } catch {
       throw new Error('Unable to load subscription options. Please check your internet connection and try again.')
     }
 
@@ -83,23 +79,18 @@ export async function purchasePro(plan = 'monthly') {
       throw new Error('The selected subscription plan is not available. Please try again later.')
     }
 
-    console.log('[RC] purchasing package:', pkg.identifier)
     const result = await Purchases.purchasePackage({ aPackage: pkg })
     const active = result?.customerInfo?.entitlements?.active ?? {}
     const isPro = !!active[ENTITLEMENT_ID]
-    console.log('[RC] purchase complete — isPro:', isPro, '| entitlements:', Object.keys(active))
     return { success: isPro, customerInfo: result.customerInfo }
   } catch (e) {
     if (isCancelError(e)) {
-      console.log('[RC] purchase cancelled by user')
       return { success: false, reason: 'cancelled' }
     }
-    // Wrap raw RC/StoreKit errors into user-friendly messages
     const raw = e?.message ?? ''
     if (raw.includes('not configured') || raw.includes('Cannot connect')) {
       throw new Error('In-app purchases are not available right now. Please try again later.')
     }
-    console.error('[RC] purchasePro error:', e)
     throw e
   }
 }
@@ -113,7 +104,6 @@ export async function restorePurchases() {
   if (!isNative()) return null
   await initRevenueCat()
   const result = await Purchases.restoreInAppPurchases()
-  console.log('[RC] restorePurchases — active entitlements:', JSON.stringify(Object.keys(result.customerInfo?.entitlements?.active || {})))
   return result.customerInfo
 }
 
@@ -122,7 +112,5 @@ export async function checkProStatus(userId) {
   if (!isNative()) return false
   await initRevenueCat(userId ?? null)
   const result = await Purchases.getCustomerInfo()
-  const isPro = !!result.customerInfo.entitlements.active?.[ENTITLEMENT_ID]
-  console.log('[RC] checkProStatus:', isPro)
-  return isPro
+  return !!result.customerInfo.entitlements.active?.[ENTITLEMENT_ID]
 }

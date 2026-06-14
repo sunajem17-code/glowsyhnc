@@ -35,7 +35,6 @@ async function request(path, options = {}) {
     }
     const errBody = await res.json().catch(() => ({}))
     if (res.status === 401) {
-      const errBody2 = await res.json().catch(() => ({}))
       // Only treat as "session expired" if it's an auth middleware rejection
       // (i.e. user has a stored token that the server rejected).
       // Login/register endpoints return 401 for wrong credentials — show that message instead.
@@ -51,7 +50,7 @@ async function request(path, options = {}) {
         } catch {}
         throw new Error('Session expired. Please sign in again.')
       }
-      throw new Error(errBody2.error || 'Invalid email or password')
+      throw new Error(errBody.error || 'Invalid email or password')
     }
     // Attach structured fields (retryAfter, plan, etc.) to the thrown error
     const err = new Error(errBody.error || `Something went wrong (${res.status})`)

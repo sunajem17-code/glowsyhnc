@@ -276,10 +276,8 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
     if (isNative()) {
       try {
         const dataUrl = await takePhoto()
-        console.log('[SCAN] takePhoto result:', dataUrl ? 'got image' : 'null')
         if (dataUrl) onPhoto(dataUrl, dataUrl)
       } catch (err) {
-        console.error('[SCAN] takePhoto error:', err?.message, err)
         if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
           alert('Camera error: ' + (err?.message || 'Unknown error'))
         }
@@ -293,10 +291,8 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
     if (isNative()) {
       try {
         const dataUrl = await pickPhoto()
-        console.log('[SCAN] pickPhoto result:', dataUrl ? 'got image' : 'null')
         if (dataUrl) onPhoto(dataUrl, dataUrl)
       } catch (err) {
-        console.error('[SCAN] pickPhoto error:', err?.message, err)
         if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
           alert('Photo error: ' + (err?.message || 'Unknown error'))
         }
@@ -563,8 +559,6 @@ export default function Scan() {
       await new Promise(r => setTimeout(r, 350))
       setAnalysisStep(4)
 
-      console.info('[Scan] AI score:', aiResult.overallScore, aiResult.tier, '| side:', aiResult.hasSideProfile)
-
       const scanRecord = {
         id:             `scan-${Date.now()}`,
         scanDate:       new Date().toISOString(),
@@ -616,7 +610,7 @@ export default function Scan() {
         gender:           g,
         assignedPhase:    assignedPh?.toLowerCase(),
         tasks,
-      }).catch(err => console.warn('[Supabase] Scan save failed (non-fatal):', err.message))
+      }).catch(() => {})
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
@@ -624,7 +618,6 @@ export default function Scan() {
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
       navigate('/results')
     } catch (err) {
-      console.error('[Scan] AI scoring failed:', err)
       if (err.message === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
