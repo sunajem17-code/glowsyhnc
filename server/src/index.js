@@ -133,6 +133,7 @@ app.use('/api/referral',    require('./routes/referral'))
 app.use('/api/promo',       require('./routes/promo'))
 app.use('/api/potential',   require('./routes/potential'))
 app.use('/api/swipemaxx',   require('./routes/swipemaxx'))
+app.use('/api/tindermaxx', express.json({ limit: '15mb' }), require('./routes/tindermaxx'))
 // Community posts can contain base64 photos — allow up to 15mb
 app.use('/api/community',   express.json({ limit: '15mb' }), require('./routes/community'))
 app.use('/webhooks',        require('./routes/email-webhooks'))

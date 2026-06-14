@@ -10,7 +10,7 @@ async function request(path, options = {}) {
   }
 
   // AI scoring can take 20–40s — give it 130s. All other calls get 15s.
-  const isAiCall = path.startsWith('/ai/')
+  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/')
   const timeoutMs = isAiCall ? 130_000 : 15_000
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -133,6 +133,9 @@ export const api = {
   },
   swipemaxx: {
     rank: (data) => request('/swipemaxx/rank', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  tindermaxx: {
+    rank: (data) => request('/tindermaxx/rank', { method: 'POST', body: JSON.stringify(data) }),
   },
   community: {
     feed:           ()           => request('/community/feed'),
