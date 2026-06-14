@@ -911,14 +911,15 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto"
+      className="fixed inset-0 z-50 flex flex-col"
       style={{ background: '#080604' }}
     >
       {/* Gold top accent */}
       <div className="h-px w-full flex-shrink-0"
         style={{ background: 'linear-gradient(90deg, transparent, rgba(198,168,92,0.55), transparent)' }} />
 
-      <div className="flex-1 px-5 pt-9 pb-10 flex flex-col">
+      {/* Scrollable content — everything except the sticky dismiss footer */}
+      <div className="flex-1 overflow-y-auto px-5 pt-9 pb-4 flex flex-col">
 
         {/* Logo + badge */}
         <div className="flex items-center justify-center gap-2 mb-5">
@@ -1078,17 +1079,13 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           </button>
         )}
 
-        {/* Dismiss */}
-        <button
-          onClick={onClose}
-          type="button"
-          className="w-full py-2 font-body text-[12px] text-center"
-          style={{ color: 'rgba(255,255,255,0.22)' }}
-        >
-          No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
-        </button>
+      </div>{/* end scrollable content */}
 
-        {/* Promo code link — web only */}
+      {/* Sticky dismiss footer — always visible, no scrolling required */}
+      <div
+        className="flex-shrink-0 px-5 flex flex-col gap-1"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
+      >
         {!isNative() && (
           <button
             onClick={() => setShowPromo(true)}
@@ -1099,7 +1096,14 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
             Have a promo code?
           </button>
         )}
-
+        <button
+          onClick={onClose}
+          type="button"
+          className="w-full py-3 font-body text-[13px] text-center"
+          style={{ color: 'rgba(255,255,255,0.30)' }}
+        >
+          No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
+        </button>
       </div>
 
       {/* Promo modal */}
@@ -1130,14 +1134,13 @@ export default function Results() {
 
   // Show paywall after a short delay — let free users see their scores first
   const [showPaywall, setShowPaywall] = useState(false)
+  const paywallDismissed = useRef(false)
 
   useEffect(() => {
-    if (isPremium || !currentScan) return
+    if (isPremium || !currentScan || paywallDismissed.current) return
     if (isNewScan) {
-      // New scan: show paywall after reveal animation completes
       if (revealDone) setShowPaywall(true)
     } else {
-      // Returning to results: give them 3s to see scores before paywall
       const t = setTimeout(() => setShowPaywall(true), 3000)
       return () => clearTimeout(t)
     }
@@ -2594,7 +2597,7 @@ export default function Results() {
           glowScore={glowScore}
           pillars={pillars}
           gender={gender ?? 'male'}
-          onClose={() => setShowPaywall(false)}
+          onClose={() => { paywallDismissed.current = true; setShowPaywall(false) }}
         />
       )}
     </AnimatePresence>
