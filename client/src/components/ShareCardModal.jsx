@@ -115,7 +115,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         overflow: 'hidden',
         background: '#0a0a0a',
         fontFamily: 'Inter, -apple-system, sans-serif',
-        zIndex: -1,
+        zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 24,
@@ -161,7 +161,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           width: 116, height: 116,
           borderRadius: '50%',
           padding: 4,
-          background: 'conic-gradient(#d4af37 0%, #f5e17a 35%, #c9922a 65%, #d4af37 100%)',
+          background: 'linear-gradient(135deg, #d4af37 0%, #f5e17a 35%, #c9922a 65%, #d4af37 100%)',
           boxShadow: '0 0 36px rgba(212,175,55,0.28), 0 0 70px rgba(212,175,55,0.09)',
         }}>
           <div style={{
@@ -305,8 +305,14 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
     if (!cardRef.current) return
     setGenerating(true); setError(null)
     try {
-      // Let DOM finish painting
-      await new Promise(r => setTimeout(r, 350))
+      // Wait for DOM paint, then wait for all <img> elements inside the card to finish loading
+      await new Promise(r => setTimeout(r, 200))
+      const imgs = Array.from(cardRef.current.querySelectorAll('img'))
+      await Promise.all(imgs.map(img =>
+        img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res })
+      ))
+      // One more frame so the browser composites the loaded images
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
       const canvas = await html2canvas(cardRef.current, {
         useCORS: true,
         allowTaint: true,
