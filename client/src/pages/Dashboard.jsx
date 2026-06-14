@@ -1,7 +1,7 @@
 import { useState, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors, X, Gift, Clock, ArrowLeftRight } from 'lucide-react'
+import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors, X, Gift, Clock, ArrowLeftRight, Sparkles } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import useStore from '../store/useStore'
 import GlowScoreRing from '../components/GlowScoreRing'
@@ -475,6 +475,34 @@ export default function Dashboard() {
           </p>
           <p className="text-[11px] font-body mt-0.5" style={{ color: '#4A4642' }}>
             Face analysis · Barber scripts · Cut rankings
+          </p>
+        </div>
+        <ChevronRight size={15} style={{ color: '#C9A84C' }} />
+      </motion.button>
+
+      {/* SwipeMaxx */}
+      <motion.button
+        {...fadeUp(0.26)}
+        onClick={() => navigate('/swipemaxx')}
+        className="w-full mb-4 rounded-2xl flex items-center gap-4 px-4 py-4 active:scale-[0.98] transition-transform"
+        style={{
+          background: '#0D0D0D',
+          border: '1px solid #1E1E1E',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        }}
+      >
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(201,146,10,0.12)', border: '1px solid rgba(201,146,10,0.25)' }}
+        >
+          <Sparkles size={19} style={{ color: '#C9A84C' }} />
+        </div>
+        <div className="text-left flex-1">
+          <p className="font-heading font-bold text-sm" style={{ color: '#F0EDE8' }}>
+            SwipeMaxx
+          </p>
+          <p className="text-[11px] font-body mt-0.5" style={{ color: '#4A4642' }}>
+            AI picks your best dating photo
           </p>
         </div>
         <ChevronRight size={15} style={{ color: '#C9A84C' }} />

@@ -5,6 +5,7 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
+import { pickPhoto, isNative } from '../utils/camera'
 
 const GOLD   = '#C6A85C'
 const BORDER = 'rgba(255,255,255,0.07)'
@@ -62,6 +63,21 @@ function fileToDataUrl(file) {
 
 function PhotoPicker({ label, value, onChange }) {
   const inputRef = useRef()
+
+  async function handlePick() {
+    if (isNative()) {
+      // On iOS/Android use Capacitor camera plugin — file input is unreliable in WKWebView
+      try {
+        const dataUrl = await pickPhoto()
+        if (dataUrl) onChange(dataUrl)
+      } catch (err) {
+        // user cancelled or denied — silently ignore
+      }
+    } else {
+      inputRef.current?.click()
+    }
+  }
+
   return (
     <div className="flex-1">
       <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5"
@@ -70,7 +86,7 @@ function PhotoPicker({ label, value, onChange }) {
       </p>
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={handlePick}
         className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center"
         style={{
           aspectRatio: '3/4',
@@ -93,6 +109,7 @@ function PhotoPicker({ label, value, onChange }) {
           </div>
         )}
       </button>
+      {/* Web fallback file input */}
       <input
         ref={inputRef}
         type="file"
@@ -100,7 +117,9 @@ function PhotoPicker({ label, value, onChange }) {
         className="hidden"
         onChange={async e => {
           const file = e.target.files?.[0]
-          if (file) onChange(await fileToDataUrl(file))
+          if (file) {
+            try { onChange(await fileToDataUrl(file)) } catch {}
+          }
           e.target.value = ''
         }}
       />
