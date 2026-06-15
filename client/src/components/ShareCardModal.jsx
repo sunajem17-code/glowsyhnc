@@ -33,10 +33,10 @@ const APPLE_PATH =
   '-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35' +
   '-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'
 
-// Renders Apple logo + "Ascendus" on ONE canvas so alignment is always perfect.
-// html2canvas captures canvas pixel buffers natively — no SVG issues.
-const ROW_H = 20
-const ROW_W = 200
+// Renders App Store icon + “Ascendus” on ONE canvas — perfect alignment guaranteed.
+// The App Store icon: blue gradient rounded square + crossing-A with heart top + crossbar.
+const ROW_H = 22
+const ROW_W = 210
 function AppStoreNameRow() {
   const ref = useRef(null)
   useEffect(() => {
@@ -45,22 +45,65 @@ function AppStoreNameRow() {
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, ROW_W, ROW_H)
 
-    // Apple logo — white, 16px tall, vertically centered
-    const iconH = 16
-    const scale = iconH / 24
-    const iconY = (ROW_H - iconH) / 2
+    // ── App Store icon (18×18 px, vertically centred in row) ──────────────────
+    const S = 18
+    const ix = 0
+    const iy = (ROW_H - S) / 2
+    const rc = S * 0.22  // corner radius
+
+    // Blue gradient background
+    const bg = ctx.createLinearGradient(ix, iy, ix, iy + S)
+    bg.addColorStop(0, '#5AC8FA')
+    bg.addColorStop(1, '#0070C9')
+    ctx.beginPath()
+    ctx.moveTo(ix + rc, iy)
+    ctx.lineTo(ix + S - rc, iy)
+    ctx.quadraticCurveTo(ix + S, iy, ix + S, iy + rc)
+    ctx.lineTo(ix + S, iy + S - rc)
+    ctx.quadraticCurveTo(ix + S, iy + S, ix + S - rc, iy + S)
+    ctx.lineTo(ix + rc, iy + S)
+    ctx.quadraticCurveTo(ix, iy + S, ix, iy + S - rc)
+    ctx.lineTo(ix, iy + rc)
+    ctx.quadraticCurveTo(ix, iy, ix + rc, iy)
+    ctx.closePath()
+    ctx.fillStyle = bg
+    ctx.fill()
+
+    // White crossing-A shape with round caps
     ctx.save()
-    ctx.translate(0, iconY)
-    ctx.scale(scale, scale)
-    ctx.fillStyle = '#ffffff'
-    ctx.fill(new Path2D(APPLE_PATH))
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = S * 0.135
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    const cx = ix + S / 2
+    const tLx = cx - S * 0.14  // top-left point
+    const tRx = cx + S * 0.14  // top-right point
+    const tY  = iy + S * 0.17
+    const bLx = ix + S * 0.16  // bottom-left
+    const bRx = ix + S * 0.84  // bottom-right
+    const bY  = iy + S * 0.83
+    const barY = iy + S * 0.6
+
+    // Left diagonal: top-right → bottom-left (the crossing part)
+    ctx.beginPath(); ctx.moveTo(tRx, tY); ctx.lineTo(bLx, bY); ctx.stroke()
+    // Right diagonal: top-left → bottom-right
+    ctx.beginPath(); ctx.moveTo(tLx, tY); ctx.lineTo(bRx, bY); ctx.stroke()
+    // Heart top: arc connecting tLx→tRx curving upward
+    ctx.beginPath()
+    ctx.moveTo(tLx, tY)
+    ctx.quadraticCurveTo(cx, iy + S * 0.02, tRx, tY)
+    ctx.stroke()
+    // Horizontal crossbar
+    ctx.beginPath(); ctx.moveTo(ix + S * 0.19, barY); ctx.lineTo(ix + S * 0.81, barY); ctx.stroke()
+
     ctx.restore()
 
-    // "Ascendus" text in gold, baseline-centered in the row
+    // ── “Ascendus” text in gold, vertically centred ────────────────────────────
     ctx.fillStyle = '#d4af37'
     ctx.font = '800 14px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textBaseline = 'middle'
-    ctx.fillText('”Ascendus”', iconH + 7, ROW_H / 2)
+    ctx.fillText('”Ascendus”', S + 8, ROW_H / 2)
   }, [])
   return <canvas ref={ref} width={ROW_W} height={ROW_H} style={{ display: 'block' }} />
 }
