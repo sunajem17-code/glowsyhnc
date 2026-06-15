@@ -47,7 +47,12 @@ const SEARCH_ICON_URI =
   )
 
 // ── ScoreBox ──────────────────────────────────────────────────────────────────
-function ScoreBox({ label, value, tierLabel, tierColor }) {
+// Fix 1: fixed height (88px) + CSS grid ensure all 6 cards are perfectly equal.
+// Fix 2: /10 uses verticalAlign baseline so it sits flush with the score number.
+// Fix 3: progress bar pushed to bottom via marginTop:auto.
+// Fix 4: tier label always #d4af37 gold, font-variant small-caps, fixed 10px size.
+// Fix 5: uniform padding 10px 12px on every card — no variation.
+function ScoreBox({ label, value, tierLabel }) {
   const v = value ?? 0
   const pct = Math.max(0, Math.min(100, (v / 10) * 100))
   const { from, to } = barColor(v)
@@ -55,47 +60,74 @@ function ScoreBox({ label, value, tierLabel, tierColor }) {
     <div style={{
       background: '#141414',
       borderRadius: 12,
-      padding: '10px 12px 10px',
+      padding: '10px 12px',           // Fix 5 & 7: identical padding on all cards
       border: '1px solid rgba(255,255,255,0.05)',
       display: 'flex',
       flexDirection: 'column',
+      height: 88,                      // Fix 1: fixed height — all cards identical
+      boxSizing: 'border-box',
     }}>
+      {/* Label */}
       <div style={{
         fontSize: 8,
         fontWeight: 700,
         letterSpacing: '0.16em',
         color: '#3a3a3a',
         textTransform: 'uppercase',
-        marginBottom: 4,
+        flexShrink: 0,
       }}>
         {label}
       </div>
+
+      {/* Score number — Fix 2: baseline alignment for /10 */}
       <div style={{
-        fontSize: 30,
-        fontWeight: 900,
-        color: '#fff',
+        marginTop: 4,
         lineHeight: 1,
-        letterSpacing: '-0.03em',
+        flexShrink: 0,
       }}>
-        {v.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 500, color: '#2e2e2e' }}>/10</span>
+        <span style={{
+          fontSize: 30,
+          fontWeight: 900,
+          color: '#fff',
+          letterSpacing: '-0.03em',
+          verticalAlign: 'baseline',
+        }}>
+          {v.toFixed(1)}
+        </span>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 500,
+          color: '#2e2e2e',
+          verticalAlign: 'baseline',  // Fix 2: sits on same baseline as score
+          marginLeft: 1,
+        }}>
+          /10
+        </span>
       </div>
+
+      {/* Fix 4: tier label — always #d4af37 gold, small-caps, fixed 10px */}
       {tierLabel && (
         <div style={{
           fontSize: 10,
           fontWeight: 700,
-          color: tierColor ?? to,
-          marginTop: 4,
-          letterSpacing: '0.04em',
+          color: '#d4af37',
+          fontVariant: 'small-caps',
+          letterSpacing: '0.06em',
+          marginTop: 3,
+          flexShrink: 0,
         }}>
           {tierLabel}
         </div>
       )}
+
+      {/* Fix 3: marginTop:auto pushes bar to bottom regardless of content height */}
       <div style={{
         height: 3,
         background: '#1e1e1e',
         borderRadius: 3,
-        marginTop: tierLabel ? 6 : 8,
+        marginTop: 'auto',            // Fix 3: always flush at bottom
         overflow: 'hidden',
+        flexShrink: 0,
       }}>
         <div style={{
           height: '100%',
@@ -219,7 +251,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         padding: '11px 14px 0',
         flexShrink: 0,
       }}>
-        <ScoreBox label="Overall"    value={score}            tierLabel={tier} tierColor={tierColor} />
+        <ScoreBox label="Overall"    value={score}            tierLabel={tier} />
         <ScoreBox label="Potential"  value={potential} />
         <ScoreBox label="Harmony"    value={pillars.harmony} />
         <ScoreBox label="Angularity" value={pillars.angularity} />
@@ -227,7 +259,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         <ScoreBox label="Dimorphism" value={pillars.dimorphism} />
       </div>
 
-      {/* Search prompt */}
+      {/* Search prompt — Fix 6: App Store icon left of "Ascendus" text */}
       <div style={{
         position: 'relative', zIndex: 1,
         margin: '11px 14px 0',
@@ -242,13 +274,23 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       }}>
         <img src={SEARCH_ICON_URI} width={16} height={16} alt="" style={{ flexShrink: 0, opacity: 0.5 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 8, color: '#404040', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
+          <div style={{ fontSize: 8, color: '#404040', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
             Search on the App Store
           </div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#d4af37', letterSpacing: '0.02em' }}>
-            &quot;Ascendus&quot;
+          {/* Fix 6: Apple icon (28×28) vertically centred left of "Ascendus" */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img
+              src={APPLE_LOGO_URI}
+              width={22}
+              height={22}
+              alt=""
+              style={{ display: 'block', flexShrink: 0, opacity: 0.9 }}
+            />
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#d4af37', letterSpacing: '0.02em' }}>
+              &quot;Ascendus&quot;
+            </span>
           </div>
-          <div style={{ fontSize: 8, color: '#2e2e2e', marginTop: 2 }}>
+          <div style={{ fontSize: 8, color: '#2e2e2e', marginTop: 3 }}>
             Find out your rating &amp; unlock your potential
           </div>
         </div>
