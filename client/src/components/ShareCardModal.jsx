@@ -24,31 +24,72 @@ function barColor(val) {
 const CARD_W = 370
 const CARD_H = Math.round(CARD_W * 16 / 9) // 658
 
-// ── Apple logo rendered on a <canvas> so html2canvas captures it reliably ────────
-// SVG data URIs are unreliable in html2canvas / WKWebView — canvas pixels are not.
-const APPLE_PATH =
-  'M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79' +
-  '-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39' +
-  'c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91' +
-  '.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04' +
-  '-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35' +
-  '-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'
-
-function AppleLogoCanvas({ size = 22, color = '#d4af37' }) {
+// ── App Store icon rendered on canvas — reliable in html2canvas / WKWebView ───────
+// Draws the iOS App Store icon: blue gradient rounded square + white pencil-A mark.
+function AppStoreIcon({ size = 24 }) {
   const ref = useRef(null)
   useEffect(() => {
     const canvas = ref.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
-    const scale = size / 24
-    ctx.clearRect(0, 0, size, size)
-    ctx.fillStyle = color
-    ctx.save()
-    ctx.scale(scale, scale)
-    ctx.fill(new Path2D(APPLE_PATH))
-    ctx.restore()
-  }, [size, color])
-  return <canvas ref={ref} width={size} height={size} style={{ display: 'block', flexShrink: 0 }} />
+    const s = size
+    const r = s * 0.22 // corner radius
+
+    // Blue gradient background
+    const grad = ctx.createLinearGradient(0, 0, s, s)
+    grad.addColorStop(0, '#32ade6')
+    grad.addColorStop(1, '#0070c9')
+    ctx.beginPath()
+    ctx.moveTo(r, 0)
+    ctx.lineTo(s - r, 0)
+    ctx.quadraticCurveTo(s, 0, s, r)
+    ctx.lineTo(s, s - r)
+    ctx.quadraticCurveTo(s, s, s - r, s)
+    ctx.lineTo(r, s)
+    ctx.quadraticCurveTo(0, s, 0, s - r)
+    ctx.lineTo(0, r)
+    ctx.quadraticCurveTo(0, 0, r, 0)
+    ctx.closePath()
+    ctx.fillStyle = grad
+    ctx.fill()
+
+    // White stylised "A" (two diagonal strokes + crossbar)
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    const lw = s * 0.115
+    ctx.lineWidth = lw
+    const cx = s / 2
+    const top = s * 0.2
+    const bot = s * 0.82
+    const spread = s * 0.3
+
+    // Left stroke
+    ctx.beginPath()
+    ctx.moveTo(cx, top)
+    ctx.lineTo(cx - spread, bot)
+    ctx.stroke()
+
+    // Right stroke
+    ctx.beginPath()
+    ctx.moveTo(cx, top)
+    ctx.lineTo(cx + spread, bot)
+    ctx.stroke()
+
+    // Crossbar
+    ctx.beginPath()
+    ctx.moveTo(cx - spread * 0.5, s * 0.58)
+    ctx.lineTo(cx + spread * 0.5, s * 0.58)
+    ctx.stroke()
+  }, [size])
+  return (
+    <canvas
+      ref={ref}
+      width={size}
+      height={size}
+      style={{ display: 'block', flexShrink: 0, borderRadius: size * 0.22 }}
+    />
+  )
 }
 
 const SEARCH_ICON_URI =
@@ -291,9 +332,9 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           <div style={{ fontSize: 8, color: '#404040', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
             Search on the App Store
           </div>
-          {/* Apple icon — canvas-rendered for reliable html2canvas capture */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AppleLogoCanvas size={22} color="#d4af37" />
+          {/* App Store icon — canvas-rendered for reliable html2canvas capture */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AppStoreIcon size={22} />
             <span style={{ fontSize: 14, fontWeight: 800, color: '#d4af37', letterSpacing: '0.02em' }}>
               &quot;Ascendus&quot;
             </span>
@@ -324,7 +365,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           borderRadius: 12,
           padding: '8px 18px 8px 13px',
         }}>
-          <AppleLogoCanvas size={20} color="#ffffff" />
+          <AppStoreIcon size={20} />
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
             <span style={{ fontSize: 8, fontWeight: 400, color: '#777', letterSpacing: '0.04em' }}>Download on the</span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
