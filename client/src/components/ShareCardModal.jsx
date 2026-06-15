@@ -251,7 +251,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         padding: '11px 14px 0',
         flexShrink: 0,
       }}>
-        <ScoreBox label="Overall"    value={score}            tierLabel={tier} />
+        <ScoreBox label="Overall"    value={score} />
         <ScoreBox label="Potential"  value={potential} />
         <ScoreBox label="Harmony"    value={pillars.harmony} />
         <ScoreBox label="Angularity" value={pillars.angularity} />
