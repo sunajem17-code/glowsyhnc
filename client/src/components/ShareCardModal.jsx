@@ -46,47 +46,60 @@ const SEARCH_ICON_URI =
     '</svg>'
   )
 
-// ── ScoreBox — balanced proportions ──────────────────────────────────────────
-function ScoreBox({ label, value }) {
+// ── ScoreBox ──────────────────────────────────────────────────────────────────
+function ScoreBox({ label, value, tierLabel, tierColor }) {
   const v = value ?? 0
   const pct = Math.max(0, Math.min(100, (v / 10) * 100))
   const { from, to } = barColor(v)
   return (
     <div style={{
       background: '#141414',
-      borderRadius: 11,
-      padding: '10px 11px 11px',
-      border: '1px solid rgba(255,255,255,0.04)',
+      borderRadius: 12,
+      padding: '10px 12px 10px',
+      border: '1px solid rgba(255,255,255,0.05)',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <div style={{
         fontSize: 8,
-        fontWeight: 600,
-        letterSpacing: '0.14em',
-        color: '#444',
+        fontWeight: 700,
+        letterSpacing: '0.16em',
+        color: '#3a3a3a',
         textTransform: 'uppercase',
         marginBottom: 4,
       }}>
         {label}
       </div>
       <div style={{
-        fontSize: 28,
+        fontSize: 30,
         fontWeight: 900,
         color: '#fff',
         lineHeight: 1,
-        letterSpacing: '-0.02em',
+        letterSpacing: '-0.03em',
       }}>
-        {v.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 500, color: '#3a3a3a' }}>/10</span>
+        {v.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 500, color: '#2e2e2e' }}>/10</span>
       </div>
+      {tierLabel && (
+        <div style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: tierColor ?? to,
+          marginTop: 4,
+          letterSpacing: '0.04em',
+        }}>
+          {tierLabel}
+        </div>
+      )}
       <div style={{
-        height: 2,
-        background: '#1c1c1c',
-        borderRadius: 2,
-        marginTop: 7,
+        height: 3,
+        background: '#1e1e1e',
+        borderRadius: 3,
+        marginTop: tierLabel ? 6 : 8,
         overflow: 'hidden',
       }}>
         <div style={{
           height: '100%',
-          borderRadius: 2,
+          borderRadius: 3,
           width: `${pct}%`,
           background: `linear-gradient(90deg, ${from}, ${to})`,
         }} />
@@ -98,10 +111,12 @@ function ScoreBox({ label, value }) {
 // ── ShareCard — rendered off-screen, captured by html2canvas ──────────────────
 function ShareCard({ scan, facePhotoUrl, cardRef }) {
   const score     = scan?.glowScore ?? (scan?.umaxScore != null ? scan.umaxScore / 10 : null) ?? 0
-  const potential = scan?.potentialScore ?? Math.min(10, score + 1.4)
+  const potential = Math.min(10, score + 1.4)
   const pillars   = scan?.pillars ?? scan?.aiScore?.pillars ?? {}
   const tier      = scan?.tier ?? ''
   const { color: tierColor } = tierMeta(tier)
+
+  const AVATAR = 158
 
   return (
     <div
@@ -121,13 +136,15 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         borderRadius: 24,
       }}
     >
-      {/* Gold radial glow at top */}
+      {/* Gold radial glow behind avatar */}
       <div style={{
         position: 'absolute',
-        top: -80, left: '50%',
+        top: 30,
+        left: '50%',
         transform: 'translateX(-50%)',
-        width: 340, height: 340,
-        background: 'radial-gradient(circle, rgba(212,175,55,0.13) 0%, transparent 65%)',
+        width: 300,
+        height: 300,
+        background: 'radial-gradient(circle, rgba(212,175,55,0.22) 0%, rgba(212,175,55,0.06) 45%, transparent 70%)',
         pointerEvents: 'none',
         zIndex: 0,
       }} />
@@ -136,7 +153,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 20px 0',
+        padding: '18px 20px 0',
         flexShrink: 0,
       }}>
         <img
@@ -145,7 +162,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           crossOrigin="anonymous"
           style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', display: 'block' }}
         />
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', color: '#d4af37' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.26em', color: '#d4af37' }}>
           ASCENDUS
         </div>
       </div>
@@ -154,57 +171,55 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', justifyContent: 'center',
-        margin: '14px 0 0',
+        marginTop: 14,
         flexShrink: 0,
       }}>
         <div style={{
-          width: 116, height: 116,
+          width: AVATAR,
+          height: AVATAR,
           borderRadius: '50%',
-          padding: 4,
-          background: 'linear-gradient(135deg, #d4af37 0%, #f5e17a 35%, #c9922a 65%, #d4af37 100%)',
-          boxShadow: '0 0 36px rgba(212,175,55,0.28), 0 0 70px rgba(212,175,55,0.09)',
+          border: '3px solid #d4af37',
+          boxShadow: '0 0 44px rgba(212,175,55,0.45), 0 0 80px rgba(212,175,55,0.13)',
+          overflow: 'hidden',
+          background: '#1e1e1e',
+          flexShrink: 0,
         }}>
-          <div style={{
-            width: '100%', height: '100%',
-            borderRadius: '50%',
-            overflow: 'hidden',
-            background: '#282828',
-          }}>
-            {facePhotoUrl && (
-              <img
-                src={facePhotoUrl}
-                alt=""
-                crossOrigin="anonymous"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            )}
-          </div>
+          {facePhotoUrl && (
+            <img
+              src={facePhotoUrl}
+              alt=""
+              crossOrigin="anonymous"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Tier */}
+      {/* Tier label */}
       <div style={{
         position: 'relative', zIndex: 1,
         textAlign: 'center',
         marginTop: 12,
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: 22, fontWeight: 900, color: tierColor, letterSpacing: '0.13em' }}>
+        <div style={{ fontSize: 24, fontWeight: 900, color: tierColor, letterSpacing: '0.14em' }}>
           {tier.toUpperCase()}
         </div>
-        <div style={{ fontSize: 11, color: '#484848', marginTop: 3, letterSpacing: '0.05em' }}>Your Results</div>
+        <div style={{ fontSize: 11, color: '#484848', marginTop: 3, letterSpacing: '0.06em' }}>
+          Your Results
+        </div>
       </div>
 
-      {/* Score grid — 2 cols × 3 rows */}
+      {/* Score grid — 2 × 3 */}
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: 8,
-        padding: '14px 16px 0',
+        gap: 7,
+        padding: '11px 14px 0',
         flexShrink: 0,
       }}>
-        <ScoreBox label="Overall"    value={score} />
+        <ScoreBox label="Overall"    value={score}            tierLabel={tier} tierColor={tierColor} />
         <ScoreBox label="Potential"  value={potential} />
         <ScoreBox label="Harmony"    value={pillars.harmony} />
         <ScoreBox label="Angularity" value={pillars.angularity} />
@@ -212,43 +227,28 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         <ScoreBox label="Dimorphism" value={pillars.dimorphism} />
       </div>
 
-      {/* Divider */}
-      <div style={{
-        position: 'relative', zIndex: 1,
-        height: 1,
-        background: '#161616',
-        margin: '14px 16px 0',
-        flexShrink: 0,
-      }} />
-
       {/* Search prompt */}
       <div style={{
         position: 'relative', zIndex: 1,
-        margin: '12px 16px 0',
+        margin: '11px 14px 0',
         background: '#0f0f0f',
         border: '1px solid #1e1e1e',
-        borderRadius: 11,
-        padding: '10px 14px',
+        borderRadius: 12,
+        padding: '9px 14px',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         flexShrink: 0,
       }}>
-        <img
-          src={SEARCH_ICON_URI}
-          width={17}
-          height={17}
-          alt=""
-          style={{ flexShrink: 0, opacity: 0.45 }}
-        />
+        <img src={SEARCH_ICON_URI} width={16} height={16} alt="" style={{ flexShrink: 0, opacity: 0.5 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 8.5, color: '#484848', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>
+          <div style={{ fontSize: 8, color: '#404040', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
             Search on the App Store
           </div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#d4af37', letterSpacing: '0.03em' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#d4af37', letterSpacing: '0.02em' }}>
             &quot;Ascendus&quot;
           </div>
-          <div style={{ fontSize: 8.5, color: '#303030', marginTop: 2 }}>
+          <div style={{ fontSize: 8, color: '#2e2e2e', marginTop: 2 }}>
             Find out your rating &amp; unlock your potential
           </div>
         </div>
@@ -258,34 +258,26 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         textAlign: 'center',
-        marginTop: 12,
-        padding: '0 16px 18px',
+        marginTop: 10,
+        padding: '0 14px 16px',
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: 11, color: '#2a2a2a', marginBottom: 8, letterSpacing: '0.04em' }}>ascendus.store</div>
+        <div style={{ fontSize: 10, color: '#2a2a2a', marginBottom: 8, letterSpacing: '0.05em' }}>
+          ascendus.store
+        </div>
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: 9,
-          background: '#0a0a0a',
-          border: '1.5px solid #242424',
-          borderRadius: 11,
+          background: '#111',
+          border: '1.5px solid #252525',
+          borderRadius: 12,
           padding: '8px 18px 8px 13px',
         }}>
-          <img
-            src={APPLE_LOGO_URI}
-            width={20}
-            height={20}
-            alt=""
-            style={{ display: 'block' }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
-            <span style={{ fontSize: 8, fontWeight: 400, color: '#888', letterSpacing: '0.04em' }}>
-              Download on the
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
-              App Store
-            </span>
+          <img src={APPLE_LOGO_URI} width={20} height={20} alt="" style={{ display: 'block' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+            <span style={{ fontSize: 8, fontWeight: 400, color: '#777', letterSpacing: '0.04em' }}>Download on the</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
           </div>
         </div>
       </div>
