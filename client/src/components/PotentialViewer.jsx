@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Share2, Download, Loader2, Sparkles, AlertTriangle, Timer } from 'lucide-react'
+import { X, Share2, Download, Loader2, Sparkles, AlertTriangle, Lock, Timer } from 'lucide-react'
 import { api } from '../utils/api'
 
 // ─── Canvas helpers ───────────────────────────────────────────────────────────
@@ -242,9 +243,11 @@ async function drawPotentialCard({ canvas, photoUrl, glowScore, tier, result, ge
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose }) {
+  const navigate = useNavigate()
   const [phase,      setPhase]      = useState('loading') // loading | done | error
   const [result,     setResult]     = useState(null)
   const [errMsg,     setErrMsg]     = useState('')
+  const [proRequired,setProRequired]= useState(false)
   const [preview,    setPreview]    = useState(null)
   const [sharing,    setSharing]    = useState(false)
   const [genCard,    setGenCard]    = useState(false)
@@ -263,6 +266,7 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
     let cancelled = false
     setResult(null)
     setGlowImage(null)
+    setProRequired(false)
     setPhase('loading')
     ;(async () => {
       try {
@@ -299,7 +303,14 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
       } catch (err) {
         console.error('POTENTIAL ERROR:', err.message)
         if (!cancelled) {
-          setErrMsg(err.message || 'Analysis failed — please try again')
+          // A 403 here means the server's Pro gate rejected the request (e.g.
+          // demo accounts always get this) — retrying will fail the same way
+          // every time, so show an upgrade CTA instead of "Try Again".
+          if (err.status === 403) {
+            setProRequired(true)
+          } else {
+            setErrMsg(err.message || 'Analysis failed — please try again')
+          }
           setPhase('error')
         }
       }
@@ -407,7 +418,30 @@ export default function PotentialViewer({ scan, facePhotoUrl, gender, onClose })
           )}
 
           {/* ── Error ─────────────────────────────────────────────── */}
-          {phase === 'error' && (
+          {phase === 'error' && proRequired && (
+            <motion.div
+              key="pro-required"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center h-64 gap-4 text-center px-6"
+            >
+              <Lock size={32} style={{ color: GOLD }} />
+              <p className="font-heading font-bold text-[15px] text-white">Pro feature</p>
+              <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Potential analysis isn't available on this account. Upgrade to Pro to unlock it.
+              </p>
+              <button
+                onClick={() => { onClose(); navigate('/premium') }}
+                className="mt-2 px-5 py-2.5 rounded-2xl font-heading font-bold text-[13px] text-black"
+                style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 100%)` }}
+              >
+                Upgrade to Pro
+              </button>
+            </motion.div>
+          )}
+
+          {phase === 'error' && !proRequired && (
             <motion.div
               key="error"
               initial={{ opacity: 0 }}

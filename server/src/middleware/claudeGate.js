@@ -117,7 +117,7 @@ async function getSubscriptionTier(userId) {
 // ── 4. Pro gate ────────────────────────────────────────────────────────────────
 async function requirePro(req, res, next) {
   if (req.isDemo) {
-    return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
+    return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   }
   try {
     const { isPro } = await getSubscriptionTier(req.userId)
@@ -125,7 +125,7 @@ async function requirePro(req, res, next) {
       req.isPro = true
       return next()
     }
-    return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
+    return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   } catch (err) {
     console.error('[claudeGate] requirePro error:', err.message)
     return res.status(500).json({ error: 'internal_error' })
