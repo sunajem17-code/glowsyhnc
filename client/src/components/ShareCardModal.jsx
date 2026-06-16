@@ -361,12 +361,16 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
             background: '#111',
             border: '1px solid #2a2a2a',
             borderRadius: 9,
-            padding: '7px 16px',
+            padding: '9px 16px',
           }}>
             <AppleLogoCanvas size={18} color="#ffffff" />
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-              <span style={{ fontSize: 8, fontWeight: 400, color: '#888', letterSpacing: '0.03em' }}>Download on the</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
+            {/* Fixed px line-heights (not multipliers) so the text block's
+                height is deterministic — that's what keeps the icon centered
+                with even spacing above/below instead of drifting with font
+                metric quirks. */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 8, lineHeight: '10px', fontWeight: 400, color: '#888', letterSpacing: '0.03em' }}>Download on the</span>
+              <span style={{ fontSize: 13, lineHeight: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
             </div>
           </div>
         </div>
