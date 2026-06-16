@@ -49,6 +49,10 @@ function canvasToDataUrl(w, h, draw) {
   return c.toDataURL('image/png')
 }
 
+// Card is captured at 2× scale overall — draw fixed-size icons at 2× source
+// resolution too so html2canvas doesn't have to upscale (and blur) them.
+const DPR = 2
+
 // Plain "Ascendus" label — no icon, no canvas needed since it's just text.
 function AppStoreNameRow() {
   return (
@@ -58,12 +62,15 @@ function AppStoreNameRow() {
   )
 }
 
-// Plain Apple logo (used in footer App Store button)
+// Plain Apple logo (used in footer App Store button). Drawn at 2× resolution
+// (matching the card's overall 2× capture scale) and shrunk via CSS so it
+// stays crisp instead of getting upscale-blurred by html2canvas.
 function AppleLogoCanvas({ size = 20, color = '#ffffff' }) {
   const [src, setSrc] = useState(null)
   useEffect(() => {
-    const url = canvasToDataUrl(size, size, (ctx) => {
-      const scale = size / 24
+    const px = size * DPR
+    const url = canvasToDataUrl(px, px, (ctx) => {
+      const scale = px / 24
       ctx.save()
       ctx.scale(scale, scale)
       ctx.fillStyle = color
@@ -79,7 +86,7 @@ function AppleLogoCanvas({ size = 20, color = '#ffffff' }) {
       alt=""
       width={size}
       height={size}
-      style={{ display: 'block', flexShrink: 0 }}
+      style={{ display: 'block', width: size, height: size, flexShrink: 0 }}
     />
   )
 }
