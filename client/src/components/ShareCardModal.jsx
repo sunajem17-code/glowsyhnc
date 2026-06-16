@@ -33,79 +33,103 @@ const APPLE_PATH =
   '-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35' +
   '-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'
 
-// Renders Apple logo + “Ascendus” on ONE canvas at 2× DPR for sharp text.
-const ROW_CSS_H = 28
+// html2canvas's DOM clone does not reliably preserve live <canvas> pixel
+// buffers (it appears to serialize the clone, which drops canvas bitmaps
+// regardless of when they were painted). So we never render a live <canvas>
+// into the captured tree — instead we paint on an OFFSCREEN canvas, convert
+// it to a PNG data URL once, and render a plain <img>. html2canvas already
+// handles <img src="data:..."> reliably (avatar photo, app logo, search icon
+// all use this path).
+function canvasToDataUrl(w, h, draw) {
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const ctx = c.getContext('2d')
+  draw(ctx)
+  return c.toDataURL('image/png')
+}
+
+// Renders Apple logo + “Ascendus” at 2× resolution for sharp text.
+const ROW_CSS_H = 24
 const ROW_CSS_W = 220
 const DPR = 2  // fixed 2× so the captured card (also 2×) gets sharp text
 function AppStoreNameRow() {
-  const ref = useRef(null)
+  const [src, setSrc] = useState(null)
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const W = ROW_CSS_W * DPR
-    const H = ROW_CSS_H * DPR
-    canvas.width  = W
-    canvas.height = H
-    const ctx = canvas.getContext('2d')
-    ctx.scale(DPR, DPR)  // all coords in CSS px from here
+    const url = canvasToDataUrl(ROW_CSS_W * DPR, ROW_CSS_H * DPR, (ctx) => {
+      ctx.scale(DPR, DPR)  // all coords in CSS px from here
 
-    const rowCenter = ROW_CSS_H / 2
+      const rowCenter = ROW_CSS_H / 2
 
-    // Apple  logo — white, bigger now (20px). The glyph's own ink bounding box
-    // inside its 24×24 viewBox runs roughly from y≈1.4 to y≈22.8, not edge to
-    // edge, so centering on that ink box (not the raw viewBox) is what actually
-    // lines it up with the text's optical center.
-    const iconH = 20
-    const scale = iconH / 24
-    const inkTopFrac = 1.4 / 24
-    const inkBotFrac = 22.8 / 24
-    const inkTop = inkTopFrac * iconH
-    const inkH   = (inkBotFrac - inkTopFrac) * iconH
-    const iconY  = rowCenter - inkTop - inkH / 2
-    ctx.save()
-    ctx.translate(0, iconY)
-    ctx.scale(scale, scale)
-    ctx.fillStyle = '#d4af37'
-    ctx.fill(new Path2D(APPLE_PATH))
-    ctx.restore()
+      // Apple  logo — gold, 20px. The glyph's own ink bounding box inside its
+      // 24×24 viewBox runs roughly from y≈1.4 to y≈22.8, not edge to edge, so
+      // centering on that ink box (not the raw viewBox) is what actually
+      // lines it up with the text's optical center.
+      const iconH = 20
+      const scale = iconH / 24
+      const inkTopFrac = 1.4 / 24
+      const inkBotFrac = 22.8 / 24
+      const inkTop = inkTopFrac * iconH
+      const inkH   = (inkBotFrac - inkTopFrac) * iconH
+      const iconY  = rowCenter - inkTop - inkH / 2
+      ctx.save()
+      ctx.translate(0, iconY)
+      ctx.scale(scale, scale)
+      ctx.fillStyle = '#d4af37'
+      ctx.fill(new Path2D(APPLE_PATH))
+      ctx.restore()
 
-    // “Ascendus” in gold — bigger (17px) and centred using real glyph metrics
-    // so its visual (ink) center lands exactly on rowCenter, not the font's
-    // line-box center (which sits lower because of descender space).
-    const label = '”Ascendus”'
-    ctx.fillStyle = '#d4af37'
-    ctx.font = '800 17px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.textBaseline = 'alphabetic'
-    const m = ctx.measureText(label)
-    const ascent  = m.actualBoundingBoxAscent  ?? 12
-    const descent = m.actualBoundingBoxDescent ?? 3
-    const baselineY = rowCenter + (ascent - descent) / 2
-    ctx.fillText(label, iconH + 8, baselineY)
+      // “Ascendus” in gold — centred using real glyph metrics so its visual
+      // (ink) center lands exactly on rowCenter, not the font's line-box
+      // center (which sits lower because of descender space).
+      const label = '”Ascendus”'
+      ctx.fillStyle = '#d4af37'
+      ctx.font = '800 17px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.textBaseline = 'alphabetic'
+      const m = ctx.measureText(label)
+      const ascent  = m.actualBoundingBoxAscent  ?? 12
+      const descent = m.actualBoundingBoxDescent ?? 3
+      const baselineY = rowCenter + (ascent - descent) / 2
+      ctx.fillText(label, iconH + 8, baselineY)
+    })
+    setSrc(url)
   }, [])
+  if (!src) return <div style={{ width: ROW_CSS_W, height: ROW_CSS_H }} />
   return (
-    <canvas
-      ref={ref}
+    <img
+      src={src}
+      alt=""
+      width={ROW_CSS_W}
+      height={ROW_CSS_H}
       style={{ display: 'block', width: ROW_CSS_W, height: ROW_CSS_H }}
     />
   )
 }
 
-// Plain Apple logo on canvas (used in footer App Store button)
+// Plain Apple logo (used in footer App Store button)
 function AppleLogoCanvas({ size = 20, color = '#ffffff' }) {
-  const ref = useRef(null)
+  const [src, setSrc] = useState(null)
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const scale = size / 24
-    ctx.clearRect(0, 0, size, size)
-    ctx.save()
-    ctx.scale(scale, scale)
-    ctx.fillStyle = color
-    ctx.fill(new Path2D(APPLE_PATH))
-    ctx.restore()
+    const url = canvasToDataUrl(size, size, (ctx) => {
+      const scale = size / 24
+      ctx.save()
+      ctx.scale(scale, scale)
+      ctx.fillStyle = color
+      ctx.fill(new Path2D(APPLE_PATH))
+      ctx.restore()
+    })
+    setSrc(url)
   }, [size, color])
-  return <canvas ref={ref} width={size} height={size} style={{ display: 'block', flexShrink: 0 }} />
+  if (!src) return <div style={{ width: size, height: size, flexShrink: 0 }} />
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      style={{ display: 'block', flexShrink: 0 }}
+    />
+  )
 }
 
 const SEARCH_ICON_URI =
@@ -135,7 +159,7 @@ function ScoreBox({ label, value, tierLabel }) {
       border: '1px solid rgba(255,255,255,0.05)',
       display: 'flex',
       flexDirection: 'column',
-      height: 88,                      // Fix 1: fixed height — all cards identical
+      height: 76,                      // Fix 1: fixed height — all cards identical
       boxSizing: 'border-box',
     }}>
       {/* Label */}
@@ -157,7 +181,7 @@ function ScoreBox({ label, value, tierLabel }) {
         flexShrink: 0,
       }}>
         <span style={{
-          fontSize: 30,
+          fontSize: 26,
           fontWeight: 900,
           color: '#fff',
           letterSpacing: '-0.03em',
@@ -219,7 +243,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
   const tier      = scan?.tier ?? ''
   const { color: tierColor } = tierMeta(tier)
 
-  const AVATAR = 158
+  const AVATAR = 124
 
   return (
     <div
@@ -256,7 +280,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '18px 20px 0',
+        padding: '14px 20px 0',
         flexShrink: 0,
       }}>
         <img
@@ -274,7 +298,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', justifyContent: 'center',
-        marginTop: 14,
+        marginTop: 10,
         flexShrink: 0,
       }}>
         <div style={{
@@ -302,10 +326,10 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         textAlign: 'center',
-        marginTop: 12,
+        marginTop: 8,
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: 24, fontWeight: 900, color: tierColor, letterSpacing: '0.14em' }}>
+        <div style={{ fontSize: 22, fontWeight: 900, color: tierColor, letterSpacing: '0.14em' }}>
           {tier.toUpperCase()}
         </div>
         <div style={{ fontSize: 11, color: '#484848', marginTop: 3, letterSpacing: '0.06em' }}>
@@ -318,8 +342,8 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         position: 'relative', zIndex: 1,
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: 7,
-        padding: '11px 14px 0',
+        gap: 6,
+        padding: '8px 14px 0',
         flexShrink: 0,
       }}>
         <ScoreBox label="Overall"    value={score} />
@@ -333,11 +357,11 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       {/* Search prompt — Fix 6: App Store icon left of "Ascendus" text */}
       <div style={{
         position: 'relative', zIndex: 1,
-        margin: '11px 14px 0',
+        margin: '8px 14px 0',
         background: '#0f0f0f',
         border: '1px solid #1e1e1e',
         borderRadius: 12,
-        padding: '9px 14px',
+        padding: '7px 14px',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -360,26 +384,31 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
       <div style={{
         position: 'relative', zIndex: 1,
         textAlign: 'center',
-        marginTop: 10,
-        padding: '0 14px 16px',
+        marginTop: 6,
+        padding: '0 14px 10px',
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: 10, color: '#2a2a2a', marginBottom: 8, letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 10, color: '#2a2a2a', marginBottom: 6, letterSpacing: '0.05em' }}>
           ascendus.store
         </div>
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 9,
-          background: '#111',
-          border: '1.5px solid #252525',
-          borderRadius: 12,
-          padding: '8px 18px 8px 13px',
-        }}>
-          <AppleLogoCanvas size={20} color="#ffffff" />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
-            <span style={{ fontSize: 8, fontWeight: 400, color: '#777', letterSpacing: '0.04em' }}>Download on the</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
+        {/* html2canvas mishandles display:inline-flex (children were dropped) —
+            use a centered regular flex row instead, matching the avatar/search
+            banner pattern that already renders correctly. */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            background: '#111',
+            border: '1.5px solid #252525',
+            borderRadius: 12,
+            padding: '7px 18px 7px 13px',
+          }}>
+            <AppleLogoCanvas size={20} color="#ffffff" />
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+              <span style={{ fontSize: 8, fontWeight: 400, color: '#777', letterSpacing: '0.04em' }}>Download on the</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
+            </div>
           </div>
         </div>
       </div>
@@ -405,7 +434,13 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
       await Promise.all(imgs.map(img =>
         img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res })
       ))
-      // One more frame so the browser composites the loaded images
+      // Wait for web fonts — until they load, text renders in a fallback font with
+      // different metrics, which can shift the layout taller and clip content (e.g.
+      // the footer) against the card's overflow:hidden bottom edge at capture time.
+      if (document.fonts?.ready) {
+        await document.fonts.ready
+      }
+      // One more frame so the browser composites the loaded images/fonts
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
       const canvas = await html2canvas(cardRef.current, {
         useCORS: true,
