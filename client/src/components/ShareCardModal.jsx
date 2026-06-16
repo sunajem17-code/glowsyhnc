@@ -49,60 +49,12 @@ function canvasToDataUrl(w, h, draw) {
   return c.toDataURL('image/png')
 }
 
-// Renders Apple logo + “Ascendus” at 2× resolution for sharp text.
-const ROW_CSS_H = 24
-const ROW_CSS_W = 220
-const DPR = 2  // fixed 2× so the captured card (also 2×) gets sharp text
+// Plain "Ascendus" label — no icon, no canvas needed since it's just text.
 function AppStoreNameRow() {
-  const [src, setSrc] = useState(null)
-  useEffect(() => {
-    const url = canvasToDataUrl(ROW_CSS_W * DPR, ROW_CSS_H * DPR, (ctx) => {
-      ctx.scale(DPR, DPR)  // all coords in CSS px from here
-
-      const rowCenter = ROW_CSS_H / 2
-
-      // Apple  logo — gold, 20px. The glyph's own ink bounding box inside its
-      // 24×24 viewBox runs roughly from y≈1.4 to y≈22.8, not edge to edge, so
-      // centering on that ink box (not the raw viewBox) is what actually
-      // lines it up with the text's optical center.
-      const iconH = 20
-      const scale = iconH / 24
-      const inkTopFrac = 1.4 / 24
-      const inkBotFrac = 22.8 / 24
-      const inkTop = inkTopFrac * iconH
-      const inkH   = (inkBotFrac - inkTopFrac) * iconH
-      const iconY  = rowCenter - inkTop - inkH / 2
-      ctx.save()
-      ctx.translate(0, iconY)
-      ctx.scale(scale, scale)
-      ctx.fillStyle = '#d4af37'
-      ctx.fill(new Path2D(APPLE_PATH))
-      ctx.restore()
-
-      // “Ascendus” in gold — centred using real glyph metrics so its visual
-      // (ink) center lands exactly on rowCenter, not the font's line-box
-      // center (which sits lower because of descender space).
-      const label = '”Ascendus”'
-      ctx.fillStyle = '#d4af37'
-      ctx.font = '800 17px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-      ctx.textBaseline = 'alphabetic'
-      const m = ctx.measureText(label)
-      const ascent  = m.actualBoundingBoxAscent  ?? 12
-      const descent = m.actualBoundingBoxDescent ?? 3
-      const baselineY = rowCenter + (ascent - descent) / 2
-      ctx.fillText(label, iconH + 8, baselineY)
-    })
-    setSrc(url)
-  }, [])
-  if (!src) return <div style={{ width: ROW_CSS_W, height: ROW_CSS_H }} />
   return (
-    <img
-      src={src}
-      alt=""
-      width={ROW_CSS_W}
-      height={ROW_CSS_H}
-      style={{ display: 'block', width: ROW_CSS_W, height: ROW_CSS_H }}
-    />
+    <div style={{ fontSize: 17, fontWeight: 800, color: '#d4af37', letterSpacing: '0.02em' }}>
+      &#8221;Ascendus&#8221;
+    </div>
   )
 }
 
@@ -398,16 +350,16 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 9,
+            gap: 8,
             background: '#111',
-            border: '1.5px solid #252525',
-            borderRadius: 12,
-            padding: '7px 18px 7px 13px',
+            border: '1px solid #2a2a2a',
+            borderRadius: 9,
+            padding: '7px 16px',
           }}>
-            <AppleLogoCanvas size={20} color="#ffffff" />
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
-              <span style={{ fontSize: 8, fontWeight: 400, color: '#777', letterSpacing: '0.04em' }}>Download on the</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
+            <AppleLogoCanvas size={18} color="#ffffff" />
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+              <span style={{ fontSize: 8, fontWeight: 400, color: '#888', letterSpacing: '0.03em' }}>Download on the</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
             </div>
           </div>
         </div>
