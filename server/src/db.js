@@ -172,4 +172,14 @@ for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }
 }
 
+// Synthetic "demo" user — lets the demo-token session (used by the "Try Demo"
+// login) satisfy community_posts' FOREIGN KEY (user_id) REFERENCES users(id)
+// constraint, so demo sessions can actually post/like/comment/rate instead of
+// failing with a FK violation. All demo sessions share this single identity,
+// matching how Claude-feature rate limiting already buckets demo under one key.
+db.prepare(`
+  INSERT OR IGNORE INTO users (id, email, name, password_hash, subscription_tier)
+  VALUES ('demo', 'demo@ascendus.internal', 'Demo User', '', 'free')
+`).run()
+
 module.exports = db

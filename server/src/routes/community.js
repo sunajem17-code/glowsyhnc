@@ -1,7 +1,11 @@
 const express = require('express')
 const { v4: uuid } = require('uuid')
 const db = require('../db')
-const { authMiddleware } = require('../middleware/auth')
+// authMiddleware rejects the demo-token used by "Try Demo" (it's not a real
+// JWT), which silently broke every community action for demo sessions.
+// verifyToken accepts demo-token as a rate-limited guest (req.userId='demo'),
+// the same pattern already used for the Claude-gated routes.
+const { verifyToken: authMiddleware } = require('../middleware/claudeGate')
 const { createLimiter } = require('../middleware/ratelimit')
 
 const router = express.Router()
