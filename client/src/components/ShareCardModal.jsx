@@ -49,10 +49,12 @@ function AppStoreNameRow() {
     const ctx = canvas.getContext('2d')
     ctx.scale(DPR, DPR)  // all coords in CSS px from here
 
-    // Apple  logo — white, 16px tall, vertically centred
+    // Apple  logo — white, 16px tall. The glyph's own ink sits slightly above
+    // its viewBox center (the leaf/stem at top is thin, the body is lower),
+    // so nudge it down a touch to optically match the text's center line.
     const iconH = 16
     const scale = iconH / 24
-    const iconY = (ROW_CSS_H - iconH) / 2
+    const iconY = (ROW_CSS_H - iconH) / 2 + 1.5
     ctx.save()
     ctx.translate(0, iconY)
     ctx.scale(scale, scale)
@@ -64,7 +66,7 @@ function AppStoreNameRow() {
     ctx.fillStyle = '#d4af37'
     ctx.font = '800 14px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textBaseline = 'middle'
-    ctx.fillText('”Ascendus”', iconH + 7, ROW_CSS_H / 2)
+    ctx.fillText('”Ascendus”', iconH + 7, ROW_CSS_H / 2 + 1)
   }, [])
   return (
     <canvas
