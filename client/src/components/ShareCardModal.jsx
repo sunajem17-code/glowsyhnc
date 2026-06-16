@@ -34,8 +34,8 @@ const APPLE_PATH =
   '-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'
 
 // Renders Apple logo + “Ascendus” on ONE canvas at 2× DPR for sharp text.
-const ROW_CSS_H = 22
-const ROW_CSS_W = 210
+const ROW_CSS_H = 28
+const ROW_CSS_W = 220
 const DPR = 2  // fixed 2× so the captured card (also 2×) gets sharp text
 function AppStoreNameRow() {
   const ref = useRef(null)
@@ -49,12 +49,19 @@ function AppStoreNameRow() {
     const ctx = canvas.getContext('2d')
     ctx.scale(DPR, DPR)  // all coords in CSS px from here
 
-    // Apple  logo — white, 16px tall. The glyph's own ink sits slightly above
-    // its viewBox center (the leaf/stem at top is thin, the body is lower),
-    // so nudge it down a touch to optically match the text's center line.
-    const iconH = 16
+    const rowCenter = ROW_CSS_H / 2
+
+    // Apple  logo — white, bigger now (20px). The glyph's own ink bounding box
+    // inside its 24×24 viewBox runs roughly from y≈1.4 to y≈22.8, not edge to
+    // edge, so centering on that ink box (not the raw viewBox) is what actually
+    // lines it up with the text's optical center.
+    const iconH = 20
     const scale = iconH / 24
-    const iconY = (ROW_CSS_H - iconH) / 2 + 1.5
+    const inkTopFrac = 1.4 / 24
+    const inkBotFrac = 22.8 / 24
+    const inkTop = inkTopFrac * iconH
+    const inkH   = (inkBotFrac - inkTopFrac) * iconH
+    const iconY  = rowCenter - inkTop - inkH / 2
     ctx.save()
     ctx.translate(0, iconY)
     ctx.scale(scale, scale)
@@ -62,11 +69,18 @@ function AppStoreNameRow() {
     ctx.fill(new Path2D(APPLE_PATH))
     ctx.restore()
 
-    // “Ascendus” in gold — sharp because canvas is 2× and CSS shrinks it
+    // “Ascendus” in gold — bigger (17px) and centred using real glyph metrics
+    // so its visual (ink) center lands exactly on rowCenter, not the font's
+    // line-box center (which sits lower because of descender space).
+    const label = '”Ascendus”'
     ctx.fillStyle = '#d4af37'
-    ctx.font = '800 14px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('”Ascendus”', iconH + 7, ROW_CSS_H / 2 + 1)
+    ctx.font = '800 17px Inter, -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.textBaseline = 'alphabetic'
+    const m = ctx.measureText(label)
+    const ascent  = m.actualBoundingBoxAscent  ?? 12
+    const descent = m.actualBoundingBoxDescent ?? 3
+    const baselineY = rowCenter + (ascent - descent) / 2
+    ctx.fillText(label, iconH + 8, baselineY)
   }, [])
   return (
     <canvas
