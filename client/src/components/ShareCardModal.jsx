@@ -65,7 +65,7 @@ function AppStoreNameRow() {
     ctx.save()
     ctx.translate(0, iconY)
     ctx.scale(scale, scale)
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = '#d4af37'
     ctx.fill(new Path2D(APPLE_PATH))
     ctx.restore()
 
