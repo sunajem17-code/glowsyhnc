@@ -110,7 +110,12 @@ export default function Auth() {
 
   function demoLogin() {
     const demoUser = {
-      id: 'demo-user',
+      // Must match server/src/middleware/claudeGate.js's verifyToken, which
+      // maps the demo-token to req.userId = 'demo'. A mismatch here breaks
+      // every "is this my own post" check (delete button, self-rating guard
+      // in Community) since post.user_id (server-assigned) would never equal
+      // currentUserId (this id) for anything the demo account creates.
+      id: 'demo',
       name: 'Alex',
       email: 'alex@ascendus.app',
       avatarUrl: null,
