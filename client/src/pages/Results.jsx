@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
-import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Beef, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map } from 'lucide-react'
+import { Share2, ArrowRight, ChevronDown, ChevronUp, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Beef, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import logo from '../assets/ascendus-icon.png'
@@ -2542,6 +2542,10 @@ export default function Results() {
     </MotionPage>
 
     {/* ── Free tier sticky bottom CTA ──────────────────────────── */}
+    {/* Note: position:fixed bottom:0 visually covers the app's BottomNav
+        (which is a normal-flow, non-fixed element with no z-index of its
+        own) — without an explicit way back, free users land here and have
+        no path to the homepage. The Home button below fixes that directly. */}
     {!isPremium && !showPaywall && (
       <div
         className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-3"
@@ -2550,7 +2554,18 @@ export default function Results() {
           backdropFilter: 'blur(12px)',
         }}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'auto 1fr 1fr' }}>
+          <button
+            onClick={() => navigate('/')}
+            aria-label="Back to home"
+            className="w-[46px] flex items-center justify-center rounded-2xl flex-shrink-0"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}
+          >
+            <Home size={17} style={{ color: 'rgba(255,255,255,0.7)' }} />
+          </button>
           <button
             onClick={() => navigate('/referral')}
             className="py-3.5 rounded-2xl font-heading font-bold text-[13px] flex items-center justify-center gap-1.5"
