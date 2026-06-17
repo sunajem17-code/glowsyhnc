@@ -683,7 +683,6 @@ function StepGender({ data, onChange, onNext, onBack }) {
           >
             <User size={40} className="mb-3" style={{ color: isMale ? '#60A5FA' : TEXT }} />
             <p className="font-heading font-bold text-[18px]" style={{ color: isMale ? '#60A5FA' : TEXT }}>Male</p>
-            <p className="font-body text-[11px] mt-1.5" style={{ color: DIM }}>Masculine model</p>
           </motion.button>
 
           {/* Female */}
@@ -699,7 +698,6 @@ function StepGender({ data, onChange, onNext, onBack }) {
           >
             <UserRound size={40} className="mb-3" style={{ color: isFemale ? '#F472B6' : TEXT }} />
             <p className="font-heading font-bold text-[18px]" style={{ color: isFemale ? '#F472B6' : TEXT }}>Female</p>
-            <p className="font-body text-[11px] mt-1.5" style={{ color: DIM }}>Feminine model</p>
           </motion.button>
         </div>
       </div>
