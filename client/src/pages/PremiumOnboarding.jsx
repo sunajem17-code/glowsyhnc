@@ -6,6 +6,7 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import TransformationScreen from '../components/TransformationScreen'
+import { StepRating, StepScoresWaiting, StepPaywall } from '../components/OnboardingFinalSteps'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 
@@ -1676,7 +1677,7 @@ export default function PremiumOnboarding() {
     setStep(s => s - 1)
   }
 
-  function finish() {
+  function finish(destination = '/') {
     const phase = calculatePhase(formData.goal, formData.height, formData.weight)
     setUserProfile({
       height: formData.height,
@@ -1704,7 +1705,7 @@ export default function PremiumOnboarding() {
       api.supabase.updateUser(profilePatch).catch(() => {})
     }
 
-    navigate('/')
+    navigate(typeof destination === 'string' ? destination : '/')
   }
 
   // Progress bar: steps 1–5
@@ -1766,7 +1767,8 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase, 7=transformation (final)
+  // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight,
+  //       6=phase, 7=transformation, 8=rating, 9=scores-waiting, 10=paywall (final → /scan)
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
@@ -1789,7 +1791,16 @@ export default function PremiumOnboarding() {
       onNext={goNext} onBack={goBack} units={units}
     />,
     <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
-    <TransformationScreen key="transformation" onNext={finish} />,
+    <TransformationScreen key="transformation" onNext={goNext} />,
+    <StepRating key="rating" onNext={goNext} />,
+    <StepScoresWaiting key="scores"
+      onAscend={goNext}
+      onInvite={() => finish('/referral')}
+    />,
+    <StepPaywall key="paywall"
+      onUnlocked={() => finish('/scan')}
+      onSkip={() => finish('/scan')}
+    />,
   ]
 
   return (
