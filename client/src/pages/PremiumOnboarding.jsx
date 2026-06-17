@@ -5,6 +5,7 @@ import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bo
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
+import TransformationScreen from '../components/TransformationScreen'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 
@@ -18,7 +19,7 @@ const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.35)'
 
-// Steps: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase
+// Steps: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=transformation, 7=phase
 // Progress bar: steps 1-5
 const TOTAL_QUIZ_STEPS = 5
 
@@ -1787,6 +1788,7 @@ export default function PremiumOnboarding() {
     <StepHeightWeight key="heightweight" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} units={units}
     />,
+    <TransformationScreen key="transformation" onNext={goNext} />,
     <StepPhaseResult key="phase" data={formData} onFinish={finish} />,
   ]
 
@@ -1806,7 +1808,7 @@ export default function PremiumOnboarding() {
       )}
 
       {/* Step counter */}
-      {showProgress && step < 6 && (
+      {showProgress && (
         <div className="absolute top-3 right-5 z-20">
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
             {step} / {TOTAL_QUIZ_STEPS}
