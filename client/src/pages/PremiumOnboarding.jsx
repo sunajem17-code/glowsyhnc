@@ -1372,7 +1372,7 @@ function StepPhaseResult({ data, onFinish }) {
       </div>
 
       <div className="pb-10 pt-4">
-        <GoldBtn label="Start My First Scan →" onClick={onFinish} />
+        <GoldBtn label="Continue →" onClick={onFinish} />
       </div>
     </div>
   )
@@ -1766,7 +1766,7 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // 5-step flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase
+  // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=phase, 7=transformation (final)
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
@@ -1788,8 +1788,8 @@ export default function PremiumOnboarding() {
     <StepHeightWeight key="heightweight" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} units={units}
     />,
-    <TransformationScreen key="transformation" onNext={goNext} />,
-    <StepPhaseResult key="phase" data={formData} onFinish={finish} />,
+    <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
+    <TransformationScreen key="transformation" onNext={finish} />,
   ]
 
   return (
