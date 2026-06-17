@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Star, Lock, Sparkles, UserPlus, Check, Loader2, ChevronRight } from 'lucide-react'
+import { Star, Sparkles, UserPlus, Check, Loader2, ChevronRight, Zap, Trophy, Eye, BarChart2 } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import useStore from '../store/useStore'
 import { purchasePro, isNative } from '../utils/iap'
+import logo from '../assets/ascendus-icon.png'
 
-// ── Design tokens (Ascendus) ───────────────────────────────────────────────────
 const G = '#C6A85C'
 const GOLD_GRAD = 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)'
 const BG = '#080808'
 const TEXT = '#F0EDE8'
-const DIM = 'rgba(255,255,255,0.4)'
-const BORDER = 'rgba(255,255,255,0.08)'
+const DIM = 'rgba(255,255,255,0.38)'
+const SURFACE = 'rgba(255,255,255,0.04)'
 
 const APP_STORE_ID = '6744042195'
 const REVIEW_URL = `https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`
@@ -24,65 +24,99 @@ async function openAppStoreReview() {
     } else {
       window.open(REVIEW_URL, '_blank', 'noopener')
     }
-  } catch {
-    /* opening the store is best-effort */
-  }
+  } catch { /* best-effort */ }
 }
 
-// ── STEP: Leave a Rating ────────────────────────────────────────────────────────
+// ── STEP: Rating ─────────────────────────────────────────────────────────────────
 export function StepRating({ onNext }) {
   const [rated, setRated] = useState(false)
+  const [hovered, setHovered] = useState(-1)
 
   return (
     <div className="flex flex-col h-full" style={{ background: BG }}>
-      <div className="flex-1 flex flex-col justify-center px-6">
-        <motion.p
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          className="font-heading font-bold text-[11px] text-center tracking-[0.22em] mb-8"
-          style={{ color: DIM }}
-        >
-          LEAVE A RATING
-        </motion.p>
 
-        {/* Stars */}
-        <div className="flex justify-center gap-2 mb-10">
-          {[0, 1, 2, 3, 4].map(i => (
-            <motion.div
-              key={i}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1 + i * 0.08, type: 'spring', stiffness: 300, damping: 18 }}
-            >
-              <Star size={42} style={{ color: G, fill: G, filter: 'drop-shadow(0 0 12px rgba(198,168,92,0.55))' }} />
-            </motion.div>
-          ))}
-        </div>
+      {/* Top glow */}
+      <div style={{
+        position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+        width: 320, height: 320, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.12) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+
+        {/* Logo */}
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="mb-8"
+        >
+          <img src={logo} alt="Ascendus" style={{ width: 72, height: 72, mixBlendMode: 'lighten' }} />
+        </motion.div>
 
         <motion.h1
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          className="font-heading font-bold text-center text-[30px] leading-tight mb-5"
-          style={{ color: TEXT, letterSpacing: '-0.01em' }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="font-heading font-bold text-[32px] leading-tight mb-3"
+          style={{ color: TEXT, letterSpacing: '-0.02em' }}
         >
-          <span style={{ fontStyle: 'italic' }}>Ascendus</span> is the #1 App to Glow Up &amp; Looksmax.
+          Enjoying<br />Ascendus?
         </motion.h1>
 
         <motion.p
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-          className="font-body text-[14px] text-center leading-relaxed px-2"
-          style={{ color: DIM }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="font-body text-[14px] leading-relaxed mb-10"
+          style={{ color: DIM, maxWidth: 280 }}
         >
-          Your rating helps us serve you better and helps others discover their potential.
+          A quick rating takes 5 seconds and helps thousands of guys discover their potential.
         </motion.p>
+
+        {/* Interactive stars */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex gap-3 mb-10"
+        >
+          {[0,1,2,3,4].map(i => (
+            <motion.button
+              key={i}
+              whileTap={{ scale: 0.85 }}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(-1)}
+              onClick={async () => { setHovered(4); await openAppStoreReview(); setRated(true) }}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+            >
+              <Star
+                size={44}
+                style={{
+                  color: i <= (hovered >= 0 ? hovered : 4) ? G : 'rgba(255,255,255,0.12)',
+                  fill: i <= (hovered >= 0 ? hovered : 4) ? G : 'transparent',
+                  filter: i <= (hovered >= 0 ? hovered : 4) ? 'drop-shadow(0 0 10px rgba(198,168,92,0.6))' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              />
+            </motion.button>
+          ))}
+        </motion.div>
+
       </div>
 
-      <div className="px-6 pb-10 pt-4 flex flex-col gap-3">
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-3">
         <motion.button
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
           whileTap={{ scale: 0.97 }}
           onClick={async () => { await openAppStoreReview(); setRated(true) }}
-          className="w-full py-4 rounded-full font-heading font-bold text-[16px] flex items-center justify-center gap-2.5"
-          style={{ background: '#FFFFFF', color: '#0A0A0A', boxShadow: '0 4px 24px rgba(255,255,255,0.2)' }}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          <Star size={18} style={{ fill: '#0A0A0A' }} /> Rate Ascendus
+          Rate Ascendus on the App Store
         </motion.button>
         <button
           onClick={onNext}
@@ -96,80 +130,132 @@ export function StepRating({ onNext }) {
   )
 }
 
-// ── STEP: Your Scores Are Waiting ───────────────────────────────────────────────
+// ── STEP: Scores Waiting ──────────────────────────────────────────────────────────
 export function StepScoresWaiting({ onAscend, onInvite }) {
-  const cards = [
-    { label: 'RATING' },
-    { label: 'POTENTIAL' },
-    { label: 'PSL SCORE' },
-    { label: 'TOP % LOOKS' },
+  const metrics = [
+    { icon: Trophy, label: 'Glow Score', value: '??', unit: '/10' },
+    { icon: Eye, label: 'PSL Rating', value: '??', unit: '' },
+    { icon: BarChart2, label: 'Top %', value: '??', unit: '' },
+    { icon: Zap, label: 'Potential', value: '??', unit: '' },
   ]
 
   return (
     <div className="flex flex-col h-full" style={{ background: BG }}>
-      <div className="flex-1 flex flex-col justify-center px-5">
-        <p className="font-mono text-[11px] tracking-[0.18em] mb-6" style={{ color: DIM }}>
-          YOUR ASCENDUS GUIDE
-        </p>
 
+      {/* Ambient glow */}
+      <div style={{
+        position: 'absolute', bottom: '30%', left: '50%', transform: 'translateX(-50%)',
+        width: 400, height: 400, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.07) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="flex-1 flex flex-col justify-center px-6">
+
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl p-6"
-          style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${BORDER}` }}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 mb-8"
         >
-          <div className="flex items-start justify-between mb-4">
-            <span className="font-mono text-[13px]" style={{ color: 'rgba(255,255,255,0.3)' }}>01</span>
-            <Lock size={18} style={{ color: 'rgba(255,255,255,0.35)' }} />
-          </div>
-
-          <h1 className="font-heading font-bold text-[34px] leading-[1.05] mb-7" style={{ color: TEXT }}>
-            YOUR SCORES<br />ARE WAITING.
-          </h1>
-
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {cards.map(({ label }) => (
-              <div
-                key={label}
-                className="rounded-2xl p-4 flex flex-col justify-between"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, minHeight: 92 }}
-              >
-                <span className="font-mono text-[10px] tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</span>
-                <div className="flex justify-start mt-3">
-                  <Lock size={18} style={{ color: 'rgba(255,255,255,0.25)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p className="font-body text-[14px]" style={{ color: DIM }}>
-            See where you rank. Know exactly what to fix.
-          </p>
+          <img src={logo} alt="" style={{ width: 28, height: 28, mixBlendMode: 'lighten', opacity: 0.85 }} />
+          <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
+            ASCENDUS ANALYSIS
+          </span>
         </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="font-heading font-bold text-[38px] leading-[1.0] mb-3"
+          style={{ color: TEXT, letterSpacing: '-0.025em' }}
+        >
+          Your results<br />are ready.
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="font-body text-[14px] mb-8"
+          style={{ color: DIM }}
+        >
+          Unlock to see exactly where you rank and what to improve first.
+        </motion.p>
+
+        {/* Metric cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="grid grid-cols-2 gap-3 mb-6"
+        >
+          {metrics.map(({ icon: Icon, label, value, unit }, i) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 + i * 0.07 }}
+              className="rounded-2xl p-4"
+              style={{
+                background: 'rgba(198,168,92,0.05)',
+                border: '1px solid rgba(198,168,92,0.15)',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Icon size={14} style={{ color: G }} />
+                <span className="font-heading text-[10px] tracking-wide font-bold" style={{ color: 'rgba(198,168,92,0.7)' }}>
+                  {label}
+                </span>
+              </div>
+              {/* Blurred value */}
+              <div className="flex items-end gap-0.5">
+                <span
+                  className="font-heading font-bold text-[28px] leading-none select-none"
+                  style={{ color: TEXT, filter: 'blur(8px)', userSelect: 'none' }}
+                >
+                  {value}
+                </span>
+                <span className="font-heading font-bold text-[14px] mb-0.5" style={{ color: DIM, filter: 'blur(6px)' }}>
+                  {unit}
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
       </div>
 
-      <div className="px-5 pb-10 pt-4 flex flex-col gap-3">
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-3">
         <motion.button
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
           whileTap={{ scale: 0.97 }}
           onClick={onAscend}
-          className="w-full py-4 rounded-full font-heading font-bold text-[16px] flex items-center justify-center gap-2"
-          style={{ background: '#FFFFFF', color: '#0A0A0A', boxShadow: '0 4px 24px rgba(255,255,255,0.18)' }}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          <Sparkles size={17} style={{ color: '#0A0A0A' }} /> Glow Up Now
+          <Sparkles size={16} style={{ color: '#0A0A0A' }} /> Unlock My Results
         </motion.button>
         <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
           whileTap={{ scale: 0.97 }}
           onClick={onInvite}
-          className="w-full py-4 rounded-full font-heading font-semibold text-[15px] flex items-center justify-center gap-2"
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.14)`, color: TEXT }}
+          className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[14px] flex items-center justify-center gap-2"
+          style={{ background: SURFACE, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
         >
-          <UserPlus size={16} /> Invite 3 Friends
+          <UserPlus size={15} /> Invite 3 Friends — Get Free Access
         </motion.button>
       </div>
     </div>
   )
 }
 
-// ── STEP: Paywall (payment plan + 3-day free trial) ─────────────────────────────
+// ── STEP: Paywall ─────────────────────────────────────────────────────────────────
 export function StepPaywall({ onUnlocked, onSkip }) {
   const [plan, setPlan] = useState('annual')
   const [loading, setLoading] = useState(false)
@@ -178,10 +264,10 @@ export function StepPaywall({ onUnlocked, onSkip }) {
   const startProTrial = useStore(s => s.startProTrial)
 
   const benefits = [
-    'Your AI Glow Score + full face metrics',
-    'Celebrity lookalike matches',
-    'Personalized 12-week glow-up plan',
-    'AI improvement coach',
+    { icon: Trophy, text: 'Full AI Glow Score + face breakdown' },
+    { icon: Eye, text: 'Celebrity lookalike matches' },
+    { icon: Zap, text: 'Personalized 12-week glow-up plan' },
+    { icon: BarChart2, text: 'AI improvement coach & weekly check-ins' },
   ]
 
   async function startTrial() {
@@ -190,14 +276,9 @@ export function StepPaywall({ onUnlocked, onSkip }) {
     try {
       if (isNative()) {
         const result = await purchasePro(plan)
-        if (result?.success) {
-          setIsPremium(true)
-          onUnlocked()
-        } else {
-          setLoading(false) // cancelled — stay on paywall
-        }
+        if (result?.success) { setIsPremium(true); onUnlocked() }
+        else setLoading(false)
       } else {
-        // Web / preview: grant the local Pro trial so the flow is testable
         startProTrial()
         onUnlocked()
       }
@@ -208,95 +289,172 @@ export function StepPaywall({ onUnlocked, onSkip }) {
     }
   }
 
+  async function buyNow() {
+    setLoading(true)
+    setError('')
+    try {
+      if (isNative()) {
+        const result = await purchasePro(plan)
+        if (result?.success) { setIsPremium(true); onUnlocked() }
+        else setLoading(false)
+      } else {
+        startProTrial()
+        onUnlocked()
+      }
+    } catch (err) {
+      const msg = (err?.message || '').toLowerCase()
+      if (!msg.includes('cancel')) setError('Unable to complete purchase. Please try again.')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full" style={{ background: BG }}>
-      <div className="flex-1 overflow-y-auto px-6 pt-16 pb-4 flex flex-col">
-        <div className="flex justify-center mb-5">
+
+      {/* Top gold glow */}
+      <div style={{
+        position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
+        width: 300, height: 300, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.15) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="flex-1 overflow-y-auto px-6 pt-14 pb-4 flex flex-col">
+
+        {/* Crown + badge */}
+        <div className="flex flex-col items-center mb-8">
+          <motion.img
+            src={logo}
+            alt="Ascendus"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 18 }}
+            style={{ width: 64, height: 64, mixBlendMode: 'lighten', marginBottom: 14 }}
+          />
           <div
-            className="px-4 py-1.5 rounded-full font-heading font-bold text-[11px] tracking-widest"
-            style={{ background: 'rgba(198,168,92,0.12)', border: `1px solid rgba(198,168,92,0.3)`, color: G }}
+            className="px-5 py-1.5 rounded-full font-heading font-bold text-[11px] tracking-widest"
+            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)', color: G }}
           >
             ASCENDUS PRO
           </div>
         </div>
 
-        <h1 className="font-heading font-bold text-center text-[27px] leading-tight mb-2" style={{ color: TEXT }}>
-          Unlock your full potential.
-        </h1>
-        <p className="font-body text-[13px] text-center mb-6" style={{ color: DIM }}>
-          Start free. Cancel anytime before it ends.
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="font-heading font-bold text-[30px] leading-tight text-center mb-1"
+          style={{ color: TEXT, letterSpacing: '-0.02em' }}
+        >
+          Start your glow-up<br />for free.
+        </motion.h1>
+        <p className="font-body text-[13px] text-center mb-7" style={{ color: DIM }}>
+          3 days free · cancel anytime
         </p>
 
         {/* Benefits */}
-        <div className="flex flex-col gap-2.5 mb-7">
-          {benefits.map(b => (
-            <div key={b} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(198,168,92,0.15)' }}>
-                <Check size={12} style={{ color: G }} />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-col gap-3 mb-7"
+        >
+          {benefits.map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
+              >
+                <Icon size={14} style={{ color: G }} />
               </div>
-              <span className="font-body text-[13.5px]" style={{ color: 'rgba(255,255,255,0.78)' }}>{b}</span>
+              <span className="font-body text-[13.5px]" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</span>
             </div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Plan toggle */}
-        <div className="rounded-2xl p-1 mb-4" style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${BORDER}` }}>
-          <div className="grid grid-cols-2 gap-1">
-            {[
-              { key: 'monthly', label: 'Monthly', price: '$7.99/mo' },
-              { key: 'annual', label: 'Annual', price: '$4.17/mo', badge: 'SAVE 48%' },
-            ].map(({ key, label, price, badge }) => (
-              <button
-                key={key}
-                onClick={() => setPlan(key)}
-                className="py-3 rounded-xl text-center transition-all"
-                style={{
-                  background: plan === key ? 'rgba(198,168,92,0.18)' : 'transparent',
-                  border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
-                }}
-              >
-                <p className="text-[11px] font-heading font-bold leading-none mb-1"
-                  style={{ color: plan === key ? G : 'rgba(255,255,255,0.35)' }}>
-                  {label}{badge && plan === key ? ` · ${badge}` : ''}
-                </p>
-                <p className="text-[14px] font-mono font-bold"
-                  style={{ color: plan === key ? TEXT : 'rgba(255,255,255,0.3)' }}>
-                  {price}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-2 gap-2 mb-5"
+        >
+          {[
+            { key: 'monthly', label: 'Monthly', price: '$7.99', per: '/mo', badge: null },
+            { key: 'annual', label: 'Annual', price: '$4.17', per: '/mo', badge: 'SAVE 48%' },
+          ].map(({ key, label, price, per, badge }) => (
+            <button
+              key={key}
+              onClick={() => setPlan(key)}
+              className="py-4 rounded-2xl text-center relative overflow-hidden transition-all"
+              style={{
+                background: plan === key ? 'rgba(198,168,92,0.12)' : SURFACE,
+                border: `1.5px solid ${plan === key ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
+              }}
+            >
+              {badge && (
+                <div
+                  className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-heading font-bold"
+                  style={{ background: G, color: '#000' }}
+                >
+                  {badge}
+                </div>
+              )}
+              <p className="font-heading font-bold text-[11px] mb-1"
+                style={{ color: plan === key ? G : 'rgba(255,255,255,0.35)' }}>
+                {label}
+              </p>
+              <p className="font-heading font-bold text-[22px] leading-none"
+                style={{ color: plan === key ? TEXT : 'rgba(255,255,255,0.55)' }}>
+                {price}
+                <span className="text-[12px] font-normal">{per}</span>
+              </p>
+            </button>
+          ))}
+        </motion.div>
 
         <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
           whileTap={{ scale: loading ? 1 : 0.97 }}
           onClick={startTrial}
           disabled={loading}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
-          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.35)' }}
+          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.4)' }}
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
           {loading ? 'Starting…' : 'Start 3-Day Free Trial'}
         </motion.button>
 
-        <p className="text-center text-[10.5px] font-body mt-3" style={{ color: 'rgba(255,255,255,0.25)' }}>
-          {isNative()
-            ? '$0 today · then billed to your Apple ID after 3 days · cancel anytime'
-            : `$0 today · then ${plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$7.99/mo'} · cancel anytime`}
+        <p className="text-center text-[10.5px] font-body mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          $0 today · cancel anytime
         </p>
+
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          whileTap={{ scale: loading ? 1 : 0.97 }}
+          onClick={buyNow}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70 mt-3"
+          style={{ background: 'transparent', border: `1.5px solid rgba(198,168,92,0.4)`, color: G }}
+        >
+          {loading ? 'Processing…' : `Buy Now · ${plan === 'annual' ? '$49.99/yr' : '$7.99/mo'}`}
+        </motion.button>
 
         {error && <p className="text-center text-[11px] font-body mt-2" style={{ color: '#EF4444' }}>{error}</p>}
       </div>
 
-      <div className="px-6 pb-10 pt-2 flex-shrink-0">
+      <div className="px-6 pb-10 pt-1 flex-shrink-0">
         <button
           onClick={onSkip}
           disabled={loading}
           className="w-full py-2 font-body text-[13px] text-center flex items-center justify-center gap-1 transition-opacity hover:opacity-70 disabled:opacity-40"
           style={{ color: DIM }}
         >
-          Maybe later <ChevronRight size={14} />
+          Maybe later <ChevronRight size={13} />
         </button>
       </div>
     </div>
