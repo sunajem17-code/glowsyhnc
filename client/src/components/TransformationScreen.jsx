@@ -3,12 +3,8 @@ import { motion } from 'framer-motion'
 
 const GOLD = '#d4af37'
 
-// To use real photos: replace BEFORE_IMG / AFTER_IMG with imported assets:
-//   import beforeImg from '../assets/transformations/before.jpg'
-//   import afterImg  from '../assets/transformations/after.jpg'
-// and swap the constants below.
-const BEFORE_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231a1a2e'/%3E%3Cstop offset='1' stop-color='%2316213e'/%3E%3C/linearGradient%3E%3Crect width='400' height='533' fill='url(%23g)'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='18' fill='rgba(255,255,255,0.3)' text-anchor='middle' dy='.35em'%3EBEFORE%3C/text%3E%3C/svg%3E"
-const AFTER_IMG  = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%230f3460'/%3E%3Cstop offset='1' stop-color='%23533483'/%3E%3C/linearGradient%3E%3Crect width='400' height='533' fill='url(%23g)'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='18' fill='rgba(255,255,255,0.3)' text-anchor='middle' dy='.35em'%3EAFTER%3C/text%3E%3C/svg%3E"
+import BEFORE_IMG from '../assets/transformations/before.jpg'
+import AFTER_IMG  from '../assets/transformations/after.jpg'
 
 const STATS = [
   { num: '12K+', label: 'Members' },
