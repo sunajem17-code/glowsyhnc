@@ -314,6 +314,77 @@ Return ONLY this JSON — no markdown, nothing else:
   return parseJSON(response.content[0]?.text?.trim() || '', 'Face scorer')
 }
 
+// ── CALL 2: Physique Scoring (optional — only when bodyImage provided) ────────
+async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male') {
+  const client = getClient()
+  const isFemale = gender === 'female'
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 600,
+    system: `You are a physique and body composition analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
+
+Score physique on a 1.0–10.0 scale across 5 categories.
+
+${isFemale ? `FEMALE PHYSIQUE SCORING:
+- proportions: Waist-to-hip ratio, shoulder width, leg/torso balance, overall silhouette harmony. High score: defined waist, proportional hips/shoulders.
+- leanness: Visible muscle separation or toning, absence of excess body fat. Does NOT require extreme leanness — healthy athletic tone is 7+.
+- frame: Bone structure and natural body frame size. Shoulder width, hip structure, limb length relative to torso.
+- posture: Spine alignment, shoulder position, head position. Forward head, rounded shoulders = low score. Upright, open chest = high score.
+- overall_presentation: Grooming, clothing fit, how well the body is presented in the photo. Clean presentation with well-fitted clothing = high score.` :
+`MALE PHYSIQUE SCORING:
+- proportions: Shoulder-to-waist ratio (V-taper), chest-to-hip ratio, limb symmetry, overall silhouette. High score: wide shoulders, narrow waist, balanced limbs.
+- leanness: Visible muscle definition or separation. Body fat level. Does NOT require stage-lean — visible abs or clear muscle definition is 7+. Soft/no definition = below 5.
+- frame: Bone structure. Shoulder width, clavicle length, wrist size, natural frame. Wide natural frame = high score regardless of muscle.
+- posture: Spine alignment, shoulder position, chest position. Rounded forward posture = low score. Upright, chest out = high score.
+- overall_presentation: Grooming, clothing fit, how well the body is presented. Clean presentation = high score.`}
+
+SCORING RULES:
+- Use the FULL 1–10 range. Do not cluster around 5–6.
+- Score based only on what is VISIBLE in the photo. If the body is partially hidden by clothing, score what you can see and note it.
+- Never penalize for natural body type — score relative to ideal proportions for that body type.
+- Body fat levels: very_lean / lean / average / above_average / heavy
+
+Return ONLY this JSON — no markdown, nothing else:
+{
+  "proportions": <number 1.0–10.0>,
+  "leanness": <number 1.0–10.0>,
+  "frame": <number 1.0–10.0>,
+  "posture": <number 1.0–10.0>,
+  "overall_presentation": <number 1.0–10.0>,
+  "body_fat_level": "<very_lean|lean|average|above_average|heavy>",
+  "physique_strengths": ["<strength 1>", "<strength 2>"],
+  "physique_improvements": ["<improvement 1>", "<improvement 2>"],
+  "physique_notes": "<one sentence summary of physique, max 15 words>"
+}`,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
+        { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique. Return ONLY the JSON.` },
+      ],
+    }],
+  })
+
+  const raw = response.content[0]?.text?.trim() || ''
+  const parsed = parseJSON(raw, 'Physique scorer')
+  const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
+  const overall = (clamp(parsed.proportions) + clamp(parsed.leanness) + clamp(parsed.frame) + clamp(parsed.posture) + clamp(parsed.overall_presentation)) / 5
+
+  return {
+    proportions:          Math.round(clamp(parsed.proportions)         * 10) / 10,
+    leanness:             Math.round(clamp(parsed.leanness)            * 10) / 10,
+    frame:                Math.round(clamp(parsed.frame)               * 10) / 10,
+    posture:              Math.round(clamp(parsed.posture)             * 10) / 10,
+    overall_presentation: Math.round(clamp(parsed.overall_presentation)* 10) / 10,
+    overall:              Math.round(overall                           * 10) / 10,
+    body_fat_level:       parsed.body_fat_level ?? 'average',
+    physique_strengths:   Array.isArray(parsed.physique_strengths)   ? parsed.physique_strengths   : [],
+    physique_improvements:Array.isArray(parsed.physique_improvements) ? parsed.physique_improvements : [],
+    physique_notes:       parsed.physique_notes ?? null,
+  }
+}
+
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
 // Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
 // Uses claude-haiku-4-5. Now accepts gender to provide appropriate pools.
@@ -426,10 +497,12 @@ ${isFemale ? `FEMALE POOLS — use ONLY these female celebrities. Match skin ton
     Lucky Blue Smith, David Gandy, Jon Kortajarena, Sean O'Pry, Tyler Cameron, Jordan Barrett
   FITNESS/SOCIAL (any ethnicity): Jeff Seid, David Laid, Ryan Terry, Simeon Panda, Ulisses Jr,
     Steve Cook, Lazar Angelov, Noah Beck, Vinnie Hacker, Chase Hudson, Bryce Hall, MrBeast
-  BLACK/MIXED (actors/athletes/musicians): Michael B Jordan, Idris Elba, Winston Duke, Kofi Siriboe,
+  BLACK/MIXED (actors/athletes/musicians/comedians): Michael B Jordan, Idris Elba, Winston Duke, Kofi Siriboe,
     Mahershala Ali, John Boyega, Dwayne Johnson, Drake, Travis Scott, The Weeknd, ASAP Rocky,
     LeBron James, Steph Curry, Ja Morant, Devin Booker, Giannis Antetokounmpo,
-    Anthony Joshua, KSI, Israel Adesanya, Kevin Hart, Kai Cenat
+    Anthony Joshua, KSI, Israel Adesanya, Kevin Hart, Kai Cenat, Druski, DC Young Fly,
+    Karlous Miller, Lil Duval, Affion Crockett, Aries Spears, Lil Rel Howery, Roy Wood Jr,
+    Mike Epps, Chris Tucker, Eddie Murphy, Dave Chappelle, Katt Williams
   ASIAN/INTERNATIONAL: BTS (V/Jin/Jungkook/RM/Suga/J-Hope/Jimin), Park Seo-jun, Song Joong-ki,
     Lee Jong-suk, Lee Min-ho, Godfrey Gao, Simu Liu, Steven Yeun
   LATINO/MIDDLE EASTERN: Bad Bunny, Maluma, J Balvin, Ozuna, Neymar, Kylian Mbappé,
@@ -437,7 +510,7 @@ ${isFemale ? `FEMALE POOLS — use ONLY these female celebrities. Match skin ton
   SOUTH ASIAN: Hrithik Roshan, Ranveer Singh, Shahid Kapoor, Tiger Shroff, Vidyut Jammwal,
     Dev Patel, Riz Ahmed`}
 
-${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST ══
+${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST (do this before naming anyone) ══
 1. SKIN TONE: pale / light / medium / tan / brown / dark-brown / deep-dark
 2. FACE SHAPE: oval / round / square / oblong / diamond / heart / triangle
 3. JAW: sharp-angular / moderate / soft-rounded / wide-square / recessed
@@ -451,9 +524,11 @@ ${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST ══
 ══ STEP 2: MATCHING RULES ══
 - SKIN TONE IS NON-NEGOTIABLE: never match across more than one skin tone category.
 - FACE SHAPE MUST MATCH: round face → only round-faced matches. Sharp angular jaw → only angular matches.
-- CATEGORY IS OPEN: if bone structure matches a model better than an actor, return the model. If they look like an athlete, return the athlete.
+- CATEGORY IS OPEN: actors, athletes, comedians, streamers, YouTubers, influencers — whoever structurally matches best. Do NOT default to famous actors when a less-famous person is the better structural match.
+- THINK BROADLY: if the person has a round full face, think Kevin Hart / Druski / Jonah Hill tier, not Idris Elba. Match the structure, not the fame.
 - SIMILARITY must be honest: 70–78% = strong (multiple features align), 60–69% = good, 55–59% = moderate. Never 80%+ unless near-identical.
-- SHARED TRAITS: name at least 2 specific anatomical features (e.g. "matching high cheekbones, almond eyes, oval face"). Never use "vibe", "energy", or "look".
+- SHARED TRAITS: name at least 2 specific anatomical features (e.g. "matching wide flat nose, round full face, full lips"). Never use "vibe", "energy", or "look".
+- REQUIRED: You MUST return 3 distinct real people with full names. No placeholders, no "Unknown Person", no made-up names.
 
 ══ STEP 3: OUTPUT ══
 Return ONLY this JSON — no markdown, no explanation, nothing else:
@@ -624,7 +699,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { faceImage, sideImage, gender = 'male' } = req.body
+    const { faceImage, sideImage, bodyImage, gender = 'male' } = req.body
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -636,6 +711,10 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     // Side profile (optional)
     const sideBase64    = sideImage ? stripPrefix(sideImage)  : null
     const sideMediaType = sideImage ? getMediaType(sideImage) : null
+
+    // Body/physique photo (optional)
+    const bodyBase64    = bodyImage ? stripPrefix(bodyImage)  : null
+    const bodyMediaType = bodyImage ? getMediaType(bodyImage) : null
 
     // ── L1: in-process memory cache ───────────────────────────────────────────
     const cacheKey = hashImages(faceBase64, 'FACE_ONLY', sideBase64)
@@ -661,15 +740,23 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     let faceResult, celebResult, computedScores
 
     try {
-      // Run face scoring and celebrity matching in parallel — cuts latency roughly in half
-      console.log('[aiScore] Starting face + celebrity in parallel...')
+      // Run face scoring, celebrity matching, and physique scoring in parallel
+      console.log('[aiScore] Starting face + celebrity + physique in parallel...')
       console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-      ;[faceResult, celebResult] = await Promise.all([
+      console.log('[aiScore] Body photo:', bodyBase64 ? 'YES' : 'NO')
+      let physiqueResult = null
+      ;[faceResult, celebResult, physiqueResult] = await Promise.all([
         withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face'),
         withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, null, null), 'celebrity').catch(err => {
           console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
           return null
         }),
+        bodyBase64
+          ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique').catch(err => {
+              console.warn('[aiScore] Physique scoring failed (non-fatal):', err.message)
+              return null
+            })
+          : Promise.resolve(null),
       ])
       computedScores = calculateFinalScore(faceResult, gender)
     } finally {
@@ -747,6 +834,9 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,
       profileData:    faceResult.profile ?? null,
+      // Physique — null when no body photo was provided
+      physiqueScore:  physiqueResult ?? null,
+      bodyFatLevel:   physiqueResult?.body_fat_level ?? null,
     }
 
     // ── Write to both caches (L1 in-memory + L2 Supabase) ─────────────────────

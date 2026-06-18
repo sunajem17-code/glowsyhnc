@@ -430,12 +430,13 @@ function AnalyzingScreen({ currentStep, slow }) {
 }
 
 // ─── Main Scan Page ───────────────────────────────────────────────────────────
-// Steps: 0=gender  1=face  2=side-profile  3=analyzing
+// Steps: 0=gender  1=face  2=side-profile  3=body  4=analyzing
 
 const STEP_META = [
   { title: 'Select Gender',  subtitle: 'For accurate Overall Rating results' },
   { title: 'Face Photo',     subtitle: 'Take your photo' },
   { title: 'Side Profile',   subtitle: 'Optional · Unlocks profile analysis' },
+  { title: 'Body Photo',     subtitle: 'Optional · Unlocks physique score' },
 ]
 
 export default function Scan() {
@@ -459,6 +460,7 @@ export default function Scan() {
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
+  const [bodyPhoto, setBodyPhoto]         = useState(null)
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
   const [error, setError]                 = useState('')
@@ -519,19 +521,21 @@ export default function Scan() {
   }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
-  async function startAnalysis(skipSideOverride = false) {
+  async function startAnalysis(skipSideOverride = false, skipBodyOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
     const skipSide = skipSideOverride
+    const skipBody = skipBodyOverride
     const g        = gender ?? 'male'
     setGender(g)
-    setStep(3)  // analyzing
+    setStep(4)  // analyzing
     setError('')
     setAnalysisStep(0)
 
     try {
       const faceB64 = await toBase64(facePhoto)
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
+      const bodyB64 = (!skipBody && bodyPhoto) ? await toBase64(bodyPhoto) : null
 
       setAnalysisStep(1)
       setSlowAnalysis(false)
@@ -543,6 +547,7 @@ export default function Scan() {
         const scoreCall = api.ai.score({
           faceImage: faceB64,
           ...(sideB64 ? { sideImage: sideB64 } : {}),
+          ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
           gender: g,
         })
         const timeoutCall = new Promise((_, reject) =>
@@ -583,6 +588,8 @@ export default function Scan() {
         },
         pillars:          aiResult.pillars         ?? null,
         celebrityMatches: aiResult.celebrityMatches ?? null,
+        physiqueScore:    aiResult.physiqueScore    ?? null,
+        bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
       }
 
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
@@ -621,21 +628,21 @@ export default function Scan() {
       if (err.message === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
-        setStep(2)
+        setStep(3)
       } else if (err.message === 'rate_limited') {
         setRateLimited(true)
         setRetryCountdown(err.retryAfter || 60)
-        setStep(2)
+        setStep(3)
       } else {
         setError('Analysis unavailable right now. Please try again in a minute.')
-        setStep(2)
+        setStep(3)
       }
     }
   }
 
   startAnalysisRef.current = startAnalysis
 
-  const isAnalyzing = step === 3
+  const isAnalyzing = step === 4
 
   if (showConsent) {
     return (
@@ -659,11 +666,11 @@ export default function Scan() {
         <PageHeader title={STEP_META[step]?.title ?? ''} subtitle={STEP_META[step]?.subtitle ?? ''} back={step > 0} />
       )}
 
-      {/* Progress bar (photo steps 1–2) */}
-      {step >= 1 && step <= 2 && (
+      {/* Progress bar (photo steps 1–3) */}
+      {step >= 1 && step <= 3 && (
         <div className="px-4 pb-3">
           <div className="flex gap-2">
-            {[1, 2].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="flex-1 h-1 rounded-full transition-colors duration-300"
                 style={{ background: i <= step ? '#C6A85C' : 'var(--border)' }} />
             ))}
@@ -671,7 +678,9 @@ export default function Scan() {
           <p className="text-xs text-secondary font-body mt-1.5">
             {step === 1
               ? 'Neutral expression · Face centered · Good lighting · No harsh shadows'
-              : 'Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera'}
+              : step === 2
+              ? 'Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera'
+              : 'Full body visible · Stand straight · Good lighting · Fitted clothing'}
           </p>
         </div>
       )}
@@ -687,6 +696,42 @@ export default function Scan() {
           {step === 1 && (
             <motion.div key="face" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => setFacePhoto(url)} />
+            </motion.div>
+          )}
+          {step === 3 && (
+            <motion.div key="body" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
+              <div className="mx-4 mb-1 px-3 py-2 rounded-xl flex items-start gap-2.5"
+                style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.2)' }}>
+                <Zap size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#C6A85C' }} />
+                <div>
+                  <p className="text-[11px] font-heading font-bold text-primary leading-snug">Unlocks Physique Score</p>
+                  <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">
+                    Proportions · Leanness · Frame · Posture · Presentation
+                  </p>
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+                  style={{ background: 'rgba(198,168,92,0.15)', color: '#C6A85C' }}>
+                  OPTIONAL
+                </span>
+              </div>
+              <div className="mx-4 mb-3 grid grid-cols-2 gap-2">
+                {[
+                  { icon: '🧍', text: 'Full body visible' },
+                  { icon: '📏', text: 'Stand straight' },
+                  { icon: '👕', text: 'Fitted clothing' },
+                  { icon: '☀️', text: 'Natural lighting' },
+                ].map(({ icon, text }) => (
+                  <div key={text} className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                    <span className="text-sm">{icon}</span>
+                    <span className="text-[11px] font-body text-primary">{text}</span>
+                  </div>
+                ))}
+              </div>
+              <PhotoUploadStep stepNum={3}
+                guide="Stand facing the camera. Full body visible from head to feet. Good lighting, fitted clothing for accurate physique scoring."
+                photo={bodyPhoto}
+                onPhoto={url => { setBodyPhoto(url); setError('') }} />
             </motion.div>
           )}
           {step === 2 && (
@@ -842,21 +887,19 @@ export default function Scan() {
             </button>
           )}
 
-          {/* Step 2: side profile */}
+          {/* Step 2: side profile → advance to body step */}
           {step === 2 && (
             <>
-              {/* Full Scan — solid gold border + glow */}
               <button
-                onClick={() => startAnalysis(false)}
+                onClick={() => { if (sidePhoto) { setStep(3); setError('') } }}
                 className="btn-amber"
                 disabled={!sidePhoto}
                 style={!sidePhoto ? { opacity: 0.55 } : {}}
               >
-                {sidePhoto ? '✦ Full Scan — Analyze Now' : 'Take or upload side profile first'}
+                {sidePhoto ? 'Continue →' : 'Take or upload side profile first'}
               </button>
-              {/* Skip Side Profile — thicker gold border, 16px vertical padding, glow */}
               <button
-                onClick={() => startAnalysis(true)}
+                onClick={() => { setStep(3); setError('') }}
                 className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
                 style={{
                   border: '3px solid #C9A84C',
@@ -872,7 +915,42 @@ export default function Scan() {
                     Skip Side Profile
                   </p>
                   <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Analyze face only (Basic Scan)
+                    Continue without side profile
+                  </p>
+                </div>
+              </button>
+            </>
+          )}
+
+          {/* Step 3: body photo */}
+          {step === 3 && (
+            <>
+              <button
+                onClick={() => startAnalysis(!sidePhoto, false)}
+                className="btn-amber"
+                disabled={!bodyPhoto}
+                style={!bodyPhoto ? { opacity: 0.55 } : {}}
+              >
+                {bodyPhoto ? '✦ Full Scan — Analyze Now' : 'Take or upload body photo first'}
+              </button>
+              <button
+                onClick={() => startAnalysis(!sidePhoto, true)}
+                className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
+                style={{
+                  border: '3px solid #C9A84C',
+                  background: 'rgba(201,168,76,0.04)',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  boxShadow: '0 0 16px rgba(201,168,76,0.4)',
+                }}
+              >
+                <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
+                <div className="text-left">
+                  <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
+                    Skip Body Photo
+                  </p>
+                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    Analyze face only
                   </p>
                 </div>
               </button>

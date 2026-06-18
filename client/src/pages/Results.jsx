@@ -1213,6 +1213,7 @@ export default function Results() {
   const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches } = currentScan
   const glowScore = currentScan.glowScore != null ? (currentScan.glowScore > 10 ? Math.round(currentScan.glowScore) / 10 : currentScan.glowScore) : null
   const pillars = scanPillars ?? aiScore?.pillars ?? null
+  const physiqueScore = currentScan.physiqueScore ?? aiScore?.physiqueScore ?? null
 
   const profileData      = aiScore?.profileData   ?? null
   const profileScore     = aiScore?.profileScore  ?? null
@@ -1939,6 +1940,67 @@ export default function Results() {
               {((pillars.harmony + pillars.angularity + pillars.features + pillars.dimorphism) / 4).toFixed(1)}/10
             </p>
           </div>
+        </Section>
+      )}
+
+      {/* ── Physique Score ───────────────────────────────────────── */}
+      {physiqueScore && (
+        <Section title="Physique Rating" icon={<Zap size={16} style={{ color: '#C6A85C' }} />} defaultOpen={true}>
+          <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
+            Physique scored across 5 categories from your body photo.
+          </p>
+          <div className="space-y-0">
+            {[
+              { key: 'proportions',          label: 'Proportions',     score: physiqueScore.proportions,          desc: gender === 'female' ? 'Waist-to-hip ratio, shoulder balance, overall silhouette.' : 'Shoulder-to-waist V-taper, chest-to-hip ratio, limb symmetry.' },
+              { key: 'leanness',             label: 'Leanness',        score: physiqueScore.leanness,             desc: 'Visible muscle definition and body fat level.' },
+              { key: 'frame',                label: 'Frame',           score: physiqueScore.frame,                desc: 'Natural bone structure, shoulder width, and clavicle length.' },
+              { key: 'posture',              label: 'Posture',         score: physiqueScore.posture,              desc: 'Spine alignment, shoulder position, and overall stance.' },
+              { key: 'overall_presentation', label: 'Presentation',    score: physiqueScore.overall_presentation, desc: 'Grooming, clothing fit, and how the physique is presented.' },
+            ].map(({ key, label, score: rawScore, desc }) => {
+              const score = rawScore ?? 5.0
+              const color = score >= 7 ? '#34C759' : score >= 5 ? '#F5A623' : '#E07A5F'
+              const pct = ((score - 1) / 9) * 100
+              return (
+                <div key={key} className="py-3 border-b border-default last:border-0">
+                  <div className="flex items-center gap-3 mb-1.5">
+                    {isPremium ? (
+                      <div className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0"
+                        style={{ color, background: score >= 7 ? 'rgba(52,199,89,0.12)' : score >= 5 ? 'rgba(245,166,35,0.12)' : 'rgba(224,122,95,0.12)' }}>
+                        {score.toFixed(1)}
+                      </div>
+                    ) : (
+                      <div className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0 select-none cursor-pointer"
+                        style={{ color, background: 'rgba(245,166,35,0.12)', filter: 'blur(5px)' }}
+                        onClick={() => navigate('/premium')}>
+                        {score.toFixed(1)}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-heading font-bold text-primary">{label}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden" style={!isPremium ? { filter: 'blur(3px)', cursor: 'pointer' } : {}} onClick={!isPremium ? () => navigate('/premium') : undefined}>
+                          <motion.div className="h-full rounded-full" style={{ background: color }}
+                            initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: 'easeOut' }} />
+                        </div>
+                        <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: isPremium ? color : 'transparent' }}>/10</span>
+                      </div>
+                    </div>
+                  </div>
+                  {isPremium
+                    ? <p className="text-[10px] text-secondary font-body leading-relaxed mt-1" style={{ paddingLeft: '60px' }}>{desc}</p>
+                    : <div style={{ paddingLeft: '60px' }}><ProText text={desc} onUpgrade={() => navigate('/premium')} /></div>
+                  }
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 pt-3 border-t border-default flex items-center justify-between">
+            <p className="text-[10px] font-heading font-bold text-secondary uppercase tracking-wide">Physique Score (avg)</p>
+            <p className="text-sm font-mono font-bold text-primary">{physiqueScore.overall?.toFixed(1) ?? '—'}/10</p>
+          </div>
+          {physiqueScore.physique_notes && isPremium && (
+            <p className="text-[10px] text-secondary font-body mt-2 leading-relaxed italic">{physiqueScore.physique_notes}</p>
+          )}
         </Section>
       )}
 
