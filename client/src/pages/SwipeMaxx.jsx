@@ -67,9 +67,9 @@ export default function SwipeMaxx() {
 
   async function handleNativePhoto() {
     try {
-      const photo = await pickPhoto()
-      if (!photo) return
-      setPhotos(prev => [...prev, { url: photo.dataUrl, base64: photo.base64, mediaType: 'image/jpeg' }])
+      const dataUrl = await pickPhoto()
+      if (!dataUrl) return
+      setPhotos(prev => [...prev, { url: dataUrl, base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' }])
     } catch {}
   }
 

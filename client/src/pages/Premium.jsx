@@ -79,7 +79,10 @@ export default function Premium() {
     try {
       if (isNative()) {
         const result = await purchasePro(plan)
-        if (result?.success) setIsPremium(true)
+        if (result?.success) {
+          setIsPremium(true)
+          api.payments.syncRc().catch(() => {})
+        }
       } else {
         const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
         const token = stored?.state?.token

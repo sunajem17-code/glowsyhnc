@@ -887,6 +887,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         // iOS: Apple In-App Purchase via RevenueCat
         const result = await purchasePro(plan)
         if (result?.success) {
+          api.payments.syncRc().catch(() => {})
           setIsPremium(true)
           navigate('/dashboard')
         }

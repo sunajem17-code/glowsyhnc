@@ -111,6 +111,7 @@ export const api = {
     createCheckout: (plan, noTrial = false) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan, noTrial }) }),
     portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
+    syncRc: () => request('/payments/sync-rc', { method: 'POST' }),
   },
   ai: {
     score: (data) => request('/ai/score', { method: 'POST', body: JSON.stringify(data) }),

@@ -5,6 +5,7 @@ import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import useStore from '../store/useStore'
 import { purchasePro, isNative } from '../utils/iap'
+import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 
 const G = '#C6A85C'
@@ -276,7 +277,7 @@ export function StepPaywall({ onUnlocked, onSkip }) {
     try {
       if (isNative()) {
         const result = await purchasePro(plan)
-        if (result?.success) { setIsPremium(true); onUnlocked() }
+        if (result?.success) { api.payments.syncRc().catch(() => {}); setIsPremium(true); onUnlocked() }
         else setLoading(false)
       } else {
         startProTrial()
@@ -295,7 +296,7 @@ export function StepPaywall({ onUnlocked, onSkip }) {
     try {
       if (isNative()) {
         const result = await purchasePro(plan)
-        if (result?.success) { setIsPremium(true); onUnlocked() }
+        if (result?.success) { api.payments.syncRc().catch(() => {}); setIsPremium(true); onUnlocked() }
         else setLoading(false)
       } else {
         startProTrial()

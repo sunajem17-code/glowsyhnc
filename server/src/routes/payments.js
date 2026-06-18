@@ -314,5 +314,18 @@ router.get('/status', authMiddleware, async (req, res) => {
   res.json({ isPremium: tier === 'premium' || isPro })
 })
 
+// Sync RevenueCat iOS purchase to server — called by client after a successful IAP
+router.post('/sync-rc', authMiddleware, async (req, res) => {
+  try {
+    await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true })
+  } catch {
+    // If Supabase fails, try SQLite
+    try {
+      db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId)
+    } catch {}
+  }
+  res.json({ ok: true })
+})
+
 router.handleWebhook = handleWebhook
 module.exports = router
