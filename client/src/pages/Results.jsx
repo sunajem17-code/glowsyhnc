@@ -2559,35 +2559,6 @@ export default function Results() {
       {/* ── CTAs ──────────────────────────────────────────────────── */}
       <div className="space-y-3 pt-1" style={{ paddingBottom: !isPremium && !showPaywall ? '112px' : '32px' }}>
 
-        {/* See Your Potential — Pro only */}
-        {isPremium ? (
-          <button
-            onClick={() => setShowPotential(true)}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{
-              background: 'linear-gradient(135deg, rgba(52,199,89,0.15) 0%, rgba(52,199,89,0.08) 100%)',
-              border: '1.5px solid rgba(52,199,89,0.45)',
-              color: '#34C759',
-              boxShadow: '0 4px 20px rgba(52,199,89,0.15)',
-            }}
-          >
-            <Sparkles size={16} />
-            See Your Potential
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowPaywall(true)}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              color: 'rgba(255,255,255,0.35)',
-            }}
-          >
-            <Lock size={14} style={{ color: '#C6A85C' }} />
-            See Your Potential — Upgrade to unlock
-          </button>
-        )}
 
         <button
           onClick={() => setShowShareCard(true)}
