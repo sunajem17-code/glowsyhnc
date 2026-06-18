@@ -617,19 +617,20 @@ Return ONLY this JSON — no markdown, nothing else:
   return parsed
 }
 
+// ── Blend weights — tune here, not scattered through code ─────────────────────
+const FACE_WEIGHT     = 0.70  // face pillars contribute 70% of overall when physique present
+const PHYSIQUE_WEIGHT = 0.30  // physique overall contributes 30% when body photo provided
+
 // ── Final score in CODE — AI never touches this ───────────────────────────────
 //
-// Formula: overall = (harmony + angularity + features + dimorphism) / 4
-// Grooming score is tracked separately but does NOT affect the overall score.
-// No body component — face pillars are the entire score.
+// Formula (face only):    overall = (harmony + angularity + features + dimorphism) / 4
+// Formula (face + body):  overall = faceAvg * FACE_WEIGHT + physiqueAvg * PHYSIQUE_WEIGHT
+// Grooming score is tracked separately and does NOT affect the overall score.
 //
-function calculateFinalScore(faceResult, gender = 'male') {
+function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null) {
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
 
-  // ── 4 Pillars → overall score ─────────────────────────────────────────────
-  // The overall score is ALWAYS the exact mathematical average of the 4 pillar
-  // scores. The AI's face_score field is ignored — code owns this number.
-  // Formula: overall = (harmony + angularity + features + dimorphism) / 4
+  // ── 4 Face Pillars ─────────────────────────────────────────────────────────
   const p = faceResult.pillars || {}
   let harmony     = clamp(p.harmony)
   let angularity  = clamp(p.angularity)
@@ -637,15 +638,20 @@ function calculateFinalScore(faceResult, gender = 'male') {
   let dimorphism  = clamp(p.dimorphism)
   const hasPillars = p.harmony != null && p.angularity != null && p.features != null && p.dimorphism != null
 
-  // Exact (unrounded) pillar average. AI's face_score is fallback only.
   const pillarAvg    = (harmony + angularity + features + dimorphism) / 4
   const aestheticRaw = hasPillars ? pillarAvg : clamp(faceResult.face_score)
 
   const faceScore     = Math.round(aestheticRaw * 10) / 10
   const groomingScore = clamp(faceResult.grooming_score)
 
-  // Overall = pillar average (face only). No body weight, no body cap.
-  const final = Math.round(aestheticRaw * 10) / 10
+  // ── Blend physique into overall when body photo was provided ───────────────
+  const physiqueOverall  = physiqueResult?.overall ?? null
+  const hasPhysique      = physiqueOverall != null
+  const blendedRaw       = hasPhysique
+    ? aestheticRaw * FACE_WEIGHT + clamp(physiqueOverall) * PHYSIQUE_WEIGHT
+    : aestheticRaw
+
+  const final = Math.round(blendedRaw * 10) / 10
 
   // Tier assignment — exact ranges, gender-aware
   // MALE:   Sub 3 (<4) · Low Tier Normie (4–4.9) · Mid Tier Normie (5–5.9)
@@ -686,7 +692,7 @@ function calculateFinalScore(faceResult, gender = 'male') {
     dimorphism = Math.max(dimorphism, pillarFloor)
   }
 
-  return { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
+  return { final, tier, faceScore, faceOnlyScore: Math.round(aestheticRaw * 10) / 10, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -758,7 +764,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
             })
           : Promise.resolve(null),
       ])
-      computedScores = calculateFinalScore(faceResult, gender)
+      computedScores = calculateFinalScore(faceResult, gender, physiqueResult)
     } finally {
       releaseSlot()
     }
@@ -772,8 +778,8 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
       : 'unavailable')
 
     // Final score: pure code — no AI involvement (computedScores already calculated above)
-    const { final, tier, faceScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
-    console.log('[aiScore] Final:', final, tier)
+    const { final, tier, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
+    console.log('[aiScore] Final:', final, tier, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
 
     const faceSub = faceResult.sub_scores || {}
@@ -781,6 +787,7 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
 
     const result = {
       overallScore:      final,
+      faceOnlyScore:     faceOnlyScore,   // face pillar avg before physique blend
       faceScore:         Math.round(faceScore    * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,
       tier,

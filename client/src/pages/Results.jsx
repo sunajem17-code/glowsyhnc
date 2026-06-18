@@ -1215,6 +1215,12 @@ export default function Results() {
   const pillars = scanPillars ?? aiScore?.pillars ?? null
   const physiqueScore = currentScan.physiqueScore ?? aiScore?.physiqueScore ?? null
 
+  // Potential: face ceiling is +1.4 normally; physique adds more upside when weak
+  const physiqueUpside = physiqueScore
+    ? Math.max(0, (7.5 - (physiqueScore.overall ?? 5)) * 0.30 * 0.3)  // physique gap × weight × dampener
+    : 0
+  const potentialScore = Math.min(10, (glowScore ?? 5) + 1.4 + physiqueUpside)
+
   const profileData      = aiScore?.profileData   ?? null
   const profileScore     = aiScore?.profileScore  ?? null
   const hasSideProfile   = !!(aiScore?.hasSideProfile || profileData)

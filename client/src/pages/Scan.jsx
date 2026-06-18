@@ -610,7 +610,12 @@ export default function Scan() {
         angularity:       aiResult.pillars?.angularity,
         features:         aiResult.pillars?.features,
         dimorphism:       aiResult.pillars?.dimorphism,
-        potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
+        potentialScore:   (() => {
+          const physiqueUpside = aiResult.physiqueScore
+            ? Math.max(0, (7.5 - (aiResult.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
+            : 0
+          return Math.min(10, (aiResult.overallScore ?? 5) + 1.4 + physiqueUpside)
+        })(),
         celebrityMatches: aiResult.celebrityMatches,
         hairTypeDetected: aiResult.hairType,
         faceShape:        aiResult.facialStructure,
