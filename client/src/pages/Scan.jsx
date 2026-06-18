@@ -81,41 +81,67 @@ function FaceGuide() {
 }
 
 
-// Side-profile silhouette: anatomical head facing right (forehead, nose, chin clearly visible)
+// Side-profile wireframe mesh head (facing right)
 function SideGuide({ size = 'normal' }) {
-  const scale = size === 'small' ? 0.72 : 1
-  const W = Math.round(110 * scale)
-  const H = Math.round(165 * scale)
+  const scale = size === 'small' ? 0.72 : size === 'overlay' ? 1.15 : 1
+  const W = Math.round(160 * scale)
+  const H = Math.round(210 * scale)
+  // Side profile facing RIGHT — wider anatomical proportions
+  // Back of skull LEFT, face features RIGHT, natural neck curves
+  const HEAD = `
+    M 96 12
+    C 116 8 142 24 148 50
+    C 152 66 148 84 146 92
+    C 152 100 158 110 158 120
+    C 158 130 152 136 144 136
+    C 140 148 134 160 126 170
+    C 118 178 108 184 100 190
+    C 104 198 108 210 108 218
+    L 50 218
+    C 50 210 54 198 60 190
+    C 52 178 38 162 28 144
+    C 16 124 10 100 12 76
+    C 14 52 26 28 48 18
+    C 62 12 78 10 88 11
+    C 91 11 94 12 96 12 Z`
+  const FACE_EDGE = `M 148 50 C 152 66 148 84 146 92 C 152 100 158 110 158 120 C 158 130 152 136 144 136 C 140 148 134 160 126 170 C 118 178 108 184 100 190`
   return (
-    <svg width={W} height={H} viewBox="0 0 110 165">
-      {/* Skull / back of head — solid gold, left side */}
-      <path
-        d="M 50 12
-           C 38 8 18 18 13 36
-           C 10 52 10 72 14 90
-           C 16 100 22 110 30 118
-           C 38 126 50 134 60 137
-           C 68 138 76 134 82 126
-           C 86 118 88 110 86 103
-           C 84 96 83 90 83 85
-           C 83 80 88 74 104 72
-           C 108 66 106 56 96 50
-           C 88 44 82 36 80 28
-           C 78 20 70 14 60 12
-           C 56 11 52 12 50 12 Z"
-        fill="none"
-        stroke="#C9A84C"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        opacity="0.92"
-      />
-      {/* Nose bridge annotation */}
-      <line x1="93" y1="52" x2="108" y2="47" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.55"/>
-      {/* Chin projection annotation */}
-      <line x1="65" y1="138" x2="65" y2="152" stroke="#F5A623" strokeWidth="1" strokeDasharray="3,3" opacity="0.55"/>
-      {/* "Face right" direction indicator */}
-      <text x="66" y="11" fill="#C9A84C" fontSize="12" opacity="0.85" fontWeight="bold">→</text>
+    <svg width={W} height={H} viewBox="0 0 172 224">
+      <defs>
+        <clipPath id={`hc-${size}`}>
+          <path d={HEAD} />
+        </clipPath>
+        <radialGradient id={`hg-${size}`} cx="70%" cy="44%" r="62%">
+          <stop offset="0%"   stopColor="#1e7a8a" stopOpacity="0.65"/>
+          <stop offset="42%"  stopColor="#0d3d4a" stopOpacity="0.78"/>
+          <stop offset="100%" stopColor="#061820" stopOpacity="0.92"/>
+        </radialGradient>
+        <filter id={`glow-${size}`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* Interior fill */}
+      <path d={HEAD} fill={`url(#hg-${size})`} />
+
+      {/* Grid lines clipped to head shape */}
+      <g clipPath={`url(#hc-${size})`} fill="none" stroke="#C6A85C" strokeWidth="0.8" opacity="0.48">
+        {/* Horizontal rings */}
+        {[28, 52, 76, 100, 124, 148, 172, 196].map((y, i) => (
+          <line key={`h${i}`} x1="0" y1={y} x2="172" y2={y} />
+        ))}
+        {/* Vertical arcs — slightly bowed to simulate globe curvature */}
+        {[18, 36, 54, 72, 90, 108, 126, 144].map((x, i) => (
+          <path key={`v${i}`} d={`M ${x} 0 Q ${x + (x < 86 ? -7 : 7)} 110 ${x} 220`} />
+        ))}
+      </g>
+
+      {/* Cyan face-front glow */}
+      <path d={FACE_EDGE} fill="none" stroke="#5ecfdf" strokeWidth="1.8" opacity="0.45" filter={`url(#glow-${size})`} />
+
+      {/* Gold border */}
+      <path d={HEAD} fill="none" stroke="#C9A84C" strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" filter={`url(#glow-${size})`} />
     </svg>
   )
 }
@@ -190,40 +216,8 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
                     <line x1="10"  y1="120" x2="170" y2="120" stroke="white" strokeWidth="0.5" opacity="0.3"/>
                   </svg>
                 ) : (
-                  /* Side-profile guide — anatomical head facing right */
-                  <svg width="170" height="220" viewBox="0 0 170 220" className="opacity-72">
-                    {/* Full side-profile silhouette — solid gold, no dashes */}
-                    <path
-                      d="M 76 18
-                         C 58 12 28 28 20 54
-                         C 15 78 15 108 22 134
-                         C 26 150 34 164 46 176
-                         C 58 186 76 196 92 198
-                         C 104 198 116 192 124 180
-                         C 132 170 134 158 130 148
-                         C 128 138 126 128 126 120
-                         C 126 112 132 106 150 100
-                         C 154 94 148 82 134 72
-                         C 124 62 116 50 112 38
-                         C 108 26 100 16 88 14
-                         C 84 13 78 18 76 18 Z"
-                      fill="none"
-                      stroke="#C9A84C"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      opacity="0.9"
-                    />
-                    {/* Nose bridge annotation */}
-                    <line x1="132" y1="74" x2="150" y2="68" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6"/>
-                    {/* Chin annotation */}
-                    <line x1="92" y1="198" x2="92" y2="214" stroke="#F5A623" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6"/>
-                    {/* Subtle crosshairs */}
-                    <line x1="85"  y1="10"  x2="85"  y2="210" stroke="white" strokeWidth="0.5" opacity="0.18"/>
-                    <line x1="10"  y1="106" x2="160" y2="106" stroke="white" strokeWidth="0.5" opacity="0.18"/>
-                    {/* "Face right" arrow */}
-                    <text x="134" y="56" fill="#C9A84C" fontSize="22" opacity="0.9" fontWeight="bold">→</text>
-                  </svg>
+                  /* Side-profile wireframe overlay */
+                  <SideGuide size="overlay" />
                 )}
               </div>
             )}
