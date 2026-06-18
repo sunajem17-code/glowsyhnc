@@ -145,8 +145,8 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Dat
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err)
-  res.status(500).json({ error: 'internal_error' })
+  console.error('[server error]', err?.message, err?.stack)
+  res.status(500).json({ error: 'Something went wrong. Please try again.' })
 })
 
 app.listen(PORT, '0.0.0.0', () => {

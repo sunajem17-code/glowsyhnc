@@ -274,7 +274,10 @@ function ShareModal({ onClose, onPosted, user, scans }) {
       }
       onPosted()
     } catch (e) {
-      setErr(e.message || 'Failed to post. Try again.')
+      console.error('[community submit]', e)
+      const msg = e?.message || ''
+      const safe = msg && !msg.match(/^(internal_error|error|undefined|null)$/i)
+      setErr(safe ? msg : "Couldn't post. Please try again.")
     } finally { setPosting(false) }
   }
 

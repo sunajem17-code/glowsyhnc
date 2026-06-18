@@ -42,19 +42,24 @@ router.post('/post', authMiddleware, async (req, res) => {
   const type = (postType === 'rate-me' ? 'rate-me' : 'glow-up')
   const id = uuid()
 
-  db.prepare(`
-    INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption, post_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, req.userId,
-    (displayName || 'Anonymous').slice(0, 30),
-    scoreBefore    ?? null,
-    scoreAfter     ?? null,
-    photoUrl       || null,
-    beforePhotoUrl || null,
-    (caption       || '').slice(0, 280),
-    type,
-  )
+  try {
+    db.prepare(`
+      INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption, post_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, req.userId,
+      (displayName || 'Anonymous').slice(0, 30),
+      scoreBefore    ?? null,
+      scoreAfter     ?? null,
+      photoUrl       || null,
+      beforePhotoUrl || null,
+      (caption       || '').slice(0, 280),
+      type,
+    )
+  } catch (e) {
+    console.error('[community post insert]', e?.message, e?.stack)
+    return res.status(500).json({ error: 'Could not save your post. Please try again.' })
+  }
 
   const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(id)
   res.json({ post })
