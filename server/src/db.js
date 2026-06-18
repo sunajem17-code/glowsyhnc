@@ -9,7 +9,7 @@ const db = new Database(path.join(DATA_DIR, 'glowsync.db'))
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
+db.pragma('foreign_keys = OFF')
 
 // Create tables
 db.exec(`
