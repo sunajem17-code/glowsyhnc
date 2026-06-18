@@ -42,6 +42,9 @@ router.post('/post', authMiddleware, async (req, res) => {
   const type = (postType === 'rate-me' ? 'rate-me' : 'glow-up')
   const id = uuid()
 
+  // Ensure user exists in SQLite (auth lives in Supabase; SQLite row may be missing)
+  db.prepare(`INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)`).run(req.userId, req.userEmail || '')
+
   try {
     db.prepare(`
       INSERT INTO community_posts (id, user_id, display_name, score_before, score_after, photo_url, before_photo_url, caption, post_type)
