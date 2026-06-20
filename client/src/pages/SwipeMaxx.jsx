@@ -7,7 +7,6 @@ import { api } from '../utils/api'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
-import { isNative as checkNative } from '../utils/iap'
 
 const GOLD    = '#C6A85C'
 const SURFACE = '#141414'

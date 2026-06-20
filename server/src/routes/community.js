@@ -35,6 +35,7 @@ router.get('/feed', authMiddleware, (req, res) => {
 
 // ── POST /api/community/post ─────────────────────────────────────────────────
 router.post('/post', authMiddleware, async (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign up for a free account to share with the community.' })
   const allowed = await checkPostLimit(req.userId)
   if (!allowed) return res.status(429).json({ error: 'Slow down — too many posts today.' })
 
@@ -79,6 +80,7 @@ router.delete('/post/:id', authMiddleware, (req, res) => {
 
 // ── POST /api/community/post/:id/like — toggle ────────────────────────────────
 router.post('/post/:id/like', authMiddleware, (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign up to like posts.' })
   const postId   = req.params.id
   const existing = db.prepare('SELECT id FROM community_likes WHERE post_id = ? AND user_id = ?')
     .get(postId, req.userId)
@@ -103,6 +105,7 @@ router.get('/post/:id/comments', authMiddleware, (req, res) => {
 
 // ── POST /api/community/post/:id/comment ─────────────────────────────────────
 router.post('/post/:id/comment', authMiddleware, (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign up to comment.' })
   const { content, displayName } = req.body
   if (!content?.trim()) return res.status(400).json({ error: 'Comment cannot be empty.' })
 
@@ -126,6 +129,7 @@ router.delete('/comment/:id', authMiddleware, (req, res) => {
 
 // ── POST /api/community/post/:id/rate — submit or update a 1-10 rating ───────
 router.post('/post/:id/rate', authMiddleware, (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign up to rate posts.' })
   const postId = req.params.id
   const post   = db.prepare('SELECT id, post_type FROM community_posts WHERE id = ?').get(postId)
   if (!post)                      return res.status(404).json({ error: 'Post not found' })

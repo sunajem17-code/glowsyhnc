@@ -314,12 +314,46 @@ router.get('/status', authMiddleware, async (req, res) => {
   res.json({ isPremium: tier === 'premium' || isPro })
 })
 
-// Sync RevenueCat iOS purchase to server — called by client after a successful IAP
+// Sync RevenueCat iOS purchase to server — called by client after a successful IAP.
+// Verifies the subscription is actually active via RevenueCat REST API before granting Pro.
 router.post('/sync-rc', authMiddleware, async (req, res) => {
+  const rcApiKey = process.env.REVENUECAT_API_KEY
+  const { rcUserId } = req.body
+
+  // Server-side verification via RevenueCat REST API
+  if (rcApiKey && rcUserId) {
+    try {
+      const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
+        headers: { Authorization: `Bearer ${rcApiKey}`, 'Content-Type': 'application/json' },
+      })
+      if (!rcRes.ok) {
+        console.warn(`[sync-rc] RevenueCat lookup failed for ${rcUserId}: HTTP ${rcRes.status}`)
+        return res.status(402).json({ error: 'Could not verify purchase — please restore purchases or contact support.' })
+      }
+      const data = await rcRes.json()
+      const subscriber = data.subscriber
+      const entitlements = subscriber?.entitlements ?? {}
+      const isPro = Object.values(entitlements).some(e => e.expires_date == null || new Date(e.expires_date) > new Date())
+      if (!isPro) {
+        console.warn(`[sync-rc] No active entitlement for rcUserId=${rcUserId} userId=${req.userId}`)
+        return res.status(402).json({ error: 'No active subscription found — please complete your purchase first.' })
+      }
+      console.log(`[sync-rc] RC verified Pro for userId=${req.userId} rcUserId=${rcUserId}`)
+    } catch (err) {
+      // If RevenueCat is unreachable, fail safe — do not grant Pro
+      console.error(`[sync-rc] RevenueCat verification error: ${err.message}`)
+      return res.status(503).json({ error: 'Purchase verification unavailable — please try again in a moment.' })
+    }
+  } else {
+    // No RC key configured — log loudly but do not grant Pro silently
+    console.error('[sync-rc] REVENUECAT_API_KEY not set or rcUserId missing — purchase NOT granted. Set REVENUECAT_API_KEY in Railway.')
+    return res.status(503).json({ error: 'Server configuration error — contact support.' })
+  }
+
+  // Verified — grant Pro
   try {
     await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true })
   } catch {
-    // If Supabase fails, try SQLite
     try {
       db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId)
     } catch {}

@@ -12,7 +12,6 @@ import MotionPage from '../components/MotionPage'
 import ShareCardModal from '../components/ShareCardModal'
 import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
-import PotentialViewer from '../components/PotentialViewer'
 import { scoreColor } from '../utils/analysis'
 import { isNative, purchasePro, restorePurchases } from '../utils/iap'
 
@@ -1179,7 +1178,6 @@ export default function Results() {
   const navigate = useNavigate()
   const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, userProfile } = useStore()
   const [showShareCard,   setShowShareCard]   = useState(false)
-  const [showPotential,   setShowPotential]   = useState(false)
   const [revealDone, setRevealDone] = useState(false)
 
   // Show reveal only on first load for a fresh scan (within last 10s)
@@ -2630,18 +2628,6 @@ export default function Results() {
         </div>
       </div>
     )}
-
-    {/* ── Potential Viewer ──────────────────────────────────────── */}
-    <AnimatePresence>
-      {showPotential && isPremium && (
-        <PotentialViewer
-          scan={currentScan}
-          facePhotoUrl={pendingFacePhoto ?? currentScan?.facePhotoUrl}
-          gender={gender ?? 'male'}
-          onClose={() => setShowPotential(false)}
-        />
-      )}
-    </AnimatePresence>
 
     {/* ── Share Card Modal ──────────────────────────────────────── */}
     <AnimatePresence>
