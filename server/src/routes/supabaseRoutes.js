@@ -231,10 +231,17 @@ router.post('/upload-image', auth, async (req, res) => {
     const { imageData, mediaType, folder } = req.body
     if (!imageData) return res.status(400).json({ error: 'imageData (base64) required' })
 
-    const buffer  = Buffer.from(imageData, 'base64')
-    const ext     = (mediaType || '').includes('png') ? 'png' : 'jpg'
-    const path    = `${folder ?? 'scan'}/${req.userId}/${Date.now()}.${ext}`
-    const mime    = mediaType || 'image/jpeg'
+    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
+    const mime = ALLOWED_MIME.includes(mediaType) ? mediaType : 'image/jpeg'
+
+    const buffer = Buffer.from(imageData, 'base64')
+    const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+    if (buffer.length > MAX_BYTES) {
+      return res.status(413).json({ error: 'Image too large — maximum 10 MB' })
+    }
+
+    const ext  = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
+    const path = `${folder ?? 'scan'}/${req.userId}/${Date.now()}.${ext}`
 
     const { error: uploadErr } = await sb.storage
       .from('scan-images')
