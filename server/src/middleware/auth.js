@@ -30,7 +30,7 @@ function authMiddleware(req, res, next) {
 function signToken(userId, email) {
   const payload = { userId }
   if (email) payload.email = email
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' })
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '90d' })
 }
 
 module.exports = { authMiddleware, signToken, JWT_SECRET }

@@ -628,6 +628,12 @@ const PHYSIQUE_WEIGHT = 0.30  // physique overall contributes 30% when body phot
 // Grooming score is tracked separately and does NOT affect the overall score.
 //
 function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null) {
+  // ── Input validation ──────────────────────────────────────────────────────────
+  if (!faceResult || typeof faceResult !== 'object') {
+    throw new Error('calculateFinalScore: faceResult is required and must be an object')
+  }
+  physiqueResult = physiqueResult ?? null  // explicit null-safe default
+
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
 
   // ── 4 Face Pillars ─────────────────────────────────────────────────────────
@@ -740,42 +746,74 @@ router.post('/score', verifyToken, resolvePro, claudeLimit, async (req, res) => 
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
+    console.log('[aiScore] Inputs — gender:', gender, '| side:', sideBase64 ? 'YES' : 'NO', '| body:', bodyBase64 ? 'YES' : 'NO')
 
     // Acquire concurrency slot only now — cache hits above never need it
     await acquireSlot()
-    let faceResult, celebResult, computedScores
+    let faceResult, celebResult = null, physiqueResult = null, computedScores
 
     try {
-      // Run face scoring, celebrity matching, and physique scoring in parallel
-      console.log('[aiScore] Starting face + celebrity + physique in parallel...')
-      console.log('[aiScore] Side profile:', sideBase64 ? 'YES' : 'NO')
-      console.log('[aiScore] Body photo:', bodyBase64 ? 'YES' : 'NO')
-      let physiqueResult = null
-      ;[faceResult, celebResult, physiqueResult] = await Promise.all([
-        withRetry(() => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType), 'face'),
-        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, null, null), 'celebrity').catch(err => {
-          console.warn('[aiScore] Celebrity match failed (non-fatal):', err.message)
-          return null
-        }),
+      // ── STEP 1: Face scoring (REQUIRED) ──────────────────────────────────────
+      // This is the only step that can produce a hard failure. If it throws,
+      // we re-throw so the outer catch returns a 500 to the client.
+      console.log('[aiScore] STEP 1 — Face scoring...')
+      try {
+        faceResult = await withRetry(
+          () => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType),
+          'face'
+        )
+        console.log('[aiScore] STEP 1 OK — face_score:', faceResult.face_score, '| structure:', faceResult.facial_structure, '| grooming:', faceResult.grooming_score)
+      } catch (faceErr) {
+        console.error(`[aiScore] STEP 1 FAILED — face scoring threw: "${faceErr.message}" | userId=${req.userId} gender=${gender} hasSide=${!!sideBase64}`)
+        throw faceErr  // only face failure escalates to a full error response
+      }
+
+      // ── STEP 2 + 3: Celebrity matching + Physique scoring (both OPTIONAL) ─────
+      // Run in parallel. Promise.allSettled never rejects — each step lives or dies
+      // independently. A physique failure degrades to face-only, never kills the result.
+      console.log('[aiScore] STEP 2+3 — Celebrity match + Physique scoring in parallel...')
+      const [celebSettled, physiqueSettled] = await Promise.allSettled([
+        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, null, null), 'celebrity'),
         bodyBase64
-          ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique').catch(err => {
-              console.warn('[aiScore] Physique scoring failed (non-fatal):', err.message)
-              return null
-            })
+          ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
           : Promise.resolve(null),
       ])
-      computedScores = calculateFinalScore(faceResult, gender, physiqueResult)
+
+      if (celebSettled.status === 'fulfilled') {
+        celebResult = celebSettled.value
+        console.log('[aiScore] STEP 2 OK — celeb matches:',
+          celebResult
+            ? [celebResult.match1, celebResult.match2, celebResult.match3]
+                .filter(Boolean).map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')
+            : 'none')
+      } else {
+        console.warn(`[aiScore] STEP 2 FAILED — celeb match non-fatal: "${celebSettled.reason?.message}" | userId=${req.userId}`)
+        celebResult = null
+      }
+
+      if (physiqueSettled.status === 'fulfilled') {
+        physiqueResult = physiqueSettled.value
+        if (physiqueResult) console.log('[aiScore] STEP 3 OK — physique overall:', physiqueResult.overall)
+        else console.log('[aiScore] STEP 3 — no body photo, skipped')
+      } else {
+        console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueSettled.reason?.message}" | userId=${req.userId} gender=${gender}`)
+        physiqueResult = null
+      }
+
+      // ── STEP 4: Overall score calculation ─────────────────────────────────────
+      // If calculation throws with physique data, retry without it before failing.
+      console.log('[aiScore] STEP 4 — Calculating final score...')
+      try {
+        computedScores = calculateFinalScore(faceResult, gender, physiqueResult)
+      } catch (calcErr) {
+        console.error(`[aiScore] STEP 4 FAILED with physique — retrying face-only: "${calcErr.message}" | physiqueResult=${JSON.stringify(physiqueResult)}`)
+        computedScores = calculateFinalScore(faceResult, gender, null)
+        physiqueResult = null  // reflect that physique was dropped
+        console.log('[aiScore] STEP 4 face-only retry OK')
+      }
     } finally {
       releaseSlot()
     }
-
-    console.log('[aiScore] Face:', faceResult.face_score, '| grooming:', faceResult.grooming_score, '| structure:', faceResult.facial_structure)
-    console.log('[aiScore] Celebrity matches:', celebResult
-      ? [celebResult.match1, celebResult.match2, celebResult.match3]
-          .filter(Boolean)
-          .map(m => `${m.celebrity} [${m.profession ?? 'unknown'}] ${m.similarity}%`)
-          .join(' | ')
-      : 'unavailable')
 
     // Final score: pure code — no AI involvement (computedScores already calculated above)
     const { final, tier, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores

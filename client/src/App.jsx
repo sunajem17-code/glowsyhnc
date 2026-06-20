@@ -42,7 +42,7 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout } = useStore()
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -85,6 +85,13 @@ export default function App() {
     const handleOffline = () => console.warn('[Network] Device went offline')
     window.addEventListener('offline', handleOffline)
     return () => window.removeEventListener('offline', handleOffline)
+  }, [])
+
+  // Auto-logout when any API call gets a 401 (expired token)
+  useEffect(() => {
+    const handle = () => { logout?.(); window.location.replace('/auth') }
+    window.addEventListener('auth:session-expired', handle)
+    return () => window.removeEventListener('auth:session-expired', handle)
   }, [])
 
   // Skip splash entirely for unauthenticated users — they land on the SEO landing

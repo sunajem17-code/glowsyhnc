@@ -35,9 +35,6 @@ async function request(path, options = {}) {
     }
     const errBody = await res.json().catch(() => ({}))
     if (res.status === 401) {
-      // Only treat as "session expired" if it's an auth middleware rejection
-      // (i.e. user has a stored token that the server rejected).
-      // Login/register endpoints return 401 for wrong credentials — show that message instead.
       const isAuthEndpoint = path.startsWith('/auth/')
       if (!isAuthEndpoint) {
         try {
@@ -46,6 +43,8 @@ async function request(path, options = {}) {
             stored.state.token = null
             stored.state.isAuthenticated = false
             localStorage.setItem('ascendus-storage', JSON.stringify(stored))
+            // Fire a global event so the app can redirect to /auth
+            window.dispatchEvent(new CustomEvent('auth:session-expired'))
           }
         } catch {}
         throw new Error('Session expired. Please sign in again.')

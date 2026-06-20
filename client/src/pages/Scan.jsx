@@ -9,6 +9,9 @@ import { api } from '../utils/api'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
+import sideProfileGuide from '../assets/side-profile-guide.png'
+import bodyGuideMale from '../assets/body-guide-male.jpg'
+import bodyGuideFemale from '../assets/body-guide-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { scheduleRescanNotification } from '../utils/notifications'
@@ -81,68 +84,21 @@ function FaceGuide() {
 }
 
 
-// Side-profile wireframe mesh head (facing right)
 function SideGuide({ size = 'normal' }) {
-  const scale = size === 'small' ? 0.72 : size === 'overlay' ? 1.15 : 1
-  const W = Math.round(160 * scale)
-  const H = Math.round(210 * scale)
-  // Side profile facing RIGHT — wider anatomical proportions
-  // Back of skull LEFT, face features RIGHT, natural neck curves
-  const HEAD = `
-    M 96 12
-    C 116 8 142 24 148 50
-    C 152 66 148 84 146 92
-    C 152 100 158 110 158 120
-    C 158 130 152 136 144 136
-    C 140 148 134 160 126 170
-    C 118 178 108 184 100 190
-    C 104 198 108 210 108 218
-    L 50 218
-    C 50 210 54 198 60 190
-    C 52 178 38 162 28 144
-    C 16 124 10 100 12 76
-    C 14 52 26 28 48 18
-    C 62 12 78 10 88 11
-    C 91 11 94 12 96 12 Z`
-  const FACE_EDGE = `M 148 50 C 152 66 148 84 146 92 C 152 100 158 110 158 120 C 158 130 152 136 144 136 C 140 148 134 160 126 170 C 118 178 108 184 100 190`
+  const maxW = size === 'small' ? 115 : size === 'overlay' ? 220 : 260
   return (
-    <svg width={W} height={H} viewBox="0 0 172 224">
-      <defs>
-        <clipPath id={`hc-${size}`}>
-          <path d={HEAD} />
-        </clipPath>
-        <radialGradient id={`hg-${size}`} cx="70%" cy="44%" r="62%">
-          <stop offset="0%"   stopColor="#1e7a8a" stopOpacity="0.65"/>
-          <stop offset="42%"  stopColor="#0d3d4a" stopOpacity="0.78"/>
-          <stop offset="100%" stopColor="#061820" stopOpacity="0.92"/>
-        </radialGradient>
-        <filter id={`glow-${size}`} x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="2.5" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
-      {/* Interior fill */}
-      <path d={HEAD} fill={`url(#hg-${size})`} />
-
-      {/* Grid lines clipped to head shape */}
-      <g clipPath={`url(#hc-${size})`} fill="none" stroke="#C6A85C" strokeWidth="0.8" opacity="0.48">
-        {/* Horizontal rings */}
-        {[28, 52, 76, 100, 124, 148, 172, 196].map((y, i) => (
-          <line key={`h${i}`} x1="0" y1={y} x2="172" y2={y} />
-        ))}
-        {/* Vertical arcs — slightly bowed to simulate globe curvature */}
-        {[18, 36, 54, 72, 90, 108, 126, 144].map((x, i) => (
-          <path key={`v${i}`} d={`M ${x} 0 Q ${x + (x < 86 ? -7 : 7)} 110 ${x} 220`} />
-        ))}
-      </g>
-
-      {/* Cyan face-front glow */}
-      <path d={FACE_EDGE} fill="none" stroke="#5ecfdf" strokeWidth="1.8" opacity="0.45" filter={`url(#glow-${size})`} />
-
-      {/* Gold border */}
-      <path d={HEAD} fill="none" stroke="#C9A84C" strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" filter={`url(#glow-${size})`} />
-    </svg>
+    <img
+      src={sideProfileGuide}
+      alt="Side profile alignment guide"
+      style={{
+        width: '85%',
+        maxWidth: maxW,
+        display: 'block',
+        margin: '0 auto',
+        mixBlendMode: 'screen',
+        filter: 'contrast(1.4) brightness(1.1)',
+      }}
+    />
   )
 }
 
@@ -262,7 +218,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
+function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
 
@@ -303,7 +259,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
       )}
 
       {/* Preview / placeholder */}
-      <div className="relative flex-1 max-h-80 rounded-3xl overflow-hidden bg-gray-900 flex items-center justify-center mt-2 mb-4">
+      <div className="relative flex-1 max-h-80 rounded-3xl overflow-hidden flex items-center justify-center mt-2 mb-4" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
         {photo ? (
           <>
             <img src={photo} alt="uploaded" className="w-full h-full object-cover" />
@@ -313,9 +269,21 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto }) {
               </div>
             </div>
           </>
+        ) : stepNum === 2 ? (
+          <img
+            src={sideProfileGuide}
+            alt="Side profile alignment guide"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', mixBlendMode: 'screen', filter: 'contrast(1.4) brightness(1.1)' }}
+          />
+        ) : stepNum === 3 ? (
+          <img
+            src={gender === 'female' ? bodyGuideFemale : bodyGuideMale}
+            alt="Body alignment guide"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+          />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
-            {stepNum === 1 ? <FaceGuide /> : <SideGuide />}
+            {stepNum === 1 && <FaceGuide />}
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
         )}
@@ -438,7 +406,7 @@ export default function Scan() {
   const {
     setPendingFacePhoto, addScan, setCurrentScan, setCurrentPlan,
     gender: savedGender, setGender, isPremium, scanCount, incrementScanCount,
-    setAssignedPhase, userProfile, lastScanDate, setLastScanDate,
+    setAssignedPhase, userProfile, lastScanDate, setLastScanDate, logout, token,
   } = useStore()
 
   // Monthly scan gate for free users
@@ -537,21 +505,65 @@ export default function Scan() {
       const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       let aiResult
-      try {
-        const scoreCall = api.ai.score({
-          faceImage: faceB64,
-          ...(sideB64 ? { sideImage: sideB64 } : {}),
-          ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
-          gender: g,
-        })
-        const timeoutCall = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
-        )
-        aiResult = await Promise.race([scoreCall, timeoutCall])
-      } finally {
+      if (token === 'demo-token') {
+        // Demo users: return mock results instead of hitting the backend
+        await new Promise(r => setTimeout(r, 2500))
         clearInterval(stageTimer)
         clearTimeout(slowTimer)
         setSlowAnalysis(false)
+        const demoScore = 6.8 + (Math.random() - 0.5) * 0.6
+        const demoTier  = getTier(demoScore, g)
+        aiResult = {
+          overallScore:    Math.round(demoScore * 10) / 10,
+          faceScore:       Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
+          faceOnlyScore:   Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
+          groomingScore:   Math.round((6.5 + Math.random()) * 10) / 10,
+          tier:            demoTier.label,
+          hasSideProfile:  !!sideB64,
+          faceSubScores: {
+            symmetry:          Math.round((6.5 + Math.random()) * 10) / 10,
+            jawlineDefinition: Math.round((6.2 + Math.random()) * 10) / 10,
+            skinClarity:       Math.round((7.0 + Math.random() * 0.8) * 10) / 10,
+            facialProportions: Math.round((6.8 + Math.random() * 0.6) * 10) / 10,
+            eyeArea:           Math.round((6.5 + Math.random()) * 10) / 10,
+            facialHarmony:     Math.round((7.0 + Math.random() * 0.5) * 10) / 10,
+          },
+          pillars: {
+            harmony:    Math.round((6.8 + Math.random()) * 10) / 10,
+            angularity: Math.round((6.5 + Math.random()) * 10) / 10,
+            features:   Math.round((7.0 + Math.random() * 0.8) * 10) / 10,
+            dimorphism: Math.round((6.3 + Math.random()) * 10) / 10,
+          },
+          facialStructure:  'Oval',
+          hairType:         null,
+          celebrityMatches: [{ name: 'Demo Match', score: 72, similarity: 0.72 }],
+          physiqueScore: bodyB64 ? {
+            overall:        Math.round((6.5 + Math.random()) * 10) / 10,
+            body_fat_level: 'Athletic',
+            muscularity:    Math.round((6.5 + Math.random()) * 10) / 10,
+            proportions:    Math.round((7.0 + Math.random() * 0.5) * 10) / 10,
+            posture:        Math.round((6.8 + Math.random() * 0.6) * 10) / 10,
+          } : null,
+          bodyFatLevel: bodyB64 ? 'Athletic' : null,
+          insights: ['Demo mode — sign up for a real account to get AI-powered analysis'],
+        }
+      } else {
+        try {
+          const scoreCall = api.ai.score({
+            faceImage: faceB64,
+            ...(sideB64 ? { sideImage: sideB64 } : {}),
+            ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
+            gender: g,
+          })
+          const timeoutCall = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
+          )
+          aiResult = await Promise.race([scoreCall, timeoutCall])
+        } finally {
+          clearInterval(stageTimer)
+          clearTimeout(slowTimer)
+          setSlowAnalysis(false)
+        }
       }
 
       setAnalysisStep(3)
@@ -624,6 +636,7 @@ export default function Scan() {
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
       navigate('/results')
     } catch (err) {
+      console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
       if (err.message === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
@@ -633,7 +646,7 @@ export default function Scan() {
         setRetryCountdown(err.retryAfter || 60)
         setStep(3)
       } else {
-        setError('Analysis unavailable right now. Please try again in a minute.')
+        setError(`Analysis unavailable: ${err?.message || 'unknown error'}`)
         setStep(3)
       }
     }
@@ -730,6 +743,7 @@ export default function Scan() {
               <PhotoUploadStep stepNum={3}
                 guide="Stand facing the camera. Full body visible from head to feet. Good lighting, fitted clothing for accurate physique scoring."
                 photo={bodyPhoto}
+                gender={gender}
                 onPhoto={url => { setBodyPhoto(url); setError('') }} />
             </motion.div>
           )}
@@ -863,6 +877,14 @@ export default function Scan() {
               style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
               Try Again
             </button>
+            {(error.includes('Session expired') || error.includes('Invalid or expired')) && (
+              <button
+                onClick={() => { logout?.(); navigate('/auth') }}
+                className="w-full text-xs font-heading font-semibold py-1.5 rounded-xl opacity-70 active:opacity-50"
+                style={{ color: '#EF4444' }}>
+                Sign out &amp; sign in again
+              </button>
+            )}
           </div>
         </div>
       )}
