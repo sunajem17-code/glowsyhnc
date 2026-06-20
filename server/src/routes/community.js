@@ -163,4 +163,28 @@ router.post('/post/:id/rate', authMiddleware, (req, res) => {
   res.json({ rating_count: row.c, avg_rating: row.avg, user_rating: score })
 })
 
+// ── POST /api/community/post/:id/report ──────────────────────────────────────
+// Required by Apple App Store Guidelines 1.2 for apps with user-generated content.
+// Post is flagged for review — NOT auto-deleted. One report per user per post.
+router.post('/post/:id/report', authMiddleware, (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign up to report posts.' })
+  const postId = req.params.id
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(postId)
+  if (!post) return res.status(404).json({ error: 'Post not found' })
+
+  const VALID_REASONS = ['spam', 'inappropriate', 'harassment', 'other']
+  const reason = VALID_REASONS.includes(req.body.reason) ? req.body.reason : 'inappropriate'
+
+  try {
+    db.prepare(
+      'INSERT OR IGNORE INTO community_reports (id, post_id, reporter_id, reason) VALUES (?, ?, ?, ?)'
+    ).run(uuid(), postId, req.userId, reason)
+    console.log(`[community] report filed: post=${postId} by=${req.userId} reason=${reason}`)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[community report]', err.message)
+    res.status(500).json({ error: 'Could not file report. Please try again.' })
+  }
+})
+
 module.exports = router

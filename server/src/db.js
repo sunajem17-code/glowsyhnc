@@ -153,6 +153,14 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(post_id, user_id)
   );
+  CREATE TABLE IF NOT EXISTS community_reports (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    reporter_id TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT 'inappropriate',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(post_id, reporter_id)
+  );
 `)
 
 // Idempotent migrations — ignore if columns already exist

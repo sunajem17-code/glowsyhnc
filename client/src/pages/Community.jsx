@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2 } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -714,8 +714,91 @@ const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate })
 })
 
 // ── Post card ─────────────────────────────────────────────────────────────────
+const REPORT_REASONS = [
+  { value: 'spam',          label: 'Spam' },
+  { value: 'inappropriate', label: 'Inappropriate content' },
+  { value: 'harassment',    label: 'Harassment or bullying' },
+  { value: 'other',         label: 'Other' },
+]
+
+function ReportSheet({ postId, onClose }) {
+  const [selected, setSelected] = useState('inappropriate')
+  const [submitting, setSubmitting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function submit() {
+    setSubmitting(true)
+    try {
+      await api.post(`/community/post/${postId}/report`, { reason: selected })
+      setDone(true)
+      setTimeout(onClose, 1800)
+    } catch {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.6)' }}
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        className="fixed bottom-0 inset-x-0 z-50 rounded-t-3xl px-5 pt-5 pb-10"
+        style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.15)' }} />
+        {done ? (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <Check size={32} style={{ color: '#34D399' }} />
+            <p className="font-heading font-bold text-base text-primary">Report submitted</p>
+            <p className="font-body text-sm text-secondary text-center">Thanks for keeping the community safe. We'll review it shortly.</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-heading font-bold text-base text-primary">Report post</h3>
+              <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+            </div>
+            <p className="font-body text-sm text-secondary mb-4">Why are you reporting this post?</p>
+            <div className="flex flex-col gap-2 mb-6">
+              {REPORT_REASONS.map(r => (
+                <button
+                  key={r.value}
+                  onClick={() => setSelected(r.value)}
+                  className="flex items-center justify-between px-4 py-3 rounded-xl text-left"
+                  style={{
+                    background: selected === r.value ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${selected === r.value ? 'rgba(198,168,92,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                  }}
+                >
+                  <span className="font-body text-sm text-primary">{r.label}</span>
+                  {selected === r.value && <Check size={14} style={{ color: GOLD }} />}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={submit}
+              disabled={submitting}
+              className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2"
+              style={{ background: submitting ? 'rgba(255,255,255,0.06)' : 'rgba(239,68,68,0.15)', color: submitting ? 'rgba(255,255,255,0.3)' : '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
+              {submitting ? 'Submitting…' : 'Submit Report'}
+            </button>
+          </>
+        )}
+      </motion.div>
+    </>
+  )
+}
+
 const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
+  const [showReport, setShowReport]         = useState(false)
   const isRateMe = post.post_type === 'rate-me'
 
   const improvement = post.score_before != null && post.score_after != null
@@ -845,20 +928,35 @@ const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLi
           <MessageCircle size={16} />
           <span className="font-body text-[12px]">{post.comments_count ?? 0}</span>
         </button>
-        {!isRateMe && (
-          <button
-            onClick={() => setShowShareSheet(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl ml-auto"
-            style={{ color: 'rgba(255,255,255,0.4)' }}
-          >
-            <Share2 size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-1 ml-auto">
+          {!post.is_mine && (
+            <button
+              onClick={() => setShowReport(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
+              style={{ color: 'rgba(255,255,255,0.2)' }}
+              aria-label="Report post"
+            >
+              <Flag size={14} />
+            </button>
+          )}
+          {!isRateMe && (
+            <button
+              onClick={() => setShowShareSheet(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
+              style={{ color: 'rgba(255,255,255,0.4)' }}
+            >
+              <Share2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
         {showShareSheet && (
           <PostShareSheet post={post} onClose={() => setShowShareSheet(false)} />
+        )}
+        {showReport && (
+          <ReportSheet postId={post.id} onClose={() => setShowReport(false)} />
         )}
       </AnimatePresence>
     </motion.div>
