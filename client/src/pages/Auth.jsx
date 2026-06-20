@@ -58,8 +58,6 @@ export default function Auth() {
   }
 
   async function handleAppleSignIn() {
-    console.log('[APPLE AUTH] Button tapped')
-    console.log('[APPLE AUTH] Platform:', Capacitor.getPlatform())
     setError('')
     setLoading(true)
     try {
@@ -73,9 +71,7 @@ export default function Auth() {
         nonce: Math.random().toString(36).substring(2, 15),
       }
 
-      console.log('[APPLE AUTH] Calling authorize with options:', JSON.stringify(options))
       const result = await SignInWithApple.authorize(options)
-      console.log('[APPLE AUTH] Result:', JSON.stringify(result))
 
       const token = result?.response?.identityToken
       if (!token) throw new Error('No identity token returned')

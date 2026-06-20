@@ -192,7 +192,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
               </div>
               <p className="font-body text-[13px] text-primary leading-snug">{c.content}</p>
             </div>
-            {c.user_id === userId && (
+            {c.is_mine && (
               <button onClick={() => deleteComment(c.id)}>
                 <Trash2 size={12} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </button>
@@ -642,7 +642,7 @@ function PostShareSheet({ post, onClose }) {
 
 // ── Rate Me scoring UI ────────────────────────────────────────────────────────
 const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate }) {
-  const isOwn = post.user_id === currentUserId
+  const isOwn = !!post.is_mine
   const [hoveredScore, setHoveredScore] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const displayScore = hoveredScore ?? post.user_rating ?? null
@@ -760,7 +760,7 @@ const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLi
             </span>
           </div>
         )}
-        {post.user_id === currentUserId && (
+        {!!post.is_mine && (
           <button onClick={() => onDelete(post.id)}>
             <Trash2 size={14} style={{ color: 'rgba(255,255,255,0.2)' }} />
           </button>

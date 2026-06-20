@@ -18,7 +18,9 @@ router.get('/feed', authMiddleware, (req, res) => {
   const userId = req.userId
   const posts = db.prepare(`
     SELECT
-      cp.*,
+      cp.id, cp.display_name, cp.score_before, cp.score_after,
+      cp.photo_url, cp.before_photo_url, cp.caption, cp.post_type, cp.created_at,
+      (cp.user_id = ?) AS is_mine,
       (SELECT COUNT(*) FROM community_likes    WHERE post_id = cp.id) AS likes_count,
       (SELECT COUNT(*) FROM community_comments WHERE post_id = cp.id) AS comments_count,
       (SELECT COUNT(*) FROM community_likes    WHERE post_id = cp.id AND user_id = ?) AS user_liked,
@@ -28,7 +30,7 @@ router.get('/feed', authMiddleware, (req, res) => {
     FROM community_posts cp
     ORDER BY cp.created_at DESC
     LIMIT 60
-  `).all(userId, userId)
+  `).all(userId, userId, userId)
 
   res.json({ posts })
 })
@@ -62,7 +64,11 @@ router.post('/post', authMiddleware, async (req, res) => {
     return res.status(500).json({ error: 'Could not save your post. Please try again.' })
   }
 
-  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(id)
+  const post = db.prepare(`
+    SELECT id, display_name, score_before, score_after, photo_url, before_photo_url,
+           caption, post_type, created_at, 1 AS is_mine
+    FROM community_posts WHERE id = ?
+  `).get(id)
   res.json({ post })
 })
 
@@ -98,7 +104,7 @@ router.post('/post/:id/like', authMiddleware, (req, res) => {
 // ── GET /api/community/post/:id/comments ─────────────────────────────────────
 router.get('/post/:id/comments', authMiddleware, (req, res) => {
   const comments = db.prepare(
-    'SELECT * FROM community_comments WHERE post_id = ? ORDER BY created_at ASC LIMIT 100'
+    'SELECT id, post_id, display_name, content, created_at FROM community_comments WHERE post_id = ? ORDER BY created_at ASC LIMIT 100'
   ).all(req.params.id)
   res.json({ comments })
 })
@@ -114,7 +120,9 @@ router.post('/post/:id/comment', authMiddleware, (req, res) => {
     'INSERT INTO community_comments (id, post_id, user_id, display_name, content) VALUES (?, ?, ?, ?, ?)'
   ).run(id, req.params.id, req.userId, (displayName || 'Anonymous').slice(0, 30), content.trim().slice(0, 500))
 
-  const comment = db.prepare('SELECT * FROM community_comments WHERE id = ?').get(id)
+  const comment = db.prepare(
+    'SELECT id, post_id, display_name, content, created_at FROM community_comments WHERE id = ?'
+  ).get(id)
   res.json({ comment })
 })
 

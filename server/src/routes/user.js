@@ -143,4 +143,30 @@ router.get('/scan-history', authMiddleware, async (req, res) => {
   res.json({ history })
 })
 
+// ── GET /api/user/unsubscribe?uid=:userId ─────────────────────────────────────
+// One-click unsubscribe link for CAN-SPAM / GDPR compliance.
+// Linked from marketing email footers. No auth required — the uid IS the token.
+router.get('/unsubscribe', async (req, res) => {
+  const { uid } = req.query
+  if (!uid) return res.status(400).send('Missing uid parameter.')
+  try {
+    const sb = getSupabase()
+    if (sb) {
+      await sb.from('users').update({ email_unsubscribed: true }).eq('id', uid)
+    } else {
+      db.prepare('UPDATE users SET email_unsubscribed = 1 WHERE id = ?').run(uid)
+    }
+    res.send(`
+      <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#111;color:#fff;">
+        <h2>You've been unsubscribed.</h2>
+        <p style="color:#aaa">You won't receive any more marketing emails from Ascendus.<br>
+        You can re-enable emails anytime in your account settings.</p>
+      </body></html>
+    `)
+  } catch (err) {
+    console.error('[unsubscribe] error:', err.message)
+    res.status(500).send('Something went wrong. Please contact support@ascendus.store.')
+  }
+})
+
 module.exports = router

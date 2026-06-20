@@ -5,8 +5,8 @@ const { authMiddleware } = require('../middleware/auth')
 
 const router = express.Router()
 
-// Get this week's leaderboard (top 20 by improvement) — public
-router.get('/', (req, res) => {
+// Get this week's leaderboard (top 20 by improvement) — requires auth
+router.get('/', authMiddleware, (req, res) => {
   try {
     const weekStart = getWeekStart()
     const rows = db.prepare(`
