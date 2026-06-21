@@ -258,11 +258,11 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
         <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} />
       )}
 
-      {/* Preview / placeholder */}
-      <div className="relative flex-1 max-h-80 rounded-3xl overflow-hidden flex items-center justify-center mt-2 mb-4" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
+      {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below */}
+      <div className="relative flex-1 max-h-80 rounded-3xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
         {photo ? (
           <>
-            <img src={photo} alt="uploaded" className="w-full h-full object-cover" />
+            <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center bg-black/25">
               <div className="w-14 h-14 rounded-full bg-[#C6A85C] flex items-center justify-center">
                 <CheckCircle2 size={30} className="text-white" />
@@ -272,14 +272,17 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
         ) : stepNum === 2 ? (
           <img
             src={sideProfileGuide}
-            alt="Side profile alignment guide"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', mixBlendMode: 'screen', filter: 'contrast(1.4) brightness(1.1)' }}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ mixBlendMode: 'screen', filter: 'contrast(1.4) brightness(1.1)' }}
           />
         ) : stepNum === 3 ? (
           <img
             src={gender === 'female' ? bodyGuideFemale : bodyGuideMale}
-            alt="Body alignment guide"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-top"
           />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
@@ -287,7 +290,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
         )}
-        {/* Corner guides when empty */}
+        {/* Corner guides — decorative only */}
         {!photo && (
           <>
             {[['top-3 left-3', true, false, true, false], ['top-3 right-3', true, false, false, true],
