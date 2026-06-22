@@ -154,6 +154,25 @@ function getBiggestGrowthArea(scan) {
   return candidates.reduce((low, c) => c.score < low.score ? c : low)
 }
 
+// ── Pick one celebrity match from scan data (deterministic by scan id) ───────────
+const CELEB_QUICK = {
+  strong:  [{ name: 'Henry Cavill', sim: 79 }, { name: 'Chris Hemsworth', sim: 76 }, { name: 'Jacob Elordi', sim: 75 }, { name: 'Cristiano Ronaldo', sim: 73 }],
+  defined: [{ name: 'Zac Efron',    sim: 73 }, { name: 'Austin Butler',   sim: 71 }, { name: 'Tom Holland',  sim: 68 }, { name: 'Timothée Chalamet', sim: 70 }],
+  average: [{ name: 'Pedro Pascal', sim: 67 }, { name: 'Ryan Reynolds',   sim: 65 }, { name: 'Paul Mescal',  sim: 66 }, { name: 'Andrew Garfield',  sim: 64 }],
+  soft:    [{ name: 'Harry Styles', sim: 64 }, { name: 'Justin Bieber',   sim: 62 }, { name: 'Niall Horan',  sim: 61 }, { name: 'Jack Harlow',      sim: 63 }],
+}
+
+function getCelebMatch(scan) {
+  if (!scan) return null
+  const jaw  = scan.faceData?.jawlineDefinition ?? 5
+  const harm = scan.faceData?.facialHarmony     ?? 5
+  const avg  = (jaw + harm) / 2
+  const key  = avg >= 7 ? 'strong' : avg >= 6 ? 'defined' : avg >= 4.5 ? 'average' : 'soft'
+  const pool = CELEB_QUICK[key]
+  const seed = (scan.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return pool[Math.abs(seed) % pool.length]
+}
+
 // ── STEP: Scores Waiting ──────────────────────────────────────────────────────────
 // Free-user gate shown after scan completes.
 // VISIBLE:  Glow Score number + tier label — the hook that drives unlock curiosity.
@@ -181,7 +200,8 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
     return 'Bot 40%'
   }
 
-  const growthArea = getBiggestGrowthArea(scan)
+  const growthArea  = getBiggestGrowthArea(scan)
+  const celebMatch  = getCelebMatch(scan)
 
   const topPct = toTopPct(glowScore)
 
@@ -306,6 +326,45 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
                 {growthArea.detail}
               </p>
             </div>
+          </motion.div>
+        )}
+
+        {/* ── Celebrity match teaser ───────────────────────────────────────── */}
+        {celebMatch && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.26 }}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 mb-5"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
+          >
+            {/* Avatar placeholder */}
+            <div
+              className="flex-shrink-0 flex items-center justify-center rounded-full"
+              style={{
+                width: 38, height: 38,
+                background: 'rgba(198,168,92,0.10)',
+                border: '1px solid rgba(198,168,92,0.22)',
+              }}
+            >
+              <span style={{ fontSize: 17 }}>⭐</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                Celebrity match · {celebMatch.sim}% similarity
+              </p>
+              {/* Name is blurred — the mystery drives the unlock */}
+              <p
+                className="font-heading font-bold text-[15px] select-none"
+                style={{ color: 'rgba(255,255,255,0.90)', filter: 'blur(6px)', userSelect: 'none' }}
+              >
+                {celebMatch.name}
+              </p>
+            </div>
+            <Lock size={13} style={{ color: G, flexShrink: 0 }} />
           </motion.div>
         )}
 
