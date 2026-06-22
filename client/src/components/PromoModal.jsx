@@ -29,11 +29,8 @@ export default function PromoModal({ onClose, onSuccess }) {
     if (!trimmed) return
     setLoading(true)
     setError('')
-    // Persist code before the request — survives a session-expired redirect
-    localStorage.setItem('pendingPromoCode', trimmed)
     try {
       await api.promo.redeem(trimmed)
-      localStorage.removeItem('pendingPromoCode')
 
       // Immediately reflect Pro status in the UI — no page reload needed
       setIsPremium(true)
@@ -52,7 +49,6 @@ export default function PromoModal({ onClose, onSuccess }) {
         ? 'Your session expired. Sign in again, then re-enter your code.'
         : msg
       )
-      localStorage.removeItem('pendingPromoCode')
     } finally {
       setLoading(false)
     }

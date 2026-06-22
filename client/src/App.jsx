@@ -7,7 +7,6 @@ import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
-import PromoModal from './components/PromoModal'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
@@ -46,7 +45,6 @@ function ProtectedRoute({ children }) {
 export default function App() {
   const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout } = useStore()
   const [splashDone, setSplashDone] = useState(false)
-  const [pendingPromoOpen, setPendingPromoOpen] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
   )
@@ -90,11 +88,6 @@ export default function App() {
     return () => window.removeEventListener('offline', handleOffline)
   }, [])
 
-  // Clean up any stale pendingPromoCode on login (no longer auto-applied)
-  useEffect(() => {
-    if (!isAuthenticated) return
-    localStorage.removeItem('pendingPromoCode')
-  }, [isAuthenticated])
 
   // Auto-logout when any API call gets a 401 (expired token)
   useEffect(() => {
@@ -124,14 +117,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <UpdatePrompt />
-      <AnimatePresence>
-        {pendingPromoOpen && (
-          <PromoModal
-            onClose={() => setPendingPromoOpen(false)}
-            onSuccess={() => setPendingPromoOpen(false)}
-          />
-        )}
-      </AnimatePresence>
       <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
       <AnimatePresence mode="wait">
         <Routes>
