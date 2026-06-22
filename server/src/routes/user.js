@@ -61,13 +61,14 @@ router.delete('/account', authMiddleware, async (req, res) => {
   const userId = req.userId
   console.log('[deleteAccount] Starting deletion for userId:', userId)
 
-  // ── Fetch user (need stripe_subscription_id) ──────────────────────────────
+  // ── Fetch user (need stripe_subscription_id) — non-fatal if not found ───────
   let user = await getUserById(userId).catch(() => null)
   if (!user) user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
-  if (!user) return res.status(404).json({ error: 'User not found' })
+  // Don't 404 — proceed with deletion even if we can't find the row (e.g. user
+  // already partially deleted, or primary record is in the profiles table).
 
   // ── 1. Cancel Stripe subscription ────────────────────────────────────────
-  const subId = user.stripe_subscription_id
+  const subId = user?.stripe_subscription_id
   if (subId) {
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -103,11 +104,21 @@ router.delete('/account', authMiddleware, async (req, res) => {
         console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
       }
     }
+    // Also clean up profiles and email_sends (may or may not exist)
+    for (const table of ['email_sends', 'scan_cache', 'affiliate_clicks']) {
+      try { await sb.from(table).delete().eq('user_id', userId) } catch {}
+    }
+    try {
+      await sb.from('profiles').delete().eq('id', userId)
+      console.log('[deleteAccount] Supabase profiles row deleted')
+    } catch (err) {
+      console.warn('[deleteAccount] Supabase profiles delete skipped:', err.message)
+    }
     try {
       await sb.from('users').delete().eq('id', userId)
-      console.log('[deleteAccount] Supabase user row deleted')
+      console.log('[deleteAccount] Supabase users row deleted')
     } catch (err) {
-      console.error('[deleteAccount] Supabase user delete failed:', err.message)
+      console.warn('[deleteAccount] Supabase users delete skipped:', err.message)
     }
   }
 

@@ -305,13 +305,27 @@ export default function Profile() {
   async function handleDeleteAccount() {
     setDeletingAccount(true)
     setDeleteAccountError('')
+
+    // Block the global session-expired redirect while deletion is in-flight so
+    // the user sees a meaningful error instead of being silently bounced to /auth.
+    const suppressRedirect = (e) => e.stopImmediatePropagation()
+    window.addEventListener('auth:session-expired', suppressRedirect, true)
+
     try {
       await api.user.deleteAccount()
       logout()
       navigate('/', { replace: true })
     } catch (err) {
-      setDeleteAccountError(err.message || 'Deletion failed. Try again or email support@ascendus.com.')
+      const msg = err.message || ''
+      const isExpired = msg.toLowerCase().includes('session') || msg.toLowerCase().includes('expired')
+      setDeleteAccountError(
+        isExpired
+          ? 'Your session expired. Sign out and sign back in, then delete your account.'
+          : msg || 'Deletion failed. Try again or email support@ascendus.com.'
+      )
       setDeletingAccount(false)
+    } finally {
+      window.removeEventListener('auth:session-expired', suppressRedirect, true)
     }
   }
 
