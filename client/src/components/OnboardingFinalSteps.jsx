@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Star, Sparkles, UserPlus, Check, Loader2, ChevronRight, Zap, Trophy, Eye, BarChart2 } from 'lucide-react'
+import { Star, Sparkles, UserPlus, Check, Loader2, ChevronRight, Zap, Trophy, Eye, BarChart2, Lock } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import useStore from '../store/useStore'
@@ -131,96 +131,202 @@ export function StepRating({ onNext }) {
   )
 }
 
+// ── Derive biggest growth area from scan sub-scores ───────────────────────────
+function getBiggestGrowthArea(scan) {
+  if (!scan) return null
+
+  const candidates = []
+
+  const fd = scan.faceData
+  if (fd) {
+    if (fd.jawlineDefinition != null) candidates.push({ label: 'Jawline & Structure',  score: fd.jawlineDefinition, detail: 'How much definition and angularity your jawline currently has versus its structural ceiling' })
+    if (fd.skinClarity       != null) candidates.push({ label: 'Skin Clarity',          score: fd.skinClarity,       detail: 'Texture, tone evenness, and clarity — the single highest-ROI area to address first' })
+    if (fd.eyeArea           != null) candidates.push({ label: 'Eye Area',              score: fd.eyeArea,           detail: 'Periorbital definition, under-eye quality, and how your eye shape reads on camera' })
+    if (fd.facialHarmony     != null) candidates.push({ label: 'Facial Harmony',        score: fd.facialHarmony,     detail: 'How well your facial thirds and feature proportions balance against each other' })
+    if (fd.facialProportions != null) candidates.push({ label: 'Facial Proportions',    score: fd.facialProportions, detail: 'Upper to lower face ratio and the width-to-length balance relative to ideal benchmarks' })
+  }
+
+  if (scan.physiqueScore?.overall != null) {
+    candidates.push({ label: 'Body & Physique', score: scan.physiqueScore.overall, detail: 'Muscle-to-fat ratio, shoulder-to-waist taper, and the visual impact of your current physique' })
+  }
+
+  if (!candidates.length) return null
+  return candidates.reduce((low, c) => c.score < low.score ? c : low)
+}
+
 // ── STEP: Scores Waiting ──────────────────────────────────────────────────────────
-export function StepScoresWaiting({ onAscend, onInvite }) {
-  const metrics = [
-    { icon: Trophy, label: 'Glow Score', value: '??', unit: '/10' },
-    { icon: Eye, label: 'PSL Rating', value: '??', unit: '' },
-    { icon: BarChart2, label: 'Top %', value: '??', unit: '' },
-    { icon: Zap, label: 'Potential', value: '??', unit: '' },
+// Free-user gate shown after scan completes.
+// VISIBLE:  Glow Score number + tier label — the hook that drives unlock curiosity.
+// BLURRED:  PSL Tier, Top %, Potential, and all sub-score details.
+// TEASER:   Biggest growth area category name visible; detail blurred — proves
+//           there's real analysis behind the paywall.
+export function StepScoresWaiting({ onAscend, onInvite, scan }) {
+  const glowScore = scan?.glowScore ?? null
+  const tier      = scan?.tier      ?? null
+
+  const physiqueUpside = scan?.physiqueScore
+    ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
+    : 0
+  const potential = glowScore != null
+    ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
+    : null
+
+  function toTopPct(score) {
+    if (score == null) return null
+    if (score >= 9.0) return 'Top 1%'
+    if (score >= 8.0) return 'Top 5%'
+    if (score >= 7.0) return 'Top 15%'
+    if (score >= 6.0) return 'Top 30%'
+    if (score >= 5.0) return 'Top 50%'
+    return 'Bot 40%'
+  }
+
+  const growthArea = getBiggestGrowthArea(scan)
+
+  // Three locked cards — PSL Tier, Top %, Potential
+  const lockedMetrics = [
+    { icon: Eye,       label: 'PSL Tier',  value: tier ?? '8.1',                    unit: '' },
+    { icon: BarChart2, label: 'Top %',     value: toTopPct(glowScore) ?? 'Top 15%', unit: '' },
+    { icon: Zap,       label: 'Potential', value: potential ?? '8.4',               unit: '/10' },
   ]
 
   return (
     <div className="flex flex-col h-full" style={{ background: BG }}>
 
-      {/* Ambient glow */}
+      {/* Ambient glow behind score */}
       <div style={{
-        position: 'absolute', bottom: '30%', left: '50%', transform: 'translateX(-50%)',
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(198,168,92,0.07) 0%, transparent 70%)',
+        position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)',
+        width: 340, height: 340, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.10) 0%, transparent 68%)',
         pointerEvents: 'none',
       }} />
 
-      <div className="flex-1 flex flex-col justify-center px-6">
+      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
 
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-8"
+          className="flex items-center gap-3 mb-7"
         >
-          <img src={logo} alt="" style={{ width: 28, height: 28, mixBlendMode: 'lighten', opacity: 0.85 }} />
+          <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
           <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
             ASCENDUS ANALYSIS
           </span>
         </motion.div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="font-heading font-bold text-[38px] leading-[1.0] mb-3"
-          style={{ color: TEXT, letterSpacing: '-0.025em' }}
-        >
-          Your results<br />are ready.
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="font-body text-[14px] mb-8"
-          style={{ color: DIM }}
-        >
-          Unlock to see exactly where you rank and what to improve first.
-        </motion.p>
-
-        {/* Metric cards */}
+        {/* ── Hero: visible Glow Score + tier ─────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="grid grid-cols-2 gap-3 mb-6"
+          transition={{ delay: 0.08 }}
+          className="mb-5"
         >
-          {metrics.map(({ icon: Icon, label, value, unit }, i) => (
-            <motion.div
-              key={label}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 + i * 0.07 }}
-              className="rounded-2xl p-4"
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
+            GLOW SCORE
+          </p>
+
+          {/* Big number — fully visible, no blur */}
+          <div className="flex items-end gap-1.5 mb-3">
+            <span
+              className="font-heading font-bold leading-none"
+              style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}
+            >
+              {glowScore != null ? glowScore.toFixed(1) : '—'}
+            </span>
+            <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              /10
+            </span>
+          </div>
+
+          {/* Tier badge — fully visible */}
+          {tier && (
+            <div
+              className="inline-flex items-center px-3 py-1.5 rounded-xl"
               style={{
-                background: 'rgba(198,168,92,0.05)',
-                border: '1px solid rgba(198,168,92,0.15)',
+                background: 'rgba(198,168,92,0.12)',
+                border: '1px solid rgba(198,168,92,0.30)',
               }}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <Icon size={14} style={{ color: G }} />
-                <span className="font-heading text-[10px] tracking-wide font-bold" style={{ color: 'rgba(198,168,92,0.7)' }}>
-                  {label}
-                </span>
+              <span
+                className="font-heading font-bold text-[11px] tracking-[0.14em]"
+                style={{ color: G }}
+              >
+                {tier.toUpperCase()}
+              </span>
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── Teaser: biggest growth area ──────────────────────────────────── */}
+        {growthArea && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
+          >
+            <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
+            <div className="min-w-0">
+              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                Biggest growth area
+              </p>
+              <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>
+                {growthArea.label}
+              </p>
+              {/* Detail is blurred — category name above is the visible hook */}
+              <p
+                className="font-body text-[12px] leading-snug select-none"
+                style={{ color: 'rgba(255,255,255,0.55)', filter: 'blur(5px)', userSelect: 'none' }}
+              >
+                {growthArea.detail}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Three locked metric cards ─────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-3 gap-2.5 mb-5"
+        >
+          {lockedMetrics.map(({ icon: Icon, label, value, unit }, i) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, scale: 0.93 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.35 + i * 0.06 }}
+              className="rounded-2xl p-3 flex flex-col"
+              style={{
+                background: 'rgba(198,168,92,0.04)',
+                border: '1px solid rgba(198,168,92,0.12)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2.5">
+                <Icon size={12} style={{ color: G }} />
+                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </div>
-              {/* Blurred value */}
+              <span className="font-heading text-[9px] tracking-wide font-bold mb-1.5" style={{ color: 'rgba(198,168,92,0.6)' }}>
+                {label}
+              </span>
               <div className="flex items-end gap-0.5">
                 <span
-                  className="font-heading font-bold text-[28px] leading-none select-none"
-                  style={{ color: TEXT, filter: 'blur(8px)', userSelect: 'none' }}
+                  className="font-heading font-bold text-[22px] leading-none select-none"
+                  style={{ color: TEXT, filter: 'blur(7px)', userSelect: 'none' }}
                 >
                   {value}
                 </span>
-                <span className="font-heading font-bold text-[14px] mb-0.5" style={{ color: DIM, filter: 'blur(6px)' }}>
-                  {unit}
-                </span>
+                {unit && (
+                  <span className="font-heading font-bold text-[11px] mb-0.5 select-none" style={{ color: DIM, filter: 'blur(5px)' }}>
+                    {unit}
+                  </span>
+                )}
               </div>
             </motion.div>
           ))}
@@ -228,22 +334,22 @@ export function StepScoresWaiting({ onAscend, onInvite }) {
 
       </div>
 
-      <div className="px-6 pb-10 pt-2 flex flex-col gap-3">
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-3 flex-shrink-0">
         <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.55 }}
           whileTap={{ scale: 0.97 }}
           onClick={onAscend}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          <Sparkles size={16} style={{ color: '#0A0A0A' }} /> Unlock My Results
+          <Sparkles size={16} style={{ color: '#0A0A0A' }} /> Unlock Full Results
         </motion.button>
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.65 }}
           whileTap={{ scale: 0.97 }}
           onClick={onInvite}
           className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[14px] flex items-center justify-center gap-2"
