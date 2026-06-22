@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
+import PromoModal from './components/PromoModal'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
@@ -33,6 +34,7 @@ const Landing        = lazy(() => import('./pages/Landing'))
 const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
 const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
 const Community      = lazy(() => import('./pages/Community'))
+const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -44,6 +46,7 @@ function ProtectedRoute({ children }) {
 export default function App() {
   const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout } = useStore()
   const [splashDone, setSplashDone] = useState(false)
+  const [pendingPromoOpen, setPendingPromoOpen] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
   )
@@ -87,6 +90,12 @@ export default function App() {
     return () => window.removeEventListener('offline', handleOffline)
   }, [])
 
+  // Auto-open promo modal if user had a pending code when their session expired
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (localStorage.getItem('pendingPromoCode')) setPendingPromoOpen(true)
+  }, [isAuthenticated])
+
   // Auto-logout when any API call gets a 401 (expired token)
   useEffect(() => {
     const handle = () => { logout?.(); window.location.replace('/auth') }
@@ -115,6 +124,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <UpdatePrompt />
+      <AnimatePresence>
+        {pendingPromoOpen && (
+          <PromoModal
+            onClose={() => setPendingPromoOpen(false)}
+            onSuccess={() => setPendingPromoOpen(false)}
+          />
+        )}
+      </AnimatePresence>
       <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
       <AnimatePresence mode="wait">
         <Routes>
@@ -154,6 +171,7 @@ export default function App() {
                 <Route path="swipemaxx" element={<SwipeMaxx />} />
                 <Route path="tindermaxx" element={<TinderMaxx />} />
                 <Route path="community" element={<Community />} />
+                <Route path="unlock" element={<ScanUnlockGate />} />
               </Route>
             </>
           )}

@@ -10,7 +10,7 @@ import { api } from '../utils/api'
 // a page reload.  Parent controls visibility via AnimatePresence.
 
 export default function PromoModal({ onClose, onSuccess }) {
-  const [code, setCode]       = useState('')
+  const [code, setCode]       = useState(() => localStorage.getItem('pendingPromoCode') || '')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [success, setSuccess] = useState(false)
@@ -29,8 +29,11 @@ export default function PromoModal({ onClose, onSuccess }) {
     if (!trimmed) return
     setLoading(true)
     setError('')
+    // Persist code before the request — survives a session-expired redirect
+    localStorage.setItem('pendingPromoCode', trimmed)
     try {
       await api.promo.redeem(trimmed)
+      localStorage.removeItem('pendingPromoCode')
 
       // Immediately reflect Pro status in the UI — no page reload needed
       setIsPremium(true)
@@ -43,7 +46,13 @@ export default function PromoModal({ onClose, onSuccess }) {
         onClose()
       }, 2200)
     } catch (err) {
-      setError(err.message || 'Invalid promo code')
+      const msg = err.message || 'Invalid promo code'
+      const isExpired = msg.toLowerCase().includes('session') || msg.toLowerCase().includes('expired')
+      setError(isExpired
+        ? 'Your session expired. Sign in again — your code is saved and will be applied automatically.'
+        : msg
+      )
+      if (!isExpired) localStorage.removeItem('pendingPromoCode')
     } finally {
       setLoading(false)
     }
