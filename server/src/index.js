@@ -7,6 +7,20 @@ if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_')) {
   console.log('✅ Stripe key loaded: sk_***')
 }
 
+// ── Referral velocity-hold re-checker — runs every 15 min ────────────────────
+try {
+  const cron = require('node-cron')
+  const { resolveVelocityHolds } = require('./utils/referralRecheck')
+  cron.schedule('*/15 * * * *', async () => {
+    try { await resolveVelocityHolds() } catch (e) { console.error('[ReferralRecheck] cron error:', e.message) }
+  })
+  // Run once immediately on startup to catch any holds that survived a restart
+  resolveVelocityHolds().catch(e => console.error('[ReferralRecheck] startup run error:', e.message))
+  console.log('✅ Referral re-check scheduler started (every 15 min)')
+} catch (e) {
+  console.warn('⚠️  Referral re-check scheduler not started:', e.message)
+}
+
 // ── Built-in email scheduler (replaces Make.com) ──────────────────────────────
 try {
   const cron = require('node-cron')

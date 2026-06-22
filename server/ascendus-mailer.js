@@ -120,11 +120,12 @@ async function sendUpgradeNudge(userId) {
   if (se) throw new Error(`Resend error: ${se.message}`)
 
   // 6. Log
-  await supabase.rpc('log_email_send', {
-    p_user_id:  userId,
-    p_type:     'day3_nudge',
+  const { error: logErr1 } = await supabase.rpc('log_email_send', {
+    p_user_id:   userId,
+    p_type:      'day3_nudge',
     p_resend_id: sent.id,
   })
+  if (logErr1) console.error(`[Mailer] log_email_send failed for ${userId}:`, logErr1.message)
 
   console.log(`📧 Nudge sent → ${profile.email} (${sent.id})`)
   return { success: true, resend_id: sent.id, email: profile.email }
@@ -243,11 +244,12 @@ async function sendWeeklyRecap(userId) {
   if (se) throw new Error(`Resend error: ${se.message}`)
 
   // 9. Log
-  await supabase.rpc('log_email_send', {
+  const { error: logErr2 } = await supabase.rpc('log_email_send', {
     p_user_id:   userId,
     p_type:      'weekly_recap',
     p_resend_id: sent.id,
   })
+  if (logErr2) console.error(`[Mailer] log_email_send failed for ${userId}:`, logErr2.message)
 
   console.log(`📧 Weekly recap sent → ${profile.email} (${sent.id})`)
   return { success: true, resend_id: sent.id, email: profile.email }
