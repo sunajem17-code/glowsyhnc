@@ -183,11 +183,12 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
 
   const growthArea = getBiggestGrowthArea(scan)
 
-  // Three locked cards — PSL Tier, Top %, Potential
+  const topPct = toTopPct(glowScore)
+
+  // Three locked cards — PSL Tier, Potential (Top % is now visible in hero)
   const lockedMetrics = [
-    { icon: Eye,       label: 'PSL Tier',  value: tier ?? '8.1',                    unit: '' },
-    { icon: BarChart2, label: 'Top %',     value: toTopPct(glowScore) ?? 'Top 15%', unit: '' },
-    { icon: Zap,       label: 'Potential', value: potential ?? '8.4',               unit: '/10' },
+    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '8.1',  unit: '' },
+    { icon: Zap,  label: 'Potential', value: potential ?? '8.4', unit: '/10' },
   ]
 
   return (
@@ -239,23 +240,42 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
             </span>
           </div>
 
-          {/* Tier badge — fully visible */}
-          {tier && (
-            <div
-              className="inline-flex items-center px-3 py-1.5 rounded-xl"
-              style={{
-                background: 'rgba(198,168,92,0.12)',
-                border: '1px solid rgba(198,168,92,0.30)',
-              }}
-            >
-              <span
-                className="font-heading font-bold text-[11px] tracking-[0.14em]"
-                style={{ color: G }}
+          {/* Tier badge + Top % — fully visible */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {tier && (
+              <div
+                className="inline-flex items-center px-3 py-1.5 rounded-xl"
+                style={{
+                  background: 'rgba(198,168,92,0.12)',
+                  border: '1px solid rgba(198,168,92,0.30)',
+                }}
               >
-                {tier.toUpperCase()}
-              </span>
-            </div>
-          )}
+                <span
+                  className="font-heading font-bold text-[11px] tracking-[0.14em]"
+                  style={{ color: G }}
+                >
+                  {tier.toUpperCase()}
+                </span>
+              </div>
+            )}
+            {topPct && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                <span
+                  className="font-heading font-bold text-[11px] tracking-[0.10em]"
+                  style={{ color: 'rgba(255,255,255,0.75)' }}
+                >
+                  {topPct}
+                </span>
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {/* ── Teaser: biggest growth area ──────────────────────────────────── */}
@@ -294,7 +314,7 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="grid grid-cols-3 gap-2.5 mb-5"
+          className="grid grid-cols-2 gap-2.5 mb-5"
         >
           {lockedMetrics.map(({ icon: Icon, label, value, unit }, i) => (
             <motion.div
