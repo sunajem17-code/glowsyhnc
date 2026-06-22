@@ -90,10 +90,10 @@ export default function App() {
     return () => window.removeEventListener('offline', handleOffline)
   }, [])
 
-  // Auto-open promo modal if user had a pending code when their session expired
+  // Clean up any stale pendingPromoCode on login (no longer auto-applied)
   useEffect(() => {
     if (!isAuthenticated) return
-    if (localStorage.getItem('pendingPromoCode')) setPendingPromoOpen(true)
+    localStorage.removeItem('pendingPromoCode')
   }, [isAuthenticated])
 
   // Auto-logout when any API call gets a 401 (expired token)

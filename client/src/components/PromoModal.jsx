@@ -10,7 +10,7 @@ import { api } from '../utils/api'
 // a page reload.  Parent controls visibility via AnimatePresence.
 
 export default function PromoModal({ onClose, onSuccess }) {
-  const [code, setCode]       = useState(() => localStorage.getItem('pendingPromoCode') || '')
+  const [code, setCode]       = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [success, setSuccess] = useState(false)
@@ -49,10 +49,10 @@ export default function PromoModal({ onClose, onSuccess }) {
       const msg = err.message || 'Invalid promo code'
       const isExpired = msg.toLowerCase().includes('session') || msg.toLowerCase().includes('expired')
       setError(isExpired
-        ? 'Your session expired. Sign in again — your code is saved and will be applied automatically.'
+        ? 'Your session expired. Sign in again, then re-enter your code.'
         : msg
       )
-      if (!isExpired) localStorage.removeItem('pendingPromoCode')
+      localStorage.removeItem('pendingPromoCode')
     } finally {
       setLoading(false)
     }
