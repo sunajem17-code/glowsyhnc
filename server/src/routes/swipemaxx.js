@@ -2,6 +2,7 @@ const express   = require('express')
 const Anthropic  = require('@anthropic-ai/sdk')
 const { verifyToken, resolvePro } = require('../middleware/claudeGate')
 const { createLimiter } = require('../middleware/ratelimit')
+const { withRetry } = require('../utils/withRetry')
 
 const router = express.Router()
 
@@ -46,7 +47,7 @@ router.post('/rank', verifyToken, resolvePro, limitMiddleware, async (req, res) 
       },
     ]))
 
-    const message = await client.messages.create({
+    const message = await withRetry(() => client.messages.create({
       model: 'claude-opus-4-5',
       max_tokens: 1024,
       messages: [{
@@ -71,7 +72,7 @@ Respond ONLY in this exact JSON (no markdown, no extra text):
           },
         ],
       }],
-    })
+    }), 'swipemaxx')
 
     const raw = message.content[0].text.trim()
     // Strip markdown code fences Claude sometimes wraps the JSON in

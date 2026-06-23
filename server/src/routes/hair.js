@@ -1,6 +1,7 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const { verifyToken, claudeLimit, requirePro } = require('../middleware/claudeGate')
+const { withRetry } = require('../utils/withRetry')
 
 const router = express.Router()
 
@@ -23,7 +24,7 @@ router.post('/analyze', verifyToken, claudeLimit, async (req, res) => {
   try {
     const client = getClient()
 
-    const message = await client.messages.create({
+    const message = await withRetry(() => client.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5',
       max_tokens: 1200,
       messages: [{
@@ -67,7 +68,7 @@ Return this exact JSON structure with no extra text:
           },
         ],
       }],
-    })
+    }), 'hair')
 
     const text = message.content[0]?.text ?? ''
     const result = parseJSON(text)

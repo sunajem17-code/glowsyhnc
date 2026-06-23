@@ -1,6 +1,7 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
+const { withRetry } = require('../utils/withRetry')
 const db = require('../db')
 
 const FREE_COACH_LIMIT = 3
@@ -144,7 +145,7 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     const client = getClient()
     const systemPrompt = buildSystemPrompt(scanContext)
 
-    const response = await client.messages.create({
+    const response = await withRetry(() => client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 400,
       system: systemPrompt,
@@ -152,7 +153,7 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
         role: m.role,
         content: m.content,
       })),
-    })
+    }), 'coach')
 
     const text = response.content[0]?.text || ''
     res.json({ message: text })

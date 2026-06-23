@@ -2,6 +2,7 @@ const express   = require('express')
 const Anthropic  = require('@anthropic-ai/sdk')
 const { verifyToken, resolvePro } = require('../middleware/claudeGate')
 const { createLimiter } = require('../middleware/ratelimit')
+const { withRetry } = require('../utils/withRetry')
 
 const router = express.Router()
 
@@ -46,7 +47,7 @@ router.post('/rank', verifyToken, resolvePro, limitMiddleware, async (req, res) 
       },
     ]))
 
-    const message = await client.messages.create({
+    const message = await withRetry(() => client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       messages: [{
@@ -71,10 +72,17 @@ Respond ONLY in this exact JSON (no markdown, no extra text):
           },
         ],
       }],
-    })
+    }), 'tindermaxx')
 
     const raw = message.content[0].text.trim()
-    const result = JSON.parse(raw)
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+    let result
+    try {
+      result = JSON.parse(cleaned)
+    } catch {
+      console.error('[TinderMaxx] JSON parse failed. Raw:', raw)
+      return res.status(500).json({ error: 'Analysis returned unexpected format — please try again.' })
+    }
     res.json(result)
   } catch (err) {
     console.error('[TinderMaxx]', err.message)
