@@ -63,15 +63,19 @@ function fileToDataUrl(file) {
 
 function PhotoPicker({ label, value, onChange }) {
   const inputRef = useRef()
+  const [pickErr, setPickErr] = useState('')
 
   async function handlePick() {
+    setPickErr('')
     if (isNative()) {
       // On iOS/Android use Capacitor camera plugin — file input is unreliable in WKWebView
       try {
         const dataUrl = await pickPhoto()
         if (dataUrl) onChange(dataUrl)
       } catch (err) {
-        // user cancelled or denied — silently ignore
+        const msg = (err?.message ?? '').toLowerCase()
+        const isCancelled = msg.includes('cancel') || msg.includes('user cancel')
+        if (!isCancelled) setPickErr('Could not open photos. Check app permissions in Settings.')
       }
     } else {
       inputRef.current?.click()
@@ -109,6 +113,11 @@ function PhotoPicker({ label, value, onChange }) {
           </div>
         )}
       </button>
+      {pickErr && (
+        <p className="font-body text-[10px] mt-1 text-center leading-tight" style={{ color: '#EF4444' }}>
+          {pickErr}
+        </p>
+      )}
       {/* Web fallback file input */}
       <input
         ref={inputRef}

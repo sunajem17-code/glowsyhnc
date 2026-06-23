@@ -54,6 +54,7 @@ export default function Premium() {
   const [unlocking, setUnlocking]         = useState(false)
   const [unlockMsg, setUnlockMsg]         = useState('')
   const [copied, setCopied]               = useState(false)
+  const [copyFailed, setCopyFailed]       = useState(false)
 
   const [searchParams] = useSearchParams()
 
@@ -155,9 +156,30 @@ export default function Premium() {
     if (navigator.share) {
       try { await navigator.share({ text, url: link }) } catch {}
     } else {
-      await navigator.clipboard?.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        await navigator.clipboard.writeText(text)
+        setCopyFailed(false)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } catch {
+        // Clipboard API unavailable or denied — try legacy execCommand
+        const el = document.createElement('input')
+        el.value = text
+        el.style.cssText = 'position:fixed;top:-9999px;opacity:0'
+        document.body.appendChild(el)
+        el.focus()
+        el.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(el)
+        if (ok) {
+          setCopyFailed(false)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } else {
+          // Both methods failed — show the link so the user can copy manually
+          setCopyFailed(true)
+        }
+      }
     }
   }
 
@@ -208,7 +230,7 @@ export default function Premium() {
         />
         <button
           onClick={() => navigate(-1)}
-          className="absolute left-4 top-14 w-9 h-9 rounded-xl flex items-center justify-center"
+          className="absolute left-4 top-14 w-9 h-9 rounded-xl flex items-center justify-center z-20"
           style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
         >
           <ChevronLeft size={18} style={{ color: TEXT }} />
@@ -347,6 +369,20 @@ export default function Premium() {
             <Share2 size={13} />
             {copied ? 'Link copied!' : 'Share My Referral Link'}
           </motion.button>
+
+          {copyFailed && (
+            <div className="mb-2.5 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <p className="font-body text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                Couldn't copy automatically — press and hold to copy manually:
+              </p>
+              <p
+                className="font-mono text-[11px] break-all select-all"
+                style={{ color: GOLD, userSelect: 'all', WebkitUserSelect: 'all' }}
+              >
+                {referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'}
+              </p>
+            </div>
+          )}
 
           {/* Claim button */}
           <motion.button

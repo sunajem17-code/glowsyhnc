@@ -758,11 +758,18 @@ function FaceMetricBar({ label, score, descriptor, locked = false, onUpgrade }) 
 
 // ─── Collapsible section ──────────────────────────────────────────────────────
 
-function Section({ title, icon, children, defaultOpen = true, badge }) {
+function Section({ title, icon, children, defaultOpen = true, badge, onOpenChange }) {
   const [open, setOpen] = useState(defaultOpen)
+  function toggle() {
+    setOpen(o => {
+      const next = !o
+      onOpenChange?.(next)
+      return next
+    })
+  }
   return (
     <div className="card mb-3">
-      <button className="w-full flex items-center gap-2 mb-1" onClick={() => setOpen(o => !o)}>
+      <button className="w-full flex items-center gap-2 mb-1" onClick={toggle}>
         <span className="flex-shrink-0">{icon}</span>
         <h2 className="font-heading font-bold text-sm text-primary flex-1 text-left">{title}</h2>
         {badge && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#C6A85C]/10 text-[#C6A85C]">{badge}</span>}
@@ -1187,14 +1194,31 @@ export default function Results() {
   // Show paywall after a short delay — let free users see their scores first
   const [showPaywall, setShowPaywall] = useState(false)
   const paywallDismissed = useRef(false)
+  const ffbOpen          = useRef(false)   // true while Face Feature Breakdown is expanded
+  const paywallTimer     = useRef(null)    // pending setTimeout handle
+
+  function handleFfbOpenChange(isOpen) {
+    ffbOpen.current = isOpen
+    if (isOpen && paywallTimer.current) {
+      // User opened the free section — cancel the pending auto-paywall
+      clearTimeout(paywallTimer.current)
+      paywallTimer.current = null
+    }
+  }
 
   useEffect(() => {
     if (isPremium || !currentScan || paywallDismissed.current) return
     if (isNewScan) {
-      if (revealDone) setShowPaywall(true)
+      if (revealDone && !ffbOpen.current) setShowPaywall(true)
     } else {
-      const t = setTimeout(() => setShowPaywall(true), 3000)
-      return () => clearTimeout(t)
+      paywallTimer.current = setTimeout(() => {
+        if (!ffbOpen.current) setShowPaywall(true)
+        paywallTimer.current = null
+      }, 3000)
+      return () => {
+        clearTimeout(paywallTimer.current)
+        paywallTimer.current = null
+      }
     }
   }, [isPremium, currentScan, isNewScan, revealDone])
 
@@ -2006,6 +2030,61 @@ export default function Results() {
           {physiqueScore.physique_notes && isPremium && (
             <p className="text-[10px] text-secondary font-body mt-2 leading-relaxed italic">{physiqueScore.physique_notes}</p>
           )}
+
+          {/* ── Strengths & Areas to Develop ── */}
+          {(physiqueScore.physique_strengths?.length > 0 || physiqueScore.physique_improvements?.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-default space-y-3">
+              {physiqueScore.physique_strengths?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-heading font-bold uppercase tracking-widest mb-2" style={{ color: '#34C759' }}>Strengths</p>
+                  <div className="space-y-1.5">
+                    {physiqueScore.physique_strengths.map((s, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(52,199,89,0.15)' }}>
+                          <span className="text-[8px] font-bold" style={{ color: '#34C759' }}>✓</span>
+                        </span>
+                        {isPremium
+                          ? <p className="text-[11px] font-body leading-relaxed text-primary">{s}</p>
+                          : <p className="text-[11px] font-body leading-relaxed text-primary select-none" style={{ filter: 'blur(4px)' }}>{s}</p>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {physiqueScore.physique_improvements?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-heading font-bold uppercase tracking-widest mb-2" style={{ color: '#F5A623' }}>Areas to Develop</p>
+                  <div className="space-y-1.5">
+                    {physiqueScore.physique_improvements.map((imp, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(245,166,35,0.15)' }}>
+                          <Target size={8} style={{ color: '#F5A623' }} />
+                        </span>
+                        {isPremium
+                          ? <p className="text-[11px] font-body leading-relaxed text-primary">{imp}</p>
+                          : <p className="text-[11px] font-body leading-relaxed text-primary select-none" style={{ filter: 'blur(4px)' }}>{imp}</p>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* CTA to Plan tab */}
+              <button
+                onClick={() => navigate('/plan')}
+                className="w-full mt-2 py-3 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[13px] transition-opacity active:opacity-75"
+                style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)', color: '#C6A85C' }}
+              >
+                <Dumbbell size={14} />
+                View Your Training Plan
+                <ArrowRight size={13} />
+              </button>
+              <p className="text-[9px] text-secondary font-body text-center leading-relaxed opacity-60">
+                General guidance only · not a substitute for professional training or medical advice
+              </p>
+            </div>
+          )}
         </Section>
       )}
 
@@ -2048,18 +2127,33 @@ export default function Results() {
       )}
 
       {/* ── Face Feature Breakdown ────────────────────────────────── */}
-      <Section title="Face Feature Breakdown" icon={<User size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false}>
+      <Section
+        title="Face Feature Breakdown"
+        icon={<User size={16} style={{ color: '#C6A85C' }} />}
+        defaultOpen={false}
+        onOpenChange={handleFfbOpenChange}
+      >
         <div className="space-y-0">
-          {[
-            { label: 'Facial Symmetry', score: faceData?.symmetry, note: 'Sleeping on your back, correcting dominant chewing side, and fixing posture all improve symmetry over time.' },
-            { label: 'Jawline Definition', score: faceData?.jawlineDefinition, note: 'Correlates directly with body fat %. Reducing body fat dramatically reveals the jawline. Mewing for long-term structural improvement.' },
-            { label: 'Skin Clarity', score: faceData?.skinClarity, note: 'Consistent cleanser → treatment → moisturizer → SPF routine produces visible change in 4–8 weeks. Retinol or tretinoin accelerates results.' },
-            { label: 'Facial Proportions', score: faceData?.facialProportions, note: 'Ideal face has equal facial thirds. Structural — address via mewing, hairstyle, beard length.' },
-            { label: 'Eye Area', score: faceData?.eyeArea, note: 'Addressed via sleep, hydration, targeted eye cream, and strategic brow grooming. Sleep consistency is #1.' },
-            { label: 'Overall Harmony', score: faceData?.facialHarmony, note: 'How all facial features read together. Improves as individual metrics improve — grooming and skincare have the fastest ROI.' },
-          ].filter(m => m.score != null).map(m => (
-            <ScoreRow key={m.label} label={m.label} score={m.score} note={m.note} isPremium={isPremium} onUpgrade={() => navigate('/premium')} />
-          ))}
+          {(() => {
+            const rows = [
+              { label: 'Facial Symmetry',    score: faceData?.symmetry,           note: 'Sleeping on your back, correcting dominant chewing side, and fixing posture all improve symmetry over time.' },
+              { label: 'Jawline Definition', score: faceData?.jawlineDefinition,  note: 'Correlates directly with body fat %. Reducing body fat dramatically reveals the jawline. Mewing for long-term structural improvement.' },
+              { label: 'Skin Clarity',       score: faceData?.skinClarity,        note: 'Consistent cleanser → treatment → moisturizer → SPF routine produces visible change in 4–8 weeks. Retinol or tretinoin accelerates results.' },
+              { label: 'Facial Proportions', score: faceData?.facialProportions,  note: 'Ideal face has equal facial thirds. Structural — address via mewing, hairstyle, beard length.' },
+              { label: 'Eye Area',           score: faceData?.eyeArea,            note: 'Addressed via sleep, hydration, targeted eye cream, and strategic brow grooming. Sleep consistency is #1.' },
+              { label: 'Overall Harmony',    score: faceData?.facialHarmony,      note: 'How all facial features read together. Improves as individual metrics improve — grooming and skincare have the fastest ROI.' },
+            ].filter(m => m.score != null)
+            if (rows.length === 0) {
+              return (
+                <p className="font-body text-[12px] text-center py-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  Feature scores are generated during your scan and available on your next analysis.
+                </p>
+              )
+            }
+            return rows.map(m => (
+              <ScoreRow key={m.label} label={m.label} score={m.score} note={m.note} isPremium={isPremium} onUpgrade={() => navigate('/premium')} />
+            ))
+          })()}
         </div>
       </Section>
 

@@ -274,7 +274,7 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
             <img
               src={facePhotoUrl}
               alt=""
-              crossOrigin="anonymous"
+              crossOrigin={facePhotoUrl.startsWith('data:') ? undefined : 'anonymous'}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           )}
@@ -391,12 +391,19 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
     if (!cardRef.current) return
     setGenerating(true); setError(null)
     try {
-      // Wait for DOM paint, then wait for all <img> elements inside the card to finish loading
+      // Wait for DOM paint, then wait for all <img> elements inside the card to finish loading.
+      // Hard cap of 3s per image — if an image never fires onload/onerror (blocked network,
+      // WKWebView CORS edge-case) the wait resolves anyway so html2canvas can proceed.
       await new Promise(r => setTimeout(r, 200))
       const imgs = Array.from(cardRef.current.querySelectorAll('img'))
-      await Promise.all(imgs.map(img =>
-        img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res })
-      ))
+      await Promise.all(imgs.map(img => {
+        if (img.complete) return Promise.resolve()
+        return new Promise(res => {
+          const t = setTimeout(res, 3000)
+          img.onload  = () => { clearTimeout(t); res() }
+          img.onerror = () => { clearTimeout(t); res() }
+        })
+      }))
       // Wait for web fonts — until they load, text renders in a fallback font with
       // different metrics, which can shift the layout taller and clip content (e.g.
       // the footer) against the card's overflow:hidden bottom edge at capture time.
@@ -411,7 +418,7 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
         backgroundColor: '#0a0a0a',
         scale: 2,
         logging: false,
-        imageTimeout: 8000,
+        imageTimeout: 3000,
         width: CARD_W,
         height: CARD_H,
       })
