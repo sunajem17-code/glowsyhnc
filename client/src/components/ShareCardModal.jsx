@@ -326,7 +326,6 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
         gap: 10,
         flexShrink: 0,
       }}>
-        <img src={SEARCH_ICON_URI} width={16} height={16} alt="" style={{ flexShrink: 0, opacity: 0.5 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 8, color: '#404040', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
             Search on the App Store

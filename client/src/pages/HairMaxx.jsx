@@ -923,7 +923,7 @@ export default function HairMaxx() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: SURFACE }}>
+    <div className="page-scroll" style={{ background: SURFACE }}>
       <Helmet>
         <title>AI Hair Analysis &amp; Hairmaxx Guide — Ascendus</title>
         <meta name="description" content="Scan your hair type with AI and get a personalized hairmaxx routine. Identify your curl pattern, porosity, and the exact products to maximize your hair's potential." />

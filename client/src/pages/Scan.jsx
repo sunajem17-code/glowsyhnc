@@ -637,7 +637,8 @@ export default function Scan() {
       incrementScanCount()
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
-      navigate('/results')
+      // Premium users see full results immediately; free users hit the unlock gate
+      navigate(isPremium ? '/results' : '/unlock')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
       if (err.message === 'hourly_cap_reached') {
@@ -914,14 +915,14 @@ export default function Scan() {
           {/* Step 2: side profile → advance to body step */}
           {step === 2 && (
             <>
-              <button
-                onClick={() => { if (sidePhoto) { setStep(3); setError('') } }}
-                className="btn-amber"
-                disabled={!sidePhoto}
-                style={!sidePhoto ? { opacity: 0.55 } : {}}
-              >
-                {sidePhoto ? 'Continue →' : 'Take or upload side profile first'}
-              </button>
+              {sidePhoto && (
+                <button
+                  onClick={() => { setStep(3); setError('') }}
+                  className="btn-amber"
+                >
+                  Continue →
+                </button>
+              )}
               <button
                 onClick={() => { setStep(3); setError('') }}
                 className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"

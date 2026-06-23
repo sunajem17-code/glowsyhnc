@@ -74,13 +74,18 @@ Respond ONLY in this exact JSON (no markdown, no extra text):
     })
 
     const raw = message.content[0].text.trim()
-    const result = JSON.parse(raw)
-    res.json(result)
-  } catch (err) {
-    console.error('[TinderMaxx]', err.message)
-    if (err instanceof SyntaxError) {
+    // Strip markdown code fences Claude sometimes wraps the JSON in
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+    let result
+    try {
+      result = JSON.parse(cleaned)
+    } catch {
+      console.error('[SwipeMaxx] JSON parse failed. Raw response:', raw)
       return res.status(500).json({ error: 'Analysis returned unexpected format — please try again.' })
     }
+    res.json(result)
+  } catch (err) {
+    console.error('[SwipeMaxx]', err.message)
     res.status(500).json({ error: 'Analysis failed — try again.' })
   }
 })
