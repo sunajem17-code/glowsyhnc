@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -805,9 +805,124 @@ function ReportSheet({ postId, onClose }) {
   )
 }
 
-const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onRate }) {
+// ── EditSheet ─────────────────────────────────────────────────────────────────
+function EditSheet({ post, onClose, onSaved }) {
+  const [caption,     setCaption]     = useState(post.caption     ?? '')
+  const [displayName, setDisplayName] = useState(post.display_name ?? '')
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState(null)
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      const { post: updated } = await api.community.editPost(post.id, { caption, displayName })
+      onSaved(updated)
+      onClose()
+    } catch (e) {
+      setError(e?.message || 'Could not save. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <motion.div
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0,  opacity: 1 }}
+        exit={{    y: 80, opacity: 0 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        className="w-full rounded-t-3xl p-6"
+        style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-heading font-bold text-base text-primary">Edit Post</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <X size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
+          </button>
+        </div>
+
+        <label className="block text-[11px] font-heading font-semibold uppercase tracking-widest text-secondary mb-1.5">
+          Display Name
+        </label>
+        <input
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value.slice(0, 30))}
+          maxLength={30}
+          className="w-full rounded-xl px-4 py-3 text-sm font-body text-primary mb-4"
+          style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
+        />
+
+        <label className="block text-[11px] font-heading font-semibold uppercase tracking-widest text-secondary mb-1.5">
+          Caption <span style={{ color: 'rgba(255,255,255,0.3)' }}>— optional</span>
+        </label>
+        <textarea
+          value={caption}
+          onChange={e => setCaption(e.target.value.slice(0, 280))}
+          maxLength={280}
+          rows={3}
+          placeholder="What's your story?"
+          className="w-full rounded-xl px-4 py-3 text-sm font-body text-primary resize-none mb-1"
+          style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
+        />
+        <p className="text-[11px] text-right mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>{caption.length}/280</p>
+
+        {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
+
+        <button
+          onClick={handleSave}
+          disabled={saving || !displayName.trim()}
+          className="w-full py-3.5 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2"
+          style={{ background: GOLD, color: '#0A0A0A', opacity: (saving || !displayName.trim()) ? 0.5 : 1 }}
+        >
+          {saving ? <Loader2 size={15} className="animate-spin" /> : 'Save Changes'}
+        </button>
+      </motion.div>
+    </div>
+  )
+}
+
+// ── ConfirmDialog ─────────────────────────────────────────────────────────────
+function ConfirmDialog({ message, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={onCancel}>
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1,    opacity: 1 }}
+        exit={{    scale: 0.92, opacity: 0 }}
+        className="w-full max-w-xs rounded-2xl p-6"
+        style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="font-body text-sm text-primary mb-5 text-center leading-relaxed">{message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
+            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
+            style={{ background: '#c0392b', color: '#fff' }}
+          >
+            Delete
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onEdit, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
+  const [showMenu, setShowMenu]             = useState(false)
+  const [showEdit, setShowEdit]             = useState(false)
   const isRateMe = post.post_type === 'rate-me'
 
   const improvement = post.score_before != null && post.score_after != null
@@ -853,11 +968,53 @@ const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLi
           </div>
         )}
         {!!post.is_mine && (
-          <button onClick={() => onDelete(post.id)}>
-            <Trash2 size={14} style={{ color: 'rgba(255,255,255,0.2)' }} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(v => !v)}
+              className="p-1.5 rounded-lg"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+            >
+              <MoreVertical size={16} />
+            </button>
+            <AnimatePresence>
+              {showMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                  animate={{ opacity: 1, scale: 1,    y: 0 }}
+                  exit={{    opacity: 0, scale: 0.92, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-8 rounded-xl overflow-hidden z-30"
+                  style={{ background: '#222', border: '1px solid rgba(255,255,255,0.12)', minWidth: 140 }}
+                >
+                  <button
+                    onClick={() => { setShowMenu(false); setShowEdit(true) }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body text-primary"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+                  >
+                    <Pencil size={13} style={{ color: GOLD }} /> Edit
+                  </button>
+                  <button
+                    onClick={() => { setShowMenu(false); onDelete(post.id) }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body"
+                    style={{ color: '#ef4444' }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
       </div>
+      <AnimatePresence>
+        {showEdit && (
+          <EditSheet
+            post={post}
+            onClose={() => setShowEdit(false)}
+            onSaved={updated => onEdit(post.id, updated)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Score bar (glow-up only) */}
       {!isRateMe && post.score_before != null && post.score_after != null && (
@@ -1002,11 +1159,27 @@ export default function Community() {
     } catch {}
   }, [])
 
-  const handleDelete = useCallback(async (postId) => {
+  const [confirmDelete, setConfirmDelete] = useState(null) // postId pending confirm
+
+  const handleDelete = useCallback((postId) => {
+    setConfirmDelete(postId)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    const postId = confirmDelete
+    setConfirmDelete(null)
     try {
       await api.community.deletePost(postId)
       setPosts(prev => prev.filter(p => p.id !== postId))
     } catch {}
+  }, [confirmDelete])
+
+  const handleEdit = useCallback((postId, updated) => {
+    setPosts(prev => prev.map(p =>
+      p.id === postId
+        ? { ...p, caption: updated.caption, display_name: updated.display_name }
+        : p
+    ))
   }, [])
 
   const handleCommentAdded = useCallback(() => {
@@ -1082,12 +1255,20 @@ export default function Community() {
             onLike={handleLike}
             onOpenComments={setActivePost}
             onDelete={handleDelete}
+            onEdit={handleEdit}
             onRate={handleRate}
           />
         ))
       )}
 
       <AnimatePresence>
+        {confirmDelete && (
+          <ConfirmDialog
+            message="Delete this post? This can't be undone."
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setConfirmDelete(null)}
+          />
+        )}
         {showShare && (
           <ShareModal
             onClose={() => setShowShare(false)}

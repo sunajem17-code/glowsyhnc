@@ -47,7 +47,10 @@ async function request(path, options = {}) {
             window.dispatchEvent(new CustomEvent('auth:session-expired'))
           }
         } catch {}
-        throw new Error('Session expired. Please sign in again.')
+        const sessionErr = new Error(errBody.error || 'Session expired. Please sign in again.')
+        sessionErr.status = 401
+        sessionErr.isSessionExpired = true
+        throw sessionErr
       }
       throw new Error(errBody.error || 'Invalid email or password')
     }
@@ -140,6 +143,7 @@ export const api = {
   community: {
     feed:           ()           => request('/community/feed'),
     post:           (data)       => request('/community/post', { method: 'POST', body: JSON.stringify(data) }),
+    editPost:       (id, data)   => request(`/community/post/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deletePost:     (id)         => request(`/community/post/${id}`, { method: 'DELETE' }),
     like:           (id)         => request(`/community/post/${id}/like`, { method: 'POST' }),
     comments:       (id)         => request(`/community/post/${id}/comments`),
