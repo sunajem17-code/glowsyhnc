@@ -19,7 +19,7 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
 
-// POST /api/tindermaxx/rank
+// POST /api/swipemaxx/rank
 // Body: { photos: [{ base64, mediaType }], gender }
 router.post('/rank', verifyToken, resolvePro, limitMiddleware, async (req, res) => {
   const { photos, gender = 'male' } = req.body

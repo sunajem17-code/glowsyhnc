@@ -38,8 +38,7 @@ const APPLE_PATH =
 // regardless of when they were painted). So we never render a live <canvas>
 // into the captured tree — instead we paint on an OFFSCREEN canvas, convert
 // it to a PNG data URL once, and render a plain <img>. html2canvas already
-// handles <img src="data:..."> reliably (avatar photo, app logo, search icon
-// all use this path).
+// handles <img src="data:..."> reliably (avatar photo, app logo, all use this path).
 function canvasToDataUrl(w, h, draw) {
   const c = document.createElement('canvas')
   c.width = w
@@ -90,15 +89,6 @@ function AppleLogoCanvas({ size = 20, color = '#ffffff' }) {
     />
   )
 }
-
-const SEARCH_ICON_URI =
-  'data:image/svg+xml;base64,' +
-  btoa(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">' +
-    '<circle cx="11" cy="11" r="7" stroke="#d4af37" stroke-width="2"/>' +
-    '<path d="M16.5 16.5L21 21" stroke="#d4af37" stroke-width="2" stroke-linecap="round"/>' +
-    '</svg>'
-  )
 
 // ── ScoreBox ──────────────────────────────────────────────────────────────────
 // Fix 1: fixed height (88px) + CSS grid ensure all 6 cards are perfectly equal.
