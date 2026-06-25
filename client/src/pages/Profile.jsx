@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import { isNative } from '../utils/iap'
-import { Purchases } from '@revenuecat/purchases-capacitor'
+import { InAppReview } from '@capacitor-community/in-app-review'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Shield, CreditCard, Share2, Trash2,
@@ -366,15 +366,10 @@ export default function Profile() {
   async function submitRating(stars) {
     setRating(stars)
     setRated(true)
-    if (stars >= 4) {
-      // Trigger native SKStoreReviewAPI — no URL, no region issues
+    if (stars >= 4 && Capacitor.isNativePlatform()) {
       try {
-        if (Capacitor.isNativePlatform()) {
-          await Purchases.requestReview()
-        } else {
-          window.open(`https://apps.apple.com/app/id6744042195?action=write-review`, '_blank', 'noopener')
-        }
-      } catch { /* best-effort */ }
+        await InAppReview.requestReview()
+      } catch { /* best-effort — Apple throttles this to a few times/year */ }
     }
     setTimeout(() => setRateOpen(false), 1800)
   }

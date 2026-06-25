@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Star, Sparkles, UserPlus, Check, Loader2, ChevronRight, Zap, Trophy, Eye, BarChart2, Lock } from 'lucide-react'
-import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
-import { Purchases } from '@revenuecat/purchases-capacitor'
+import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
@@ -16,19 +15,11 @@ const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.38)'
 const SURFACE = 'rgba(255,255,255,0.04)'
 
-const APP_STORE_ID = '6744042195'
-// Universal URL — no country segment, used only as web fallback
-const REVIEW_URL = `https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`
-
 async function openAppStoreReview() {
+  if (!Capacitor.isNativePlatform()) return
   try {
-    if (Capacitor.isNativePlatform()) {
-      // Native SKStoreReviewAPI — shows the popup inside the app, no region issues
-      await Purchases.requestReview()
-    } else {
-      window.open(REVIEW_URL, '_blank', 'noopener')
-    }
-  } catch { /* best-effort */ }
+    await InAppReview.requestReview()
+  } catch { /* best-effort — Apple throttles this to a few times/year */ }
 }
 
 // ── STEP: Rating ─────────────────────────────────────────────────────────────────
