@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
 import logo from '../assets/ascendus-icon.png'
 
 const GOLD   = '#C6A85C'
@@ -8,7 +7,6 @@ const SURFACE = '#0E0E0E'
 
 export default function AgeGate({ onConfirmed }) {
   const [checked, setChecked] = useState(false)
-  const navigate = useNavigate()
 
   return (
     <div
@@ -78,23 +76,23 @@ export default function AgeGate({ onConfirmed }) {
           <span className="font-body text-[14px] leading-snug" style={{ color: 'rgba(240,237,230,0.8)' }}>
             I confirm I am <strong style={{ color: '#F0EDE6' }}>13 years of age or older</strong> and
             agree to the{' '}
-            <button
-              type="button"
+            <a
+              href="/terms"
               className="underline"
               style={{ color: GOLD }}
-              onClick={e => { e.stopPropagation(); navigate('/terms') }}
+              onClick={e => e.stopPropagation()}
             >
               Terms of Use
-            </button>
+            </a>
             {' '}and{' '}
-            <button
-              type="button"
+            <a
+              href="/privacy"
               className="underline"
               style={{ color: GOLD }}
-              onClick={e => { e.stopPropagation(); navigate('/privacy') }}
+              onClick={e => e.stopPropagation()}
             >
               Privacy Policy
-            </button>
+            </a>
             .
           </span>
         </label>
@@ -117,23 +115,21 @@ export default function AgeGate({ onConfirmed }) {
       {/* Footer */}
       <p className="font-body text-[11px] text-center" style={{ color: 'rgba(255,255,255,0.2)' }}>
         By continuing you accept our{' '}
-        <button
-          type="button"
+        <a
+          href="/privacy"
           className="underline"
           style={{ color: 'rgba(198,168,92,0.5)' }}
-          onClick={() => navigate('/privacy')}
         >
           Privacy Policy
-        </button>
+        </a>
         {' '}and{' '}
-        <button
-          type="button"
+        <a
+          href="/terms"
           className="underline"
           style={{ color: 'rgba(198,168,92,0.5)' }}
-          onClick={() => navigate('/terms')}
         >
           Terms of Use
-        </button>
+        </a>
       </p>
     </div>
   )
