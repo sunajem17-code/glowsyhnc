@@ -157,6 +157,12 @@ app.get('/',           (req, res) => res.json({ status: 'ok', timestamp: new Dat
 app.get('/health',     (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// Deployed commit — RAILWAY_GIT_COMMIT_SHA is injected automatically by Railway
+app.get('/api/version', (req, res) => res.json({
+  commit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+  timestamp: new Date().toISOString(),
+}))
+
 // Error handler
 app.use((err, req, res, next) => {
   console.error('[server error]', err?.message, err?.stack)
