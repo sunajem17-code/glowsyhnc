@@ -10,6 +10,7 @@ import UpdatePrompt from './components/UpdatePrompt'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
+import AgeGate from './pages/AgeGate'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
@@ -43,7 +44,7 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout } = useStore()
+  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout, ageConfirmed, setAgeConfirmed } = useStore()
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -95,6 +96,11 @@ export default function App() {
     window.addEventListener('auth:session-expired', handle)
     return () => window.removeEventListener('auth:session-expired', handle)
   }, [])
+
+  // COPPA: age gate is shown once per install, before anything else
+  if (!ageConfirmed) {
+    return <AgeGate onConfirmed={setAgeConfirmed} />
+  }
 
   // Skip splash entirely for unauthenticated users — they land on the SEO landing
   // page directly, which is better for conversion AND Google crawling.

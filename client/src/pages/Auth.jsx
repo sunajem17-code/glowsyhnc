@@ -315,7 +315,7 @@ export default function Auth() {
       </motion.form>
 
       {/* Mode toggle */}
-      <div className="px-6 py-10 text-center">
+      <div className="px-6 pt-10 pb-4 text-center">
         {isSignup ? (
           <>
             <span className="text-sm text-secondary font-body">Already have an account? </span>
@@ -342,6 +342,16 @@ export default function Auth() {
           </>
         )}
       </div>
+
+      {/* Privacy + Terms links — shown in signup mode */}
+      {isSignup && (
+        <p className="px-6 pb-10 text-center font-body text-xs text-secondary">
+          By signing up you agree to our{' '}
+          <a href="/terms" className="underline" style={{ color: '#C6A85C' }}>Terms of Use</a>
+          {' '}and{' '}
+          <a href="/privacy" className="underline" style={{ color: '#C6A85C' }}>Privacy Policy</a>.
+        </p>
+      )}
     </div>
   )
 }

@@ -40,6 +40,7 @@ const useStore = create(
         gender: null,
         userProfile: null,
         legalConsented: false,
+        // age gate is device-level, intentionally NOT reset on logout
       }),
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
 
@@ -90,6 +91,11 @@ const useStore = create(
       // Legal consent (age gate + AI/biometric consent)
       legalConsented: false,
       setLegalConsented: () => set({ legalConsented: true }),
+
+      // 13+ age gate — shown once per install
+      ageConfirmed: false,
+      ageConfirmedAt: null,
+      setAgeConfirmed: () => set({ ageConfirmed: true, ageConfirmedAt: new Date().toISOString() }),
 
       // Units preference
       units: 'metric', // 'metric' | 'imperial'
@@ -268,6 +274,8 @@ const useStore = create(
         theme: state.theme,
         hasOnboarded: state.hasOnboarded,
         legalConsented: state.legalConsented,
+        ageConfirmed: state.ageConfirmed,
+        ageConfirmedAt: state.ageConfirmedAt,
         units: state.units,
         lastScanDate: state.lastScanDate,
         referralCode: state.referralCode,
