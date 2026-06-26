@@ -1080,6 +1080,9 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
               try {
                 const info = await restorePurchases()
                 if (info?.entitlements?.active?.['Ascendus Pro']) {
+                  const rcUserId = info?.originalAppUserId
+                  api.payments.syncRc(rcUserId).catch(() => {})
+                  sessionStorage.setItem('asc_pro_splash_shown', '1')
                   setIsPremium(true)
                   onClose()
                 } else {

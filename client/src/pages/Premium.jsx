@@ -117,7 +117,11 @@ export default function Premium() {
       const info = await restorePurchases()
       const isPro = !!info?.entitlements?.active?.['Ascendus Pro']
       if (isPro) {
+        const rcUserId = info?.originalAppUserId
+        api.payments.syncRc(rcUserId).catch(() => {})
+        sessionStorage.setItem('asc_pro_splash_shown', '1')
         setIsPremium(true)
+        navigate('/dashboard')
       } else {
         setCheckoutError('No previous purchase found.')
       }
@@ -140,8 +144,9 @@ export default function Premium() {
     try {
       const { ok, isPremium: granted } = await api.referral.unlockPro()
       if (ok && granted) {
+        sessionStorage.setItem('asc_pro_splash_shown', '1')
         setIsPremium(true)
-        setUnlockMsg('🎉 Pro unlocked! Enjoy.')
+        navigate('/dashboard')
       }
     } catch (err) {
       setUnlockMsg(err.message || 'Not enough referrals yet.')
