@@ -6,9 +6,10 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import TransformationScreen from '../components/TransformationScreen'
-import { StepRating, StepScoresWaiting, StepPaywall } from '../components/OnboardingFinalSteps'
+import { StepRating, StepPaywall } from '../components/OnboardingFinalSteps'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
+import { getDeviceId } from '../utils/deviceId'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const G = '#C6A85C'
@@ -319,7 +320,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const setAuth = useStore(s => s.setAuth)
-  const { setHasOnboarded, setLegalConsented, setReferralCode } = useStore()
+  const { setHasOnboarded, setLegalConsented, setAgeConfirmed, setReferralCode } = useStore()
 
   async function handleSignIn(e) {
     e.preventDefault()
@@ -330,6 +331,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
       setAuth(data.user, data.token)
       setReferralCode(String(data.user.id).substring(0, 8).toUpperCase())
       setLegalConsented()
+      setAgeConfirmed()
       setHasOnboarded()
       onSuccess()
     } catch (err) {
@@ -429,11 +431,13 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
       // Pass referral code if user arrived via a referral link (?ref=ASCXXXXX)
       const urlParams = new URLSearchParams(window.location.search)
       const refCode = urlParams.get('ref')
+      const deviceId = await getDeviceId().catch(() => null)
       const res = await api.auth.register({
         name: data.name.trim(),
         email: data.email.trim(),
         password: data.password,
-        ...(refCode ? { refCode } : {}),
+        ...(refCode   ? { refCode }   : {}),
+        ...(deviceId  ? { deviceId }  : {}),
       })
       setAuth(res.user, res.token)
       setReferralCode(String(res.user.id).substring(0, 8).toUpperCase())
@@ -588,9 +592,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
   const allChecked = Object.values(checks).every(Boolean)
 
   const items = [
-    { key: 'age', label: 'I am 17 years of age or older', sub: null },
-    { key: 'terms', label: 'I agree to the Terms of Service', sub: null, link: '/terms' },
-    { key: 'privacy', label: 'I agree to the Privacy Policy', sub: null, link: '/privacy' },
+    { key: 'legalAgeConsent', label: 'I confirm I am 13 years of age or older and agree to the Terms of Service and Privacy Policy.', sub: null, link: 'both' },
     {
       key: 'aiConsent',
       label: 'I consent to AI photo analysis',
@@ -611,7 +613,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
           Before you begin.
         </h1>
         <p className="font-body text-[13px] mb-5" style={{ color: DIM }}>
-          All 5 must be checked to continue.
+          All 3 must be checked to continue.
         </p>
 
         <div className="space-y-2.5 mb-5">
@@ -621,7 +623,15 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
                 checked={!!checks[key]}
                 onToggle={() => onToggle(key)}
                 label={
-                  link ? (
+                  link === 'both' ? (
+                    <span>
+                      I confirm I am 13 years of age or older and agree to the{' '}
+                      <span role="link" onClick={e => { e.stopPropagation(); navigate('/terms') }} className="underline cursor-pointer" style={{ color: G }}>Terms of Service</span>
+                      {' '}and{' '}
+                      <span role="link" onClick={e => { e.stopPropagation(); navigate('/privacy') }} className="underline cursor-pointer" style={{ color: G }}>Privacy Policy</span>
+                      .
+                    </span>
+                  ) : link ? (
                     <span>
                       {label.split(' Terms of Service')[0]}
                       {label.includes('Terms of Service') && (
@@ -1631,7 +1641,7 @@ function IntroSlides({ onDone }) {
 export default function PremiumOnboarding() {
   const navigate = useNavigate()
   const {
-    setUserProfile, setHasOnboarded, setLegalConsented,
+    setUserProfile, setHasOnboarded, setLegalConsented, setAgeConfirmed,
     setGender, setAssignedPhase, setUnits, units, isAuthenticated, setAuth,
   } = useStore()
 
@@ -1652,7 +1662,7 @@ export default function PremiumOnboarding() {
   })
 
   const [checks, setChecks] = useState({
-    age: false, terms: false, privacy: false, aiConsent: false, disclaimer: false,
+    legalAgeConsent: false, aiConsent: false, disclaimer: false,
   })
 
   function updateField(key, value) {
@@ -1685,6 +1695,7 @@ export default function PremiumOnboarding() {
     setGender(formData.gender || null)
     setAssignedPhase(phase)
     setLegalConsented()
+    setAgeConfirmed()
     setHasOnboarded()
 
     if (authData) {
@@ -1766,7 +1777,7 @@ export default function PremiumOnboarding() {
   }
 
   // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight,
-  //       6=phase, 7=transformation, 8=rating, 9=scores-waiting, 10=paywall (final → /scan)
+  //       6=phase, 7=transformation, 8=rating, 9=paywall (final → /scan)
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
@@ -1791,10 +1802,6 @@ export default function PremiumOnboarding() {
     <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
     <TransformationScreen key="transformation" onNext={goNext} />,
     <StepRating key="rating" onNext={goNext} />,
-    <StepScoresWaiting key="scores"
-      onAscend={goNext}
-      onInvite={() => finish('/referral')}
-    />,
     <StepPaywall key="paywall"
       onUnlocked={() => finish('/scan')}
       onSkip={() => finish('/scan')}
