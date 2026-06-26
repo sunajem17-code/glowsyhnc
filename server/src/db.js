@@ -206,7 +206,7 @@ const migrations = [
   // promo redemption tracking
   "ALTER TABLE users ADD COLUMN promo_redeemed INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN promo_expires_at TEXT",
-  // COPPA 13+ age gate
+  // 17+ age confirmation
   "ALTER TABLE users ADD COLUMN age_confirmed INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN age_confirmed_at TEXT",
 ]

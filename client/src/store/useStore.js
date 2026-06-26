@@ -92,7 +92,7 @@ const useStore = create(
       legalConsented: false,
       setLegalConsented: () => set({ legalConsented: true }),
 
-      // 13+ age gate — shown once per install
+      // 17+ age confirmation — stored once per install
       ageConfirmed: false,
       ageConfirmedAt: null,
       setAgeConfirmed: () => set({ ageConfirmed: true, ageConfirmedAt: new Date().toISOString() }),

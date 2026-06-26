@@ -592,7 +592,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
   const allChecked = Object.values(checks).every(Boolean)
 
   const items = [
-    { key: 'legalAgeConsent', label: 'I confirm I am 13 years of age or older and agree to the Terms of Service and Privacy Policy.', sub: null, link: 'both' },
+    { key: 'legalAgeConsent', label: 'I confirm I am 17 years of age or older and agree to the Terms of Service and Privacy Policy.', sub: null, link: 'both' },
     {
       key: 'aiConsent',
       label: 'I consent to AI photo analysis',
@@ -625,7 +625,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
                 label={
                   link === 'both' ? (
                     <span>
-                      I confirm I am 13 years of age or older and agree to the{' '}
+                      I confirm I am 17 years of age or older and agree to the{' '}
                       <span role="link" onClick={e => { e.stopPropagation(); navigate('/terms') }} className="underline cursor-pointer" style={{ color: G }}>Terms of Service</span>
                       {' '}and{' '}
                       <span role="link" onClick={e => { e.stopPropagation(); navigate('/privacy') }} className="underline cursor-pointer" style={{ color: G }}>Privacy Policy</span>
