@@ -81,8 +81,10 @@ export default function Premium() {
       if (isNative()) {
         const result = await purchasePro(plan)
         if (result?.success) {
+          const rcUserId = result.customerInfo?.originalAppUserId
+          sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
-          api.payments.syncRc().catch(() => {})
+          api.payments.syncRc(rcUserId).catch(() => {})
         }
       } else {
         const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
