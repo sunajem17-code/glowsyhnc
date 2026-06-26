@@ -263,7 +263,8 @@ export default function ScanUnlockGate() {
       try {
         const result = await purchasePro('annual')
         if (result?.success) {
-          api.payments.syncRc().catch(() => {})
+          const rcUserId = result.customerInfo?.originalAppUserId
+          api.payments.syncRc(rcUserId).catch(() => {})
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
           navigate('/results', { replace: true })
