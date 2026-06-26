@@ -16,7 +16,7 @@ import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { scheduleRescanNotification } from '../utils/notifications'
 
-const ANALYSIS_STEPS = [
+export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
   { label: 'Matching celebrity lookalikes...', Icon: Star },
   { label: 'Calculating your score...', Icon: Zap },
@@ -218,7 +218,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
 
@@ -343,7 +343,7 @@ function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
 
 // ─── Analyzing Screen ─────────────────────────────────────────────────────────
 
-function AnalyzingScreen({ currentStep, slow }) {
+export function AnalyzingScreen({ currentStep, slow }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
       <div className="relative w-28 h-28 mb-8">

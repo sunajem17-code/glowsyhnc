@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
@@ -6,7 +6,10 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import TransformationScreen from '../components/TransformationScreen'
-import { StepRating, StepPaywall } from '../components/OnboardingFinalSteps'
+import { StepRating } from '../components/OnboardingFinalSteps'
+import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
+import { generatePlanTasks } from '../utils/content'
+import { assignPhase } from '../utils/phase'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { getDeviceId } from '../utils/deviceId'
@@ -522,69 +525,6 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
   )
 }
 
-// ── STEP 2: Age Gate ──────────────────────────────────────────────────────────
-function StepAgeGate({ data, onChange, onNext, onBack }) {
-  const confirmed = data.ageConfirmed === true
-  const blocked   = data.ageConfirmed === false
-
-  return (
-    <div className="flex flex-col h-full px-6">
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
-        <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          How old are you?
-        </h1>
-        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>
-          Ascendus is available to users 17 and older.
-        </p>
-
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { key: true,  label: '17 or older', Icon: Check, color: '#34C759', bg: 'rgba(52,199,89,0.08)', border: 'rgba(52,199,89,0.28)' },
-            { key: false, label: 'Under 17',    Icon: X,     color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' },
-          ].map(({ key, label, Icon, color, bg, border }) => {
-            const isSelected = data.ageConfirmed === key
-            return (
-              <motion.button
-                key={String(key)}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => onChange('ageConfirmed', key)}
-                className="flex flex-col items-center py-8 rounded-2xl transition-all"
-                style={{
-                  background: isSelected ? bg : SURFACE,
-                  border: `1.5px solid ${isSelected ? border : BORDER}`,
-                }}
-              >
-                <Icon size={36} className="mb-3" style={{ color: isSelected ? color : 'rgba(255,255,255,0.4)' }} />
-                <p className="font-heading font-bold text-[14px]" style={{ color: isSelected ? color : TEXT }}>{label}</p>
-              </motion.button>
-            )
-          })}
-        </div>
-
-        {blocked && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-5 px-4 py-3 rounded-2xl"
-            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
-          >
-            <p className="text-sm font-heading font-bold text-center" style={{ color: '#EF4444' }}>
-              Ascendus is for users 17 and older.
-            </p>
-            <p className="text-[12px] font-body text-center mt-1" style={{ color: 'rgba(239,68,68,0.7)' }}>
-              Contact support@ascendus.com if you believe this is an error.
-            </p>
-          </motion.div>
-        )}
-      </div>
-
-      <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} disabled={!confirmed} />
-      </div>
-    </div>
-  )
-}
 
 // ── STEP 3: Legal Consent ─────────────────────────────────────────────────────
 function StepConsent({ checks, onToggle, onNext, onBack }) {
@@ -1387,6 +1327,153 @@ function StepPhaseResult({ data, onFinish }) {
   )
 }
 
+// ── STEP 6: Photo Capture + Analysis (combined, no skip) ─────────────────────
+// Reuses PhotoUploadStep and AnalyzingScreen exported from Scan.jsx.
+// Handles both the capture UI and the analysis spinner in one component so
+// scan state never needs to leak into the parent's step array.
+function StepScanCapture({ gender, onDone, onBack }) {
+  const [phase, setPhase]               = useState('capture') // 'capture' | 'analyzing'
+  const [facePhoto, setFacePhoto]       = useState(null)
+  const [analysisStep, setAnalysisStep] = useState(0)
+  const [slowAnalysis, setSlowAnalysis] = useState(false)
+  const [error, setError]               = useState('')
+
+  // Same helper as Scan.jsx — resizes image to ≤1024px and encodes as JPEG base64
+  async function toBase64(url, maxPx = 1024) {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const blobUrl = URL.createObjectURL(blob)
+      img.onload = () => {
+        URL.revokeObjectURL(blobUrl)
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Image load failed')) }
+      img.src = blobUrl
+    })
+  }
+
+  async function runAnalysis() {
+    if (!facePhoto) return
+    setPhase('analyzing')
+    setError('')
+    setAnalysisStep(0)
+
+    try {
+      const faceB64 = await toBase64(facePhoto)
+      setAnalysisStep(1)
+      setSlowAnalysis(false)
+      const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
+      const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
+
+      let aiResult
+      try {
+        aiResult = await Promise.race([
+          api.ai.score({ faceImage: faceB64, gender: gender || 'male' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)),
+        ])
+      } finally {
+        clearInterval(stageTimer)
+        clearTimeout(slowTimer)
+        setSlowAnalysis(false)
+      }
+
+      setAnalysisStep(3)
+      await new Promise(r => setTimeout(r, 350))
+      setAnalysisStep(4)
+
+      const scanRecord = {
+        id:             `scan-${Date.now()}`,
+        scanDate:       new Date().toISOString(),
+        analyzedAt:     new Date().toISOString(),
+        facePhotoUrl:   faceB64,
+        sidePhotoUrl:   null,
+        hasSideProfile: false,
+        gender:         gender || 'male',
+        umaxScore:      aiResult.overallScore,
+        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
+        tier:           aiResult.tier,
+        aiScore:        aiResult,
+        faceData: {
+          aestheticScore:    aiResult.faceScore,
+          pillars:           null,
+          symmetry:          aiResult.faceSubScores?.symmetry          ?? null,
+          jawlineDefinition: aiResult.faceSubScores?.jawlineDefinition ?? null,
+          skinClarity:       aiResult.faceSubScores?.skinClarity       ?? null,
+          facialProportions: aiResult.faceSubScores?.facialProportions ?? null,
+          eyeArea:           aiResult.faceSubScores?.eyeArea           ?? null,
+          facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
+        },
+        pillars:          aiResult.pillars          ?? null,
+        celebrityMatches: aiResult.celebrityMatches ?? null,
+        physiqueScore:    null,
+        bodyFatLevel:     null,
+      }
+
+      onDone(scanRecord)
+    } catch (err) {
+      setPhase('capture')
+      setError(err.message || 'Analysis failed. Please try again.')
+    }
+  }
+
+  if (phase === 'analyzing') {
+    return (
+      <div className="flex flex-col h-full" style={{ background: BG }}>
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+      <BackBtn onBack={onBack} />
+      <div className="pt-12 pb-4">
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
+          YOUR AI SCAN
+        </p>
+        <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+          Take your first scan.
+        </h1>
+        <p className="font-body text-[13px]" style={{ color: DIM }}>
+          Front-facing photo · Neutral expression · Good lighting · No hat or glasses
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{error}</p>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        <PhotoUploadStep
+          stepNum={1}
+          guide={null}
+          photo={facePhoto}
+          onPhoto={(url) => setFacePhoto(url)}
+          gender={gender || 'male'}
+        />
+      </div>
+
+      <div className="pb-10 pt-2">
+        <GoldBtn
+          label={facePhoto ? 'Analyze My Results →' : 'Upload or Take a Photo First'}
+          onClick={runAnalysis}
+          disabled={!facePhoto}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 // Steps: 0=welcome, 1=signup, 2=age, 3=consent, 4=gender, 5=goal,
 //        6=height, 7=weight, 8=bmi, 9=experience, 10=phase
@@ -1643,6 +1730,8 @@ export default function PremiumOnboarding() {
   const {
     setUserProfile, setHasOnboarded, setLegalConsented, setAgeConfirmed,
     setGender, setAssignedPhase, setUnits, units, isAuthenticated, setAuth,
+    addScan, setCurrentScan, setCurrentPlan, setPendingFacePhoto,
+    setLastScanDate, incrementScanCount,
   } = useStore()
 
   // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
@@ -1717,9 +1806,41 @@ export default function PremiumOnboarding() {
     navigate(typeof destination === 'string' ? destination : '/')
   }
 
-  // Progress bar: steps 1–5
-  const showProgress = step >= 1 && step <= 5
-  const progressPct = showProgress ? ((step - 1) / TOTAL_QUIZ_STEPS) * 100 : 0
+  // Called by StepScanCapture when analysis completes — saves scan record to
+  // store (same fields as Scan.jsx) then advances to PhaseResult
+  function handleScanDone(scanRecord) {
+    const g = formData.gender || 'male'
+    const phase = calculatePhase(formData.goal, formData.height, formData.weight)
+    const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, phase, g)
+
+    setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
+    setPendingFacePhoto(scanRecord.facePhotoUrl)
+    addScan(scanRecord)
+    setCurrentScan(scanRecord)
+    setAssignedPhase(phase)
+    setLastScanDate(new Date().toISOString())
+    incrementScanCount()
+
+    // Persist to Supabase non-blocking — same fields as regular Scan flow
+    api.supabase.saveScan({
+      overallScore:  scanRecord.umaxScore,
+      tier:          scanRecord.tier,
+      faceScore:     scanRecord.faceData?.aestheticScore,
+      harmony:       scanRecord.pillars?.harmony,
+      angularity:    scanRecord.pillars?.angularity,
+      features:      scanRecord.pillars?.features,
+      dimorphism:    scanRecord.pillars?.dimorphism,
+      gender:        g,
+      assignedPhase: phase?.toLowerCase(),
+      tasks,
+    }).catch(() => {})
+
+    goNext() // advance to PhaseResult (step 8 in new sequence)
+  }
+
+  // Progress bar: steps 1–9 (covers full quiz through Rating)
+  const showProgress = step >= 1 && step <= 9
+  const progressPct = showProgress ? ((step - 1) / 9) * 100 : 0
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -1777,7 +1898,7 @@ export default function PremiumOnboarding() {
   }
 
   // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight,
-  //       6=phase, 7=transformation, 8=rating, 9=paywall (final → /scan)
+  //       6=scan-capture+analysis, 7=phase, 8=transformation, 9=rating → /unlock
   const steps = [
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
@@ -1799,13 +1920,14 @@ export default function PremiumOnboarding() {
     <StepHeightWeight key="heightweight" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} units={units}
     />,
+    <StepScanCapture key="scan"
+      gender={formData.gender}
+      onDone={handleScanDone}
+      onBack={goBack}
+    />,
     <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
     <TransformationScreen key="transformation" onNext={goNext} />,
-    <StepRating key="rating" onNext={goNext} />,
-    <StepPaywall key="paywall"
-      onUnlocked={() => finish('/scan')}
-      onSkip={() => finish('/scan')}
-    />,
+    <StepRating key="rating" onNext={() => finish('/unlock')} />,
   ]
 
   return (
