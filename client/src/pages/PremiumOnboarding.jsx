@@ -2077,7 +2077,7 @@ export default function PremiumOnboarding() {
     try {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
       const result = await SignInWithApple.authorize({
-        clientId: 'com.ascendus.store',
+        clientId: 'com.ascendus.app',
         redirectURI: 'https://ascendus.store/auth/apple/callback',
         scopes: 'email name',
         state: Date.now().toString(),

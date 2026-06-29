@@ -11,9 +11,7 @@ const jwksClient = require('jwks-rsa')
 
 const APPLE_ISS = 'https://appleid.apple.com'
 
-// Bundle identifiers that may appear in the token's `aud` claim.
-// Release build ships as com.ascendus.app; debug uses com.ascendus.store.
-const ALLOWED_AUDIENCES = (process.env.APPLE_BUNDLE_IDS || 'com.ascendus.app,com.ascendus.store')
+const ALLOWED_AUDIENCES = (process.env.APPLE_BUNDLE_IDS || 'com.ascendus.app')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean)

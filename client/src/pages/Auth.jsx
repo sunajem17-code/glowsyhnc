@@ -64,7 +64,7 @@ export default function Auth() {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
 
       const options = {
-        clientId: 'com.ascendus.store',
+        clientId: 'com.ascendus.app',
         redirectURI: 'https://ascendus.store/auth/apple/callback',
         scopes: 'email name',
         state: Date.now().toString(),

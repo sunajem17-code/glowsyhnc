@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ascendus.store',
+  appId: 'com.ascendus.app',
   appName: 'Ascendus',
   webDir: 'dist',
   server: {
