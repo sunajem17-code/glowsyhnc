@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
@@ -115,13 +115,21 @@ export default function App() {
     return () => window.removeEventListener('auth:session-expired', handle)
   }, [])
 
+  const handleSplashDone = useCallback(() => {
+    console.log('[GATE] Splash onDone fired → setSplashDone(true)')
+    setSplashDone(true)
+  }, [])
+
+  const handleProSplashDone = useCallback(() => {
+    console.log('[GATE] PremiumSplash onDone fired → setProSplashDone(true)')
+    sessionStorage.setItem(SESSION_KEY, '1')
+    setProSplashDone(true)
+  }, [])
+
   // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
     console.log('[GATE] → SPLASH (splashDone=false, isAuthenticated=true)')
-    return <Splash onDone={() => {
-      console.log('[GATE] Splash onDone fired → setSplashDone(true)')
-      setSplashDone(true)
-    }} />
+    return <Splash onDone={handleSplashDone} />
   }
 
   // ── GATE 2: PremiumSplash ────────────────────────────────────────
@@ -129,11 +137,7 @@ export default function App() {
     console.log('[GATE] → PREMIUM SPLASH (isPremium=true, proSplashDone=false)')
     return (
       <AnimatePresence>
-        <PremiumSplash onDone={() => {
-          console.log('[GATE] PremiumSplash onDone fired → setProSplashDone(true)')
-          sessionStorage.setItem(SESSION_KEY, '1')
-          setProSplashDone(true)
-        }} />
+        <PremiumSplash onDone={handleProSplashDone} />
       </AnimatePresence>
     )
   }
