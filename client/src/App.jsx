@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
@@ -10,6 +10,7 @@ import UpdatePrompt from './components/UpdatePrompt'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
+import PremiumSplash from './pages/PremiumSplash'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
@@ -28,7 +29,6 @@ const Referral       = lazy(() => import('./pages/Referral'))
 const Compare        = lazy(() => import('./pages/Compare'))
 const AICoach        = lazy(() => import('./pages/AICoach'))
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
-const PremiumSplash  = lazy(() => import('./pages/PremiumSplash'))
 const Landing        = lazy(() => import('./pages/Landing'))
 const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
 const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
@@ -49,7 +49,22 @@ export default function App() {
     () => !!sessionStorage.getItem(SESSION_KEY)
   )
 
+  // ── DIAGNOSTIC: render counter + state snapshot ──────────────────
+  const renderCount = useRef(0)
+  renderCount.current += 1
+  console.log(
+    `[GATE] App render #${renderCount.current} —`,
+    `isAuthenticated=${isAuthenticated}`,
+    `splashDone=${splashDone}`,
+    `isPremium=${isPremium}`,
+    `proSplashDone=${proSplashDone}`,
+    `hasOnboarded=${hasOnboarded}`,
+  )
+  // ─────────────────────────────────────────────────────────────────
+
+
   useEffect(() => {
+    console.log('[GATE] useEffect: theme changed →', theme)
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
@@ -57,15 +72,20 @@ export default function App() {
   useEffect(() => { captureEmailUTM() }, [])
 
   // Initialize RevenueCat — pass user ID when logged in so purchases are linked
-  useEffect(() => { initRevenueCat(user?.id ?? null).catch(() => {}) }, [user?.id])
+  useEffect(() => {
+    console.log('[GATE] useEffect: initRevenueCat, user?.id =', user?.id)
+    initRevenueCat(user?.id ?? null).catch((e) => console.warn('[GATE] initRevenueCat error:', e))
+  }, [user?.id])
 
   // Check if pro trial has expired on load
   useEffect(() => {
+    console.log('[GATE] useEffect: checkProTrial')
     if (checkProTrial) checkProTrial()
   }, [])
 
   // Refresh Pro status on startup and whenever app comes back to foreground
   useEffect(() => {
+    console.log('[GATE] useEffect: refreshProStatus, isAuthenticated =', isAuthenticated)
     if (!isAuthenticated) return
     refreshProStatus()
     const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus() }
@@ -88,7 +108,6 @@ export default function App() {
     return () => window.removeEventListener('offline', handleOffline)
   }, [])
 
-
   // Auto-logout when any API call gets a 401 (expired token)
   useEffect(() => {
     const handle = () => { logout?.(); window.location.replace('/auth') }
@@ -96,23 +115,31 @@ export default function App() {
     return () => window.removeEventListener('auth:session-expired', handle)
   }, [])
 
-  // Skip splash entirely for unauthenticated users — they land on the SEO landing
-  // page directly, which is better for conversion AND Google crawling.
+  // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
-    return <Splash onDone={() => setSplashDone(true)} />
+    console.log('[GATE] → SPLASH (splashDone=false, isAuthenticated=true)')
+    return <Splash onDone={() => {
+      console.log('[GATE] Splash onDone fired → setSplashDone(true)')
+      setSplashDone(true)
+    }} />
   }
 
-  // Show premium splash once per session for Pro users (only after main splash)
+  // ── GATE 2: PremiumSplash ────────────────────────────────────────
   if (isAuthenticated && isPremium && !proSplashDone) {
+    console.log('[GATE] → PREMIUM SPLASH (isPremium=true, proSplashDone=false)')
     return (
       <AnimatePresence>
         <PremiumSplash onDone={() => {
+          console.log('[GATE] PremiumSplash onDone fired → setProSplashDone(true)')
           sessionStorage.setItem(SESSION_KEY, '1')
           setProSplashDone(true)
         }} />
       </AnimatePresence>
     )
   }
+
+  // ── GATE 3: Router ───────────────────────────────────────────────
+  console.log('[GATE] → ROUTER MOUNTING (hasOnboarded =', hasOnboarded, ')')
 
   return (
     <BrowserRouter>
