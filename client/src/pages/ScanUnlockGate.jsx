@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { UserPlus, Share2, Check, Loader2, Users, ChevronRight } from 'lucide-react'
@@ -6,6 +6,7 @@ import useStore from '../store/useStore'
 import { StepScoresWaiting } from '../components/OnboardingFinalSteps'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
+import PromoModal from '../components/PromoModal'
 
 const G    = '#C6A85C'
 const GRAD = 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)'
@@ -13,6 +14,130 @@ const BG   = '#080808'
 const TEXT = '#F0EDE8'
 const DIM  = 'rgba(255,255,255,0.38)'
 const SURF = 'rgba(255,255,255,0.04)'
+
+// ── Unlock Reveal Animation ───────────────────────────────────────────────────
+function UnlockReveal({ score, onContinue }) {
+  const [revealed, setRevealed] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setRevealed(true), 1400)
+    return () => clearTimeout(t)
+  }, [])
+
+  const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
+    angle: (i / 22) * 360,
+    radius: 90 + (i % 3) * 55,
+    size: 3 + (i % 4),
+    delay: (i % 7) * 0.06,
+  }))
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 flex flex-col items-center justify-center z-50"
+      style={{ background: '#000' }}
+    >
+      {/* Expanding gold ring */}
+      <motion.div
+        initial={{ scale: 0.2, opacity: 0.9 }}
+        animate={{ scale: revealed ? 3.5 : 0.2, opacity: revealed ? 0 : 0.9 }}
+        transition={{ duration: 1.2, ease: 'easeOut' }}
+        style={{
+          position: 'absolute',
+          width: 240, height: 240, borderRadius: '50%',
+          border: `2px solid ${G}`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Particle burst */}
+      {PARTICLES.map((p, i) => (
+        <motion.div
+          key={i}
+          initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
+          animate={revealed ? {
+            x: Math.cos((p.angle * Math.PI) / 180) * p.radius,
+            y: Math.sin((p.angle * Math.PI) / 180) * p.radius,
+            opacity: 0,
+            scale: 0,
+          } : {}}
+          transition={{ duration: 0.85, delay: p.delay, ease: 'easeOut' }}
+          style={{
+            position: 'absolute',
+            width: p.size, height: p.size,
+            borderRadius: '50%',
+            background: G,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+
+      {/* Ambient glow */}
+      <motion.div
+        animate={{ opacity: revealed ? 0.25 : 0 }}
+        transition={{ duration: 1.0, delay: 0.4 }}
+        style={{
+          position: 'absolute',
+          width: 360, height: 360, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(198,168,92,0.5) 0%, transparent 65%)',
+          filter: 'blur(20px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Score unblurs */}
+      <div className="relative z-10 text-center">
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="font-heading font-bold text-[11px] tracking-[0.22em] mb-6"
+          style={{ color: 'rgba(198,168,92,0.65)' }}
+        >
+          YOUR ASCENDUS SCORE
+        </motion.p>
+
+        <motion.div
+          initial={{ filter: 'blur(28px)', scale: 0.8, opacity: 0 }}
+          animate={{
+            filter: revealed ? 'blur(0px)' : 'blur(28px)',
+            scale: revealed ? 1 : 0.8,
+            opacity: 1,
+          }}
+          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        >
+          <span
+            className="font-heading font-bold"
+            style={{ fontSize: 100, color: TEXT, letterSpacing: '-0.04em', lineHeight: 1, display: 'block' }}
+          >
+            {score.toFixed(1)}
+          </span>
+          <span className="font-heading font-bold text-[26px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            /10
+          </span>
+        </motion.div>
+      </div>
+
+      {/* Continue button */}
+      <AnimatePresence>
+        {revealed && (
+          <motion.button
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onContinue}
+            className="relative z-10 mt-14 px-12 py-4 rounded-2xl font-heading font-bold text-[16px]"
+            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.45)' }}
+          >
+            See My Full Results
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
 
 const REQUIRED = 3
 
@@ -232,6 +357,8 @@ export default function ScanUnlockGate() {
   const { currentScan, isPremium, setIsPremium } = useStore()
 
   const [showInvite, setShowInvite]       = useState(false)
+  const [showPromo, setShowPromo]         = useState(false)
+  const [showReveal, setShowReveal]       = useState(false)
   const [referralCode, setReferralCode]   = useState(null)
   const [referralCount, setReferralCount] = useState(0)
   const [loadingRef, setLoadingRef]       = useState(false)
@@ -258,6 +385,12 @@ export default function ScanUnlockGate() {
 
   if (isPremium || !currentScan) return null
 
+  const revealScore = currentScan?.glowScore ?? currentScan?.umaxScore ?? 7.0
+
+  if (showReveal) {
+    return <UnlockReveal score={revealScore} onContinue={() => navigate('/results', { replace: true })} />
+  }
+
   async function handleAscend() {
     if (isNative()) {
       try {
@@ -267,7 +400,7 @@ export default function ScanUnlockGate() {
           api.payments.syncRc(rcUserId).catch(() => {})
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
-          navigate('/results', { replace: true })
+          setShowReveal(true)
         }
       } catch (err) {
         const msg = (err?.message || '').toLowerCase()
@@ -289,6 +422,34 @@ export default function ScanUnlockGate() {
         onAscend={handleAscend}
         onInvite={handleInvite}
       />
+
+      {/* Promo code link */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center" style={{ zIndex: 10 }}>
+        <button
+          onClick={() => setShowPromo(true)}
+          className="font-body text-[12px] text-center transition-opacity hover:opacity-70 px-4 py-2"
+          style={{ color: 'rgba(198,168,92,0.5)' }}
+        >
+          Have a promo code?
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showPromo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30"
+          >
+            <PromoModal
+              onClose={() => setShowPromo(false)}
+              onSuccess={() => { setShowPromo(false); setShowReveal(true) }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showInvite && (
           <motion.div

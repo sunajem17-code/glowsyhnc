@@ -264,6 +264,10 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
 ${profileSection}
+KEY STRENGTHS — for each item in key_strengths, write a complete sentence (not a tag). Name the specific feature, explain WHY it scores well structurally (the exact trait that makes it attractive), and state what it contributes to the overall look. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
+
+TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
+
 Return ONLY this JSON — no markdown, nothing else:
 {
   "face_score": <number 1.0–10.0>,

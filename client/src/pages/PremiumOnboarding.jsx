@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -215,6 +215,50 @@ const SOCIAL_STATS = [
   { value: '+1.2pts', label: 'avg score in 90 days' },
   { value: '78%', label: 'complete their plan' },
 ]
+
+function StepIntro({ onNext }) {
+  return (
+    <div className="flex flex-col h-full px-6">
+      <div className="flex-1 flex flex-col justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <p className="font-heading font-bold text-[28px] leading-tight mb-5" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+            First Impressions<br />Are Fast
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.5 }}
+          className="space-y-4"
+        >
+          <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            Research on social perception shows people form judgments about attractiveness, confidence, and trustworthiness within seconds of seeing a face — often before a single word is spoken. That snap judgment shapes dating, social, and even professional outcomes.
+          </p>
+          <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            The good news: most of what drives that impression — grooming, skin, fitness, posture, style — is genuinely improvable, not fixed.
+          </p>
+          <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            Ascendus uses AI to show you exactly where you stand and what's actually worth working on, so you're not guessing.
+          </p>
+        </motion.div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+        className="pb-10 pt-4"
+      >
+        <GoldBtn label="Next →" onClick={onNext} />
+      </motion.div>
+    </div>
+  )
+}
 
 function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
   const navigate = useNavigate()
@@ -1315,7 +1359,7 @@ function StepPhaseResult({ data, onFinish }) {
           style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}` }}
         >
           <p className="font-body text-[11px] text-center" style={{ color: DIM }}>
-            Take your first scan to unlock your AI Glow Score and personalized 12-week plan.
+            Your AI scan is complete. This phase and your 12-week plan have been personalized to your results.
           </p>
         </motion.div>
       </div>
@@ -1327,18 +1371,15 @@ function StepPhaseResult({ data, onFinish }) {
   )
 }
 
-// ── STEP 6: Photo Capture + Analysis (combined, no skip) ─────────────────────
-// Reuses PhotoUploadStep and AnalyzingScreen exported from Scan.jsx.
-// Handles both the capture UI and the analysis spinner in one component so
-// scan state never needs to leak into the parent's step array.
+// ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack }) {
-  const [phase, setPhase]               = useState('capture') // 'capture' | 'analyzing'
+  const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing'
   const [facePhoto, setFacePhoto]       = useState(null)
+  const [sidePhoto, setSidePhoto]       = useState(null)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [error, setError]               = useState('')
 
-  // Same helper as Scan.jsx — resizes image to ≤1024px and encodes as JPEG base64
   async function toBase64(url, maxPx = 1024) {
     const res = await fetch(url)
     const blob = await res.blob()
@@ -1360,14 +1401,14 @@ function StepScanCapture({ gender, onDone, onBack }) {
     })
   }
 
-  async function runAnalysis() {
-    if (!facePhoto) return
+  async function runAnalysisWithData(face, side) {
     setPhase('analyzing')
     setError('')
     setAnalysisStep(0)
 
     try {
-      const faceB64 = await toBase64(facePhoto)
+      const faceB64 = await toBase64(face)
+      const sideB64 = side ? await toBase64(side) : null
       setAnalysisStep(1)
       setSlowAnalysis(false)
       const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
@@ -1376,7 +1417,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
       let aiResult
       try {
         aiResult = await Promise.race([
-          api.ai.score({ faceImage: faceB64, gender: gender || 'male' }),
+          api.ai.score({ faceImage: faceB64, sideImage: sideB64, gender: gender || 'male' }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)),
         ])
       } finally {
@@ -1394,8 +1435,8 @@ function StepScanCapture({ gender, onDone, onBack }) {
         scanDate:       new Date().toISOString(),
         analyzedAt:     new Date().toISOString(),
         facePhotoUrl:   faceB64,
-        sidePhotoUrl:   null,
-        hasSideProfile: false,
+        sidePhotoUrl:   sideB64,
+        hasSideProfile: !!sideB64,
         gender:         gender || 'male',
         umaxScore:      aiResult.overallScore,
         glowScore:      Math.round(aiResult.overallScore * 10) / 10,
@@ -1419,7 +1460,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       onDone(scanRecord)
     } catch (err) {
-      setPhase('capture')
+      setPhase(side ? 'side' : 'face')
       setError(err.message || 'Analysis failed. Please try again.')
     }
   }
@@ -1432,18 +1473,69 @@ function StepScanCapture({ gender, onDone, onBack }) {
     )
   }
 
+  if (phase === 'side') {
+    return (
+      <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+        <BackBtn onBack={() => { setPhase('face'); setError('') }} />
+        <div className="pt-12 pb-4">
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
+            STEP 2 OF 2
+          </p>
+          <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+            Now, your side profile.
+          </h1>
+          <p className="font-body text-[13px]" style={{ color: DIM }}>
+            Turn 90° to your right · Chin level · Same lighting
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{error}</p>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto">
+          <PhotoUploadStep
+            stepNum={2}
+            guide={null}
+            photo={sidePhoto}
+            onPhoto={setSidePhoto}
+            gender={gender || 'male'}
+          />
+        </div>
+
+        <div className="pb-10 pt-2 flex flex-col gap-3">
+          <GoldBtn
+            label={sidePhoto ? 'Analyze My Results →' : 'Upload or Take a Side Photo'}
+            onClick={() => runAnalysisWithData(facePhoto, sidePhoto)}
+            disabled={!sidePhoto}
+          />
+          <button
+            onClick={() => runAnalysisWithData(facePhoto, null)}
+            className="w-full py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70"
+            style={{ color: 'rgba(255,255,255,0.28)' }}
+          >
+            Skip side profile
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // phase === 'face'
   return (
     <div className="flex flex-col h-full px-6" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
       <div className="pt-12 pb-4">
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
-          YOUR AI SCAN
+          STEP 1 OF 2
         </p>
         <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Take your first scan.
+          Take your front photo.
         </h1>
         <p className="font-body text-[13px]" style={{ color: DIM }}>
-          Front-facing photo · Neutral expression · Good lighting · No hat or glasses
+          Front-facing · Neutral expression · Good lighting · No hat or glasses
         </p>
       </div>
 
@@ -1465,10 +1557,130 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       <div className="pb-10 pt-2">
         <GoldBtn
-          label={facePhoto ? 'Analyze My Results →' : 'Upload or Take a Photo First'}
-          onClick={runAnalysis}
+          label={facePhoto ? 'Continue →' : 'Upload or Take a Photo First'}
+          onClick={() => { if (facePhoto) { setPhase('side'); setError('') } }}
           disabled={!facePhoto}
         />
+      </div>
+    </div>
+  )
+}
+
+// ── STEP 8: Locked Reveal — swipeable metric cards, all blurred ───────────────
+function StepLockedReveal({ onContinue }) {
+  const navigate    = useNavigate()
+  const currentScan = useStore(s => s.currentScan)
+  const [cardIdx, setCardIdx] = useState(0)
+
+  const scan      = currentScan
+  const glowScore = scan?.glowScore ?? scan?.umaxScore
+  const pillars   = scan?.pillars ?? {}
+  const potential = glowScore != null ? Math.min(10, glowScore + 1.4).toFixed(1) : null
+
+  const cards = [
+    { label: 'Overall Score', value: glowScore?.toFixed(1) ?? '—', unit: '/10', sub: 'Your AI-computed attractiveness rating' },
+    { label: 'Potential',     value: potential ?? '—',              unit: '/10', sub: 'Your achievable peak with the right protocol' },
+    { label: 'Harmony',       value: pillars.harmony?.toFixed(1)    ?? '—', unit: '/10', sub: 'How well your features work together as a unit' },
+    { label: 'Angularity',    value: pillars.angularity?.toFixed(1) ?? '—', unit: '/10', sub: 'Bone structure definition and facial sharpness' },
+    { label: 'Features',      value: pillars.features?.toFixed(1)   ?? '—', unit: '/10', sub: 'Quality of your individual facial features' },
+    { label: 'Dimorphism',    value: pillars.dimorphism?.toFixed(1) ?? '—', unit: '/10', sub: 'Strength of sex-specific facial characteristics' },
+  ]
+  if (scan?.physiqueScore?.overall != null) {
+    cards.push({ label: 'Physique', value: scan.physiqueScore.overall.toFixed(1), unit: '/10', sub: 'Body composition and visual impact score' })
+  }
+
+  return (
+    <div className="flex flex-col h-full" style={{ background: BG }}>
+      <div style={{
+        position: 'absolute', top: '8%', left: '50%', transform: 'translateX(-50%)',
+        width: 320, height: 320, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.13) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 text-center"
+        >
+          <p className="font-heading font-bold text-[11px] tracking-[0.2em] mb-2" style={{ color: G }}>
+            YOUR RESULTS ARE READY
+          </p>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+            {cards.length} metrics analyzed.<br />Unlock to see them all.
+          </h1>
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={cardIdx}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.15}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -60 && cardIdx < cards.length - 1) setCardIdx(i => i + 1)
+              if (info.offset.x > 60 && cardIdx > 0) setCardIdx(i => i - 1)
+            }}
+            className="rounded-3xl p-8 flex flex-col items-center text-center mb-6 cursor-grab active:cursor-grabbing select-none"
+            style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.22)', minHeight: 220 }}
+          >
+            <div className="mb-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.28)' }}>
+              <Lock size={18} style={{ color: G }} />
+            </div>
+            <p className="font-heading font-bold text-[11px] tracking-[0.16em] mb-4" style={{ color: 'rgba(198,168,92,0.7)' }}>
+              {cards[cardIdx].label.toUpperCase()}
+            </p>
+            <div className="flex items-end gap-1 mb-3">
+              <span className="font-heading font-bold select-none" style={{ fontSize: 68, color: TEXT, filter: 'blur(10px)', userSelect: 'none', lineHeight: 1, letterSpacing: '-0.03em' }}>
+                {cards[cardIdx].value}
+              </span>
+              <span className="font-heading font-bold text-[22px] mb-2 select-none" style={{ color: 'rgba(255,255,255,0.4)', filter: 'blur(5px)' }}>
+                {cards[cardIdx].unit}
+              </span>
+            </div>
+            <p className="font-body text-[13px]" style={{ color: DIM }}>
+              {cards[cardIdx].sub}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="flex items-center justify-center gap-2 mb-8">
+          {cards.map((_, i) => (
+            <motion.button
+              key={i}
+              onClick={() => setCardIdx(i)}
+              animate={{ width: i === cardIdx ? 20 : 6, opacity: i === cardIdx ? 1 : 0.3 }}
+              transition={{ duration: 0.25 }}
+              style={{ height: 6, borderRadius: 99, background: G, flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-3 flex-shrink-0">
+        <motion.button
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => navigate('/unlock')}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2"
+          style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${G} 50%, #A8893A 100%)`, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          <Lock size={16} style={{ color: '#0A0A0A' }} /> Unlock Results Now
+        </motion.button>
+        <button
+          onClick={onContinue}
+          className="w-full py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(255,255,255,0.25)' }}
+        >
+          Continue
+        </button>
       </div>
     </div>
   )
@@ -1736,8 +1948,8 @@ export default function PremiumOnboarding() {
 
   // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
   const [introDone, setIntroDone] = useState(true)
-  // If already authenticated, skip Welcome (0) and SignUp (1) — start at consent
-  const [step, setStep] = useState(isAuthenticated ? 2 : 0)
+  // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
+  const [step, setStep] = useState(isAuthenticated ? 3 : 0)
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -1838,9 +2050,9 @@ export default function PremiumOnboarding() {
     goNext() // advance to PhaseResult (step 8 in new sequence)
   }
 
-  // Progress bar: steps 1–9 (covers full quiz through Rating)
-  const showProgress = step >= 1 && step <= 9
-  const progressPct = showProgress ? ((step - 1) / 9) * 100 : 0
+  // Progress bar: steps 2–11 (quiz through Rating)
+  const showProgress = step >= 2 && step <= 11
+  const progressPct = showProgress ? ((step - 2) / 10) * 100 : 0
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -1897,9 +2109,10 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight,
-  //       6=scan-capture+analysis, 7=phase, 8=transformation, 9=rating → /unlock
+  // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=gender, 5=goal, 6=heightweight,
+  //       7=scan(face+side), 8=locked-reveal, 9=phase, 10=transformation, 11=rating → /unlock
   const steps = [
+    <StepIntro key="intro" onNext={goNext} />,
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
       onSignIn={() => setSigningIn(true)}
@@ -1925,6 +2138,7 @@ export default function PremiumOnboarding() {
       onDone={handleScanDone}
       onBack={goBack}
     />,
+    <StepLockedReveal key="locked-reveal" onContinue={goNext} />,
     <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
     <TransformationScreen key="transformation" onNext={goNext} />,
     <StepRating key="rating" onNext={() => finish('/unlock')} />,
