@@ -1429,7 +1429,9 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
     try {
       const faceB64 = await toBase64(face)
+      setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
+      if (sideB64) setSidePhoto(sideB64)
       setAnalysisStep(1)
       setSlowAnalysis(false)
       const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)

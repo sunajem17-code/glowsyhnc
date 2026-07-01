@@ -506,8 +506,11 @@ export default function Scan() {
 
     try {
       const faceB64 = await toBase64(facePhoto)
+      setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
+      if (sideB64) setSidePhoto(sideB64)
       const bodyB64 = (!skipBody && bodyPhoto) ? await toBase64(bodyPhoto) : null
+      if (bodyB64) setBodyPhoto(bodyB64)
 
       setAnalysisStep(1)
       setSlowAnalysis(false)
