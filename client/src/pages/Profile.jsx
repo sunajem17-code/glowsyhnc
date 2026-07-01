@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
@@ -294,6 +294,24 @@ export default function Profile() {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteAccountError, setDeleteAccountError] = useState('')
+  const deleteBackdropRef = useRef(null)
+
+  // Lock scroll on the page behind the modal. On iOS WebView, overflow:hidden
+  // alone doesn't stop momentum scroll — we also intercept touchmove at the
+  // document level with { passive: false } so preventDefault() actually works.
+  useEffect(() => {
+    if (!deleteAccountOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    const prevent = (e) => e.preventDefault()
+    document.addEventListener('touchmove', prevent, { passive: false })
+    return () => {
+      document.body.style.overflow = prev
+      document.documentElement.style.overflow = ''
+      document.removeEventListener('touchmove', prevent)
+    }
+  }, [deleteAccountOpen])
 
   const bestScore = scans.length > 0 ? Math.max(...scans.map(s => s.glowScore)) : 0
   const latestScan = scans[0]
@@ -1132,11 +1150,13 @@ export default function Profile() {
       <AnimatePresence>
         {deleteAccountOpen && (
           <motion.div
+            ref={deleteBackdropRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end"
-            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', touchAction: 'none' }}
+            onClick={(e) => { if (e.target === deleteBackdropRef.current && !deletingAccount) setDeleteAccountOpen(false) }}
           >
             <motion.div
               initial={{ y: '100%' }}
