@@ -1482,8 +1482,10 @@ function StepScanCapture({ gender, onDone, onBack }) {
         bodyFatLevel:     null,
       }
 
+      console.log('[SCAN DONE] calling onDone with scanRecord id:', scanRecord.id)
       onDone(scanRecord)
     } catch (err) {
+      console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status)
       const m = (err.message || '').toLowerCase()
       const isRateLimit = err.message === 'rate_limited' || err.status === 429
         || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
@@ -2112,37 +2114,47 @@ export default function PremiumOnboarding() {
   // tier + growth area + celeb match). PhaseResult/Transformation/Rating follow
   // after the user has seen and interacted with the unlock screen.
   function handleScanDone(scanRecord) {
-    const g = formData.gender || 'male'
-    const phase = calculatePhase(formData.goal, formData.height, formData.weight)
-    const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, phase, g)
+    console.log('[SCAN DONE] handleScanDone fired', JSON.stringify({ id: scanRecord?.id, score: scanRecord?.umaxScore, tier: scanRecord?.tier }))
+    try {
+      const g = formData.gender || 'male'
+      const phase = calculatePhase(formData.goal, formData.height, formData.weight)
+      console.log('[SCAN DONE] calling generatePlanTasks')
+      const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, phase, g)
+      console.log('[SCAN DONE] generatePlanTasks done, tasks count:', tasks?.length)
 
-    setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
-    setPendingFacePhoto(scanRecord.facePhotoUrl)
-    addScan(scanRecord)
-    setCurrentScan(scanRecord)
-    setAssignedPhase(phase)
-    setLastScanDate(new Date().toISOString())
-    incrementScanCount()
+      setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
+      setPendingFacePhoto(scanRecord.facePhotoUrl)
+      addScan(scanRecord)
+      setCurrentScan(scanRecord)
+      setAssignedPhase(phase)
+      setLastScanDate(new Date().toISOString())
+      incrementScanCount()
 
-    // Persist to Supabase non-blocking — same fields as regular Scan flow
-    api.supabase.saveScan({
-      overallScore:  scanRecord.umaxScore,
-      tier:          scanRecord.tier,
-      faceScore:     scanRecord.faceData?.aestheticScore,
-      harmony:       scanRecord.pillars?.harmony,
-      angularity:    scanRecord.pillars?.angularity,
-      features:      scanRecord.pillars?.features,
-      dimorphism:    scanRecord.pillars?.dimorphism,
-      gender:        g,
-      assignedPhase: phase?.toLowerCase(),
-      tasks,
-    }).catch(() => {})
+      // Persist to Supabase non-blocking — same fields as regular Scan flow
+      api.supabase.saveScan({
+        overallScore:  scanRecord.umaxScore,
+        tier:          scanRecord.tier,
+        faceScore:     scanRecord.faceData?.aestheticScore,
+        harmony:       scanRecord.pillars?.harmony,
+        angularity:    scanRecord.pillars?.angularity,
+        features:      scanRecord.pillars?.features,
+        dimorphism:    scanRecord.pillars?.dimorphism,
+        gender:        g,
+        assignedPhase: phase?.toLowerCase(),
+        tasks,
+      }).catch(() => {})
 
-    // flushSync ensures hasOnboarded=true is committed to the React tree before
-    // navigate fires — otherwise /unlock is caught by the * wildcard (PremiumOnboarding)
-    // because the route only exists in the hasOnboarded=true branch of App.jsx
-    flushSync(() => { setHasOnboarded() })
-    navigate('/unlock', { replace: true }) // show unlock gate immediately — the hook
+      // flushSync ensures hasOnboarded=true is committed to the React tree before
+      // navigate fires — otherwise /unlock is caught by the * wildcard (PremiumOnboarding)
+      // because the route only exists in the hasOnboarded=true branch of App.jsx
+      console.log('[SCAN DONE] calling flushSync + setHasOnboarded')
+      flushSync(() => { setHasOnboarded() })
+      console.log('[SCAN DONE] flushSync done, calling navigate /unlock')
+      navigate('/unlock', { replace: true }) // show unlock gate immediately — the hook
+      console.log('[SCAN DONE] navigate called')
+    } catch (err) {
+      console.error('[SCAN DONE] ERROR in handleScanDone:', err?.message, err?.stack)
+    }
   }
 
   // Progress bar: steps 2–11 (quiz through Rating)
