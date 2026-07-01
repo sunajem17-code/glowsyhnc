@@ -645,12 +645,15 @@ export default function Scan() {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
         setStep(3)
-      } else if (err.message === 'rate_limited') {
+      } else if (err.message === 'rate_limited' || err.status === 429) {
         setRateLimited(true)
-        setRetryCountdown(err.retryAfter || 60)
+        setRetryCountdown(err.retryAfter || 30)
         setStep(3)
       } else {
-        setError(`Analysis unavailable: ${err?.message || 'unknown error'}`)
+        const friendlyMsg = err.message === 'server_error'
+          ? "We're experiencing high demand right now. Please try again in 30 seconds."
+          : (err.message || 'Analysis failed. Please try again.')
+        setError(friendlyMsg)
         setStep(3)
       }
     }

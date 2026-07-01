@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock } from 'lucide-react'
@@ -1373,12 +1373,27 @@ function StepPhaseResult({ data, onFinish }) {
 
 // ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack }) {
-  const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing'
+  const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing' | 'retry_error'
   const [facePhoto, setFacePhoto]       = useState(null)
   const [sidePhoto, setSidePhoto]       = useState(null)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [error, setError]               = useState('')
+  const [rateLimited, setRateLimited]   = useState(false)
+  const [retryCountdown, setRetryCountdown] = useState(0)
+  const retrySideRef = useRef(null)
+
+  // Countdown → auto-retry with the same photos
+  useEffect(() => {
+    if (!rateLimited) return
+    if (retryCountdown <= 0) {
+      setRateLimited(false)
+      runAnalysisWithData(facePhoto, retrySideRef.current)
+      return
+    }
+    const t = setTimeout(() => setRetryCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [rateLimited, retryCountdown]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toBase64(url, maxPx = 1024) {
     const res = await fetch(url)
@@ -1460,9 +1475,73 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       onDone(scanRecord)
     } catch (err) {
-      setPhase(side ? 'side' : 'face')
-      setError(err.message || 'Analysis failed. Please try again.')
+      const isRateLimit = err.message === 'rate_limited' || err.status === 429
+      if (isRateLimit) {
+        retrySideRef.current = side
+        setRateLimited(true)
+        setRetryCountdown(err.retryAfter || 30)
+        setPhase('retry_error')
+      } else {
+        const friendlyMsg = err.message === 'server_error'
+          ? "We're experiencing high demand. Please try again in 30 seconds."
+          : (err.message || 'Analysis failed. Please try again.')
+        setError(friendlyMsg)
+        setPhase(side ? 'side' : 'face')
+      }
     }
+  }
+
+  if (phase === 'retry_error') {
+    return (
+      <div className="flex flex-col h-full items-center justify-center px-8" style={{ background: BG }}>
+        <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+          {rateLimited ? (
+            <>
+              <div className="relative w-20 h-20">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(201,168,76,0.2)" strokeWidth="4" />
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#C6A85C" strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 28}`}
+                    strokeDashoffset={`${2 * Math.PI * 28 * (retryCountdown / 30)}`}
+                    style={{ transition: 'stroke-dashoffset 1s linear' }} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-heading font-bold text-xl" style={{ color: '#C6A85C' }}>{retryCountdown}</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="font-heading font-bold text-base" style={{ color: TEXT }}>High demand right now</p>
+                <p className="font-body text-[13px] mt-1" style={{ color: DIM }}>We're experiencing high demand right now. Please try again in 30 seconds.</p>
+                <p className="font-body text-[12px] mt-1" style={{ color: DIM }}>Auto-retrying in {retryCountdown}s…</p>
+              </div>
+              <button
+                onClick={() => { setRateLimited(false); runAnalysisWithData(facePhoto, retrySideRef.current) }}
+                className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
+                style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}>
+                Retry Now
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Something went wrong</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>{error || "We're experiencing high demand. Please try again in 30 seconds."}</p>
+              <button
+                onClick={() => { setError(''); runAnalysisWithData(facePhoto, retrySideRef.current) }}
+                className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
+                style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}>
+                Try Again
+              </button>
+              <button
+                onClick={() => setPhase(retrySideRef.current ? 'side' : 'face')}
+                className="w-full py-2 font-body text-[12px] text-center"
+                style={{ color: DIM }}>
+                Retake photo
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (phase === 'analyzing') {
