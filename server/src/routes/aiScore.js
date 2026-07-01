@@ -1,8 +1,20 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
+const { RekognitionClient, RecognizeCelebritiesCommand } = require('@aws-sdk/client-rekognition')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
+
+// ── AWS Rekognition client ────────────────────────────────────────────────────
+function getRekognitionClient() {
+  return new RekognitionClient({
+    region: process.env.AWS_REGION || 'us-east-1',
+    credentials: {
+      accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  })
+}
 
 const router = express.Router()
 
@@ -40,7 +52,7 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update(bodyB64 ?? 'skip')
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
-  h.update('||v2') // bump to bust Supabase cache after celeb prompt rewrite
+  h.update('||v3') // bump to bust Supabase cache — Rekognition path replaces Claude lookalike
   return h.digest('hex') // 64-char hex string
 }
 
@@ -390,11 +402,60 @@ Return ONLY this JSON — no markdown, nothing else:
   }
 }
 
+// ── Rekognition: call RecognizeCelebrities, return raw CelebrityFaces array ──
+async function rekognizeImage(faceBase64) {
+  const client = getRekognitionClient()
+  const bytes  = Buffer.from(faceBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+  const cmd    = new RecognizeCelebritiesCommand({ Image: { Bytes: bytes } })
+  const resp   = await client.send(cmd)
+  return resp.CelebrityFaces ?? []
+}
+
 // ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
-// Runs in parallel with calls 1+2. Non-blocking — failure returns null gracefully.
-// Uses claude-haiku-4-5. Now accepts gender to provide appropriate pools.
-// Includes automatic fallback retry when generic/unknown names are detected.
+// Tries AWS Rekognition first. Falls back to Claude if Rekognition returns 0
+// matches or fails. Pads with Claude results when Rekognition returns 1–2.
 async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male', faceResult = null, computedScores = null) {
+  // ── Step A: attempt Rekognition ────────────────────────────────────────────
+  let rekogFaces = []
+  try {
+    rekogFaces = await withRetry(() => rekognizeImage(faceBase64), 'rekognition')
+    console.log(`[CELEB] Rekognition returned ${rekogFaces.length} matches`)
+  } catch (err) {
+    console.warn('[CELEB] Rekognition failed, falling back to Claude:', err.message)
+  }
+
+  if (rekogFaces.length === 0) {
+    console.log('[CELEB] Rekognition returned 0 matches, full Claude fallback')
+    return await getClaudeMatches(faceBase64, faceMediaType, gender, faceResult, computedScores)
+  }
+
+  // ── Step B: map Rekognition results to client shape ─────────────────────────
+  const mapped = rekogFaces.slice(0, 3).map(r => ({
+    celebrity:    r.Name,
+    profession:   'Celebrity',
+    similarity:   Math.round(r.MatchConfidence),
+    shared_traits: 'Matched by AWS Rekognition facial recognition',
+  }))
+
+  // ── Step C: pad remaining slots with Claude if fewer than 3 Rekognition hits ──
+  if (mapped.length < 3) {
+    console.log(`[CELEB] Falling back to Claude for remaining ${3 - mapped.length} slots`)
+    try {
+      const claudeResult = await getClaudeMatches(faceBase64, faceMediaType, gender, faceResult, computedScores)
+      const claudeSlots  = [claudeResult.match1, claudeResult.match2, claudeResult.match3].filter(Boolean)
+      while (mapped.length < 3 && claudeSlots.length > 0) {
+        mapped.push(claudeSlots.shift())
+      }
+    } catch (err) {
+      console.warn('[CELEB] Claude padding failed:', err.message)
+    }
+  }
+
+  return { match1: mapped[0] ?? null, match2: mapped[1] ?? null, match3: mapped[2] ?? null }
+}
+
+// ── Claude-based celebrity matching (used as fallback / padding) ──────────────
+async function getClaudeMatches(faceBase64, faceMediaType, gender = 'male', faceResult = null, computedScores = null) {
   const client  = getClient()
   const isFemale = gender === 'female'
 
@@ -768,7 +829,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     // ── L1: in-process memory cache ───────────────────────────────────────────
     // v2: suffix bumped to invalidate stale celebrity results from before the
     // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
-    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v2', sideBase64)
+    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v3', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
