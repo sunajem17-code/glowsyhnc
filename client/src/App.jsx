@@ -34,6 +34,7 @@ const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
 const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
 const Community      = lazy(() => import('./pages/Community'))
 const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
+const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -187,6 +188,7 @@ export default function App() {
                 <Route path="swipemaxx" element={<SwipeMaxx />} />
                 <Route path="tindermaxx" element={<TinderMaxx />} />
                 <Route path="community" element={<Community />} />
+                <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="unlock" element={<ScanUnlockGate />} />
               </Route>
             </>

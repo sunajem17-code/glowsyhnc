@@ -944,4 +944,83 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
   }
 })
 
+// ── POST /api/ai/workout-plan ─────────────────────────────────────────────────
+// Generates a personalized weekly workout split from physique sub-scores.
+// Uses haiku for speed + cost. Falls back to 500 so the client can show a
+// generic plan rather than an error screen.
+router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  const { physiqueScores, gender, trainingLevel } = req.body
+  if (!physiqueScores || typeof physiqueScores !== 'object') {
+    return res.status(400).json({ error: 'physiqueScores object required' })
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return res.status(500).json({ error: 'AI unavailable', fallback: true })
+
+  try {
+    const client = getClient()
+    const level = trainingLevel || 'beginner'
+    const isFemale = gender === 'female'
+
+    const scored = [
+      { name: 'proportions', score: physiqueScores.proportions ?? 5 },
+      { name: 'leanness',    score: physiqueScores.leanness    ?? 5 },
+      { name: 'frame',       score: physiqueScores.frame       ?? 5 },
+      { name: 'posture',     score: physiqueScores.posture     ?? 5 },
+      { name: 'presentation', score: physiqueScores.overall_presentation ?? 5 },
+    ].sort((a, b) => a.score - b.score)
+
+    const weakAreas   = scored.slice(0, 2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
+    const strongAreas = scored.slice(-2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
+
+    const splitRule = level === 'advanced' ? '6-day PPL (Push/Pull/Legs)'
+      : level === 'intermediate' ? '4-day Upper/Lower'
+      : '3-day Full Body'
+
+    const prompt = `You are an elite physique coach. Generate a personalized weekly workout plan for a ${level} ${isFemale ? 'female' : 'male'}.
+
+Physique scores (1–10 scale): ${JSON.stringify(physiqueScores)}
+Priority weak areas: ${weakAreas}
+Current strengths: ${strongAreas}
+Training split: ${splitRule}
+
+Requirements:
+- Each day: 4–6 exercises
+- Every exercise: sets (number), reps (string like "8-12" or "5"), why (1 sentence tying directly to one of their specific sub-scores)
+- Make "why" hyper-specific: reference the actual score number and what improving that exercise will do for that metric
+- Day names must match the split (e.g. "Push Day", "Upper Body", "Full Body A")
+- Focus field: the primary goal of that day in ≤8 words
+
+Respond ONLY with valid JSON — no extra text:
+{
+  "split": "${splitRule}",
+  "trainingLevel": "${level}",
+  "days": [
+    {
+      "name": "Day name",
+      "focus": "Primary goal",
+      "exercises": [
+        { "name": "Exercise", "sets": 3, "reps": "8-12", "why": "One sentence tied to their scores" }
+      ]
+    }
+  ]
+}`
+
+    const raw = await withRetry(async () => {
+      const msg = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2500,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      return msg.content[0].text
+    }, 'workout-plan')
+
+    const plan = parseJSON(raw, 'workout-plan')
+    res.json(plan)
+  } catch (err) {
+    console.error('[workout-plan] error:', err.message)
+    res.status(500).json({ error: 'Plan generation failed', fallback: true })
+  }
+})
+
 module.exports = router

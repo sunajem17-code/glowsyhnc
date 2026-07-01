@@ -1833,7 +1833,7 @@ export default function Results() {
         <Section title="AI Analysis" icon={<Target size={16} style={{ color: '#C6A85C' }} />}>
           {aiScore?.topImprovement && (
             <div className="mb-3 px-3 py-2.5 rounded-xl bg-[#C6A85C]/10 border border-[#C6A85C]/25">
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-[#C6A85C] mb-0.5">Top Priority</p>
+              <p className="text-[10px] font-body italic text-[#C6A85C] mb-1 opacity-80">The biggest thing to work on right now:</p>
               {isPremium
                 ? <p className="text-xs text-primary font-body leading-relaxed">{aiScore.topImprovement}</p>
                 : <ProText text={aiScore.topImprovement} onUpgrade={() => navigate('/premium')} />
@@ -1842,24 +1842,31 @@ export default function Results() {
           )}
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 p-3">
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-success mb-2">Strengths</p>
+              <p className="text-[10px] font-heading font-bold text-success mb-2">What's Working</p>
               {aiScore?.keyStrengths?.map((s, i) => (
-                <p key={i} className="text-[11px] font-body text-primary leading-snug mb-1 last:mb-0">✓ {s}</p>
+                <p key={i} className="text-[11px] font-body text-primary leading-snug mb-1.5 last:mb-0">{s}</p>
               ))}
             </div>
             <div className="rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 p-3">
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-warning mb-2">To Improve</p>
+              <p className="text-[10px] font-heading font-bold text-warning mb-2">What To Focus On</p>
               {aiScore?.keyWeaknesses?.map((w, i) => (
-                <p key={i} className="text-[11px] font-body text-primary leading-snug mb-1 last:mb-0">→ {w}</p>
+                <p key={i} className="text-[11px] font-body text-primary leading-snug mb-1.5 last:mb-0">{w}</p>
               ))}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 text-[10px] text-secondary font-body">
-              Facial structure: <span className="font-bold capitalize text-primary">{facialStructure}</span>
-              {aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided' && <> · Body: <span className="font-bold capitalize text-primary">{aiScore.bodyFatLevel.replace('_', ' ')}</span></>}
+          {(facialStructure || (aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided')) && (
+            <div className="mt-2 text-[10px] text-secondary font-body leading-relaxed">
+              {facialStructure === 'average'
+                ? <>Overall facial structure sits in a solid baseline range with real upside to unlock.</>
+                : facialStructure
+                  ? <>Facial structure is <span className="font-bold capitalize text-primary">{facialStructure}</span> — a genuine asset to build on.</>
+                  : null
+              }
+              {aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided' && (
+                <>{facialStructure ? ' ' : ''}Body composition reads as <span className="font-bold capitalize text-primary">{aiScore.bodyFatLevel.replace('_', ' ')}</span>.</>
+              )}
             </div>
-          </div>
+          )}
         </Section>
       )}
 
@@ -2032,6 +2039,24 @@ export default function Results() {
             <p className="text-[10px] font-heading font-bold text-secondary uppercase tracking-wide">Physique Score (avg)</p>
             <p className="text-sm font-mono font-bold text-primary">{physiqueScore.overall?.toFixed(1) ?? '—'}/10</p>
           </div>
+          {/* Physique tier label */}
+          {physiqueScore.overall != null && (() => {
+            const avg = physiqueScore.overall
+            const { label: ptLabel, color: ptColor } =
+              avg >= 8.0 ? { label: 'Elite Physique',   color: '#A29BFE' }
+              : avg >= 6.5 ? { label: 'Athletic Build',  color: '#34C759' }
+              : avg >= 5.0 ? { label: 'Developing',      color: '#F5A623' }
+              :               { label: 'Foundation Stage', color: '#E07A5F' }
+            return (
+              <div className="mt-3 flex items-center justify-center">
+                <span className="px-3 py-1 rounded-full text-[10px] font-heading font-bold uppercase tracking-widest"
+                  style={{ background: `${ptColor}18`, border: `1px solid ${ptColor}44`, color: ptColor }}>
+                  {ptLabel}
+                </span>
+              </div>
+            )
+          })()}
+
           {physiqueScore.physique_notes && isPremium && (
             <p className="text-[10px] text-secondary font-body mt-2 leading-relaxed italic">{physiqueScore.physique_notes}</p>
           )}
@@ -2077,7 +2102,7 @@ export default function Results() {
               )}
               {/* CTA to Plan tab */}
               <button
-                onClick={() => navigate('/plan')}
+                onClick={() => navigate('/workout-plan')}
                 className="w-full mt-2 py-3 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[13px] transition-opacity active:opacity-75"
                 style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)', color: '#C6A85C' }}
               >
@@ -2667,8 +2692,8 @@ export default function Results() {
         </button>
         {isPremium && (
           <>
-            <button onClick={() => navigate('/plan')} className="btn-primary flex items-center justify-center gap-2">
-              See My 12-Week Roadmap <ArrowRight size={15} />
+            <button onClick={() => navigate('/workout-plan')} className="btn-primary flex items-center justify-center gap-2">
+              See My Training Plan <ArrowRight size={15} />
             </button>
             <button onClick={() => navigate('/scan')} className="btn-ghost border border-default">
               Take Another Scan
