@@ -598,30 +598,13 @@ export function StepPaywall({ onUnlocked, onSkip }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={startTrial}
+          onClick={buyNow}
           disabled={loading}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.4)' }}
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
-          {loading ? 'Starting…' : 'Start 3-Day Free Trial'}
-        </motion.button>
-
-        <p className="text-center text-[10.5px] font-body mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
-          $0 today · cancel anytime
-        </p>
-
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={buyNow}
-          disabled={loading}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70 mt-3"
-          style={{ background: 'transparent', border: `1.5px solid rgba(198,168,92,0.4)`, color: G }}
-        >
-          {loading ? 'Processing…' : `Buy Now · ${plan === 'annual' ? '$49.99/yr' : '$7.99/mo'}`}
+          {loading ? 'Processing…' : plan === 'annual' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
         </motion.button>
 
         {error && <p className="text-center text-[11px] font-body mt-2" style={{ color: '#EF4444' }}>{error}</p>}

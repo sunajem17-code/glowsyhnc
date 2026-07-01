@@ -43,7 +43,6 @@ export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
   const [plan, setPlan] = useState('yearly')
-  const [subscribingTrial, setSubscribingTrial] = useState(false)
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
@@ -275,8 +274,8 @@ export default function Premium() {
           style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
         >
           {[
-            { key: 'monthly', label: 'Monthly', price: '$7.99/mo' },
-            { key: 'yearly',  label: 'Yearly',  price: '$49.99/yr', badge: 'Save 48%' },
+            { key: 'monthly', label: 'Monthly', price: '$1.84/wk' },
+            { key: 'yearly',  label: 'Yearly',  price: '$0.96/wk', badge: 'Save 48%' },
           ].map(({ key, label, price, badge }) => (
             <button
               key={key}
@@ -543,7 +542,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : 'Start 3-Day Free Trial'}
+          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
         </motion.button>
 
         {/* Apple IAP required disclosure */}

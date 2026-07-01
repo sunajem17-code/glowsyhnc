@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
@@ -406,6 +407,7 @@ export default function Profile() {
   }
 
   return (
+    <>
     <MotionPage className="px-4">
       <PageHeader title="Profile" />
 
@@ -1146,110 +1148,124 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      {/* ── Delete Account Modal ──────────────────────────────────── */}
-      <AnimatePresence>
-        {deleteAccountOpen && (
-          <motion.div
-            ref={deleteBackdropRef}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end"
-            style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(10px)', touchAction: 'none', pointerEvents: 'all' }}
-            onClick={(e) => { if (e.target === deleteBackdropRef.current && !deletingAccount) setDeleteAccountOpen(false) }}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-              className="w-full rounded-t-3xl"
-              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom, 34px)' }}
-            >
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
-              </div>
+    </MotionPage>
 
-              <div className="px-5 pt-4 flex-shrink-0" style={{ paddingBottom: 'max(40px, calc(env(safe-area-inset-bottom, 0px) + 24px))' }}>
-                {/* Header */}
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <Trash2 size={16} style={{ color: '#EF4444' }} />
+      {/* ── Delete Account Modal — rendered in a portal so MotionPage's
+           CSS transform doesn't create a new stacking context that traps
+           position:fixed, causing the backdrop to be clipped. ─────────── */}
+      {createPortal(
+        <AnimatePresence>
+          {deleteAccountOpen && (
+            <motion.div
+              ref={deleteBackdropRef}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                display: 'flex', alignItems: 'flex-end',
+                background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(10px)',
+                touchAction: 'none',
+              }}
+              onClick={(e) => { if (e.target === deleteBackdropRef.current && !deletingAccount) setDeleteAccountOpen(false) }}
+            >
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+                style={{
+                  width: '100%',
+                  background: '#0D0D0D',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  borderBottom: 'none',
+                  borderRadius: '24px 24px 0 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {/* Handle */}
+                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4, flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)' }} />
+                </div>
+
+                <div style={{ padding: '16px 20px', paddingBottom: 'max(40px, calc(env(safe-area-inset-bottom, 0px) + 24px))', flexShrink: 0 }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', flexShrink: 0 }}>
+                        <Trash2 size={16} style={{ color: '#EF4444' }} />
+                      </div>
+                      <h3 className="font-heading font-bold text-[18px] text-white">Delete Account</h3>
                     </div>
-                    <h3 className="font-heading font-bold text-[18px] text-white">Delete Account</h3>
+                    <button
+                      onClick={() => !deletingAccount && setDeleteAccountOpen(false)}
+                      style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer' }}
+                    >
+                      <X size={15} className="text-white" />
+                    </button>
                   </div>
+
+                  {/* Warning box */}
+                  <div style={{ borderRadius: 16, padding: '16px', marginBottom: 20, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                    <p className="font-heading font-bold text-[13px]" style={{ color: '#EF4444', marginBottom: 8 }}>
+                      This is permanent and cannot be undone.
+                    </p>
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[
+                        'Your account and login will be deleted',
+                        'All scans, scores, and progress history',
+                        'Your 12-week plan and check-in streak',
+                        'Your active subscription will be cancelled',
+                      ].map(line => (
+                        <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <span style={{ marginTop: 2, fontSize: 10, color: 'rgba(239,68,68,0.7)', flexShrink: 0 }}>✕</span>
+                          <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Error */}
+                  {deleteAccountError && (
+                    <p className="font-body text-[11px] text-center" style={{ color: '#EF4444', marginBottom: 12 }}>
+                      {deleteAccountError}
+                    </p>
+                  )}
+
+                  {/* Buttons */}
                   <button
-                    onClick={() => !deletingAccount && setDeleteAccountOpen(false)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(255,255,255,0.08)' }}
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount}
+                    className="font-heading font-bold text-[14px]"
+                    style={{ width: '100%', padding: '16px', borderRadius: 16, background: '#EF4444', color: 'white', border: 'none', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: deletingAccount ? 0.5 : 1, cursor: deletingAccount ? 'not-allowed' : 'pointer' }}
                   >
-                    <X size={15} className="text-white" />
+                    {deletingAccount ? (
+                      <>
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                          style={{ display: 'inline-block', width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
+                        />
+                        Deleting…
+                      </>
+                    ) : 'Yes, Delete Everything'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteAccountOpen(false)}
+                    disabled={deletingAccount}
+                    className="font-heading font-bold text-[14px]"
+                    style={{ width: '100%', padding: '14px', borderRadius: 16, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                  >
+                    Cancel
                   </button>
                 </div>
-
-                {/* Warning box */}
-                <div className="rounded-2xl px-4 py-4 mb-5"
-                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                  <p className="font-heading font-bold text-[13px] mb-2" style={{ color: '#EF4444' }}>
-                    This is permanent and cannot be undone.
-                  </p>
-                  <ul className="space-y-1.5">
-                    {[
-                      'Your account and login will be deleted',
-                      'All scans, scores, and progress history',
-                      'Your 12-week plan and check-in streak',
-                      'Your active subscription will be cancelled',
-                    ].map(line => (
-                      <li key={line} className="flex items-start gap-2">
-                        <span className="mt-0.5 text-[10px]" style={{ color: 'rgba(239,68,68,0.7)' }}>✕</span>
-                        <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Error message */}
-                {deleteAccountError && (
-                  <p className="font-body text-[11px] mb-3 text-center" style={{ color: '#EF4444' }}>
-                    {deleteAccountError}
-                  </p>
-                )}
-
-                {/* Buttons */}
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deletingAccount}
-                  className="w-full py-4 rounded-2xl font-heading font-bold text-[14px] mb-3 flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: '#EF4444', color: 'white' }}
-                >
-                  {deletingAccount ? (
-                    <>
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        className="inline-block"
-                        style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
-                      />
-                      Deleting…
-                    </>
-                  ) : 'Yes, Delete Everything'}
-                </button>
-                <button
-                  onClick={() => setDeleteAccountOpen(false)}
-                  disabled={deletingAccount}
-                  className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px]"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
-                >
-                  Cancel
-                </button>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </MotionPage>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   )
 }

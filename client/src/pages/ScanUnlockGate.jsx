@@ -100,66 +100,126 @@ function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
   )
 }
 
-// ── Card 1: Glow Score ────────────────────────────────────────────────────────
+// ── Card 1: Original StepScoresWaiting layout ────────────────────────────────
 
 function Card1Score({ scan }) {
   const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
   const tier      = scan?.tier ?? null
   const topPct    = toTopPct(glowScore)
+  const growthArea = getBiggestGrowthArea(scan)
+  const celebMatch = getCelebMatch(scan)
+
+  const physiqueUpside = scan?.physiqueScore
+    ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.09)
+    : 0
+  const potential = glowScore != null
+    ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
+    : null
+
+  const lockedMetrics = [
+    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '—',       unit: '' },
+    { icon: Zap,  label: 'Potential', value: potential ?? '—',  unit: potential ? '/10' : '' },
+  ]
 
   return (
-    <CardShell badge="ASCENDUS SCORE" icon={Star}>
-      <div className="mb-8">
-        <div className="flex items-end gap-2 mb-4" style={{ lineHeight: 1 }}>
-          <span
-            className="font-heading font-bold"
-            style={{ fontSize: 88, color: TEXT, letterSpacing: '-0.04em', lineHeight: 1 }}
-          >
-            {glowScore != null ? glowScore.toFixed(1) : '—'}
-          </span>
-          <span
-            className="font-heading font-bold text-[24px] mb-2"
-            style={{ color: 'rgba(255,255,255,0.3)' }}
-          >
-            /10
+    <div className="flex flex-col h-full" style={{ background: BG }}>
+      {/* Ambient glow */}
+      <div style={{
+        position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)',
+        width: 340, height: 340, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(198,168,92,0.10) 0%, transparent 68%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
+
+        {/* Header — logo + wordmark */}
+        <div className="flex items-center gap-3 mb-7">
+          <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
+          <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
+            ASCENDUS ANALYSIS
           </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {tier && (
-            <div
-              className="inline-flex items-center px-3 py-1.5 rounded-xl"
-              style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.30)' }}
-            >
-              <span className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: G }}>
-                {tier.toUpperCase()}
-              </span>
-            </div>
-          )}
-          {topPct && (
-            <div
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}
-            >
-              <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <span className="font-heading font-bold text-[11px] tracking-[0.10em]" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                {topPct}
-              </span>
-            </div>
-          )}
+        {/* Hero score */}
+        <div className="mb-5">
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
+            GLOW SCORE
+          </p>
+          <div className="flex items-end gap-1.5 mb-3">
+            <span className="font-heading font-bold leading-none" style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
+              {glowScore != null ? glowScore.toFixed(1) : '—'}
+            </span>
+            <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {tier && (
+              <div className="inline-flex items-center px-3 py-1.5 rounded-xl" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.30)' }}>
+                <span className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: G }}>{tier.toUpperCase()}</span>
+              </div>
+            )}
+            {topPct && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                <span className="font-heading font-bold text-[11px] tracking-[0.10em]" style={{ color: 'rgba(255,255,255,0.75)' }}>{topPct}</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div
-        className="rounded-2xl px-4 py-3.5"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <p className="font-body text-[12px] leading-relaxed" style={{ color: DIM }}>
-          Swipe right to explore your full breakdown —{' '}
-          <span style={{ color: G }}>6 categories locked for you</span>
+        {/* Biggest growth area teaser */}
+        {growthArea && (
+          <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
+            <div className="min-w-0">
+              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Biggest growth area</p>
+              <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>{growthArea.label}</p>
+              <p className="font-body text-[12px] leading-snug select-none" style={{ color: 'rgba(255,255,255,0.55)', filter: 'blur(5px)', userSelect: 'none' }}>
+                {growthArea.detail}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Celebrity match teaser */}
+        {celebMatch && (
+          <div className="flex items-center gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}>
+              <span style={{ fontSize: 17 }}>⭐</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Celebrity match · {celebMatch.sim}% similarity</p>
+              <p className="font-heading font-bold text-[15px] select-none" style={{ color: 'rgba(255,255,255,0.90)', filter: 'blur(6px)', userSelect: 'none' }}>
+                {celebMatch.name}
+              </p>
+            </div>
+            <Lock size={13} style={{ color: G, flexShrink: 0 }} />
+          </div>
+        )}
+
+        {/* Locked metric cards */}
+        <div className="grid grid-cols-2 gap-2.5 mb-4">
+          {lockedMetrics.map(({ icon: Icon, label, value, unit }, i) => (
+            <div key={label} className="rounded-2xl p-3 flex flex-col" style={{ background: 'rgba(198,168,92,0.04)', border: '1px solid rgba(198,168,92,0.12)' }}>
+              <div className="flex items-center justify-between mb-2.5">
+                <Icon size={12} style={{ color: G }} />
+                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+              </div>
+              <span className="font-heading text-[9px] tracking-wide font-bold mb-1.5" style={{ color: 'rgba(198,168,92,0.6)' }}>{label}</span>
+              <div className="flex items-end gap-0.5">
+                <span className="font-heading font-bold text-[22px] leading-none select-none" style={{ color: TEXT, filter: 'blur(7px)', userSelect: 'none' }}>{value}</span>
+                {unit && <span className="font-heading font-bold text-[11px] mb-0.5 select-none" style={{ color: DIM, filter: 'blur(5px)' }}>{unit}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Swipe hint */}
+        <p className="font-body text-[11px] text-center" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          Swipe → for full breakdown
         </p>
       </div>
-    </CardShell>
+    </div>
   )
 }
 
