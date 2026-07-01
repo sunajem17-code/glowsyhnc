@@ -1141,14 +1141,17 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      {/* ── Cancel Subscription Modal ─────────────────────────────── */}
-      <AnimatePresence>
-        {cancelOpen && (
-          <CancelModal onClose={() => setCancelOpen(false)} />
-        )}
-      </AnimatePresence>
-
     </MotionPage>
+
+      {/* ── Cancel Subscription Modal — portal escapes MotionPage transform ── */}
+      {createPortal(
+        <AnimatePresence>
+          {cancelOpen && (
+            <CancelModal onClose={() => setCancelOpen(false)} />
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ── Delete Account Modal — rendered in a portal so MotionPage's
            CSS transform doesn't create a new stacking context that traps

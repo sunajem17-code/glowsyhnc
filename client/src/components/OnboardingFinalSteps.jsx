@@ -560,8 +560,8 @@ export function StepPaywall({ onUnlocked, onSkip }) {
           className="grid grid-cols-2 gap-2 mb-5"
         >
           {[
-            { key: 'monthly', label: 'Monthly', price: '$7.99', per: '/mo', badge: null },
-            { key: 'annual', label: 'Annual', price: '$4.17', per: '/mo', badge: 'SAVE 48%' },
+            { key: 'monthly', label: 'Monthly', price: '$1.84', per: '/wk', badge: null },
+            { key: 'annual', label: 'Annual', price: '$0.96', per: '/wk', badge: 'SAVE 48%' },
           ].map(({ key, label, price, per, badge }) => (
             <button
               key={key}
