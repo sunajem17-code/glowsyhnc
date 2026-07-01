@@ -124,7 +124,6 @@ export const api = {
   },
   hair: {
     analyze: (data) => request('/hair/analyze', { method: 'POST', body: JSON.stringify(data) }),
-    tryon:   (data) => request('/hair/tryon',   { method: 'POST', body: JSON.stringify(data) }),
   },
   leaderboard: {
     get: () => request('/leaderboard'),

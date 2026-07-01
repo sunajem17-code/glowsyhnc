@@ -277,108 +277,8 @@ function AILoading() {
 }
 
 // ─── AI Results ────────────────────────────────────────────────────────────────
-// ── Hair Try-On Modal ─────────────────────────────────────────────────────────
-function HairTryOnModal({ hairstyleName, headShape, hairType, facePhoto, onClose }) {
-  const [phase, setPhase]     = useState('loading') // loading | done | error
-  const [image, setImage]     = useState(null)
-  const [errMsg, setErrMsg]   = useState('')
-  const [retryN, setRetryN]   = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    setPhase('loading'); setImage(null); setErrMsg('')
-    ;(async () => {
-      try {
-        if (!facePhoto?.base64) throw new Error('No photo available — rescan first')
-        const data = await api.hair.tryon({
-          imageData:     facePhoto.base64,
-          hairstyleName,
-          headShape:     headShape ?? 'oval',
-          hairType:      hairType  ?? 'straight',
-        })
-        if (!cancelled) { setImage(data.image); setPhase('done') }
-      } catch (err) {
-        if (!cancelled) { setErrMsg(err.message || 'Try-on failed'); setPhase('error') }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [retryN])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: 'rgba(4,3,1,0.97)', backdropFilter: 'blur(20px)' }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 flex-shrink-0">
-        <div>
-          <p className="font-heading font-bold text-[15px]" style={{ color: '#fff' }}>AI Hair Try-On</p>
-          <p className="font-body text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{hairstyleName}</p>
-        </div>
-        <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.08)' }}>
-          <X size={17} className="text-white" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center justify-center">
-        {phase === 'loading' && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-2" style={{ borderColor: `${GOLD}30` }} />
-              <div className="absolute inset-0 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: GOLD, borderTopColor: 'transparent' }} />
-              <Sparkles size={18} className="absolute inset-0 m-auto" style={{ color: GOLD }} />
-            </div>
-            <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Rendering your {hairstyleName}…
-            </p>
-            <p className="font-body text-[11px] text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              This takes about 15-20 seconds
-            </p>
-          </div>
-        )}
-
-        {phase === 'error' && (
-          <div className="flex flex-col items-center gap-4 text-center px-6">
-            <p className="font-heading font-bold text-[15px] text-white">Try-on failed</p>
-            <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{errMsg}</p>
-            <button onClick={() => setRetryN(n => n + 1)}
-              className="px-5 py-2.5 rounded-2xl font-heading font-bold text-[13px] text-black"
-              style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 100%)` }}>
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {phase === 'done' && image && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm"
-          >
-            <div className="rounded-2xl overflow-hidden mb-4"
-              style={{ border: `2px solid ${GOLD}60`, boxShadow: `0 0 30px ${GOLD}25` }}>
-              <img src={image} alt={hairstyleName} className="w-full" />
-            </div>
-            <p className="font-heading font-bold text-[13px] text-center mb-1" style={{ color: GOLD }}>
-              {hairstyleName}
-            </p>
-            <p className="font-body text-[11px] text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              AI-generated — results may vary
-            </p>
-          </motion.div>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
-function AIResults({ result, isPremium, facePhoto, onUpgrade, onRescan }) {
+function AIResults({ result, isPremium, onUpgrade, onRescan }) {
   const [copiedIdx, setCopiedIdx] = useState(null)
-  const [tryOnCut, setTryOnCut]   = useState(null)
 
   function copyScript(text, idx) {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -485,17 +385,6 @@ function AIResults({ result, isPremium, facePhoto, onUpgrade, onRescan }) {
                     <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>{rec.avoid}</p>
                   </div>
 
-                  {/* Try On button — Pro only */}
-                  {isPremium && facePhoto && (
-                    <button
-                      onClick={() => setTryOnCut({ name: rec.name })}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-heading font-bold text-[12px]"
-                      style={{ background: `${GOLD}12`, border: `1px solid ${GOLD}35`, color: GOLD }}
-                    >
-                      <Sparkles size={13} />
-                      Try On with AI
-                    </button>
-                  )}
                 </div>
               </motion.div>
             ))}
@@ -555,18 +444,6 @@ function AIResults({ result, isPremium, facePhoto, onUpgrade, onRescan }) {
         Scan Again
       </button>
 
-      {/* Hair Try-On Modal */}
-      <AnimatePresence>
-        {tryOnCut && (
-          <HairTryOnModal
-            hairstyleName={tryOnCut.name}
-            headShape={result.headShape}
-            hairType={result.hairType}
-            facePhoto={facePhoto}
-            onClose={() => setTryOnCut(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -852,7 +729,6 @@ export default function HairMaxx() {
   const [aiStep, setAiStep]     = useState('capture') // 'capture' | 'loading' | 'results'
   const [aiResult, setAiResult] = useState(null)
   const [aiError, setAiError]   = useState(null)
-  const [aiPhoto, setAiPhoto]   = useState(null) // { base64, mediaType } for try-on
 
   // Manual flow state
   const [manualStep, setManualStep] = useState(0)
@@ -881,7 +757,6 @@ export default function HairMaxx() {
         mediaType = result.mediaType
       }
       const result = await api.hair.analyze({ imageData: base64, mediaType })
-      setAiPhoto({ base64, mediaType })
       setAiResult(result)
       setAiStep('results')
     } catch (err) {
@@ -980,9 +855,8 @@ export default function HairMaxx() {
               <AIResults
                 result={aiResult}
                 isPremium={isPremium}
-                facePhoto={aiPhoto}
                 onUpgrade={() => navigate('/premium')}
-                onRescan={() => { setAiStep('capture'); setAiResult(null); setAiPhoto(null) }}
+                onRescan={() => { setAiStep('capture'); setAiResult(null) }}
               />
             </motion.div>
           )}
