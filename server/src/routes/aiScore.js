@@ -404,10 +404,14 @@ Return ONLY this JSON — no markdown, nothing else:
 
 // ── Rekognition: call RecognizeCelebrities, return raw CelebrityFaces array ──
 async function rekognizeImage(faceBase64) {
-  const client = getRekognitionClient()
-  const bytes  = Buffer.from(faceBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-  const cmd    = new RecognizeCelebritiesCommand({ Image: { Bytes: bytes } })
-  const resp   = await client.send(cmd)
+  const client  = getRekognitionClient()
+  const bytes   = Buffer.from(faceBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+  const cmd     = new RecognizeCelebritiesCommand({ Image: { Bytes: bytes } })
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Rekognition timed out after 10s')), 10_000)
+  )
+  const resp = await Promise.race([client.send(cmd), timeout])
   return resp.CelebrityFaces ?? []
 }
 
