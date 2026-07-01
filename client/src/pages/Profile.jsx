@@ -1164,7 +1164,7 @@ export default function Profile() {
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 280 }}
               className="w-full rounded-t-3xl"
-              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom, 34px)' }}
             >
               {/* Handle */}
               <div className="flex justify-center pt-3 pb-1 flex-shrink-0">

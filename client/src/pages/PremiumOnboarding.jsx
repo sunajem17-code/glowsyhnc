@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock } from 'lucide-react'
@@ -2137,6 +2138,10 @@ export default function PremiumOnboarding() {
       tasks,
     }).catch(() => {})
 
+    // flushSync ensures hasOnboarded=true is committed to the React tree before
+    // navigate fires — otherwise /unlock is caught by the * wildcard (PremiumOnboarding)
+    // because the route only exists in the hasOnboarded=true branch of App.jsx
+    flushSync(() => { setHasOnboarded() })
     navigate('/unlock', { replace: true }) // show unlock gate immediately — the hook
   }
 
