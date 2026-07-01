@@ -2364,7 +2364,15 @@ export default function Results() {
       {/* ── Celebrity Lookalikes ──────────────────────────────────── */}
       <Section title="Celebrity Lookalikes" icon={<Star size={16} style={{ color: '#C6A85C', fill: '#C6A85C' }} />} defaultOpen={false}>
         <div className="space-y-0">
-          {resolvedMatches.map((match, i) => (
+          {resolvedMatches.every(m => !m.similarity || m.celebrity === 'No close match found') ? (
+            <div className="py-4 flex flex-col items-center gap-1.5 text-center">
+              <p className="text-sm font-heading font-bold text-primary">No celebrity match found</p>
+              <p className="text-[11px] font-body text-secondary">Rekognition couldn't find a match for this photo. Try a clearer, front-facing photo.</p>
+            </div>
+          ) : resolvedMatches.map((match, i) => {
+            const isNoMatch = !match.similarity || match.celebrity === 'No close match found'
+            if (isNoMatch) return null
+            return (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-heading font-bold text-sm"
@@ -2373,9 +2381,7 @@ export default function Results() {
                 {match.celebrity?.charAt(0) ?? '?'}
               </div>
               <div className="flex-1">
-                {/* Name always visible */}
                 <p className="text-sm font-heading font-bold text-primary">{match.celebrity}</p>
-                {/* Shared traits — blurred for free */}
                 {(match.shared_traits || match.reason) && (
                   isPremium ? (
                     <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C', opacity: 0.8 }}>
@@ -2390,7 +2396,6 @@ export default function Results() {
                     </p>
                   )
                 )}
-                {/* Similarity bar — blurred for free */}
                 {isPremium ? (
                   <div className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                     <motion.div
@@ -2414,7 +2419,6 @@ export default function Results() {
                   </div>
                 )}
               </div>
-              {/* Similarity % — blurred for free */}
               {isPremium ? (
                 <span className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0">{match.similarity}%</span>
               ) : (
@@ -2427,7 +2431,8 @@ export default function Results() {
                 </span>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
         {!isPremium && (
           <button

@@ -411,25 +411,25 @@ async function rekognizeImage(faceBase64) {
   return resp.CelebrityFaces ?? []
 }
 
-// ── CALL 3 (parallel): Celebrity Lookalike ────────────────────────────────────
-// Tries AWS Rekognition first. Falls back to Claude if Rekognition returns 0
-// matches or fails. Pads with Claude results when Rekognition returns 1–2.
-async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male', faceResult = null, computedScores = null) {
-  // ── Step A: attempt Rekognition ────────────────────────────────────────────
+const NO_MATCH = { celebrity: 'No close match found', profession: null, similarity: 0, shared_traits: 'No celebrity match detected' }
+
+// ── CALL 3 (parallel): Celebrity Lookalike via AWS Rekognition ────────────────
+// Rekognition is the only path. No Claude fallback.
+async function getCelebrityMatch(faceBase64) {
   let rekogFaces = []
   try {
     rekogFaces = await withRetry(() => rekognizeImage(faceBase64), 'rekognition')
     console.log(`[CELEB] Rekognition returned ${rekogFaces.length} matches`)
   } catch (err) {
-    console.warn('[CELEB] Rekognition failed, falling back to Claude:', err.message)
+    console.warn(`[CELEB] Rekognition failed: ${err.message}`)
+    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
   }
 
   if (rekogFaces.length === 0) {
-    console.log('[CELEB] Rekognition returned 0 matches, full Claude fallback')
-    return await getClaudeMatches(faceBase64, faceMediaType, gender, faceResult, computedScores)
+    console.log('[CELEB] Rekognition returned 0 matches')
+    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
   }
 
-  // ── Step B: map Rekognition results to client shape ─────────────────────────
   const mapped = rekogFaces.slice(0, 3).map(r => ({
     celebrity:    r.Name,
     profession:   'Celebrity',
@@ -437,282 +437,10 @@ async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male', fac
     shared_traits: 'Matched by AWS Rekognition facial recognition',
   }))
 
-  // ── Step C: pad remaining slots with Claude if fewer than 3 Rekognition hits ──
-  if (mapped.length < 3) {
-    console.log(`[CELEB] Falling back to Claude for remaining ${3 - mapped.length} slots`)
-    try {
-      const claudeResult = await getClaudeMatches(faceBase64, faceMediaType, gender, faceResult, computedScores)
-      const claudeSlots  = [claudeResult.match1, claudeResult.match2, claudeResult.match3].filter(Boolean)
-      while (mapped.length < 3 && claudeSlots.length > 0) {
-        mapped.push(claudeSlots.shift())
-      }
-    } catch (err) {
-      console.warn('[CELEB] Claude padding failed:', err.message)
-    }
-  }
+  while (mapped.length < 3) mapped.push(NO_MATCH)
 
-  return { match1: mapped[0] ?? null, match2: mapped[1] ?? null, match3: mapped[2] ?? null }
-}
-
-// ── Claude-based celebrity matching (used as fallback / padding) ──────────────
-async function getClaudeMatches(faceBase64, faceMediaType, gender = 'male', faceResult = null, computedScores = null) {
-  const client  = getClient()
-  const isFemale = gender === 'female'
-
-  // ── Build score context block so Claude can use actual metrics for matching ──
-  let scoreBlock = ''
-  if (faceResult && computedScores) {
-    const { final, tier, harmony, angularity, features, dimorphism } = computedScores
-    const fs = faceResult.facial_structure ?? 'unknown'
-    const ht = faceResult.hair_type ?? 'unknown'
-    const dimLabel = isFemale ? 'Femininity' : 'Masculinity'
-    const sexLabel = isFemale ? 'feminine' : 'masculine'
-
-    const harmonyDesc  = harmony    >= 8 ? 'highly symmetric, well-proportioned'           : harmony    >= 6 ? 'above-average facial balance'         : 'some asymmetry or imbalance'
-    const angularDesc  = angularity >= 8 ? 'sharp defined jaw and prominent cheekbones'    : angularity >= 6 ? 'moderate bone definition'             : 'soft or rounded bone structure'
-    const featuresDesc = features   >= 8 ? 'standout individual features'                  : features   >= 6 ? 'above-average feature quality'         : 'average individual features'
-    const dimorphDesc  = dimorphism >= 8 ? `strongly ${sexLabel}`                          : dimorphism >= 6 ? `moderately ${sexLabel}`                : `mildly ${sexLabel} or androgynous`
-
-    const maleAngularRule = angularity < 5
-      ? '- Angularity < 5 → match ONLY to celebrities with soft, round, or full facial structure. Reject any match with a sharp or angular jaw.'
-      : angularity >= 8
-        ? '- Angularity ≥ 8 → match ONLY to celebrities with a sharp defined jaw, prominent cheekbones, and angular bone structure.'
-        : '- Angularity 5–7 → moderate bone definition; avoid both very sharp and very soft extremes.'
-    const maleDimRule = dimorphism < 5
-      ? '- Sex dimorphism < 5 → androgynous or soft bone structure. Match to celebrities with narrow jaw, softer brow, and delicate features. Do NOT return hyper-masculine matches.'
-      : dimorphism >= 8
-        ? '- Sex dimorphism ≥ 8 → strongly masculine bone structure. Match only to celebrities known for heavy brow ridge, strong jaw, and prominent masculine features.'
-        : '- Sex dimorphism 5–7 → moderate masculinity; avoid extreme ends of masculine/androgynous spectrum.'
-    const femaleDimRule = dimorphism < 5
-      ? '- Femininity < 5 → stronger facial bone structure. Avoid hyper-feminine or delicate matches.'
-      : dimorphism >= 8
-        ? '- Femininity ≥ 8 → highly feminine bone structure. Match only to celebrities known for delicate, feminine features.'
-        : '- Femininity 5–7 → balanced; avoid extremes.'
-    const scoreRule = final < 5
-      ? '- Overall score < 5 → match to lesser-known or B-tier celebrities; do NOT match to elite A-listers.'
-      : final >= 8
-        ? '- Overall score ≥ 8 → match only to top-tier celebrities known for strong aesthetics.'
-        : '- Overall score 5–7 → mid-tier celebrity matches; avoid both extreme ends.'
-
-    scoreBlock = `
-══ THIS PERSON'S SCORE PROFILE — use to guide every match ══
-Overall Score: ${final}/10  (Tier: ${tier})
-• Harmony    (facial balance):    ${harmony}/10    — ${harmonyDesc}
-• Angularity (bone structure):    ${angularity}/10 — ${angularDesc}
-• Features   (individual quality): ${features}/10  — ${featuresDesc}
-• ${dimLabel} (sex characteristics): ${dimorphism}/10 — ${dimorphDesc}
-• Face type: ${fs} | Hair: ${ht}
-
-BONE STRUCTURE MATCHING RULES — NON-NEGOTIABLE:
-⚠ Match based ONLY on facial bone structure, jaw shape, eye spacing, nose shape, and overall facial geometry. IGNORE hair, style, clothing, era, music genre, fanbase, or cultural associations entirely. A style/vibe match is a WRONG answer.
-${maleAngularRule}
-${isFemale ? femaleDimRule : maleDimRule}
-- Harmony ≥ 8 → match to celebrities known for symmetrical, well-proportioned facial structure.
-${scoreRule}
-- If your confidence in the structural match is low, say so in shared_traits ("moderate structural similarity") rather than forcing a famous name that doesn't match the bone structure.
-
-`
-  }
-
-  // ── Helper: detect if any returned name is generic or unrecognisable ────────
-  function isGenericOrUnknown(parsed) {
-    if (!parsed) return true
-    const names = [parsed.match1, parsed.match2, parsed.match3]
-      .filter(Boolean)
-      .map(m => (m.celebrity || '').trim().toLowerCase())
-    if (names.length === 0) return true
-    return names.some(n =>
-      !n ||
-      n.length < 3 ||
-      /unknown|generic|person|individual|n\/a|no match|nobody|placeholder/i.test(n)
-    )
-  }
-
-  // ── Primary system prompt — expanded to cover models, athletes, influencers ─
-  const systemPrompt = `You are a facial match specialist. You identify the most visually similar celebrity, model, athlete, or public figure for any face worldwide — not just Hollywood actors.
-
-YOUR MATCH POOL — draw from ALL of these categories equally:
-• Actors & musicians (Hollywood, Bollywood, K-pop, Nollywood, Latin, European)
-• Fashion models (Victoria's Secret, Vogue runway, Sports Illustrated, editorial)
-• Fitness models, physique athletes, and men's health cover models
-• Instagram / TikTok creators with 500k+ followers
-• Professional athletes (soccer, basketball, boxing, UFC, NFL, tennis, F1)
-• International celebrities from any country or industry
-
-ACCURACY OVER FAME — the most structurally accurate match wins, even if they are less famous than an actor. A runway model who shares identical bone structure beats a mismatched Hollywood star every time.
-
-CANDIDATE POOLS BY ETHNICITY AND GENDER (non-exhaustive — use your full knowledge):
-
-${isFemale ? `FEMALE POOLS — use ONLY these female celebrities. Match skin tone exactly before anything else:
-  BLACK/DARK-SKIN: Beyoncé, Rihanna, Zendaya, Lupita Nyong'o, Naomi Campbell, Halle Bailey,
-    Ari Lennox, Normani, Jorja Smith, Tyla
-  LATINO/OLIVE: Selena Gomez, Jennifer Lopez, Camila Cabello, Dua Lipa, Rosalía
-  ASIAN: Lisa (BLACKPINK), Jennie (BLACKPINK), Gemma Chan, Awkwafina, Constance Wu
-  WHITE EUROPEAN/AMERICAN: Margot Robbie, Sydney Sweeney, Florence Pugh, Sabrina Carpenter,
-    Olivia Rodrigo, Hailey Bieber, Kendall Jenner
-  MIDDLE EASTERN: Nadine Njeim, Haifa Wehbe
-  INTERNET FAMOUS (any ethnicity): Alix Earle, Emma Chamberlain, Addison Rae
-
-  ⚠ FEMALE MATCHING RULES — NON-NEGOTIABLE:
-  - ONLY match to females on this list. Never return a male name for a female subject.
-  - Skin tone MUST match exactly. Black/dark skin → only Black/dark celebrities. White → only White celebrities. Never cross.
-  - Face shape MUST match. Round face → only round-faced matches. Angular → only angular matches.
-  - Similarity MAX 78% unless near-identical. Never go above 78%.
-  - shared_traits must name at least 2 specific anatomical features (e.g. "high cheekbones, almond eyes"). Never use "vibe" or "energy".` : `MALE POOLS:
-  WHITE EUROPEAN/AMERICAN (actors/models): Timothée Chalamet, Jacob Elordi, Austin Butler, Paul Mescal,
-    Tom Holland, Zac Efron, Glen Powell, Richard Madden, Kit Harington, Henry Cavill, Chris Hemsworth,
-    Pedro Pascal, Adam Driver, Brad Pitt, Ryan Reynolds, Leonardo DiCaprio, Harry Styles,
-    Lucky Blue Smith, David Gandy, Jon Kortajarena, Sean O'Pry, Tyler Cameron, Jordan Barrett
-  FITNESS/SOCIAL (any ethnicity): Jeff Seid, David Laid, Ryan Terry, Simeon Panda, Ulisses Jr,
-    Steve Cook, Lazar Angelov, Noah Beck, Vinnie Hacker, Chase Hudson, Bryce Hall, MrBeast
-  BLACK/MIXED (actors/athletes/musicians/comedians): Michael B Jordan, Idris Elba, Winston Duke, Kofi Siriboe,
-    Mahershala Ali, John Boyega, Dwayne Johnson, Drake, Travis Scott, The Weeknd, ASAP Rocky,
-    LeBron James, Steph Curry, Ja Morant, Devin Booker, Giannis Antetokounmpo,
-    Anthony Joshua, KSI, Israel Adesanya, Kevin Hart, Kai Cenat, Druski, DC Young Fly,
-    Karlous Miller, Lil Duval, Affion Crockett, Aries Spears, Lil Rel Howery, Roy Wood Jr,
-    Mike Epps, Chris Tucker, Eddie Murphy, Dave Chappelle, Katt Williams
-  ASIAN/INTERNATIONAL: BTS (V/Jin/Jungkook/RM/Suga/J-Hope/Jimin), Park Seo-jun, Song Joong-ki,
-    Lee Jong-suk, Lee Min-ho, Godfrey Gao, Simu Liu, Steven Yeun
-  LATINO/MIDDLE EASTERN: Bad Bunny, Maluma, J Balvin, Ozuna, Neymar, Kylian Mbappé,
-    Rami Malek, Marwan Kenzari, Oscar Isaac, Diego Luna, Gael Garcia Bernal
-  SOUTH ASIAN: Hrithik Roshan, Ranveer Singh, Shahid Kapoor, Tiger Shroff, Vidyut Jammwal,
-    Dev Patel, Riz Ahmed`}
-
-${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST (do this before naming anyone) ══
-1. SKIN TONE: pale / light / medium / tan / brown / dark-brown / deep-dark
-2. FACE SHAPE: oval / round / square / oblong / diamond / heart / triangle
-3. JAW: sharp-angular / moderate / soft-rounded / wide-square / recessed
-4. CHEEKBONES: prominent-high / average / flat / wide
-5. EYES: almond / round / hooded / deep-set / wide-set / close-set / monolid
-6. NOSE: wide-flat / broad / medium / narrow / upturned / aquiline
-7. LIPS: full / medium / thin
-8. FACE FULLNESS: very-lean / lean / average / full / heavy
-9. ETHNICITY: East-Asian / South-Asian / Southeast-Asian / Black-African / Black-American / Middle-Eastern / Latino / White-European / Mixed
-
-══ STEP 2: HARD MATCHING RULES (violations = wrong answer) ══
-
-RULE 1 — SKIN TONE IS NON-NEGOTIABLE:
-  Never match across more than one skin tone category. pale/light → only pale/light celebrities. brown/dark → only brown/dark celebrities.
-
-RULE 2 — FACE SHAPE MUST MATCH:
-  round face → ONLY round-faced celebrities. Sharp angular jaw → ONLY sharp-jaw celebrities. Soft jaw → ONLY soft-jaw celebrities.
-  NEVER match a round soft face to a chiseled angular celebrity, or vice versa.
-
-RULE 3 — STRUCTURE ONLY — IGNORE EVERYTHING ELSE:
-  Match based ONLY on facial bone structure, jaw shape, eye spacing, nose shape, and overall facial geometry.
-  IGNORE completely: hair, hairstyle, clothing, era, music genre, fanbase, cultural vibe, celebrity aesthetics.
-  A style/vibe/era association is a WRONG answer. "They both give off the same energy" is a WRONG answer.
-
-RULE 4 — CATEGORY IS OPEN:
-  actors, athletes, comedians, streamers, YouTubers, influencers — whoever structurally matches best.
-  Do NOT default to famous actors when a less-famous person is the better structural match.
-  If the person has a round full face, think Kevin Hart / Druski / Jonah Hill — not Idris Elba. Match the structure, not the fame.
-
-RULE 5 — SIMILARITY SCORES MUST BE HONEST:
-  75–78%: Very strong match — multiple features align precisely
-  65–74%: Good match — primary structural features align
-  55–64%: Moderate match — some features align but differences are notable
-  Below 55%: Weak match — if this is the best available, say so explicitly
-  NEVER give 80%+ unless near-identical. Most honest matches will be 60–72%.
-
-RULE 6 — SHARED TRAITS MUST BE SPECIFIC AND ANATOMICAL:
-  BAD: "similar vibe", "same energy", "similar look", "both attractive"
-  GOOD: "both have wide-set almond eyes, broad nose, and round face with full cheeks"
-  GOOD: "matching sharp square jaw, high cheekbones, and deep-set eyes"
-  Every shared_traits field MUST name at least 2 specific anatomical features.
-
-RULE 7 — IF NO STRONG MATCH EXISTS:
-  Give the closest honest match with similarity 55–58% and explain in shared_traits exactly
-  what makes it a weak match (e.g. "closest available — similar nose shape but jaw and face
-  fullness differ significantly"). Never force a high-similarity number on a weak match.
-
-══ STEP 3: OUTPUT ══
-Return ONLY this JSON — no markdown, no explanation, nothing else:
-{
-  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer|Fitness Model>", "similarity": <55–78>, "shared_traits": "<2+ specific anatomical features>" },
-  "match2": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <55–75>, "shared_traits": "<2+ specific anatomical features>" },
-  "match3": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <55–72>, "shared_traits": "<2+ specific anatomical features>" }
-}`
-
-  // ── Fallback system prompt — fame-focused, simpler ──────────────────────────
-  const fallbackSystemPrompt = `You are a celebrity identification assistant. Given a face photo, name the most famous ${isFemale ? 'female' : 'male'} person this person looks like — ${isFemale ? 'actresses, female models, female athletes, or female influencers' : 'actors, male models, male athletes, or male influencers'} with mainstream recognition (100k+ followers or widely known name).
-
-${isFemale ? `FEMALE ONLY — only return female celebrity names. Skin tone must match. Max similarity 78%.
-Preferred pool: Beyoncé, Rihanna, Zendaya, Lupita Nyong'o, Naomi Campbell, Halle Bailey, Normani, Tyla, Selena Gomez, Jennifer Lopez, Camila Cabello, Dua Lipa, Lisa BLACKPINK, Jennie BLACKPINK, Gemma Chan, Margot Robbie, Sydney Sweeney, Florence Pugh, Sabrina Carpenter, Olivia Rodrigo, Hailey Bieber, Kendall Jenner, Nadine Njeim, Alix Earle, Emma Chamberlain, Addison Rae` : ''}
-
-Return ONLY this JSON — no markdown, nothing else:
-{
-  "match1": { "celebrity": "Full Name", "profession": "<Actor|Model|Athlete|Musician|Influencer>", "similarity": <55–78>, "shared_traits": "<2+ specific anatomical features that match>" },
-  "match2": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" },
-  "match3": { "celebrity": "Full Name", "profession": "<profession>", "similarity": <number>, "shared_traits": "<features>" }
-}`
-
-  // ── Primary call ───────────────────────────────────────────────────────────
-  let parsed
-  try {
-    const primaryResp = await client.messages.create({
-      model:       'claude-haiku-4-5-20251001',
-      max_tokens:  800,
-      temperature: 0.1,
-      system:      systemPrompt,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
-          { type: 'text',  text: `[Seed: ${Math.random().toString(36).slice(2, 10)}] Analyze this person's face using the score profile above. The scores reveal their EXACT bone structure, facial balance, and sex characteristics — use them to narrow your pool to celebrities with the SAME structural profile. Do NOT default to the most famous person; find the most accurate structural match. If they resemble a model or athlete more than an actor, return the model/athlete. Return ONLY the JSON.` },
-        ],
-      }],
-    })
-
-    const primaryRaw = primaryResp.content[0]?.text?.trim() ?? ''
-    console.log('[celeb] Primary raw (first 300):', primaryRaw.slice(0, 300))
-
-    parsed = parseJSON(primaryRaw, 'Celebrity matcher')
-    const primaryLog = [parsed.match1, parsed.match2, parsed.match3]
-      .filter(Boolean)
-      .map(m => `${m.celebrity} [${m.profession ?? '?'}] ${m.similarity}%`)
-      .join(' | ')
-    console.log('[celeb] Primary matches:', primaryLog || '(none parsed)')
-  } catch (err) {
-    console.warn('[celeb] Primary call failed:', err.message)
-    throw err
-  }
-
-  // ── Fallback: retry if any name looks generic or unrecognisable ────────────
-  if (isGenericOrUnknown(parsed)) {
-    console.log('[celeb] Generic/unknown name detected — retrying with fallback prompt...')
-    try {
-      const fallbackResp = await client.messages.create({
-        model:       'claude-haiku-4-5-20251001',
-        max_tokens:  800,
-        temperature: 0.1,
-        system:      fallbackSystemPrompt,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
-            { type: 'text',  text: `Who is the most famous person this person looks like? Be specific — give a real name of someone with over 100k followers or mainstream recognition. Return ONLY the JSON.` },
-          ],
-        }],
-      })
-
-      const fallbackRaw = fallbackResp.content[0]?.text?.trim() ?? ''
-      console.log('[celeb] Fallback raw (first 300):', fallbackRaw.slice(0, 300))
-
-      const fallbackParsed = parseJSON(fallbackRaw, 'Celebrity matcher fallback')
-      const fallbackLog = [fallbackParsed.match1, fallbackParsed.match2, fallbackParsed.match3]
-        .filter(Boolean)
-        .map(m => `${m.celebrity} [${m.profession ?? '?'}] ${m.similarity}%`)
-        .join(' | ')
-      console.log('[celeb] Fallback matches:', fallbackLog || '(none parsed)')
-      return fallbackParsed
-    } catch (fallbackErr) {
-      console.warn('[celeb] Fallback also failed (returning primary result):', fallbackErr.message)
-      // Fall through — return the original parsed result even if names were weak
-    }
-  }
-
-  return parsed
+  console.log(`[CELEB] Final matches: ${mapped.map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')}`)
+  return { match1: mapped[0], match2: mapped[1], match3: mapped[2] }
 }
 
 // ── Blend weights — tune here, not scattered through code ─────────────────────
@@ -873,7 +601,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       // independently. A physique failure degrades to face-only, never kills the result.
       console.log('[aiScore] STEP 2+3 — Celebrity match + Physique scoring in parallel...')
       const [celebSettled, physiqueSettled] = await Promise.allSettled([
-        withRetry(() => getCelebrityMatch(faceBase64, faceMediaType, gender, null, null), 'celebrity'),
+        getCelebrityMatch(faceBase64),
         bodyBase64
           ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
           : Promise.resolve(null),
