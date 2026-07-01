@@ -59,7 +59,18 @@
       "Bash(curl -s https://glowsyhnc-production-e16b.up.railway.app/api/scan/analyze -X POST -H \"Content-Type: application/json\" -H \"Authorization: Bearer test\" -d '{\"photo\":\"test\"}')",
       "Bash(curl -s -X POST https://glowsyhnc-production-e16b.up.railway.app/api/ai/score -H 'Content-Type: application/json' -H 'Authorization: Bearer test' -d '{\"faceImage\":\"data:image/jpeg;base64,/9j/test\",\"gender\":\"male\"}')",
       "Bash(agvtool new-version *)",
-      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer agvtool new-version -all 13)"
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer agvtool new-version -all 13)",
+      "Bash(git --git-dir=/Users/suleimannajem/looksmaxing/.git show HEAD:client/ios/App/CapApp-SPM/Package.swift)",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/App-* 2>/dev/null; ls ~/Library/Developer/Xcode/DerivedData/ | grep App)",
+      "Bash(open ~/looksmaxing/client/ios/App/App.xcodeproj)",
+      "Bash(xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' build)",
+      "Bash(xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -resolvePackageDependencies)",
+      "Bash(npm view *)",
+      "Bash(railway run *)",
+      "Bash(railway logs *)",
+      "Bash(node --input-type=module)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" \"https://glowsyhnc-production-e16b.up.railway.app/api/auth/ping\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" \"https://glowsyhnc-production-e16b.up.railway.app/\")"
     ]
   }
 }
