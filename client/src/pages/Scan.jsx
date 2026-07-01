@@ -362,8 +362,8 @@ export function AnalyzingScreen({ currentStep, slow }) {
         {slow ? (
           <motion.div key="slow" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="mb-6 text-center">
-            <h2 className="font-heading font-bold text-xl text-primary mb-1">Still analyzing…</h2>
-            <p className="text-xs font-body" style={{ color: '#C6A85C' }}>Almost there — high demand right now</p>
+            <h2 className="font-heading font-bold text-xl text-primary mb-1">Still working…</h2>
+            <p className="text-xs font-body" style={{ color: '#C6A85C' }}>Celebrity matching takes a little longer</p>
           </motion.div>
         ) : (
           <motion.div key="normal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}

@@ -40,6 +40,7 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update(bodyB64 ?? 'skip')
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
+  h.update('||v2') // bump to bust Supabase cache after celeb prompt rewrite
   return h.digest('hex') // 64-char hex string
 }
 
@@ -412,19 +413,19 @@ async function getCelebrityMatch(faceBase64, faceMediaType, gender = 'male', fac
     const dimorphDesc  = dimorphism >= 8 ? `strongly ${sexLabel}`                          : dimorphism >= 6 ? `moderately ${sexLabel}`                : `mildly ${sexLabel} or androgynous`
 
     const maleAngularRule = angularity < 5
-      ? '- Angularity < 5 → ONLY match to soft-faced, round-featured celebrities. NEVER pick sharp-jawed actors.'
+      ? '- Angularity < 5 → match ONLY to celebrities with soft, round, or full facial structure. Reject any match with a sharp or angular jaw.'
       : angularity >= 8
-        ? '- Angularity ≥ 8 → ONLY match to sharply angular celebrities with defined jaws and prominent cheekbones.'
-        : '- Angularity 5–7 → moderate definition; avoid the extremes on both ends.'
+        ? '- Angularity ≥ 8 → match ONLY to celebrities with a sharp defined jaw, prominent cheekbones, and angular bone structure.'
+        : '- Angularity 5–7 → moderate bone definition; avoid both very sharp and very soft extremes.'
     const maleDimRule = dimorphism < 5
-      ? '- Dimorphism < 5 → androgynous/soft → Timothée Chalamet / Harry Styles / K-pop tier. NEVER return Hemsworth or Cavill.'
+      ? '- Sex dimorphism < 5 → androgynous or soft bone structure. Match to celebrities with narrow jaw, softer brow, and delicate features. Do NOT return hyper-masculine matches.'
       : dimorphism >= 8
-        ? '- Dimorphism ≥ 8 → highly masculine → Henry Cavill / Chris Hemsworth / Michael B. Jordan tier.'
-        : '- Dimorphism 5–7 → moderate masculinity → mid-tier masculine celebrities.'
+        ? '- Sex dimorphism ≥ 8 → strongly masculine bone structure. Match only to celebrities known for heavy brow ridge, strong jaw, and prominent masculine features.'
+        : '- Sex dimorphism 5–7 → moderate masculinity; avoid extreme ends of masculine/androgynous spectrum.'
     const femaleDimRule = dimorphism < 5
-      ? '- Femininity < 5 → stronger/masculine female features → avoid hyper-feminine matches.'
+      ? '- Femininity < 5 → stronger facial bone structure. Avoid hyper-feminine or delicate matches.'
       : dimorphism >= 8
-        ? '- Femininity ≥ 8 → highly feminine → match only to celebrities with delicate, feminine bone structure.'
+        ? '- Femininity ≥ 8 → highly feminine bone structure. Match only to celebrities known for delicate, feminine features.'
         : '- Femininity 5–7 → balanced; avoid extremes.'
     const scoreRule = final < 5
       ? '- Overall score < 5 → match to lesser-known or B-tier celebrities; do NOT match to elite A-listers.'
@@ -441,11 +442,13 @@ Overall Score: ${final}/10  (Tier: ${tier})
 • ${dimLabel} (sex characteristics): ${dimorphism}/10 — ${dimorphDesc}
 • Face type: ${fs} | Hair: ${ht}
 
-SCORE-BASED MATCHING RULES — NON-NEGOTIABLE:
+BONE STRUCTURE MATCHING RULES — NON-NEGOTIABLE:
+⚠ Match based ONLY on facial bone structure, jaw shape, eye spacing, nose shape, and overall facial geometry. IGNORE hair, style, clothing, era, music genre, fanbase, or cultural associations entirely. A style/vibe match is a WRONG answer.
 ${maleAngularRule}
 ${isFemale ? femaleDimRule : maleDimRule}
-- Harmony ≥ 8 → match to celebrities known for symmetrical, well-proportioned faces.
+- Harmony ≥ 8 → match to celebrities known for symmetrical, well-proportioned facial structure.
 ${scoreRule}
+- If your confidence in the structural match is low, say so in shared_traits ("moderate structural similarity") rather than forcing a famous name that doesn't match the bone structure.
 
 `
   }
@@ -559,9 +562,10 @@ Return ONLY this JSON — no markdown, nothing else:
   let parsed
   try {
     const primaryResp = await client.messages.create({
-      model:      'claude-haiku-4-5',
-      max_tokens: 800,
-      system:     systemPrompt,
+      model:       'claude-haiku-4-5-20251001',
+      max_tokens:  800,
+      temperature: 0.1,
+      system:      systemPrompt,
       messages: [{
         role: 'user',
         content: [
@@ -590,9 +594,10 @@ Return ONLY this JSON — no markdown, nothing else:
     console.log('[celeb] Generic/unknown name detected — retrying with fallback prompt...')
     try {
       const fallbackResp = await client.messages.create({
-        model:      'claude-haiku-4-5',
-        max_tokens: 800,
-        system:     fallbackSystemPrompt,
+        model:       'claude-haiku-4-5-20251001',
+        max_tokens:  800,
+        temperature: 0.1,
+        system:      fallbackSystemPrompt,
         messages: [{
           role: 'user',
           content: [
@@ -733,7 +738,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const bodyMediaType = bodyImage ? getMediaType(bodyImage) : null
 
     // ── L1: in-process memory cache ───────────────────────────────────────────
-    const cacheKey = hashImages(faceBase64, 'FACE_ONLY', sideBase64)
+    // v2: suffix bumped to invalidate stale celebrity results from before the
+    // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
+    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v2', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
