@@ -528,14 +528,42 @@ ${scoreBlock}══ STEP 1: MEASURE THESE TRAITS FIRST (do this before naming an
 8. FACE FULLNESS: very-lean / lean / average / full / heavy
 9. ETHNICITY: East-Asian / South-Asian / Southeast-Asian / Black-African / Black-American / Middle-Eastern / Latino / White-European / Mixed
 
-══ STEP 2: MATCHING RULES ══
-- SKIN TONE IS NON-NEGOTIABLE: never match across more than one skin tone category.
-- FACE SHAPE MUST MATCH: round face → only round-faced matches. Sharp angular jaw → only angular matches.
-- CATEGORY IS OPEN: actors, athletes, comedians, streamers, YouTubers, influencers — whoever structurally matches best. Do NOT default to famous actors when a less-famous person is the better structural match.
-- THINK BROADLY: if the person has a round full face, think Kevin Hart / Druski / Jonah Hill tier, not Idris Elba. Match the structure, not the fame.
-- SIMILARITY must be honest: 70–78% = strong (multiple features align), 60–69% = good, 55–59% = moderate. Never 80%+ unless near-identical.
-- SHARED TRAITS: name at least 2 specific anatomical features (e.g. "matching wide flat nose, round full face, full lips"). Never use "vibe", "energy", or "look".
-- REQUIRED: You MUST return 3 distinct real people with full names. No placeholders, no "Unknown Person", no made-up names.
+══ STEP 2: HARD MATCHING RULES (violations = wrong answer) ══
+
+RULE 1 — SKIN TONE IS NON-NEGOTIABLE:
+  Never match across more than one skin tone category. pale/light → only pale/light celebrities. brown/dark → only brown/dark celebrities.
+
+RULE 2 — FACE SHAPE MUST MATCH:
+  round face → ONLY round-faced celebrities. Sharp angular jaw → ONLY sharp-jaw celebrities. Soft jaw → ONLY soft-jaw celebrities.
+  NEVER match a round soft face to a chiseled angular celebrity, or vice versa.
+
+RULE 3 — STRUCTURE ONLY — IGNORE EVERYTHING ELSE:
+  Match based ONLY on facial bone structure, jaw shape, eye spacing, nose shape, and overall facial geometry.
+  IGNORE completely: hair, hairstyle, clothing, era, music genre, fanbase, cultural vibe, celebrity aesthetics.
+  A style/vibe/era association is a WRONG answer. "They both give off the same energy" is a WRONG answer.
+
+RULE 4 — CATEGORY IS OPEN:
+  actors, athletes, comedians, streamers, YouTubers, influencers — whoever structurally matches best.
+  Do NOT default to famous actors when a less-famous person is the better structural match.
+  If the person has a round full face, think Kevin Hart / Druski / Jonah Hill — not Idris Elba. Match the structure, not the fame.
+
+RULE 5 — SIMILARITY SCORES MUST BE HONEST:
+  75–78%: Very strong match — multiple features align precisely
+  65–74%: Good match — primary structural features align
+  55–64%: Moderate match — some features align but differences are notable
+  Below 55%: Weak match — if this is the best available, say so explicitly
+  NEVER give 80%+ unless near-identical. Most honest matches will be 60–72%.
+
+RULE 6 — SHARED TRAITS MUST BE SPECIFIC AND ANATOMICAL:
+  BAD: "similar vibe", "same energy", "similar look", "both attractive"
+  GOOD: "both have wide-set almond eyes, broad nose, and round face with full cheeks"
+  GOOD: "matching sharp square jaw, high cheekbones, and deep-set eyes"
+  Every shared_traits field MUST name at least 2 specific anatomical features.
+
+RULE 7 — IF NO STRONG MATCH EXISTS:
+  Give the closest honest match with similarity 55–58% and explain in shared_traits exactly
+  what makes it a weak match (e.g. "closest available — similar nose shape but jaw and face
+  fullness differ significantly"). Never force a high-similarity number on a weak match.
 
 ══ STEP 3: OUTPUT ══
 Return ONLY this JSON — no markdown, no explanation, nothing else:
