@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
@@ -50,22 +50,7 @@ export default function App() {
     () => !!sessionStorage.getItem(SESSION_KEY)
   )
 
-  // ── DIAGNOSTIC: render counter + state snapshot ──────────────────
-  const renderCount = useRef(0)
-  renderCount.current += 1
-  console.log(
-    `[GATE] App render #${renderCount.current} —`,
-    `isAuthenticated=${isAuthenticated}`,
-    `splashDone=${splashDone}`,
-    `isPremium=${isPremium}`,
-    `proSplashDone=${proSplashDone}`,
-    `hasOnboarded=${hasOnboarded}`,
-  )
-  // ─────────────────────────────────────────────────────────────────
-
-
   useEffect(() => {
-    console.log('[GATE] useEffect: theme changed →', theme)
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
@@ -74,19 +59,16 @@ export default function App() {
 
   // Initialize RevenueCat — pass user ID when logged in so purchases are linked
   useEffect(() => {
-    console.log('[GATE] useEffect: initRevenueCat, user?.id =', user?.id)
-    initRevenueCat(user?.id ?? null).catch((e) => console.warn('[GATE] initRevenueCat error:', e))
+    initRevenueCat(user?.id ?? null).catch(() => {})
   }, [user?.id])
 
   // Check if pro trial has expired on load
   useEffect(() => {
-    console.log('[GATE] useEffect: checkProTrial')
     if (checkProTrial) checkProTrial()
   }, [])
 
   // Refresh Pro status on startup and whenever app comes back to foreground
   useEffect(() => {
-    console.log('[GATE] useEffect: refreshProStatus, isAuthenticated =', isAuthenticated)
     if (!isAuthenticated) return
     refreshProStatus()
     const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus() }
@@ -116,35 +98,26 @@ export default function App() {
     return () => window.removeEventListener('auth:session-expired', handle)
   }, [])
 
-  const handleSplashDone = useCallback(() => {
-    console.log('[GATE] Splash onDone fired → setSplashDone(true)')
-    setSplashDone(true)
-  }, [])
+  const handleSplashDone = useCallback(() => { setSplashDone(true) }, [])
 
   const handleProSplashDone = useCallback(() => {
-    console.log('[GATE] PremiumSplash onDone fired → setProSplashDone(true)')
     sessionStorage.setItem(SESSION_KEY, '1')
     setProSplashDone(true)
   }, [])
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
-    console.log('[GATE] → SPLASH (splashDone=false, isAuthenticated=true)')
     return <Splash onDone={handleSplashDone} />
   }
 
   // ── GATE 2: PremiumSplash ────────────────────────────────────────
   if (isAuthenticated && isPremium && !proSplashDone) {
-    console.log('[GATE] → PREMIUM SPLASH (isPremium=true, proSplashDone=false)')
     return (
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
       </AnimatePresence>
     )
   }
-
-  // ── GATE 3: Router ───────────────────────────────────────────────
-  console.log('[GATE] → ROUTER MOUNTING (hasOnboarded =', hasOnboarded, ')')
 
   return (
     <BrowserRouter>

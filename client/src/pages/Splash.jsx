@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import logo from '../assets/ascendus-icon.png'
 
@@ -6,18 +6,10 @@ const EASE = [0.16, 1, 0.3, 1]
 
 export default function Splash({ onDone }) {
   const [visible, setVisible] = useState(true)
-  const fireCount = useRef(0)
-
   useEffect(() => {
-    fireCount.current += 1
-    console.log(`[SPLASH] useEffect fired (count=${fireCount.current}) — arming 4100ms timer`)
     const fadeOut = setTimeout(() => setVisible(false), 3500)
-    const nav = setTimeout(() => {
-      console.log(`[SPLASH] timer FIRED — calling onDone (effect had fired ${fireCount.current}x total)`)
-      onDone()
-    }, 4100)
+    const nav = setTimeout(() => onDone(), 4100)
     return () => {
-      console.log(`[SPLASH] useEffect CLEANUP — timers cleared (count=${fireCount.current})`)
       clearTimeout(fadeOut)
       clearTimeout(nav)
     }
