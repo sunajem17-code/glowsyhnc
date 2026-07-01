@@ -2019,7 +2019,9 @@ export default function PremiumOnboarding() {
   }
 
   // Called by StepScanCapture when analysis completes — saves scan record to
-  // store (same fields as Scan.jsx) then advances to PhaseResult
+  // store then immediately shows the unlock gate (the hook screen with score +
+  // tier + growth area + celeb match). PhaseResult/Transformation/Rating follow
+  // after the user has seen and interacted with the unlock screen.
   function handleScanDone(scanRecord) {
     const g = formData.gender || 'male'
     const phase = calculatePhase(formData.goal, formData.height, formData.weight)
@@ -2047,7 +2049,7 @@ export default function PremiumOnboarding() {
       tasks,
     }).catch(() => {})
 
-    goNext() // advance to PhaseResult (step 8 in new sequence)
+    navigate('/unlock', { replace: true }) // show unlock gate immediately — the hook
   }
 
   // Progress bar: steps 2–11 (quiz through Rating)

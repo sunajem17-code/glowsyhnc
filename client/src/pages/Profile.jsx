@@ -1155,7 +1155,7 @@ export default function Profile() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end"
-            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', touchAction: 'none' }}
+            style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(10px)', touchAction: 'none', pointerEvents: 'all' }}
             onClick={(e) => { if (e.target === deleteBackdropRef.current && !deletingAccount) setDeleteAccountOpen(false) }}
           >
             <motion.div
@@ -1164,14 +1164,14 @@ export default function Profile() {
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 280 }}
               className="w-full rounded-t-3xl"
-              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none' }}
+              style={{ background: '#0D0D0D', border: '1px solid rgba(239,68,68,0.2)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
             >
               {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1">
+              <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
                 <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
               </div>
 
-              <div className="px-5 pt-4 pb-10">
+              <div className="px-5 pt-4 flex-shrink-0" style={{ paddingBottom: 'max(40px, calc(env(safe-area-inset-bottom, 0px) + 24px))' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
