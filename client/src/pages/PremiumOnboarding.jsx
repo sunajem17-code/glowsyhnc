@@ -1475,18 +1475,19 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       onDone(scanRecord)
     } catch (err) {
+      const m = (err.message || '').toLowerCase()
       const isRateLimit = err.message === 'rate_limited' || err.status === 429
+        || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
+        || m.includes('rate_limit') || m.includes('too many') || m.includes('overloaded')
+        || m.includes('capacity') || m.includes('credit') || m.includes('high demand')
       if (isRateLimit) {
         retrySideRef.current = side
         setRateLimited(true)
         setRetryCountdown(err.retryAfter || 30)
         setPhase('retry_error')
       } else {
-        const friendlyMsg = err.message === 'server_error'
-          ? "We're experiencing high demand. Please try again in 30 seconds."
-          : (err.message || 'Analysis failed. Please try again.')
-        setError(friendlyMsg)
-        setPhase(side ? 'side' : 'face')
+        setError("We're experiencing high demand. Please try again in 30 seconds.")
+        setPhase('retry_error')
       }
     }
   }

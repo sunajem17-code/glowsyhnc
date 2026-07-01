@@ -645,15 +645,19 @@ export default function Scan() {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
         setStep(3)
-      } else if (err.message === 'rate_limited' || err.status === 429) {
-        setRateLimited(true)
-        setRetryCountdown(err.retryAfter || 30)
-        setStep(3)
       } else {
-        const friendlyMsg = err.message === 'server_error'
-          ? "We're experiencing high demand right now. Please try again in 30 seconds."
-          : (err.message || 'Analysis failed. Please try again.')
-        setError(friendlyMsg)
+        const m = (err.message || '').toLowerCase()
+        const isRateLimit = err.message === 'rate_limited' || err.status === 429
+          || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
+          || m.includes('rate_limit') || m.includes('too many') || m.includes('overloaded')
+          || m.includes('capacity') || m.includes('credit') || m.includes('high demand')
+          || m.includes('server_error')
+        if (isRateLimit) {
+          setRateLimited(true)
+          setRetryCountdown(err.retryAfter || 30)
+        } else {
+          setError(err.message || 'Analysis failed. Please try again.')
+        }
         setStep(3)
       }
     }
