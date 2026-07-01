@@ -463,26 +463,33 @@ export default function Scan() {
     )
   }
 
-  // Convert an image URL (blob: or data:) to a resized base64 string
+  // Convert an image URL (blob: or data:) to a resized base64 string.
+  // 15s timeout guards against WKWebView blob URL expiry silently hanging.
   async function toBase64(url, maxPx = 1024) {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      const blobUrl = URL.createObjectURL(blob)
-      img.onload = () => {
-        URL.revokeObjectURL(blobUrl)
-        const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
-        const w = Math.round(img.width  * scale)
-        const h = Math.round(img.height * scale)
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-        resolve(canvas.toDataURL('image/jpeg', 0.85))
-      }
-      img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Image load failed')) }
-      img.src = blobUrl
-    })
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Photo processing timed out — please retake your photo')), 15_000)
+    )
+    const convert = (async () => {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        const blobUrl = URL.createObjectURL(blob)
+        img.onload = () => {
+          URL.revokeObjectURL(blobUrl)
+          const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+          const w = Math.round(img.width  * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w; canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        }
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Image load failed')) }
+        img.src = blobUrl
+      })
+    })()
+    return Promise.race([convert, timeout])
   }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
