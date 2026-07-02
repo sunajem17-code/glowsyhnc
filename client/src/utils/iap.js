@@ -87,11 +87,8 @@ export async function purchasePro(plan = 'monthly') {
     if (isCancelError(e)) {
       return { success: false, reason: 'cancelled' }
     }
-    const raw = e?.message ?? ''
-    if (raw.includes('not configured') || raw.includes('Cannot connect')) {
-      throw new Error('In-app purchases are not available right now. Please try again later.')
-    }
-    throw e
+    // Never surface raw RevenueCat / StoreKit internals to users
+    throw new Error('Unable to complete purchase. Please try again.')
   }
 }
 

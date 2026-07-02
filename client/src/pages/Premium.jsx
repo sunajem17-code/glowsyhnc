@@ -102,7 +102,8 @@ export default function Premium() {
       if (lower.includes('session expired') || lower.includes('user not found')) {
         setSessionExpired(true)
       } else if (!lower.includes('cancel')) {
-        setCheckoutError(msg || 'Unable to complete purchase. Please try again.')
+        // Always show a generic message — never expose raw RC/StoreKit errors
+        setCheckoutError('Unable to complete purchase. Please try again.')
       }
     } finally {
       setSubscribingNow(false)
