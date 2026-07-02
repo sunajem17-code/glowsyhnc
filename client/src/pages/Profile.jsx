@@ -323,6 +323,7 @@ export default function Profile() {
   }
 
   async function handleDeleteAccount() {
+    console.log('[DELETE] button tapped')
     setDeletingAccount(true)
     setDeleteAccountError('')
 
@@ -332,10 +333,13 @@ export default function Profile() {
     window.addEventListener('auth:session-expired', suppressRedirect, true)
 
     try {
-      await api.user.deleteAccount()
+      console.log('[DELETE] calling API DELETE /user/account')
+      const result = await api.user.deleteAccount()
+      console.log('[DELETE] result:', JSON.stringify(result))
       logout()
       navigate('/', { replace: true })
     } catch (err) {
+      console.error('[DELETE] error:', err?.message, err?.status, err?.stack)
       const msg = err.message || ''
       const isExpired = msg.toLowerCase().includes('session') || msg.toLowerCase().includes('expired')
       setDeleteAccountError(
