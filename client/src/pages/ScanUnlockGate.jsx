@@ -71,8 +71,16 @@ function toTopPct(score) {
 
 function CardShell({ badge, icon: Icon, children }) {
   return (
-    <div className="h-full flex flex-col pt-10 pb-2 px-6 overflow-y-auto">
-      <div className="flex items-center gap-2.5 mb-7 flex-shrink-0">
+    <div className="h-full flex flex-col pt-5 pb-2 px-6 overflow-y-auto">
+      {/* Centered logo — visible inside card content, below safe area */}
+      <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
+        <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
+        <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
+          ASCENDUS
+        </span>
+      </div>
+      {/* Badge row */}
+      <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
@@ -86,7 +94,10 @@ function CardShell({ badge, icon: Icon, children }) {
           {badge}
         </span>
       </div>
-      {children}
+      {/* Content — vertically centered in remaining space */}
+      <div className="flex-1 flex flex-col justify-center">
+        {children}
+      </div>
     </div>
   )
 }
@@ -133,11 +144,11 @@ function Card1Score({ scan }) {
 
       <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
 
-        {/* Header — logo + wordmark */}
-        <div className="flex items-center gap-3 mb-7">
-          <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
-          <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
-            ASCENDUS ANALYSIS
+        {/* Header — centered logo + wordmark */}
+        <div className="flex items-center justify-center gap-2.5 mb-7">
+          <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
+          <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
+            ASCENDUS
           </span>
         </div>
 
@@ -681,14 +692,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, isPurchasing }) {
         background: 'radial-gradient(circle, rgba(198,168,92,0.09) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
-
-      {/* Ascendus wordmark */}
-      <div className="flex items-center gap-2.5 px-6 pt-safe" style={{ paddingTop: 'max(18px, env(safe-area-inset-top, 18px))' }}>
-        <img src={logo} alt="" style={{ width: 22, height: 22, mixBlendMode: 'lighten', opacity: 0.8 }} />
-        <span className="font-heading font-bold text-[10px] tracking-[0.22em]" style={{ color: 'rgba(198,168,92,0.55)' }}>
-          ASCENDUS
-        </span>
-      </div>
 
       {/* Swipeable area */}
       <div
