@@ -2150,6 +2150,19 @@ export default function Results() {
                     />
                   ) : null
                 )}
+                <button
+                  onClick={() => navigate(isPremium ? '/coach' : '/premium')}
+                  className="w-full mt-4 flex items-center justify-between px-3 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.18)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Bot size={14} style={{ color: '#C6A85C' }} />
+                    <span className="text-[12px] font-heading font-semibold" style={{ color: '#C6A85C' }}>
+                      Ask AI Coach about these metrics
+                    </span>
+                  </div>
+                  <ChevronRight size={14} style={{ color: 'rgba(198,168,92,0.5)' }} />
+                </button>
               </>
             )
           })()}

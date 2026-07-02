@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
   Lock, Sparkles, Star, Eye, Zap, BarChart2, Smile, Dumbbell, Brain,
-  TrendingUp, Activity, X,
+  TrendingUp, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
-import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import logo from '../assets/ascendus-icon.png'
@@ -634,124 +633,6 @@ function Card7Physique({ scan }) {
   )
 }
 
-// ── Plan Picker Sheet ─────────────────────────────────────────────────────────
-// Shown when user taps "Unlock Full Results" on native iOS.
-// purchasePro() is only reachable after the user explicitly taps a plan pill —
-// selectedPlan starts null and the CTA stays disabled until it's set.
-
-const PLANS = [
-  { key: 'monthly', label: 'Monthly', price: '$1.84', per: '/wk', sub: '$7.99 billed monthly',  badge: null },
-  { key: 'annual',  label: 'Annual',  price: '$0.96', per: '/wk', sub: '$49.99 billed yearly',  badge: 'SAVE 48%' },
-]
-
-function PlanPickerSheet({ isPurchasing, onSelect, onClose }) {
-  const [selectedPlan, setSelectedPlan] = useState(null)
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="absolute inset-0 z-40 flex items-end"
-      style={{ background: 'rgba(0,0,0,0.80)', backdropFilter: 'blur(8px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !isPurchasing) onClose() }}
-    >
-      <motion.div
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 32, stiffness: 300 }}
-        className="w-full rounded-t-3xl flex flex-col"
-        style={{ background: '#0D0D0D', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-        </div>
-
-        <div className="px-5 pt-3" style={{ paddingBottom: 'max(36px, calc(env(safe-area-inset-bottom, 0px) + 20px))' }}>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <p className="font-heading font-bold text-[18px] text-white">Choose Your Plan</p>
-              <p className="font-body text-[12px] mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                Select a plan to unlock your full results
-              </p>
-            </div>
-            {!isPurchasing && (
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.08)' }}
-              >
-                <X size={15} className="text-white" />
-              </button>
-            )}
-          </div>
-
-          {/* Plan pills */}
-          <div className="grid grid-cols-2 gap-2.5 mb-5">
-            {PLANS.map(({ key, label, price, per, sub, badge }) => (
-              <button
-                key={key}
-                onClick={() => !isPurchasing && setSelectedPlan(key)}
-                className="py-4 px-3 rounded-2xl text-center relative flex flex-col items-center transition-all"
-                style={{
-                  background: selectedPlan === key ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
-                  border: `1.5px solid ${selectedPlan === key ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                }}
-              >
-                {badge && (
-                  <div
-                    className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-heading font-bold"
-                    style={{ background: G, color: '#000' }}
-                  >
-                    {badge}
-                  </div>
-                )}
-                <p className="font-heading font-bold text-[11px] mb-1"
-                  style={{ color: selectedPlan === key ? G : 'rgba(255,255,255,0.35)' }}>
-                  {label}
-                </p>
-                <p className="font-heading font-bold text-[22px] leading-none"
-                  style={{ color: selectedPlan === key ? TEXT : 'rgba(255,255,255,0.55)' }}>
-                  {price}<span className="text-[12px] font-normal">{per}</span>
-                </p>
-                <p className="font-body text-[10px] mt-1"
-                  style={{ color: 'rgba(255,255,255,0.30)' }}>
-                  {sub}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          {/* CTA — disabled until plan explicitly selected */}
-          <motion.button
-            whileTap={{ scale: (!selectedPlan || isPurchasing) ? 1 : 0.97 }}
-            onClick={() => selectedPlan && !isPurchasing && onSelect(selectedPlan)}
-            disabled={!selectedPlan || isPurchasing}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{
-              background: selectedPlan ? GRAD : 'rgba(255,255,255,0.08)',
-              color: selectedPlan ? '#0A0A0A' : 'rgba(255,255,255,0.25)',
-              boxShadow: selectedPlan ? '0 4px 24px rgba(198,168,92,0.35)' : 'none',
-              transition: 'background 0.2s, color 0.2s, box-shadow 0.2s',
-            }}
-          >
-            {isPurchasing
-              ? <><Loader2 size={16} className="animate-spin" /> Processing…</>
-              : <><Sparkles size={16} style={{ color: selectedPlan ? '#0A0A0A' : 'rgba(255,255,255,0.25)' }} />
-                  {selectedPlan ? `Get Ascendus Pro — ${selectedPlan === 'annual' ? '$49.99/yr' : '$7.99/mo'}` : 'Select a plan above'}
-                </>
-            }
-          </motion.button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
 const SLIDE_VARIANTS = {
@@ -1093,13 +974,11 @@ export default function ScanUnlockGate() {
   const navigate = useNavigate()
   const { currentScan, isPremium, setIsPremium } = useStore()
 
-  const [showInvite, setShowInvite]         = useState(false)
-  const [showPromo, setShowPromo]           = useState(false)
-  const [showReveal, setShowReveal]         = useState(false)
-  const [showPlanPicker, setShowPlanPicker] = useState(false)
-  const [referralCode, setReferralCode]     = useState(null)
-  const [referralCount, setReferralCount]   = useState(0)
-  const [isPurchasing, setIsPurchasing]     = useState(false)
+  const [showInvite, setShowInvite]     = useState(false)
+  const [showPromo, setShowPromo]       = useState(false)
+  const [showReveal, setShowReveal]     = useState(false)
+  const [referralCode, setReferralCode] = useState(null)
+  const [referralCount, setReferralCount] = useState(0)
 
   useEffect(() => {
     if (isPremium) navigate('/results', { replace: true })
@@ -1124,36 +1003,8 @@ export default function ScanUnlockGate() {
     return <UnlockReveal score={revealScore} onContinue={() => navigate('/results', { replace: true })} />
   }
 
-  // Opens plan picker on native; goes straight to /premium on web
   function handleAscend() {
-    if (isNative()) {
-      setShowPlanPicker(true)
-    } else {
-      navigate('/premium')
-    }
-  }
-
-  // Called only after user has explicitly tapped a plan pill in the sheet
-  async function handlePurchase(plan) {
-    if (isPurchasing || !plan) return
-    setIsPurchasing(true)
-    try {
-      const result = await purchasePro(plan)
-      if (result?.success) {
-        const rcUserId = result.customerInfo?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
-        sessionStorage.setItem('asc_pro_splash_shown', '1')
-        setIsPremium(true)
-        setShowPlanPicker(false)
-        setShowReveal(true)
-      }
-    } catch (err) {
-      const msg = (err?.message || '').toLowerCase()
-      setShowPlanPicker(false)
-      if (!msg.includes('cancel')) navigate('/premium')
-    } finally {
-      setIsPurchasing(false)
-    }
+    navigate('/premium')
   }
 
   return (
@@ -1162,7 +1013,7 @@ export default function ScanUnlockGate() {
         scan={currentScan}
         onAscend={handleAscend}
         onInvite={() => setShowInvite(true)}
-        isPurchasing={isPurchasing}
+        isPurchasing={false}
       />
 
       {/* Promo code link */}
@@ -1175,17 +1026,6 @@ export default function ScanUnlockGate() {
           Have a promo code?
         </button>
       </div>
-
-      {/* Plan picker — only fires purchasePro after explicit plan selection */}
-      <AnimatePresence>
-        {showPlanPicker && (
-          <PlanPickerSheet
-            isPurchasing={isPurchasing}
-            onSelect={handlePurchase}
-            onClose={() => setShowPlanPicker(false)}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showPromo && (

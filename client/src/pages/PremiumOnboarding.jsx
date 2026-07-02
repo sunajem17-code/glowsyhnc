@@ -41,8 +41,8 @@ function BackBtn({ onBack }) {
   return (
     <button
       onClick={onBack}
-      className="absolute top-14 left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)' }}
+      className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
+      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
       <ChevronLeft size={18} style={{ color: DIM }} />
     </button>
@@ -2268,7 +2268,7 @@ export default function PremiumOnboarding() {
 
       {/* Step counter */}
       {showProgress && (
-        <div className="absolute top-3 right-5 z-20">
+        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
             {step} / {TOTAL_QUIZ_STEPS}
           </span>
