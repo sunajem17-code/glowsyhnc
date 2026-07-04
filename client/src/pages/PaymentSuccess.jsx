@@ -14,28 +14,32 @@ export default function PaymentSuccess() {
   const navigatedRef = useRef(false)
 
   useEffect(() => {
-    // Stripe only redirects here on successful payment — set premium immediately (optimistic)
-    setIsPremium(true)
-    // Mark the pro splash as already shown so it doesn't fire again on top of this page
     sessionStorage.setItem(SESSION_KEY, '1')
 
-    // Background: confirm with server + sync profile (non-blocking)
+    // Confirm with server before granting premium. Poll up to 8 times so webhook
+    // processing latency doesn't cause a false negative.
     if (isAuthenticated) {
-      refreshProStatus().catch(() => {})
+      refreshProStatus().catch((err) => console.warn('[PaymentSuccess] refreshProStatus failed:', err.message))
 
       let attempts = 0
       const poll = async () => {
         try {
           const { isPremium } = await api.payments.status()
-          if (isPremium) { setIsPremium(true); return }
-        } catch {}
+          if (isPremium) {
+            setIsPremium(true)
+            return
+          }
+        } catch (err) {
+          console.warn('[PaymentSuccess] status poll error:', err.message)
+        }
         attempts++
         if (attempts < 8) setTimeout(poll, 2500)
       }
-      setTimeout(poll, 1500)
+      // Start at 500ms so at least one poll fires before the 2.8s auto-navigate
+      setTimeout(poll, 500)
     }
 
-    // Auto-navigate to dashboard after 2.8 s so user stays logged in
+    // Auto-navigate to dashboard after 2.8 s
     const t = setTimeout(() => {
       if (!navigatedRef.current) {
         navigatedRef.current = true

@@ -165,7 +165,7 @@ const useStore = create(
               const isPro = await checkProStatus(u?.id ?? null)
               if (isPro) set({ isPremium: true })
             }
-          } catch { /* RevenueCat unavailable — fall through to server check */ }
+          } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
           const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
           const base = `https://${API.replace(/^https?:\/\//, '')}/api`
@@ -202,8 +202,8 @@ const useStore = create(
               } : state.streak,
             }))
           }
-        } catch {
-          // Fail silently — stale data is better than a crash
+        } catch (err) {
+          console.warn('[refreshProStatus] status/profile fetch failed:', err?.message)
         }
       },
 

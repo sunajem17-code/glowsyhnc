@@ -187,6 +187,7 @@ Include a "profile" object in your JSON response.` : ''
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: hasSide ? 1100 : 950,
+    temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 Score face and grooming on a 1.0–10.0 scale.
@@ -287,7 +288,7 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
 ${profileSection}
-KEY STRENGTHS — for each item in key_strengths, write a complete sentence (not a tag). Name the specific feature, explain WHY it scores well structurally (the exact trait that makes it attractive), and state what it contributes to the overall look. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
+KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
 
@@ -350,6 +351,7 @@ async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male') {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 600,
+    temperature: 0,
     system: `You are a physique and body composition analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 Score physique on a 1.0–10.0 scale across 5 categories.
@@ -482,6 +484,7 @@ async function getCelebrityMatch(faceBase64, gender = 'male') {
     profession:   'Celebrity',
     similarity:   Math.round(r.MatchConfidence),
     shared_traits: 'Matched by AWS Rekognition facial recognition',
+    source:       'rekognition',
   }))
 
   while (mapped.length < 3) mapped.push(NO_MATCH)
@@ -584,7 +587,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { faceImage, sideImage, bodyImage, gender = 'male' } = req.body
+    const { faceImage, sideImage, bodyImage, gender = 'male', previousScore } = req.body
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -691,9 +694,23 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     }
 
     // Final score: pure code — no AI involvement (computedScores already calculated above)
-    const { final, tier, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
-    console.log('[aiScore] Final:', final, tier, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
+    const { final: rawFinal, tier, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
+    console.log('[aiScore] Final:', rawFinal, tier, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
+
+    // Rescan anchoring — cap score movement at ±1.0 per rescan to prevent
+    // photo-variance-driven score jumps. Only applied when previousScore is provided.
+    let final = rawFinal
+    const prevNum = typeof previousScore === 'number' && previousScore >= 1 && previousScore <= 10
+      ? previousScore
+      : null
+    if (prevNum !== null) {
+      const delta = rawFinal - prevNum
+      if (Math.abs(delta) > 0.5) {
+        final = Math.round((prevNum + Math.sign(delta) * Math.min(Math.abs(delta), 1.0)) * 10) / 10
+        console.log(`[aiScore] Rescan anchoring: raw=${rawFinal} prev=${prevNum} anchored=${final}`)
+      }
+    }
 
     const faceSub = faceResult.sub_scores || {}
     const r = (v) => v != null ? Math.round(Number(v) * 10) / 10 : null

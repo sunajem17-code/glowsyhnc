@@ -44,7 +44,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (name) updates.name = name
     if (avatarUrl) updates.avatar_url = avatarUrl
     if (Object.keys(updates).length) {
-      try { const { updateUserById } = require('../supabase'); await updateUserById(req.userId, updates) } catch {}
+      try { const { updateUserById } = require('../supabase'); await updateUserById(req.userId, updates) } catch (err) { console.warn('[updateProfile] Supabase update skipped:', err.message) }
     }
   } else {
     if (name) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.userId)
@@ -104,9 +104,13 @@ router.delete('/account', authMiddleware, async (req, res) => {
         console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
       }
     }
-    // Also clean up profiles and email_sends (may or may not exist)
+    // Also clean up optional tables (may or may not exist in this environment)
     for (const table of ['email_sends', 'scan_cache', 'affiliate_clicks']) {
-      try { await sb.from(table).delete().eq('user_id', userId) } catch {}
+      try {
+        await sb.from(table).delete().eq('user_id', userId)
+      } catch (err) {
+        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
+      }
     }
     try {
       await sb.from('profiles').delete().eq('id', userId)
@@ -127,16 +131,18 @@ router.delete('/account', authMiddleware, async (req, res) => {
     // task_completions may reference tasks; delete via plan ownership
     const plans = db.prepare('SELECT id FROM action_plans WHERE user_id = ?').all(userId)
     for (const plan of plans) {
-      try { db.prepare('DELETE FROM tasks WHERE plan_id = ?').run(plan.id) } catch {}
-      try { db.prepare('DELETE FROM task_completions WHERE plan_id = ?').run(plan.id) } catch {}
+      try { db.prepare('DELETE FROM tasks WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] tasks by plan delete skipped:', err.message) }
+      try { db.prepare('DELETE FROM task_completions WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] task_completions by plan delete skipped:', err.message) }
     }
     // Also try direct user_id column in case schema differs
-    try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch {}
+    try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] task_completions by user delete skipped:', err.message) }
     db.prepare('DELETE FROM daily_checkins WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM streaks WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM action_plans WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM scans WHERE user_id = ?').run(userId)
-    try { db.prepare('DELETE FROM leaderboard WHERE user_id = ?').run(userId) } catch {}
+    try { db.prepare('DELETE FROM community_likes WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_likes delete skipped:', err.message) }
+    try { db.prepare('DELETE FROM community_posts WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_posts delete skipped:', err.message) }
+    try { db.prepare('DELETE FROM leaderboard WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] leaderboard delete skipped:', err.message) }
     db.prepare('DELETE FROM users WHERE id = ?').run(userId)
     console.log('[deleteAccount] SQLite cleanup done')
   } catch (err) {

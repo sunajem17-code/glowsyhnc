@@ -1680,13 +1680,13 @@ export default function Results() {
     // Filter out Rekognition NO_MATCH sentinels before checking if we have real results
     const raw = celebrityMatches ?? aiScore?.celebrityMatches
     const ai = raw?.filter(m => m?.celebrity && m.celebrity !== 'No close match found' && (m.similarity ?? 0) > 0)
-    if (ai?.length > 0) return ai
+    if (ai?.length > 0) return ai.map(m => ({ ...m, source: m.source ?? 'rekognition' }))
     // Rekognition returned nothing useful — fall through to weighted local pool
     const g = gender === 'female' ? 'female' : 'male'
     const pool = CELEB_POOLS[g][facialStructure] ?? CELEB_POOLS[g]['average']
     const seed = (currentScan?.id ?? '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
     const userGroup = aiScore?.perceivedEthnicity ?? null
-    return weightedSeededPick3(pool, seed, userGroup)
+    return weightedSeededPick3(pool, seed, userGroup).map(m => ({ ...m, source: 'ai_estimate' }))
   })()
 
   // ─── Skin Analysis ──────────────────────────────────────────────────────────
@@ -2496,11 +2496,12 @@ export default function Results() {
           {resolvedMatches.every(m => !m.similarity || m.celebrity === 'No close match found') ? (
             <div className="py-4 flex flex-col items-center gap-1.5 text-center">
               <p className="text-sm font-heading font-bold text-primary">No celebrity match found</p>
-              <p className="text-[11px] font-body text-secondary">Rekognition couldn't find a match for this photo. Try a clearer, front-facing photo.</p>
+              <p className="text-[11px] font-body text-secondary">Try a clearer, front-facing photo for better matching.</p>
             </div>
           ) : resolvedMatches.map((match, i) => {
-            const isNoMatch = !match.similarity || match.celebrity === 'No close match found'
+            const isNoMatch = !match.celebrity || match.celebrity === 'No close match found'
             if (isNoMatch) return null
+            const isRekognition = match.source === 'rekognition'
             return (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
               <div
@@ -2511,7 +2512,7 @@ export default function Results() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-heading font-bold text-primary">{match.celebrity}</p>
-                {(match.shared_traits || match.reason) && (
+                {isRekognition && (match.shared_traits || match.reason) && (
                   isPremium ? (
                     <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C', opacity: 0.8 }}>
                       {match.shared_traits || match.reason}
@@ -2525,39 +2526,48 @@ export default function Results() {
                     </p>
                   )
                 )}
-                {isPremium ? (
-                  <div className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${match.similarity}%` }}
-                      transition={{ duration: 1, ease: 'easeOut', delay: i * 0.15 }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden select-none cursor-pointer"
-                    style={{ filter: 'blur(3px)' }}
-                    onClick={() => navigate('/premium')}
-                  >
+                {!isRekognition && (
+                  <p className="text-[10px] font-body mt-0.5" style={{ color: '#C6A85C', opacity: 0.55 }}>
+                    Shared facial features
+                  </p>
+                )}
+                {isRekognition && (
+                  isPremium ? (
+                    <div className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)' }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${match.similarity}%` }}
+                        transition={{ duration: 1, ease: 'easeOut', delay: i * 0.15 }}
+                      />
+                    </div>
+                  ) : (
                     <div
-                      className="h-full rounded-full"
-                      style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)', width: `${match.similarity}%` }}
-                    />
-                  </div>
+                      className="mt-1 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden select-none cursor-pointer"
+                      style={{ filter: 'blur(3px)' }}
+                      onClick={() => navigate('/premium')}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{ background: 'linear-gradient(90deg, #C6A85C, #F5A623)', width: `${match.similarity}%` }}
+                      />
+                    </div>
+                  )
                 )}
               </div>
-              {isPremium ? (
-                <span className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0">{match.similarity}%</span>
-              ) : (
-                <span
-                  className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0 select-none cursor-pointer"
-                  style={{ filter: 'blur(5px)' }}
-                  onClick={() => navigate('/premium')}
-                >
-                  {match.similarity}%
-                </span>
+              {isRekognition && (
+                isPremium ? (
+                  <span className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0">{match.similarity}%</span>
+                ) : (
+                  <span
+                    className="text-xs font-mono font-bold text-[#C6A85C] flex-shrink-0 select-none cursor-pointer"
+                    style={{ filter: 'blur(5px)' }}
+                    onClick={() => navigate('/premium')}
+                  >
+                    {match.similarity}%
+                  </span>
+                )
               )}
             </div>
             )

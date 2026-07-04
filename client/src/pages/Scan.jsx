@@ -407,6 +407,7 @@ const STEP_META = [
 export default function Scan() {
   const navigate = useNavigate()
   const savedGender       = useStore(s => s.gender)
+  const scans             = useStore(s => s.scans)
   const isPremium         = useStore(s => s.isPremium)
   const scanCount         = useStore(s => s.scanCount)
   const userProfile       = useStore(s => s.userProfile)
@@ -572,11 +573,13 @@ export default function Scan() {
         }
       } else {
         try {
+          const lastGlowScore = scans?.[0]?.glowScore ?? null
           const scoreCall = api.ai.score({
             faceImage: faceB64,
             ...(sideB64 ? { sideImage: sideB64 } : {}),
             ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
             gender: g,
+            ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
           })
           const timeoutCall = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)

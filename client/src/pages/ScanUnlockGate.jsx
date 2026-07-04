@@ -20,6 +20,27 @@ const SURF = 'rgba(255,255,255,0.04)'
 
 // ── Helpers (copied from OnboardingFinalSteps) ────────────────────────────────
 
+// Returns the user's single strongest feature — used for the one unblurred
+// personalized observation shown before the paywall. Prefers AI-generated text
+// (keyStrengths[0]) because it's specific; falls back to the highest sub-score.
+function getStrongestFeature(scan) {
+  if (!scan) return null
+  const strengths = scan.aiScore?.keyStrengths
+  if (Array.isArray(strengths) && strengths.length > 0) return strengths[0]
+  const fd = scan.faceData
+  if (!fd) return null
+  const candidates = [
+    { score: fd.facialHarmony,     text: 'Well-balanced facial proportions and strong feature harmony' },
+    { score: fd.jawlineDefinition, text: 'Strong, defined jawline and angular bone structure' },
+    { score: fd.skinClarity,       text: 'Clear, even skin tone and healthy skin texture' },
+    { score: fd.eyeArea,           text: 'Well-defined periorbital area and expressive eye shape' },
+    { score: fd.symmetry,          text: 'High facial symmetry across all key feature pairs' },
+    { score: fd.facialProportions, text: 'Strong facial width-to-height proportions' },
+  ].filter(c => c.score != null)
+  if (!candidates.length) return null
+  return candidates.reduce((hi, c) => c.score > hi.score ? c : hi).text
+}
+
 function getBiggestGrowthArea(scan) {
   if (!scan) return null
   const candidates = []
@@ -53,7 +74,7 @@ function getCelebMatch(scan) {
   const key  = avg >= 7 ? 'strong' : avg >= 6 ? 'defined' : avg >= 4.5 ? 'average' : 'soft'
   const pool = CELEB_QUICK[key]
   const seed = (scan.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return pool[Math.abs(seed) % pool.length]
+  return { ...pool[Math.abs(seed) % pool.length], source: 'ai_estimate' }
 }
 
 function toTopPct(score) {
@@ -70,31 +91,34 @@ function toTopPct(score) {
 
 function CardShell({ badge, icon: Icon, children }) {
   return (
-    <div className="h-full flex flex-col pb-2 px-6 overflow-y-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      {/* Centered logo — visible inside card content, below safe area */}
-      <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
-        <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
-        <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
-          ASCENDUS
-        </span>
-      </div>
-      {/* Badge row */}
-      <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
-        >
-          <Icon size={16} style={{ color: G }} />
+    // Outer: full height, clips overflow for scroll, applies safe-area at top
+    <div className="h-full flex flex-col overflow-y-auto"
+         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0px)' }}>
+      {/* Single centered block — branding + badge + content all centered together */}
+      <div className="flex-1 flex flex-col justify-center px-6 pb-2">
+        {/* Branding — in the middle of the card, not pinned to top */}
+        <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
+          <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
+          <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
+            ASCENDUS
+          </span>
         </div>
-        <span
-          className="font-heading font-bold text-[10px] tracking-[0.22em]"
-          style={{ color: 'rgba(198,168,92,0.75)' }}
-        >
-          {badge}
-        </span>
-      </div>
-      {/* Content — vertically centered in remaining space */}
-      <div className="flex-1 flex flex-col justify-center">
+        {/* Badge row */}
+        <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
+          >
+            <Icon size={16} style={{ color: G }} />
+          </div>
+          <span
+            className="font-heading font-bold text-[10px] tracking-[0.22em]"
+            style={{ color: 'rgba(198,168,92,0.75)' }}
+          >
+            {badge}
+          </span>
+        </div>
+        {/* Card content */}
         {children}
       </div>
     </div>
@@ -113,11 +137,12 @@ function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
 // ── Card 1: Original StepScoresWaiting layout ────────────────────────────────
 
 function Card1Score({ scan }) {
-  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
-  const tier      = scan?.tier ?? null
-  const topPct    = toTopPct(glowScore)
-  const growthArea = getBiggestGrowthArea(scan)
-  const celebMatch = getCelebMatch(scan)
+  const glowScore      = scan?.glowScore ?? scan?.umaxScore ?? null
+  const tier           = scan?.tier ?? null
+  const topPct         = toTopPct(glowScore)
+  const growthArea     = getBiggestGrowthArea(scan)
+  const celebMatch     = getCelebMatch(scan)
+  const topStrength    = getStrongestFeature(scan)
 
   const physiqueUpside = scan?.physiqueScore
     ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.09)
@@ -177,6 +202,17 @@ function Card1Score({ scan }) {
           </div>
         </div>
 
+        {/* Top strength — one real unblurred personalized observation */}
+        {topStrength && (
+          <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.18)' }}>
+            <div className="flex-shrink-0 mt-0.5" style={{ color: G, fontSize: 13 }}>✦</div>
+            <div className="min-w-0">
+              <p className="font-body text-[10px] tracking-[0.14em] mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>YOUR TOP STRENGTH</p>
+              <p className="font-heading font-semibold text-[13px] leading-snug" style={{ color: TEXT }}>{topStrength}</p>
+            </div>
+          </div>
+        )}
+
         {/* Biggest growth area teaser */}
         {growthArea && (
           <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -198,7 +234,9 @@ function Card1Score({ scan }) {
               <span style={{ fontSize: 17 }}>⭐</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Celebrity match · {celebMatch.sim}% similarity</p>
+              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                {celebMatch.source === 'rekognition' ? `Celebrity match · ${celebMatch.sim}% similarity` : 'Celebrity match · Shared facial features'}
+              </p>
               <p className="font-heading font-bold text-[15px] select-none" style={{ color: 'rgba(255,255,255,0.90)', filter: 'blur(6px)', userSelect: 'none' }}>
                 {celebMatch.name}
               </p>
@@ -385,7 +423,7 @@ function Card4Celebrity({ scan }) {
   const rcMatches = (scan?.celebrityMatches ?? [])
     .filter(m => m?.Name && m?.MatchConfidence > 0)
     .slice(0, 3)
-    .map(m => ({ name: m.Name, sim: Math.round(m.MatchConfidence) }))
+    .map(m => ({ name: m.Name, sim: Math.round(m.MatchConfidence), source: 'rekognition' }))
 
   const fallback = getCelebMatch(scan)
   const matches  = rcMatches.length > 0 ? rcMatches : (fallback ? [fallback] : [])
@@ -424,7 +462,7 @@ function Card4Celebrity({ scan }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-body text-[10px] mb-1" style={{ color: DIM }}>
-                {match.sim}% facial similarity
+                {match.source === 'rekognition' ? `${match.sim}% facial similarity` : 'Shared facial features'}
               </p>
               <BlurLock>
                 <p className="font-heading font-bold text-[17px]" style={{ color: TEXT }}>
@@ -874,7 +912,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 
   async function pollCount() {
     try { const { count: fresh } = await api.referral.count(); setCount(fresh ?? 0); return fresh ?? 0 }
-    catch { return count }
+    catch (err) { console.warn('[ScanUnlockGate] pollCount failed:', err.message); return count }
   }
 
   async function handleShare() {
@@ -884,7 +922,12 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
       else await navigator.clipboard?.writeText(shareText)
       setShareCount(n => n + 1)
       setTimeout(async () => { const fresh = await pollCount(); if (fresh >= REQUIRED) handleUnlock(fresh) }, 1500)
-    } catch { /* cancelled */ } finally { setSharing(false) }
+    } catch (err) {
+      // navigator.share throws on user cancel — expected, not an error
+      if (!err?.message?.toLowerCase().includes('cancel') && err?.name !== 'AbortError') {
+        console.warn('[ScanUnlockGate] handleShare failed:', err.message)
+      }
+    } finally { setSharing(false) }
   }
 
   async function handleUnlock(freshCount) {
