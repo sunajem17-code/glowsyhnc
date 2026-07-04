@@ -5,7 +5,7 @@ export default function PageHeader({ title, subtitle, back, action }) {
   const navigate = useNavigate()
 
   return (
-    <div className="flex items-center gap-3 px-4 pt-14 pb-5">
+    <div className="flex items-center gap-3 px-4 pb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       {back && (
         <button
           onClick={() => navigate(-1)}

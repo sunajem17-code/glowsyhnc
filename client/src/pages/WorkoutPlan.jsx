@@ -313,14 +313,16 @@ export default function WorkoutPlan() {
   const [isFallback, setIsFallback] = useState(false)
 
   const loadPlan = useCallback(async () => {
+    if (!physiqueScores) return   // gate — don't generate anything without a body photo
+
     setLoading(true)
     setError(null)
     setIsFallback(false)
 
-    // Non-premium users or users without a physique scan get the fallback instantly
-    if (!isPremium || !physiqueScores) {
+    // Non-premium users get the fallback plan instantly
+    if (!isPremium) {
       setPlan(buildFallback(physiqueScores, gender))
-      setIsFallback(!physiqueScores)
+      setIsFallback(false)
       setLoading(false)
       return
     }
@@ -341,6 +343,44 @@ export default function WorkoutPlan() {
   useEffect(() => {
     loadPlan()
   }, [loadPlan])
+
+  // ── Gate: no body photo uploaded yet ─────────────────────────────────────────
+  if (!physiqueScores) {
+    return (
+      <MotionPage>
+        <PageHeader title="Training Plan" onBack={() => navigate(-1)} />
+        <div className="flex-1 flex flex-col items-center justify-center px-8 pb-24 text-center gap-5">
+          <div
+            className="w-20 h-20 rounded-3xl flex items-center justify-center"
+            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
+          >
+            <Dumbbell size={36} style={{ color: '#C6A85C' }} />
+          </div>
+          <div className="space-y-2">
+            <p className="font-heading font-bold text-[20px] text-primary leading-tight">
+              Add Your Physique Photo
+            </p>
+            <p className="font-body text-[13px] text-secondary leading-relaxed">
+              Your training plan is built from your physique scan. Upload a body photo to get a plan tailored to your actual weak areas.
+            </p>
+          </div>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate('/scan')}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{
+              background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)',
+              color: '#0A0A0A',
+              boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+            }}
+          >
+            <Target size={16} />
+            Scan Your Physique
+          </motion.button>
+        </div>
+      </MotionPage>
+    )
+  }
 
   const levelLabel = plan?.trainingLevel ?? inferredLevel
   const splitLabel = plan?.split ?? `${inferredLevel === 'beginner' ? '3-day Full Body' : inferredLevel === 'intermediate' ? '4-day Upper/Lower' : '6-day PPL'}`
@@ -372,18 +412,8 @@ export default function WorkoutPlan() {
             </div>
           </div>
 
-          {physiqueScores && (
-            <>
-              <p className="font-body text-[11px] text-secondary mb-2">Built around your weak areas:</p>
-              <WeakAreaChips physiqueScores={physiqueScores} />
-            </>
-          )}
-
-          {!physiqueScores && (
-            <p className="font-body text-[12px] text-secondary mt-1">
-              Take a body scan to get a plan personalized to your physique weak areas.
-            </p>
-          )}
+          <p className="font-body text-[11px] text-secondary mb-2">Built around your weak areas:</p>
+          <WeakAreaChips physiqueScores={physiqueScores} />
         </motion.div>
 
         {/* Fallback notice */}

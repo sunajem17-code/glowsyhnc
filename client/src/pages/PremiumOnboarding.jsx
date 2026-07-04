@@ -25,9 +25,9 @@ const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.35)'
 
-// Steps: 0=welcome, 1=signup, 2=consent, 3=gender, 4=goal, 5=heightweight, 6=transformation, 7=phase
-// Progress bar: steps 1-5
-const TOTAL_QUIZ_STEPS = 5
+// Steps: 0=intro, 1=welcome, 2=signup, 3=consent, 4=gender, 5=goal, 6=heightweight, 7=scan
+//         8=locked-reveal, 9=phase, 10=transformation, 11=rating
+// Progress counter: only during data-collection steps (2–7)
 
 const pageVariants = {
   enter: (dir) => ({ x: dir > 0 ? 48 : -48, opacity: 0 }),
@@ -1969,7 +1969,8 @@ function IntroSlides({ onDone }) {
       {/* Skip */}
       <button
         onClick={onDone}
-        className="absolute top-14 right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
+        className="absolute right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
         style={{ color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
       >
         Skip
@@ -2157,9 +2158,13 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Progress bar: steps 2–11 (quiz through Rating)
-  const showProgress = step >= 2 && step <= 11
-  const progressPct = showProgress ? ((step - 2) / 10) * 100 : 0
+  // Progress bar: only during data-collection steps (2–7); post-scan celebration screens (8–11) get no counter
+  const QUIZ_START = isAuthenticated ? 3 : 2
+  const QUIZ_END = 7
+  const showProgress = step >= QUIZ_START && step <= QUIZ_END
+  const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
+  const stepCounter = step - QUIZ_START + 1
+  const stepTotal = QUIZ_END - QUIZ_START + 1
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -2270,7 +2275,7 @@ export default function PremiumOnboarding() {
       {showProgress && (
         <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
-            {step} / {TOTAL_QUIZ_STEPS}
+            {stepCounter} / {stepTotal}
           </span>
         </div>
       )}

@@ -1564,11 +1564,13 @@ export default function Results() {
   }
 
   const resolvedMatches = (() => {
-    const ai = celebrityMatches ?? aiScore?.celebrityMatches
+    // Filter out Rekognition NO_MATCH sentinels before checking if we have real results
+    const raw = celebrityMatches ?? aiScore?.celebrityMatches
+    const ai = raw?.filter(m => m?.celebrity && m.celebrity !== 'No close match found' && (m.similarity ?? 0) > 0)
     if (ai?.length > 0) return ai
+    // Rekognition returned nothing useful — fall through to local seeded pool
     const g = gender === 'female' ? 'female' : 'male'
     const pool = CELEB_POOLS[g][facialStructure] ?? CELEB_POOLS[g]['average']
-    // Derive a numeric seed from the scan ID so picks are stable for this scan
     const seed = (currentScan?.id ?? '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
     return seededPick3(pool, seed)
   })()

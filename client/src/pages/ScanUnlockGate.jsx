@@ -70,7 +70,7 @@ function toTopPct(score) {
 
 function CardShell({ badge, icon: Icon, children }) {
   return (
-    <div className="h-full flex flex-col pt-5 pb-2 px-6 overflow-y-auto">
+    <div className="h-full flex flex-col pb-2 px-6 overflow-y-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       {/* Centered logo — visible inside card content, below safe area */}
       <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
         <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
@@ -641,7 +641,7 @@ const SLIDE_VARIANTS = {
   exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-function SwipeableResultCards({ scan, onAscend, onInvite, isPurchasing }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing }) {
   const [cardIdx, setCardIdx]   = useState(0)
   const [direction, setDirection] = useState(1)
   const touchStartX = useRef(null)
@@ -757,6 +757,15 @@ function SwipeableResultCards({ scan, onAscend, onInvite, isPurchasing }) {
           style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
         >
           <UserPlus size={14} /> Invite 3 Friends — Get Free Access
+        </button>
+
+        <button
+          onClick={onPromo}
+          disabled={isPurchasing}
+          className="w-full py-2 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
+          style={{ color: 'rgba(198,168,92,0.35)' }}
+        >
+          Have a promo code?
         </button>
       </div>
     </div>
@@ -1013,19 +1022,9 @@ export default function ScanUnlockGate() {
         scan={currentScan}
         onAscend={handleAscend}
         onInvite={() => setShowInvite(true)}
+        onPromo={() => setShowPromo(true)}
         isPurchasing={false}
       />
-
-      {/* Promo code link */}
-      <div className="absolute left-0 right-0 flex justify-center" style={{ bottom: 'max(8px, env(safe-area-inset-bottom, 8px))', zIndex: 10 }}>
-        <button
-          onClick={() => setShowPromo(true)}
-          className="font-body text-[11px] text-center transition-opacity hover:opacity-70 px-4 py-1.5"
-          style={{ color: 'rgba(198,168,92,0.35)' }}
-        >
-          Have a promo code?
-        </button>
-      </div>
 
       <AnimatePresence>
         {showPromo && (
