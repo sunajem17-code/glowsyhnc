@@ -6,8 +6,12 @@ import useStore from '../store/useStore'
 import { checkAchievements } from '../utils/achievements'
 
 export default function Layout() {
-  const store = useStore()
-  const { unlockAchievement, scans, currentPlan, streak, referralCount, achievements } = store
+  const scans            = useStore(s => s.scans)
+  const currentPlan      = useStore(s => s.currentPlan)
+  const streak           = useStore(s => s.streak)
+  const referralCount    = useStore(s => s.referralCount)
+  const achievements     = useStore(s => s.achievements)
+  const unlockAchievement = useStore(s => s.unlockAchievement)
 
   // Check for new achievements whenever key state changes
   useEffect(() => {

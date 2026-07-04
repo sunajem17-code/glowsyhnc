@@ -44,7 +44,14 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { theme, hasOnboarded, isAuthenticated, checkProTrial, isPremium, refreshProStatus, user, logout } = useStore()
+  const theme            = useStore(s => s.theme)
+  const hasOnboarded     = useStore(s => s.hasOnboarded)
+  const isAuthenticated  = useStore(s => s.isAuthenticated)
+  const isPremium        = useStore(s => s.isPremium)
+  const userId           = useStore(s => s.user?.id)
+  const checkProTrial    = useStore(s => s.checkProTrial)
+  const refreshProStatus = useStore(s => s.refreshProStatus)
+  const logout           = useStore(s => s.logout)
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -59,8 +66,8 @@ export default function App() {
 
   // Initialize RevenueCat — pass user ID when logged in so purchases are linked
   useEffect(() => {
-    initRevenueCat(user?.id ?? null).catch(() => {})
-  }, [user?.id])
+    initRevenueCat(userId ?? null).catch(() => {})
+  }, [userId])
 
   // Check if pro trial has expired on load
   useEffect(() => {

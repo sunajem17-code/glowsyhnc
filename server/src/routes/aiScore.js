@@ -268,6 +268,16 @@ HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "bald"       → shaved head or very close cut with no texture visible
 - "unknown"    → hair not visible or cannot be determined from photo
 
+PERCEIVED ETHNICITY — classify the most visually apparent ethnic background from facial features only. Use the closest single match:
+- "white"         → Northern/Southern/Eastern European ancestry
+- "black"         → Sub-Saharan African ancestry
+- "east_asian"    → East Asian (Chinese, Japanese, Korean, Southeast Asian)
+- "south_asian"   → South Asian (Indian, Pakistani, Bangladeshi, Sri Lankan)
+- "latino"        → Latin American or Hispanic (regardless of skin tone)
+- "middle_eastern"→ Arab, Persian, Turkish, or Levantine ancestry
+- "mixed"         → Clearly mixed or ambiguous — cannot confidently assign one group
+Base this only on visual facial features visible in the photo. If uncertain, use "mixed".
+
 FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe:
 - jawline: sharpness, gonial angle definition, and visible edge clarity
 - cheekbones: height, prominence, and forward projection of the malar bones
@@ -287,6 +297,7 @@ Return ONLY this JSON — no markdown, nothing else:
   "grooming_score": <number 1.0–10.0>,
   "facial_structure": "<soft/round|average|defined|strong>",
   "hair_type": "<straight|wavy|curly|coily|locs|bald|unknown>",
+  "perceived_ethnicity": "<white|black|east_asian|south_asian|latino|middle_eastern|mixed>",
   "pillars": {
     "harmony": <number 1.0–10.0>,
     "angularity": <number 1.0–10.0>,
@@ -417,9 +428,29 @@ async function rekognizeImage(faceBase64) {
 
 const NO_MATCH = { celebrity: 'No close match found', profession: null, similarity: 0, shared_traits: 'No celebrity match detected' }
 
+// Known-female celebrity names drawn from our own CELEB_POOLS female list.
+// Used to filter cross-gender Rekognition results without an external lookup.
+const KNOWN_FEMALE_CELEBS = new Set([
+  'Angelina Jolie','Megan Fox','Charlize Theron','Cate Blanchett','Eva Green',
+  'Monica Bellucci','Bella Hadid','Naomi Campbell','Kendall Jenner','Hailey Bieber',
+  'Gigi Hadid','Adriana Lima','Joan Smalls','Winnie Harlow','Rihanna','Beyoncé',
+  'Rosalía','Sommer Ray','Ana Cheri','Natalie Portman','Emma Watson','Zendaya',
+  'Florence Pugh','Anya Taylor-Joy','Daisy Ridley','Lupita Nyongo','Letitia Wright',
+  'Olivia Rodrigo','Sabrina Carpenter','Billie Eilish','Gracie Abrams','Halle Bailey',
+  'SZA','Gemma Chan','Jennifer Aniston','Anne Hathaway','Sandra Bullock',
+  'Reese Witherspoon','Blake Lively','Scarlett Johansson','Millie Bobby Brown',
+  'Sydney Sweeney','Selena Gomez','Camila Cabello','Dua Lipa','Ariana Grande',
+  'Jennifer Lopez','Normani','Tyla','Doja Cat','Ari Lennox','Jorja Smith',
+  'Megan Thee Stallion','Adele','Lizzo','Meghan Trainor','Kelly Clarkson',
+  'Rebel Wilson','Chrissy Metz','Ashley Graham','Tess Holliday','Alix Earle',
+  'Emma Chamberlain','Addison Rae','Charli DAmelio','Dixie DAmelio','Pokimane',
+  'Valkyrae','Liza Koshy','Lilly Singh','Rachel Zegler','Haifa Wehbe',
+])
+
 // ── CALL 3 (parallel): Celebrity Lookalike via AWS Rekognition ────────────────
 // Rekognition is the only path. No Claude fallback.
-async function getCelebrityMatch(faceBase64) {
+async function getCelebrityMatch(faceBase64, gender = 'male') {
+  const isFemale = gender === 'female'
   let rekogFaces = []
   try {
     rekogFaces = await withRetry(() => rekognizeImage(faceBase64), 'rekognition')
@@ -434,7 +465,19 @@ async function getCelebrityMatch(faceBase64) {
     return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
   }
 
-  const mapped = rekogFaces.slice(0, 3).map(r => ({
+  // Filter cross-gender matches. For male users, exclude names we know are female.
+  // For female users we have no exhaustive male exclusion list, so pass all through —
+  // Rekognition rarely matches female faces to male celebrities anyway.
+  const genderFiltered = isFemale
+    ? rekogFaces
+    : rekogFaces.filter(r => !KNOWN_FEMALE_CELEBS.has(r.Name))
+  // If filtering wiped everything, fall back to unfiltered to avoid returning 3x NO_MATCH
+  const faces = genderFiltered.length > 0 ? genderFiltered : rekogFaces
+  if (genderFiltered.length === 0) {
+    console.warn(`[CELEB] Gender filter removed all ${rekogFaces.length} matches — using unfiltered`)
+  }
+
+  const mapped = faces.slice(0, 3).map(r => ({
     celebrity:    r.Name,
     profession:   'Celebrity',
     similarity:   Math.round(r.MatchConfidence),
@@ -605,7 +648,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       // independently. A physique failure degrades to face-only, never kills the result.
       console.log('[aiScore] STEP 2+3 — Celebrity match + Physique scoring in parallel...')
       const [celebSettled, physiqueSettled] = await Promise.allSettled([
-        getCelebrityMatch(faceBase64),
+        getCelebrityMatch(faceBase64, gender),
         bodyBase64
           ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
           : Promise.resolve(null),
@@ -661,8 +704,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       faceScore:         Math.round(faceScore    * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,
       tier,
-      facialStructure:   faceResult.facial_structure,
-      hairType:          faceResult.hair_type ?? 'unknown',
+      facialStructure:    faceResult.facial_structure,
+      hairType:           faceResult.hair_type ?? 'unknown',
+      perceivedEthnicity: faceResult.perceived_ethnicity ?? 'mixed',
       faceSubScores: {
         symmetry:          r(faceSub.symmetry),
         jawlineDefinition: r(faceSub.jawline_definition),

@@ -367,8 +367,11 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const setAuth = useStore(s => s.setAuth)
-  const { setHasOnboarded, setLegalConsented, setAgeConfirmed, setReferralCode } = useStore()
+  const setAuth           = useStore(s => s.setAuth)
+  const setHasOnboarded   = useStore(s => s.setHasOnboarded)
+  const setLegalConsented = useStore(s => s.setLegalConsented)
+  const setAgeConfirmed   = useStore(s => s.setAgeConfirmed)
+  const setReferralCode   = useStore(s => s.setReferralCode)
 
   async function handleSignIn(e) {
     e.preventDefault()
@@ -1970,8 +1973,7 @@ function IntroSlides({ onDone }) {
       <button
         onClick={onDone}
         className="absolute right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
-        style={{ color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
       >
         Skip
       </button>
@@ -2031,12 +2033,22 @@ function IntroSlides({ onDone }) {
 
 export default function PremiumOnboarding() {
   const navigate = useNavigate()
-  const {
-    setUserProfile, setHasOnboarded, setLegalConsented, setAgeConfirmed,
-    setGender, setAssignedPhase, setUnits, units, isAuthenticated, setAuth,
-    addScan, setCurrentScan, setCurrentPlan, setPendingFacePhoto,
-    setLastScanDate, incrementScanCount,
-  } = useStore()
+  const isAuthenticated    = useStore(s => s.isAuthenticated)
+  const units              = useStore(s => s.units)
+  const setUserProfile     = useStore(s => s.setUserProfile)
+  const setHasOnboarded    = useStore(s => s.setHasOnboarded)
+  const setLegalConsented  = useStore(s => s.setLegalConsented)
+  const setAgeConfirmed    = useStore(s => s.setAgeConfirmed)
+  const setGender          = useStore(s => s.setGender)
+  const setAssignedPhase   = useStore(s => s.setAssignedPhase)
+  const setUnits           = useStore(s => s.setUnits)
+  const setAuth            = useStore(s => s.setAuth)
+  const addScan            = useStore(s => s.addScan)
+  const setCurrentScan     = useStore(s => s.setCurrentScan)
+  const setCurrentPlan     = useStore(s => s.setCurrentPlan)
+  const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
+  const setLastScanDate    = useStore(s => s.setLastScanDate)
+  const incrementScanCount = useStore(s => s.incrementScanCount)
 
   // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
   const [introDone, setIntroDone] = useState(true)

@@ -26,7 +26,11 @@ function ToggleButton({ checked, onToggle, label, icon: Icon, color }) {
 
 export default function DailyCheckin() {
   const navigate = useNavigate()
-  const { addCheckin, todayCheckin, streak, updateStreak, token } = useStore()
+  const todayCheckin  = useStore(s => s.todayCheckin)
+  const streak        = useStore(s => s.streak)
+  const token         = useStore(s => s.token)
+  const addCheckin    = useStore(s => s.addCheckin)
+  const updateStreak  = useStore(s => s.updateStreak)
 
   const today = new Date().toDateString()
   const alreadyDone = todayCheckin?.date === today

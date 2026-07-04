@@ -25,7 +25,13 @@ const fadeUp = (delay = 0) => ({
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user, scans, currentPlan, streak, todayCheckin, isPremium, referralCount } = useStore()
+  const user          = useStore(s => s.user)
+  const scans         = useStore(s => s.scans)
+  const currentPlan   = useStore(s => s.currentPlan)
+  const streak        = useStore(s => s.streak)
+  const todayCheckin  = useStore(s => s.todayCheckin)
+  const isPremium     = useStore(s => s.isPremium)
+  const referralCount = useStore(s => s.referralCount)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 5
 

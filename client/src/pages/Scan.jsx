@@ -406,11 +406,21 @@ const STEP_META = [
 
 export default function Scan() {
   const navigate = useNavigate()
-  const {
-    setPendingFacePhoto, addScan, setCurrentScan, setCurrentPlan,
-    gender: savedGender, setGender, isPremium, scanCount, incrementScanCount,
-    setAssignedPhase, userProfile, lastScanDate, setLastScanDate, logout, token,
-  } = useStore()
+  const savedGender       = useStore(s => s.gender)
+  const isPremium         = useStore(s => s.isPremium)
+  const scanCount         = useStore(s => s.scanCount)
+  const userProfile       = useStore(s => s.userProfile)
+  const lastScanDate      = useStore(s => s.lastScanDate)
+  const token             = useStore(s => s.token)
+  const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
+  const addScan           = useStore(s => s.addScan)
+  const setCurrentScan    = useStore(s => s.setCurrentScan)
+  const setCurrentPlan    = useStore(s => s.setCurrentPlan)
+  const setGender         = useStore(s => s.setGender)
+  const incrementScanCount = useStore(s => s.incrementScanCount)
+  const setAssignedPhase  = useStore(s => s.setAssignedPhase)
+  const setLastScanDate   = useStore(s => s.setLastScanDate)
+  const logout            = useStore(s => s.logout)
 
   // Monthly scan gate for free users
   const isFreeScanBlocked = (() => {

@@ -21,7 +21,7 @@ export default function Splash({ onDone }) {
         <motion.div
           key="splash"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.6, ease: 'easeIn' } }}
+          exit={{ opacity: 0, pointerEvents: 'none', transition: { duration: 0.6, ease: 'easeIn' } }}
           className="fixed inset-0 flex flex-col items-center justify-center z-50"
           style={{ background: '#000000' }}
         >

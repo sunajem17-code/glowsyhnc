@@ -1184,6 +1184,105 @@ const SKIN_INGREDIENTS = {
   }],
 }
 
+// ─── Celebrity ethnicity groups — module-level so it's created once, not per render ──
+// Groups: white | black | east_asian | south_asian | latino | middle_eastern | mixed
+const CELEB_GROUPS = {
+  // ── Male strong ──
+  'Henry Cavill':'white','Chris Hemsworth':'white','Brad Pitt':'white',
+  'Jacob Elordi':'white','Glen Powell':'white','Jon Bernthal':'white',
+  'Tom Hardy':'white','Cillian Murphy':'white','Joe Manganiello':'white',
+  'Matt Bomer':'white','Cristiano Ronaldo':'white',
+  'Anthony Joshua':'black','Israel Adesanya':'black','Lewis Hamilton':'black',
+  'ASAP Rocky':'black','Travis Scott':'black',"Kylian Mbappé":'black',
+  'Neymar':'latino','Bad Bunny':'latino',
+  'David Gandy':'white','Lucky Blue Smith':'white','Lazar Angelov':'white',
+  'Jon Kortajarena':'white','Devin Caherly':'white','Jericho (TikTok)':'white',
+  // ── Male defined ──
+  'Zac Efron':'white','Tom Holland':'white','Austin Butler':'white',
+  'Paul Mescal':'white','Timothée Chalamet':'white','Richard Madden':'white',
+  'Kit Harington':'white','Ryan Reynolds':'white','Pedro Alonso':'white',
+  'Oscar Isaac':'latino',
+  'Devin Booker':'mixed','Ja Morant':'black','Odell Beckham Jr.':'black',
+  'Victor Wembanyama':'black','Jalen Green':'black',
+  'Harry Styles':'white','The Weeknd':'black','Drake':'black',
+  'Maluma':'latino','J Balvin':'latino',
+  'Jeff Seid':'white','Steve Cook':'white','Ryan Terry':'white','Tyler Cameron':'white',
+  'Dev Patel':'south_asian','Simu Liu':'east_asian',
+  'Steven Yeun':'east_asian','Park Seo-jun':'east_asian','V (BTS)':'east_asian',
+  'Noah Beck':'white','Vinnie Hacker':'white','Chase Hudson':'white',
+  'Bryce Hall':'white','Tayler Holder':'white','Jordan Barrett':'white',
+  // ── Male average ──
+  'Chris Evans':'white','Jake Gyllenhaal':'white','Pedro Pascal':'latino',
+  'Adam Driver':'white','John Boyega':'black','Riz Ahmed':'south_asian',
+  'Mahershala Ali':'black','Donald Glover':'black','John Krasinski':'white',
+  'Miles Teller':'white','Lakeith Stanfield':'black',
+  'Steph Curry':'black','LeBron James':'black','Trae Young':'black',
+  'Lamine Yamal':'black','Saquon Barkley':'black',
+  'Post Malone':'white','Lil Baby':'black','Polo G':'black',
+  'Rod Wave':'black','J. Cole':'black','Kendrick Lamar':'black',
+  'Tyler the Creator':'black','Frank Ocean':'black',
+  'MrBeast':'white','Logan Paul':'white','KSI':'black','xQc':'white',
+  'Pokimane (male ref)':'middle_eastern','Typical Gamer':'white',
+  'Valkyrae':'east_asian','Corpse Husband':'white','NICKMERCS':'white',
+  'SypherPK':'middle_eastern','Yung Gravy':'white',
+  'Trevor Noah':'black','Hasan Piker':'middle_eastern','Matt Rife':'white',
+  // ── Male soft/round ──
+  'Kevin Hart':'black','Jonah Hill':'white','Jack Black':'white',
+  'Seth Rogen':'white','Channing Tatum':'white','James Corden':'white',
+  'Ed Sheeran':'white','Niall Horan':'white','Sam Smith':'white',
+  'Charlie Puth':'white','Shawn Mendes':'latino',
+  'Kai Cenat':'black','IShowSpeed':'black','Druski':'black',
+  'Fanum':'black','YourRAGE':'black','Duke Dennis':'black',
+  'Agent 00':'black','Zias':'black','ImDontai':'black',
+  'Caseoh':'white','HasanAbi':'middle_eastern','Markiplier':'mixed',
+  'Jacksepticeye':'white','Dream':'white','GeorgeNotFound':'white','Larray':'black',
+  'Zach Galifianakis':'white','Gabriel Iglesias':'latino','Bert Kreischer':'white',
+  // ── Female strong ──
+  'Angelina Jolie':'white','Megan Fox':'white','Charlize Theron':'white',
+  'Cate Blanchett':'white','Eva Green':'white','Monica Bellucci':'white',
+  'Bella Hadid':'mixed','Naomi Campbell':'black','Kendall Jenner':'white',
+  'Hailey Bieber':'white','Gigi Hadid':'mixed','Adriana Lima':'mixed',
+  'Joan Smalls':'black','Winnie Harlow':'black','Rihanna':'black',
+  'Beyoncé':'black',"Rosalía":'white','Sommer Ray':'white','Ana Cheri':'latino',
+  // ── Female defined ──
+  'Natalie Portman':'white','Emma Watson':'white','Zendaya':'mixed',
+  'Florence Pugh':'white','Anya Taylor-Joy':'white','Daisy Ridley':'white',
+  'Lupita Nyongo':'black','Letitia Wright':'black',
+  'Olivia Rodrigo':'east_asian','Sabrina Carpenter':'white','Billie Eilish':'white',
+  'Gracie Abrams':'white','Halle Bailey':'black','SZA':'black',
+  'Gemma Chan':'east_asian','Lisa (BLACKPINK)':'east_asian',
+  'Jennie (BLACKPINK)':'east_asian','Jisoo (BLACKPINK)':'east_asian',
+  'IU':'east_asian','Tzuyu (TWICE)':'east_asian',
+  'Loren Gray':'white','Bryce Xavier (fem)':'black','Bretman Rock':'east_asian',
+  // ── Female average ──
+  'Jennifer Aniston':'white','Anne Hathaway':'white','Sandra Bullock':'white',
+  'Reese Witherspoon':'white','Blake Lively':'white','Scarlett Johansson':'white',
+  'Millie Bobby Brown':'white','Sydney Sweeney':'white',
+  'Selena Gomez':'latino','Camila Cabello':'latino','Dua Lipa':'white',
+  'Ariana Grande':'white','Jennifer Lopez':'latino',
+  'Normani':'black','Tyla':'black','Doja Cat':'black','Ari Lennox':'black',
+  'Jorja Smith':'black','Megan Thee Stallion':'black',
+  'Rosé (BLACKPINK)':'east_asian','Jihyo (TWICE)':'east_asian',
+  'Nayeon (TWICE)':'east_asian','Jang Wonyoung':'east_asian',
+  'Haifa Wehbe':'middle_eastern','Pokimane':'middle_eastern',
+  'Valkyrae':'east_asian','Imane Anys':'middle_eastern',
+  'Liza Koshy':'south_asian','Lilly Singh':'south_asian',
+  'Rachel Zegler':'latino',
+  'Alix Earle':'white','Emma Chamberlain':'white','Addison Rae':'white',
+  'Charli DAmelio':'white','Dixie DAmelio':'white',
+  'Hannah Meloche':'white','Gabi Butler':'white',
+  'Iskra Lawrence':'white','Nyma Tang':'black',
+  // ── Female soft/round ──
+  'Adele':'white','Lizzo':'black','Meghan Trainor':'white',
+  'Kelly Clarkson':'white','Rebel Wilson':'white','Chrissy Metz':'white',
+  'Nikita Dragun':'latino','Trisha Paytas':'white',
+  'Annie LeBlanc':'white','Baby Ariel':'latino','Brent Rivera (fem)':'latino',
+  'SSSniperWolf':'middle_eastern','Amouranth':'white',
+  'Hafu':'mixed','QuarterJade':'east_asian','Kyedae':'east_asian',
+  'Gloria Borger':'white','Ashley Graham':'white',
+  'Tess Holliday':'white','Hunter McGrady':'white',
+}
+
 // ─── Main Results Page ────────────────────────────────────────────────────────
 
 export default function Results() {
@@ -1551,16 +1650,30 @@ export default function Results() {
     },
   }
 
-  function seededPick3(pool, seed) {
-    // Deterministic shuffle using scan ID as seed — stable across re-renders
+  // Weighted seeded pick: same-group celebrities get 2× copies in the draw pool,
+  // making them ~2× more likely without ever hard-excluding cross-group options.
+  // Falls back gracefully when the pool has thin same-group coverage.
+  function weightedSeededPick3(pool, seed, userGroup) {
+    const weighted = []
+    for (const c of pool) {
+      weighted.push(c)
+      if (userGroup && CELEB_GROUPS[c.celebrity] === userGroup) weighted.push(c)
+    }
     let s = seed
-    const arr = [...pool]
+    const arr = [...weighted]
     for (let i = arr.length - 1; i > 0; i--) {
       s = (s * 1664525 + 1013904223) & 0xffffffff
       const j = Math.abs(s) % (i + 1);
       [arr[i], arr[j]] = [arr[j], arr[i]]
     }
-    return arr.slice(0, 3)
+    // Deduplicate — same celeb may appear twice from weighting; take first unique 3
+    const seen = new Set()
+    const result = []
+    for (const c of arr) {
+      if (!seen.has(c.celebrity)) { seen.add(c.celebrity); result.push(c) }
+      if (result.length === 3) break
+    }
+    return result
   }
 
   const resolvedMatches = (() => {
@@ -1568,11 +1681,12 @@ export default function Results() {
     const raw = celebrityMatches ?? aiScore?.celebrityMatches
     const ai = raw?.filter(m => m?.celebrity && m.celebrity !== 'No close match found' && (m.similarity ?? 0) > 0)
     if (ai?.length > 0) return ai
-    // Rekognition returned nothing useful — fall through to local seeded pool
+    // Rekognition returned nothing useful — fall through to weighted local pool
     const g = gender === 'female' ? 'female' : 'male'
     const pool = CELEB_POOLS[g][facialStructure] ?? CELEB_POOLS[g]['average']
     const seed = (currentScan?.id ?? '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    return seededPick3(pool, seed)
+    const userGroup = aiScore?.perceivedEthnicity ?? null
+    return weightedSeededPick3(pool, seed, userGroup)
   })()
 
   // ─── Skin Analysis ──────────────────────────────────────────────────────────

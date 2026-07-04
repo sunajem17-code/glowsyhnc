@@ -7,8 +7,9 @@ import appIcon from '../assets/ascendus-icon-transparent.png'
 const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
 
-// Deterministic particle positions so they're stable per render
-const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
+// Deterministic particle positions — stable, not recalculated per render
+// CSS-driven so they run on the compositor thread (zero JS RAF cost)
+const PARTICLES = Array.from({ length: 16 }, (_, i) => ({
   id: i,
   left: ((i * 47 + 13) % 100),
   delay: (i * 0.19) % 3.2,
@@ -16,6 +17,21 @@ const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
   size: i % 3 === 0 ? 3 : i % 3 === 1 ? 2 : 1.5,
   opacity: 0.18 + (i % 4) * 0.08,
 }))
+
+// Injected once at module load — no per-render cost
+if (typeof document !== 'undefined' && !document.getElementById('ps-particle-kf')) {
+  const style = document.createElement('style')
+  style.id = 'ps-particle-kf'
+  style.textContent = `
+    @keyframes ps-rise {
+      0%   { transform: translateY(0);      opacity: 0; }
+      10%  { opacity: var(--ps-op); }
+      85%  { opacity: var(--ps-op); }
+      100% { transform: translateY(var(--ps-travel)); opacity: 0; }
+    }
+  `
+  document.head.appendChild(style)
+}
 
 export default function PremiumSplash({ onDone }) {
   const user = useStore(s => s.user)
@@ -40,9 +56,9 @@ export default function PremiumSplash({ onDone }) {
       className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
       style={{ background: '#000000', zIndex: 9999 }}
     >
-      {/* Floating gold particles */}
+      {/* Floating gold particles — CSS-driven, compositor thread only */}
       {PARTICLES.map(p => (
-        <motion.div
+        <div
           key={p.id}
           className="absolute rounded-full pointer-events-none"
           style={{
@@ -51,17 +67,10 @@ export default function PremiumSplash({ onDone }) {
             left: `${p.left}%`,
             bottom: '-10px',
             background: GOLD,
+            '--ps-op': p.opacity,
+            '--ps-travel': `calc(-100vh - 40px)`,
+            animation: `ps-rise ${p.duration}s ${p.delay}s linear infinite`,
             opacity: 0,
-          }}
-          animate={{
-            y: [0, -window.innerHeight - 40],
-            opacity: [0, p.opacity, p.opacity, 0],
-          }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: 'linear',
           }}
         />
       ))}
