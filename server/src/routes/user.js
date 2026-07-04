@@ -124,6 +124,33 @@ router.delete('/account', authMiddleware, async (req, res) => {
     } catch (err) {
       console.warn('[deleteAccount] Supabase users delete skipped:', err.message)
     }
+
+    // ── Delete scan images from Supabase Storage ────────────────────────────
+    // Files are stored under scan-images/{folder}/{userId}/... where folder
+    // is always 'scan' (the default in /supabase/upload-image). We list only
+    // this user's prefix so we never touch any other user's files.
+    try {
+      const { data: files, error: listErr } = await sb.storage
+        .from('scan-images')
+        .list(`scan/${userId}`)
+      if (listErr) {
+        console.warn('[deleteAccount] Storage list failed:', listErr.message)
+      } else if (files && files.length > 0) {
+        const paths = files.map(f => `scan/${userId}/${f.name}`)
+        const { error: removeErr } = await sb.storage
+          .from('scan-images')
+          .remove(paths)
+        if (removeErr) {
+          console.warn('[deleteAccount] Storage remove failed:', removeErr.message)
+        } else {
+          console.log(`[deleteAccount] Storage: removed ${paths.length} file(s) for userId:`, userId)
+        }
+      } else {
+        console.log('[deleteAccount] Storage: no scan images found for userId:', userId)
+      }
+    } catch (err) {
+      console.warn('[deleteAccount] Storage cleanup error:', err.message)
+    }
   }
 
   // ── 3. SQLite cascade delete ──────────────────────────────────────────────

@@ -223,7 +223,11 @@ router.put('/user', auth, async (req, res) => {
 })
 
 // ── POST /supabase/upload-image ────────────────────────────────────────────────
-// Upload a base64 image to Supabase Storage. Returns the public URL.
+// Upload a base64 image to Supabase Storage (private bucket).
+// Returns a short-lived signed URL (60 s) — never a permanent public URL.
+// The bucket must be set to Private in Supabase with owner-only RLS policies.
+const SIGNED_URL_EXPIRY_SECONDS = 60
+
 router.post('/upload-image', auth, async (req, res) => {
   if (!requireSupabase(res)) return
   try {
@@ -240,20 +244,25 @@ router.post('/upload-image', auth, async (req, res) => {
       return res.status(413).json({ error: 'Image too large — maximum 10 MB' })
     }
 
-    const ext  = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
-    const path = `${folder ?? 'scan'}/${req.userId}/${Date.now()}.${ext}`
+    const ext        = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
+    const storagePath = `scan/${req.userId}/${Date.now()}.${ext}`
 
     const { error: uploadErr } = await sb.storage
       .from('scan-images')
-      .upload(path, buffer, { contentType: mime, upsert: false })
+      .upload(storagePath, buffer, { contentType: mime, upsert: false })
 
     if (uploadErr) throw uploadErr
 
-    const { data: { publicUrl } } = sb.storage
+    // Use a short-lived signed URL instead of a permanent public URL.
+    // Never call getPublicUrl() — the bucket is private.
+    const { data: signedData, error: signErr } = await sb.storage
       .from('scan-images')
-      .getPublicUrl(path)
+      .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_SECONDS)
 
-    res.json({ url: publicUrl })
+    if (signErr) throw signErr
+
+    // Return the storage path so callers can generate fresh signed URLs on demand.
+    res.json({ url: signedData.signedUrl, path: storagePath })
   } catch (err) {
     console.error('[Supabase] Image upload failed:', err.message)
     res.status(500).json({ error: 'internal_error' })

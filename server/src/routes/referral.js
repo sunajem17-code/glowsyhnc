@@ -46,9 +46,28 @@ router.post('/claim-trial', verifyToken, async (req, res) => {
   expires.setDate(expires.getDate() + 7)
   const expiresAt = expires.toISOString()
 
-  // Update Supabase (primary) + SQLite (fallback)
-  try { await updateUserById(req.userId, { subscription_tier: 'trial', pro_trial_expires_at: expiresAt }) } catch {}
-  try { db.prepare("UPDATE users SET subscription_tier = 'trial', pro_trial_expires_at = ? WHERE id = ?").run(expiresAt, req.userId) } catch {}
+  // Update Supabase (primary) + SQLite (fallback).
+  // If both fail, do not return success — the tier was never actually updated.
+  let sbOk = false
+  let sqliteOk = false
+
+  try {
+    await updateUserById(req.userId, { subscription_tier: 'trial', pro_trial_expires_at: expiresAt })
+    sbOk = true
+  } catch (err) {
+    console.error('[referral/claim-trial] Supabase update failed:', err.message)
+  }
+
+  try {
+    db.prepare("UPDATE users SET subscription_tier = 'trial', pro_trial_expires_at = ? WHERE id = ?").run(expiresAt, req.userId)
+    sqliteOk = true
+  } catch (err) {
+    console.error('[referral/claim-trial] SQLite update failed:', err.message)
+  }
+
+  if (!sbOk && !sqliteOk) {
+    return res.status(500).json({ error: 'Failed to activate trial — please try again or contact support.' })
+  }
 
   res.json({ ok: true, expiresAt })
 })
@@ -74,8 +93,28 @@ router.post('/unlock-pro', verifyToken, async (req, res) => {
     })
   }
 
-  try { await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true }) } catch {}
-  try { db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId) } catch {}
+  // Update Supabase (primary) + SQLite (fallback).
+  // If both fail, do not return success — the tier was never actually updated.
+  let sbOk = false
+  let sqliteOk = false
+
+  try {
+    await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true })
+    sbOk = true
+  } catch (err) {
+    console.error('[referral/unlock-pro] Supabase update failed:', err.message)
+  }
+
+  try {
+    db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId)
+    sqliteOk = true
+  } catch (err) {
+    console.error('[referral/unlock-pro] SQLite update failed:', err.message)
+  }
+
+  if (!sbOk && !sqliteOk) {
+    return res.status(500).json({ error: 'Failed to unlock Pro — please try again or contact support.' })
+  }
 
   res.json({ ok: true, isPremium: true })
 })
