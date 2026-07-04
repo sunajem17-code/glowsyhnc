@@ -74,7 +74,7 @@ export default function PrivacyPolicy() {
         </Section>
 
         <Section title="3. Face Data">
-          <p>Ascendus does not store face data. When you submit a photo for analysis, it is transmitted directly to Anthropic's Claude AI API for real-time processing and is not retained by Ascendus after the analysis is complete. Photos are not saved to our servers or databases.</p>
+          <p>When you submit a photo for analysis, it is transmitted securely to our server and sent to Anthropic's Claude AI API for processing. Your photos are stored in Supabase Storage (scan-images bucket) and are retained until you delete your account or scan data. See Section 5 for deletion options.</p>
         </Section>
 
         <Section title="4. AI & Biometric Data">
