@@ -6,7 +6,7 @@ import { Check, X, ChevronLeft, Lock, Users, Share2, CheckCircle, Loader2 } from
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import { isNative, purchasePro, restorePurchases, initRevenueCat } from '../utils/iap'
+import { isNative, purchasePro, restorePurchases, initRevenueCat, checkTrialEligibility } from '../utils/iap'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
 const GOLD = '#C6A85C'
@@ -54,10 +54,22 @@ export default function Premium() {
   const [unlockMsg, setUnlockMsg]         = useState('')
   const [copied, setCopied]               = useState(false)
   const [copyFailed, setCopyFailed]       = useState(false)
+  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
 
   const [searchParams] = useSearchParams()
 
-  useEffect(() => { initRevenueCat().catch(() => {}) }, [])
+  useEffect(() => {
+    initRevenueCat().catch(() => {})
+    if (isNative()) {
+      checkTrialEligibility()
+        .then(result => {
+          setTrialEligibility(result)
+          const path = (result.monthly === 'eligible' || result.yearly === 'eligible') ? 'trial' : 'standard'
+          console.log(`[PAYWALL][path=${path}] Paywall shown`)
+        })
+        .catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     api.referral.count()
@@ -308,10 +320,22 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
+          {(() => {
+            if (subscribingNow) return 'Opening checkout…'
+            const eligible = trialEligibility[plan] === 'eligible'
+            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial — then $49.99/yr' : 'Start 3-Day Free Trial — then $7.99/mo'
+            return plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'
+          })()}
         </motion.button>
-        <p className="text-center text-[10px] font-body mb-6" style={{ color: TEXT_DIM }}>
-          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
+        <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
+          {trialEligibility[plan] === 'eligible'
+            ? plan === 'yearly'
+              ? '3-day free trial, then $49.99/year. Auto-renews unless cancelled before trial ends.'
+              : '3-day free trial, then $7.99/month. Auto-renews unless cancelled before trial ends.'
+            : plan === 'yearly'
+              ? 'Billed annually · Cancel anytime'
+              : 'Billed monthly · Cancel anytime'
+          }
         </p>
 
         {checkoutError && (

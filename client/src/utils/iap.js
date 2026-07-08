@@ -111,3 +111,35 @@ export async function checkProStatus(userId) {
   const result = await Purchases.getCustomerInfo()
   return !!result.customerInfo.entitlements.active?.[ENTITLEMENT_ID]
 }
+
+// ── Trial eligibility check ───────────────────────────────────────────────────
+// Returns { monthly: 'eligible'|'ineligible'|'unknown', yearly: 'eligible'|'ineligible'|'unknown' }
+// Only users who have never used a trial on this Apple ID are eligible.
+// Falls back to 'unknown' on any error so the UI defaults to standard (no trial copy).
+export async function checkTrialEligibility() {
+  if (!isNative()) return { monthly: 'unknown', yearly: 'unknown' }
+  try {
+    await initRevenueCat()
+    const MONTHLY_ID = 'com.ascendus.app.monthly'
+    const YEARLY_ID  = 'com.ascendus.app.yearly'
+    const result = await Purchases.checkTrialOrIntroductoryPriceEligibility({
+      productIdentifiers: [MONTHLY_ID, YEARLY_ID],
+    })
+    const status = result?.introEligibilityStatus ?? result
+    function parse(raw) {
+      if (!raw) return 'unknown'
+      const s = typeof raw === 'object' ? (raw.status ?? raw.introEligibilityStatus ?? raw) : raw
+      // RC Capacitor returns numeric: 0=unknown, 1=ineligible, 2=eligible, 3=no_intro_offer
+      if (s === 2 || s === 'eligible' || s === 'INTRO_ELIGIBILITY_STATUS_ELIGIBLE') return 'eligible'
+      if (s === 1 || s === 'ineligible' || s === 'INTRO_ELIGIBILITY_STATUS_INELIGIBLE') return 'ineligible'
+      return 'unknown'
+    }
+    const monthly = parse(status?.[MONTHLY_ID])
+    const yearly  = parse(status?.[YEARLY_ID])
+    console.log(`[PAYWALL] Trial eligibility — monthly:${monthly} yearly:${yearly}`)
+    return { monthly, yearly }
+  } catch (err) {
+    console.warn('[PAYWALL] checkTrialEligibility failed:', err?.message)
+    return { monthly: 'unknown', yearly: 'unknown' }
+  }
+}
