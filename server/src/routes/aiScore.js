@@ -1,6 +1,8 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
+const path = require('path')
+const fs = require('fs')
 const { RekognitionClient, RecognizeCelebritiesCommand } = require('@aws-sdk/client-rekognition')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
@@ -430,6 +432,102 @@ async function rekognizeImage(faceBase64) {
 
 const NO_MATCH = { celebrity: 'No close match found', profession: null, similarity: 0, shared_traits: 'No celebrity match detected' }
 
+// ── Lookalike pool (loaded once at startup) ───────────────────────────────────
+let LOOKALIKE_POOL = null
+function getLookalikePool() {
+  if (LOOKALIKE_POOL) return LOOKALIKE_POOL
+  try {
+    const poolPath = path.join(__dirname, '../../data/lookalikePool.json')
+    LOOKALIKE_POOL = JSON.parse(fs.readFileSync(poolPath, 'utf8'))
+    const total = Object.values(LOOKALIKE_POOL).reduce((s, a) => s + a.length, 0)
+    console.log(`[CELEB] Lookalike pool loaded: ${total} candidates across ${Object.keys(LOOKALIKE_POOL).length} categories`)
+  } catch (err) {
+    console.error('[CELEB] Failed to load lookalikePool.json:', err.message)
+    LOOKALIKE_POOL = {}
+  }
+  return LOOKALIKE_POOL
+}
+
+// ── Claude two-call celebrity fallback ───────────────────────────────────────
+// Call A: vision — extract physical face descriptors (no celebrity names)
+// Call B: text   — match descriptors against pool candidates
+async function getCelebrityMatchClaude(faceBase64) {
+  const client = getClient()
+  const pool   = getLookalikePool()
+
+  // Flatten pool to a compact string for Call B prompt
+  const poolText = Object.entries(pool).map(([cat, entries]) => {
+    const lines = entries.map(e => `- ${e.name} (${cat}): ${e.notableFeatures.join(', ')}`).join('\n')
+    return `## ${cat}\n${lines}`
+  }).join('\n\n')
+
+  // ── Call A: face descriptor extraction ──────────────────────────────────────
+  const base64Data = faceBase64.replace(/^data:image\/\w+;base64,/, '')
+  const mediaType  = faceBase64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg'
+
+  let faceDescriptors
+  try {
+    const callA = await withRetry(() => client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 512,
+      system: 'You are a facial structure analyst. Output ONLY valid JSON with no markdown, no explanations, no celebrity names. Describe the physical structure of the face shown using objective anatomical terms.',
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64Data },
+          },
+          {
+            type: 'text',
+            text: 'Describe this face\'s physical structure. Output ONLY a JSON object with these keys: faceShape, jawType, browType, noseType, eyeShape, lipFullness, cheekbones, skinTone, hairTexture. Use concise descriptive values (e.g. "square", "angular", "deep-set", "olive"). No celebrity names. No commentary.',
+          },
+        ],
+      }],
+    }), 'claude-celeb-A')
+
+    faceDescriptors = JSON.parse(callA.content[0].text.trim())
+    console.log('[CELEB][tier=claude-fallback] Call A descriptors:', JSON.stringify(faceDescriptors))
+  } catch (err) {
+    console.error('[CELEB][tier=claude-fallback] Call A failed:', err.message)
+    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
+  }
+
+  // ── Call B: match descriptors against pool ───────────────────────────────────
+  try {
+    const callB = await withRetry(() => client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: `You are a celebrity lookalike matcher. Match faces based ONLY on shared physical features (face shape, jaw, cheekbones, brow, nose, eyes, lips). NEVER use ethnicity, race, or fame as a matching shortcut. Output ONLY valid JSON — no markdown, no explanations.`,
+      messages: [{
+        role: 'user',
+        content: `Face descriptors:\n${JSON.stringify(faceDescriptors, null, 2)}\n\nCandidate pool:\n${poolText}\n\nPick the single best matching candidate from the pool per category. Return 1 to 3 total matches (only include a match if it is genuinely similar). Output a JSON array of objects, each with: celebrity (string), category (string), matchStrength ("strong" or "moderate"), shared_traits (one sentence referencing specific physical features from the descriptors). Example: [{"celebrity":"Henry Cavill","category":"mainstream_celebrity","matchStrength":"strong","shared_traits":"Shares a square jaw, defined cheekbones, and deep-set eyes."}]`,
+      }],
+    }), 'claude-celeb-B')
+
+    let matches = JSON.parse(callB.content[0].text.trim())
+    if (!Array.isArray(matches)) matches = [matches]
+    matches = matches.slice(0, 3)
+    console.log(`[CELEB][tier=claude-fallback] Call B matches: ${matches.map(m => m.celebrity).join(', ')}`)
+
+    const mapped = matches.map(m => ({
+      celebrity:     m.celebrity,
+      profession:    m.category === 'model' ? 'Model' : m.category === 'streamer' ? 'Streamer' : m.category === 'tiktok_influencer' ? 'TikTok Influencer' : 'Celebrity',
+      similarity:    0,
+      shared_traits: m.shared_traits || 'Shared facial features',
+      matchStrength: m.matchStrength || 'moderate',
+      source:        'claude',
+      category:      m.category,
+    }))
+
+    while (mapped.length < 3) mapped.push(NO_MATCH)
+    return { match1: mapped[0], match2: mapped[1], match3: mapped[2] }
+  } catch (err) {
+    console.error('[CELEB][tier=claude-fallback] Call B failed:', err.message)
+    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
+  }
+}
+
 // Known-female celebrity names drawn from our own CELEB_POOLS female list.
 // Used to filter cross-gender Rekognition results without an external lookup.
 const KNOWN_FEMALE_CELEBS = new Set([
@@ -449,22 +547,21 @@ const KNOWN_FEMALE_CELEBS = new Set([
   'Valkyrae','Liza Koshy','Lilly Singh','Rachel Zegler','Haifa Wehbe',
 ])
 
-// ── CALL 3 (parallel): Celebrity Lookalike via AWS Rekognition ────────────────
-// Rekognition is the only path. No Claude fallback.
+// ── CALL 3 (parallel): Celebrity Lookalike via AWS Rekognition → Claude fallback
 async function getCelebrityMatch(faceBase64, gender = 'male') {
   const isFemale = gender === 'female'
   let rekogFaces = []
   try {
     rekogFaces = await withRetry(() => rekognizeImage(faceBase64), 'rekognition')
-    console.log(`[CELEB] Rekognition returned ${rekogFaces.length} matches`)
+    console.log(`[CELEB][tier=rekognition] Rekognition returned ${rekogFaces.length} matches`)
   } catch (err) {
-    console.warn(`[CELEB] Rekognition failed: ${err.message}`)
-    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
+    console.warn(`[CELEB][tier=rekognition] Rekognition failed: ${err.message} — falling back to Claude`)
+    return getCelebrityMatchClaude(faceBase64)
   }
 
   if (rekogFaces.length === 0) {
-    console.log('[CELEB] Rekognition returned 0 matches')
-    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
+    console.log('[CELEB][tier=rekognition] Rekognition returned 0 matches — falling back to Claude')
+    return getCelebrityMatchClaude(faceBase64)
   }
 
   // Filter cross-gender matches. For male users, exclude names we know are female.
@@ -489,7 +586,7 @@ async function getCelebrityMatch(faceBase64, gender = 'male') {
 
   while (mapped.length < 3) mapped.push(NO_MATCH)
 
-  console.log(`[CELEB] Final matches: ${mapped.map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')}`)
+  console.log(`[CELEB][tier=rekognition] Final matches: ${mapped.map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')}`)
   return { match1: mapped[0], match2: mapped[1], match3: mapped[2] }
 }
 
