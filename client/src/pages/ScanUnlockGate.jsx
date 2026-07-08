@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { checkTrialEligibility, isNative } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
   Lock, Sparkles, Star, Eye, Zap, BarChart2, Smile, Dumbbell, Brain,
@@ -679,7 +680,7 @@ const SLIDE_VARIANTS = {
   exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, trialEligibility = {} }) {
   const [cardIdx, setCardIdx]   = useState(0)
   const [direction, setDirection] = useState(1)
   const touchStartX = useRef(null)
@@ -774,19 +775,31 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing 
         className="flex flex-col gap-2.5 px-6 flex-shrink-0"
         style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))', paddingTop: 8 }}
       >
-        <motion.button
-          whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={onAscend}
-          disabled={isPurchasing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
-          style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-        >
-          {isPurchasing
-            ? <Loader2 size={16} className="animate-spin" />
-            : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
-          }
-          {isPurchasing ? 'Processing…' : 'Unlock Full Results'}
-        </motion.button>
+        {(() => {
+          const trialReady = trialEligibility.monthly === 'eligible' || trialEligibility.yearly === 'eligible'
+          return (
+            <>
+              <motion.button
+                whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+                onClick={onAscend}
+                disabled={isPurchasing}
+                className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
+                style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+              >
+                {isPurchasing
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+                }
+                {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
+              </motion.button>
+              {trialReady && !isPurchasing && (
+                <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
+                  3 days free, then $7.99/mo or $49.99/yr · Cancel anytime
+                </p>
+              )}
+            </>
+          )
+        })()}
 
         <button
           onClick={onInvite}
@@ -1031,6 +1044,7 @@ export default function ScanUnlockGate() {
   const [showReveal, setShowReveal]     = useState(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
+  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
 
   useEffect(() => {
     if (isPremium) navigate('/results', { replace: true })
@@ -1044,6 +1058,9 @@ export default function ScanUnlockGate() {
     if (!currentScan || isPremium) return
     api.referral.count()
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
+      .catch(() => {})
+    checkTrialEligibility()
+      .then(result => setTrialEligibility(result))
       .catch(() => {})
   }, [])
 
@@ -1067,6 +1084,7 @@ export default function ScanUnlockGate() {
         onInvite={() => setShowInvite(true)}
         onPromo={() => setShowPromo(true)}
         isPurchasing={false}
+        trialEligibility={trialEligibility}
       />
 
       <AnimatePresence>

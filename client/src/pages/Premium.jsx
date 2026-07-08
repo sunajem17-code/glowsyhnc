@@ -320,22 +320,10 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {(() => {
-            if (subscribingNow) return 'Opening checkout…'
-            const eligible = trialEligibility[plan] === 'eligible'
-            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial — then $49.99/yr' : 'Start 3-Day Free Trial — then $7.99/mo'
-            return plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'
-          })()}
+          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
-          {trialEligibility[plan] === 'eligible'
-            ? plan === 'yearly'
-              ? '3-day free trial, then $49.99/year. Auto-renews unless cancelled before trial ends.'
-              : '3-day free trial, then $7.99/month. Auto-renews unless cancelled before trial ends.'
-            : plan === 'yearly'
-              ? 'Billed annually · Cancel anytime'
-              : 'Billed monthly · Cancel anytime'
-          }
+          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
         </p>
 
         {checkoutError && (
@@ -567,8 +555,23 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
+          {(() => {
+            if (subscribingNow) return 'Opening checkout…'
+            const eligible = trialEligibility[plan] === 'eligible'
+            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial — then $49.99/yr' : 'Start 3-Day Free Trial — then $7.99/mo'
+            return plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'
+          })()}
         </motion.button>
+        <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
+          {trialEligibility[plan] === 'eligible'
+            ? plan === 'yearly'
+              ? '3-day free trial, then $49.99/year. Auto-renews unless cancelled before trial ends.'
+              : '3-day free trial, then $7.99/month. Auto-renews unless cancelled before trial ends.'
+            : plan === 'yearly'
+              ? 'Billed annually · Cancel anytime'
+              : 'Billed monthly · Cancel anytime'
+          }
+        </p>
 
         {/* Apple IAP required disclosure */}
         <div className="mt-2 mb-4 px-1 space-y-1">
