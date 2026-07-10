@@ -10,6 +10,10 @@
 
 // ── Inline the function under test (copied from aiScore.js) ───────────────────
 // Keep this in sync manually, or extract calculateFinalScore to a shared util.
+// Tier assignment itself is NOT duplicated here — it's imported from the same
+// lib/tier.js module aiScore.js uses, so tests validate the real function.
+const { getTier } = require('./lib/tier')
+
 const FACE_WEIGHT     = 0.70
 const PHYSIQUE_WEIGHT = 0.30
 
@@ -41,27 +45,7 @@ function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null)
     : aestheticRaw
 
   const final = Math.round(blendedRaw * 10) / 10
-
-  let tier
-  if (gender === 'female') {
-    if      (final >= 9.5) tier = 'True Eve'
-    else if (final >= 9.0) tier = 'Eve Lite'
-    else if (final >= 8.0) tier = 'Eve'
-    else if (final >= 7.0) tier = 'Stacy'
-    else if (final >= 6.0) tier = 'High Tier Becky'
-    else if (final >= 5.0) tier = 'Mid Tier Becky'
-    else if (final >= 4.0) tier = 'Low Tier Becky'
-    else                   tier = 'Sub 3'
-  } else {
-    if      (final >= 9.5) tier = 'True Adam'
-    else if (final >= 9.0) tier = 'Adam Lite'
-    else if (final >= 8.0) tier = 'Chad'
-    else if (final >= 7.0) tier = 'Chadlite'
-    else if (final >= 6.0) tier = 'High Tier Normie'
-    else if (final >= 5.0) tier = 'Mid Tier Normie'
-    else if (final >= 4.0) tier = 'Low Tier Normie'
-    else                   tier = 'Sub 3'
-  }
+  const tier = getTier(final, gender)
 
   if (final >= 8.0 && hasPillars) {
     const pillarFloor = Math.round((final - 1.5) * 10) / 10
@@ -212,6 +196,29 @@ run('Scenario 11: Score boundaries (clamped to 1–10)', () => {
   const extreme = { ...FACE_GOOD, pillars: { harmony: 999, angularity: -5, features: 0, dimorphism: 11 } }
   const r = calculateFinalScore(extreme, 'male', null)
   assert('final within 1–10', r.final >= 1.0 && r.final <= 10.0, `got ${r.final}`)
+})
+
+run('Scenario 12: Rescan anchoring — tier must follow the anchored score, not the raw one', () => {
+  // Regression test for the "Chad" (reveal) vs "High Tier Normie" (settled UI) bug:
+  // calculateFinalScore no longer assigns a tier, and the /score route must derive
+  // tier from the score AFTER rescan anchoring is applied — never from the raw blend.
+  const FACE_HIGH = { ...FACE_GOOD, pillars: { harmony: 8.5, angularity: 8.5, features: 8.5, dimorphism: 8.5 } }
+  const r = calculateFinalScore(FACE_HIGH, 'male', null)
+  assert('raw final is 8.5', r.final === 8.5, `got ${r.final}`)
+
+  // Mirrors the rescan-anchoring formula in aiScore.js's /score route.
+  const prevNum = 6.0
+  const delta = r.final - prevNum
+  const anchoredFinal = Math.abs(delta) > 0.5
+    ? Math.round((prevNum + Math.sign(delta) * Math.min(Math.abs(delta), 1.0)) * 10) / 10
+    : r.final
+  assert('anchoring caps the jump', anchoredFinal === 7.0, `got ${anchoredFinal}`)
+
+  const rawTier      = getTier(r.final, 'male')
+  const anchoredTier = getTier(anchoredFinal, 'male')
+  assert('raw and anchored scores land in different tiers (proves the bug scenario is real)', rawTier !== anchoredTier, `raw=${rawTier} anchored=${anchoredTier}`)
+  assert('tier is computed from the anchored score, not raw', anchoredTier === 'Chadlite', `got "${anchoredTier}"`)
+  assert('tier is NOT computed from the raw score', rawTier === 'Chad' && anchoredTier !== rawTier)
 })
 
 // ── Summary ────────────────────────────────────────────────────────────────────

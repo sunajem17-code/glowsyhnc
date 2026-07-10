@@ -6,6 +6,7 @@ const fs = require('fs')
 const { RekognitionClient, RecognizeCelebritiesCommand } = require('@aws-sdk/client-rekognition')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
+const { getTier } = require('../lib/tier')
 
 // ── AWS Rekognition client ────────────────────────────────────────────────────
 function getRekognitionClient() {
@@ -632,33 +633,10 @@ function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null)
 
   const final = Math.round(blendedRaw * 10) / 10
 
-  // Tier assignment — exact ranges, gender-aware
-  // MALE:   Sub 3 (<4) · Low Tier Normie (4–4.9) · Mid Tier Normie (5–5.9)
-  //         High Tier Normie (6–6.9) · Chadlite (7–7.9) · Chad (8–8.9)
-  //         Adam Lite (9–9.4) · True Adam (9.5–10)
-  // FEMALE: Sub 3 (<4) · Low Tier Becky (4–4.9) · Mid Tier Becky (5–5.9)
-  //         High Tier Becky (6–6.9) · Stacy (7–7.9) · Eve (8–8.9)
-  //         Eve Lite (9–9.4) · True Eve (9.5–10)
-  let tier
-  if (gender === 'female') {
-    if      (final >= 9.5) tier = 'True Eve'
-    else if (final >= 9.0) tier = 'Eve Lite'
-    else if (final >= 8.0) tier = 'Eve'
-    else if (final >= 7.0) tier = 'Stacy'
-    else if (final >= 6.0) tier = 'High Tier Becky'
-    else if (final >= 5.0) tier = 'Mid Tier Becky'
-    else if (final >= 4.0) tier = 'Low Tier Becky'
-    else                   tier = 'Sub 3'
-  } else {
-    if      (final >= 9.5) tier = 'True Adam'
-    else if (final >= 9.0) tier = 'Adam Lite'
-    else if (final >= 8.0) tier = 'Chad'
-    else if (final >= 7.0) tier = 'Chadlite'
-    else if (final >= 6.0) tier = 'High Tier Normie'
-    else if (final >= 5.0) tier = 'Mid Tier Normie'
-    else if (final >= 4.0) tier = 'Low Tier Normie'
-    else                   tier = 'Sub 3'
-  }
+  // NOTE: tier is intentionally NOT computed here. `final` at this point is the
+  // raw blended score, before rescan anchoring is applied by the caller. Tier
+  // must be derived from the anchored score the user actually sees — see
+  // getTier() call in the /score route, after anchoring is resolved.
 
   // Pillar floor rule: when overall >= 8.0, no individual pillar can be more than
   // 1.5 points below the overall score. Prevents contradictory displays
@@ -671,7 +649,7 @@ function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null)
     dimorphism = Math.max(dimorphism, pillarFloor)
   }
 
-  return { final, tier, faceScore, faceOnlyScore: Math.round(aestheticRaw * 10) / 10, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
+  return { final, faceScore, faceOnlyScore: Math.round(aestheticRaw * 10) / 10, groomingScore, harmony, angularity, features, dimorphism, hasPillars }
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -791,8 +769,8 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     }
 
     // Final score: pure code — no AI involvement (computedScores already calculated above)
-    const { final: rawFinal, tier, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
-    console.log('[aiScore] Final:', rawFinal, tier, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
+    const { final: rawFinal, faceScore, faceOnlyScore, groomingScore, harmony, angularity, features, dimorphism, hasPillars } = computedScores
+    console.log('[aiScore] Final:', rawFinal, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
 
     // Rescan anchoring — cap score movement at ±1.0 per rescan to prevent
@@ -808,6 +786,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         console.log(`[aiScore] Rescan anchoring: raw=${rawFinal} prev=${prevNum} anchored=${final}`)
       }
     }
+
+    // Tier MUST be derived from the anchored `final` — this is the same score
+    // returned as overallScore below and what every screen displays. Computing
+    // tier from rawFinal here previously caused the reveal animation (which used
+    // this tier string) to show a different label than screens that recomputed
+    // tier client-side from the anchored score.
+    const tier = getTier(final, gender)
+    console.log('[aiScore] Tier:', tier)
 
     const faceSub = faceResult.sub_scores || {}
     const r = (v) => v != null ? Math.round(Number(v) * 10) / 10 : null

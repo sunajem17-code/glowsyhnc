@@ -54,6 +54,8 @@ function AnimatedNumber({ target }) {
 export default function UMaxScoreBadge({ umaxScore, gender = 'male', showScale = false, size = 'large' }) {
   const [scaleOpen, setScaleOpen] = useState(false)
   const tier = getTier(umaxScore, gender)
+  // TEMP TRACE — remove after tier-consistency verification is done.
+  console.log('[TIER-TRACE] UMaxScoreBadge (settled UI) recomputed tier:', { umaxScore, gender, tierLabel: tier?.label })
 
   // If score is invalid or tier could not be determined, show a safe fallback card
   const isValidScore = umaxScore !== null && umaxScore !== undefined && !isNaN(umaxScore)

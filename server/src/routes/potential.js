@@ -6,6 +6,7 @@
 const express   = require('express')
 const Anthropic  = require('@anthropic-ai/sdk')
 const { verifyToken, requirePro, claudeLimit } = require('../middleware/claudeGate')
+const { MALE_TIERS: MALE_TIER_TABLE, FEMALE_TIERS: FEMALE_TIER_TABLE } = require('../lib/tier')
 
 const router = express.Router()
 
@@ -52,10 +53,10 @@ router.post('/analyze', verifyToken, requirePro, claudeLimit, async (req, res) =
 
   const isFemale = gender === 'female'
 
-  // Only include tiers strictly ABOVE the current tier so potential never goes down
-  const MALE_TIERS   = ['Sub 3', 'Low Tier Normie', 'Mid Tier Normie', 'High Tier Normie', 'Chadlite', 'Chad', 'Adam Lite', 'True Adam']
-  const FEMALE_TIERS = ['Sub 3', 'Low Tier Becky', 'Mid Tier Becky', 'High Tier Becky', 'Stacy', 'Eve', 'Eve Lite', 'True Eve']
-  const allTiers = isFemale ? FEMALE_TIERS : MALE_TIERS
+  // Only include tiers strictly ABOVE the current tier so potential never goes down.
+  // Labels come from the shared tier table (lib/tier.js), lowest-first — it's
+  // ordered highest-first for score lookup, so reverse it here.
+  const allTiers = (isFemale ? FEMALE_TIER_TABLE : MALE_TIER_TABLE).map(t => t.label).reverse()
   const currentIdx = currentTier ? allTiers.findIndex(t => t.toLowerCase() === currentTier.toLowerCase()) : -1
   // Potential must be at least one tier above current; if already at top, keep same tier
   const minIdx = Math.max(currentIdx, 0)

@@ -535,10 +535,13 @@ export default function Scan() {
         clearInterval(stageTimer)
         clearTimeout(slowTimer)
         setSlowAnalysis(false)
-        const demoScore = 6.8 + (Math.random() - 0.5) * 0.6
+        // Round first, then derive tier from the SAME rounded value used for
+        // overallScore — computing tier from the unrounded score can land it
+        // on the wrong side of a threshold vs. the rounded score shown elsewhere.
+        const demoScore = Math.round((6.8 + (Math.random() - 0.5) * 0.6) * 10) / 10
         const demoTier  = getTier(demoScore, g)
         aiResult = {
-          overallScore:    Math.round(demoScore * 10) / 10,
+          overallScore:    demoScore,
           faceScore:       Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
           faceOnlyScore:   Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
           groomingScore:   Math.round((6.5 + Math.random()) * 10) / 10,
@@ -585,6 +588,12 @@ export default function Scan() {
             setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
           )
           aiResult = await Promise.race([scoreCall, timeoutCall])
+          // TEMP TRACE — remove after tier-consistency verification is done.
+          console.log('[TIER-TRACE] scan result from server:', {
+            previousScore: lastGlowScore,
+            overallScore:  aiResult?.overallScore,
+            tier:          aiResult?.tier,
+          })
         } finally {
           clearInterval(stageTimer)
           clearTimeout(slowTimer)

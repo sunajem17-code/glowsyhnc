@@ -1339,6 +1339,8 @@ export default function Results() {
 
   const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches } = currentScan
   const glowScore = currentScan.glowScore != null ? (currentScan.glowScore > 10 ? Math.round(currentScan.glowScore) / 10 : currentScan.glowScore) : null
+  // TEMP TRACE — remove after tier-consistency verification is done.
+  console.log('[TIER-TRACE] Results.jsx currentScan fields:', { umaxScore, glowScore, tierUsedByReveal: tier, gender })
   const pillars = scanPillars ?? aiScore?.pillars ?? null
   const physiqueScore = currentScan.physiqueScore ?? aiScore?.physiqueScore ?? null
 
