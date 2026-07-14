@@ -40,6 +40,7 @@ const useStore = create(
         gender: null,
         userProfile: null,
         legalConsented: false,
+        hasSeenFeatureTour: false,
         // age gate is device-level, intentionally NOT reset on logout
       }),
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
@@ -87,6 +88,12 @@ const useStore = create(
       hasOnboarded: false,
       setHasOnboarded: () => set({ hasOnboarded: true }),
       resetOnboarding: () => set({ hasOnboarded: false }),
+
+      // Post-onboarding feature tour — shown once, right after a user's first
+      // scan. Gated in App.jsx alongside a session flag so pre-existing users
+      // (onboarded before this shipped) never see it retroactively.
+      hasSeenFeatureTour: false,
+      setHasSeenFeatureTour: () => set({ hasSeenFeatureTour: true }),
 
       // Legal consent (age gate + AI/biometric consent)
       legalConsented: false,
@@ -273,6 +280,7 @@ const useStore = create(
         streak: state.streak,
         theme: state.theme,
         hasOnboarded: state.hasOnboarded,
+        hasSeenFeatureTour: state.hasSeenFeatureTour,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,
         ageConfirmedAt: state.ageConfirmedAt,

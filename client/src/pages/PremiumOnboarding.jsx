@@ -14,20 +14,51 @@ import { assignPhase } from '../utils/phase'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { getDeviceId } from '../utils/deviceId'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { JUST_ONBOARDED_KEY } from '../utils/tourFlags'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const G = '#C6A85C'
+const G = GOLD
 const G_DIM = 'rgba(198,168,92,0.10)'
 const G_BORDER = 'rgba(198,168,92,0.28)'
 const BG = '#080808'
 const SURFACE = '#111111'
 const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = '#F0EDE8'
-const DIM = 'rgba(255,255,255,0.35)'
+const DIM = 'rgba(255,255,255,0.5)'  // 5.3:1 against BG — 0.35 measured ~3.1:1, under the 4.5:1 body-text floor
 
 // Steps: 0=intro, 1=welcome, 2=signup, 3=consent, 4=gender, 5=goal, 6=heightweight, 7=scan
 //         8=locked-reveal, 9=phase, 10=transformation, 11=rating
 // Progress counter: only during data-collection steps (2–7)
+
+// Draft persistence: survives a refresh/backgrounding mid-quiz. Session-scoped
+// (not localStorage) and excludes password fields so nothing sensitive lingers.
+const DRAFT_KEY = 'ascendus_onboarding_draft'
+
+function loadDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(draft) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // storage unavailable (private browsing, quota) — fail silently, non-critical
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // ignore
+  }
+}
 
 const pageVariants = {
   enter: (dir) => ({ x: dir > 0 ? 48 : -48, opacity: 0 }),
@@ -41,6 +72,7 @@ function BackBtn({ onBack }) {
   return (
     <button
       onClick={onBack}
+      aria-label="Go back"
       className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
       style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
@@ -59,7 +91,7 @@ function GoldBtn({ label, onClick, disabled, loading }) {
       style={{
         background: disabled || loading
           ? 'rgba(198,168,92,0.22)'
-          : `linear-gradient(135deg, #D4B96A 0%, ${G} 50%, #A8893A 100%)`,
+          : GOLD_GRADIENT,
         color: disabled || loading ? 'rgba(255,255,255,0.25)' : '#0A0A0A',
         boxShadow: disabled || loading ? 'none' : `0 4px 20px rgba(198,168,92,0.25)`,
         letterSpacing: '0.01em',
@@ -158,6 +190,29 @@ function Slider({ label, unit, value, displayValue, min, max, step = 1, onChange
     dragging.current = false
   }
 
+  function onKeyDown(e) {
+    const big = (max - min) / 20 || step
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      onChange(Math.min(max, Math.round((value + step) / step) * step))
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      onChange(Math.max(min, Math.round((value - step) / step) * step))
+    } else if (e.key === 'PageUp') {
+      e.preventDefault()
+      onChange(Math.min(max, Math.round((value + big) / step) * step))
+    } else if (e.key === 'PageDown') {
+      e.preventDefault()
+      onChange(Math.max(min, Math.round((value - big) / step) * step))
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      onChange(min)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      onChange(max)
+    }
+  }
+
   return (
     <div className="mb-6">
       <div className="flex items-baseline justify-between mb-4">
@@ -172,12 +227,20 @@ function Slider({ label, unit, value, displayValue, min, max, step = 1, onChange
       {/* Track — pointer events handle both touch and mouse */}
       <div
         ref={trackRef}
-        className="relative flex items-center select-none"
+        role="slider"
+        tabIndex={0}
+        aria-label={label}
+        aria-valuenow={value}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuetext={`${displayValue ?? value}${unit || ''}`}
+        className="relative flex items-center select-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A85C] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080808]"
         style={{ height: 48, touchAction: 'none', cursor: 'pointer' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onKeyDown={onKeyDown}
       >
         {/* Background track */}
         <div className="absolute inset-x-0 rounded-full" style={{ height: 4, background: 'rgba(255,255,255,0.08)' }} />
@@ -421,6 +484,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
                 value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 style={{ ...inputStyle, paddingRight: 48 }} required />
               <button type="button" onClick={() => setShowPw(v => !v)}
+                aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
                 className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -534,6 +598,7 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
                 value={data.password || ''} onChange={e => onChange('password', e.target.value)}
                 style={{ ...inputStyle, paddingRight: 48 }} />
               <button type="button" onClick={() => setShowPw(v => !v)}
+                aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
                 className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -548,6 +613,7 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
                   borderColor: data.confirmPassword && data.password !== data.confirmPassword ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.12)',
                 }} />
               <button type="button" onClick={() => setShowConfirm(v => !v)}
+                aria-label={showConfirm ? 'Hide password' : 'Show password'} aria-pressed={showConfirm}
                 className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
                 {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -672,7 +738,7 @@ function StepGender({ data, onChange, onNext, onBack }) {
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => onChange('gender', 'male')}
-            className="flex flex-col items-center py-10 rounded-3xl transition-all duration-150"
+            className="flex flex-col items-center py-10 rounded-2xl transition-all duration-150"
             style={{
               background: isMale ? 'rgba(37,99,235,0.12)' : SURFACE,
               border: `2px solid ${isMale ? '#3B82F6' : BORDER}`,
@@ -687,7 +753,7 @@ function StepGender({ data, onChange, onNext, onBack }) {
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => onChange('gender', 'female')}
-            className="flex flex-col items-center py-10 rounded-3xl transition-all duration-150"
+            className="flex flex-col items-center py-10 rounded-2xl transition-all duration-150"
             style={{
               background: isFemale ? 'rgba(236,72,153,0.10)' : SURFACE,
               border: `2px solid ${isFemale ? '#EC4899' : BORDER}`,
@@ -1514,7 +1580,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
             <>
               <div className="relative w-20 h-20">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(201,168,76,0.2)" strokeWidth="4" />
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(198,168,92,0.2)" strokeWidth="4" />
                   <circle cx="32" cy="32" r="28" fill="none" stroke="#C6A85C" strokeWidth="4" strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 28}`}
                     strokeDashoffset={`${2 * Math.PI * 28 * (retryCountdown / 30)}`}
@@ -1532,7 +1598,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
               <button
                 onClick={() => { setRateLimited(false); runAnalysisWithData(facePhoto, retrySideRef.current) }}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
-                style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}>
+                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}>
                 Retry Now
               </button>
             </>
@@ -1543,7 +1609,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
               <button
                 onClick={() => { setError(''); runAnalysisWithData(facePhoto, retrySideRef.current) }}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
-                style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}>
+                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}>
                 Try Again
               </button>
               <button
@@ -1720,7 +1786,7 @@ function StepLockedReveal({ onContinue }) {
               if (info.offset.x < -60 && cardIdx < cards.length - 1) setCardIdx(i => i + 1)
               if (info.offset.x > 60 && cardIdx > 0) setCardIdx(i => i - 1)
             }}
-            className="rounded-3xl p-8 flex flex-col items-center text-center mb-6 cursor-grab active:cursor-grabbing select-none"
+            className="rounded-2xl p-8 flex flex-col items-center text-center mb-6 cursor-grab active:cursor-grabbing select-none"
             style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.22)', minHeight: 220 }}
           >
             <div className="mb-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.28)' }}>
@@ -1764,7 +1830,7 @@ function StepLockedReveal({ onContinue }) {
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate('/unlock')}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2"
-          style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${G} 50%, #A8893A 100%)`, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
           <Lock size={16} style={{ color: '#0A0A0A' }} /> Unlock Results Now
         </motion.button>
@@ -1785,9 +1851,12 @@ function StepLockedReveal({ onContinue }) {
 //        6=height, 7=weight, 8=bmi, 9=experience, 10=phase
 
 // ── Intro Slides ─────────────────────────────────────────────────────────────
-const SLIDE_GOLD = '#C9A84C'
-const SLIDE_GOLD_DIM = 'rgba(201,168,76,0.12)'
-const SLIDE_GOLD_BORDER = 'rgba(201,168,76,0.28)'
+// Was a separate, drifted gold (#C9A84C) — this is a dead-code path today
+// (IntroSlides is never reached, see `introDone` default below) but fixing
+// the color anyway since it's cheap and the file's already being touched.
+const SLIDE_GOLD = GOLD
+const SLIDE_GOLD_DIM = G_DIM
+const SLIDE_GOLD_BORDER = G_BORDER
 
 function Slide1() {
   const stats = [
@@ -1938,7 +2007,7 @@ function Slide3() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="flex-1 rounded-xl px-2 py-3 flex flex-col items-center gap-1"
-            style={{ background: '#0A0A0A', border: `0.5px solid rgba(201,168,76,0.25)` }}
+            style={{ background: '#0A0A0A', border: `0.5px solid rgba(198,168,92,0.25)` }}
           >
             <span className="font-heading font-bold text-[18px] leading-none" style={{ color: SLIDE_GOLD }}>{num}</span>
             <p className="font-body text-[10px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.45)' }}>{label}</p>
@@ -2019,8 +2088,8 @@ function IntroSlides({ onDone }) {
             color: '#000000',
             borderRadius: slide < total - 1 ? 16 : 12,
             boxShadow: slide < total - 1
-              ? '0 4px 20px rgba(201,168,76,0.3)'
-              : '0 2px 12px rgba(201,168,76,0.5)',
+              ? '0 4px 20px rgba(198,168,92,0.3)'
+              : '0 2px 12px rgba(198,168,92,0.5)',
             letterSpacing: '0.02em',
           }}
         >
@@ -2050,10 +2119,15 @@ export default function PremiumOnboarding() {
   const setLastScanDate    = useStore(s => s.setLastScanDate)
   const incrementScanCount = useStore(s => s.incrementScanCount)
 
+  // Restore an in-progress draft (unauthenticated only — an authenticated user
+  // always starts fresh at Consent) so a refresh/backgrounding mid-quiz doesn't
+  // silently discard answers already entered.
+  const draft = isAuthenticated ? null : loadDraft()
+
   // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
   const [introDone, setIntroDone] = useState(true)
   // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
-  const [step, setStep] = useState(isAuthenticated ? 3 : 0)
+  const [step, setStep] = useState(isAuthenticated ? 3 : (draft?.step ?? 0))
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -2064,11 +2138,20 @@ export default function PremiumOnboarding() {
     gender: '', goal: '',
     improvementFocus: [],
     height: 175, weight: 75,
+    ...draft?.formData,
   })
 
   const [checks, setChecks] = useState({
     legalAgeConsent: false, aiConsent: false, disclaimer: false,
+    ...draft?.checks,
   })
+
+  // Persist a draft on every change (password fields excluded on purpose).
+  useEffect(() => {
+    if (isAuthenticated) return
+    const { password, confirmPassword, ...safeFormData } = formData
+    saveDraft({ step, formData: safeFormData, checks })
+  }, [step, formData, checks, isAuthenticated])
 
   function updateField(key, value) {
     if (key === '_units') {
@@ -2091,6 +2174,11 @@ export default function PremiumOnboarding() {
   }
 
   function finish(destination = '/') {
+    clearDraft()
+    // Defensive — handleScanDone() above is the normal completion path and
+    // already sets this, but this covers finish() too in case it's ever
+    // reached directly.
+    try { sessionStorage.setItem(JUST_ONBOARDED_KEY, '1') } catch {}
     const phase = calculatePhase(formData.goal, formData.height, formData.weight)
     setUserProfile({
       height: formData.height,
@@ -2159,7 +2247,10 @@ export default function PremiumOnboarding() {
 
       // flushSync ensures hasOnboarded=true is committed to the React tree before
       // navigate fires — otherwise /unlock is caught by the * wildcard (PremiumOnboarding)
-      // because the route only exists in the hasOnboarded=true branch of App.jsx
+      // because the route only exists in the hasOnboarded=true branch of App.jsx.
+      // This is the one reliable "onboarding just completed" moment for a normal
+      // first-time user, so it's also where the Feature Tour gate gets armed.
+      try { sessionStorage.setItem(JUST_ONBOARDED_KEY, '1') } catch {}
       console.log('[SCAN DONE] calling flushSync + setHasOnboarded')
       flushSync(() => { setHasOnboarded() })
       console.log('[SCAN DONE] flushSync done, calling navigate /unlock')

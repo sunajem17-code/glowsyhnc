@@ -11,8 +11,10 @@ import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import Auth from './pages/Auth'
 import PremiumSplash from './pages/PremiumSplash'
+import { JUST_ONBOARDED_KEY } from './utils/tourFlags'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
+const FeatureTour    = lazy(() => import('./pages/FeatureTour/FeatureTour'))
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
 const Scan           = lazy(() => import('./pages/Scan'))
 const Results        = lazy(() => import('./pages/Results'))
@@ -44,14 +46,16 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const theme            = useStore(s => s.theme)
-  const hasOnboarded     = useStore(s => s.hasOnboarded)
-  const isAuthenticated  = useStore(s => s.isAuthenticated)
-  const isPremium        = useStore(s => s.isPremium)
-  const userId           = useStore(s => s.user?.id)
-  const checkProTrial    = useStore(s => s.checkProTrial)
-  const refreshProStatus = useStore(s => s.refreshProStatus)
-  const logout           = useStore(s => s.logout)
+  const theme               = useStore(s => s.theme)
+  const hasOnboarded        = useStore(s => s.hasOnboarded)
+  const hasSeenFeatureTour  = useStore(s => s.hasSeenFeatureTour)
+  const setHasSeenFeatureTour = useStore(s => s.setHasSeenFeatureTour)
+  const isAuthenticated     = useStore(s => s.isAuthenticated)
+  const isPremium           = useStore(s => s.isPremium)
+  const userId              = useStore(s => s.user?.id)
+  const checkProTrial       = useStore(s => s.checkProTrial)
+  const refreshProStatus    = useStore(s => s.refreshProStatus)
+  const logout              = useStore(s => s.logout)
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -112,6 +116,11 @@ export default function App() {
     setProSplashDone(true)
   }, [])
 
+  const handleTourDone = useCallback(() => {
+    setHasSeenFeatureTour()
+    sessionStorage.removeItem(JUST_ONBOARDED_KEY)
+  }, [setHasSeenFeatureTour])
+
   // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
     return <Splash onDone={handleSplashDone} />
@@ -123,6 +132,22 @@ export default function App() {
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
       </AnimatePresence>
+    )
+  }
+
+  // ── GATE 3: Feature Tour ─────────────────────────────────────────
+  // Plays once, right after a user's first onboarding completes (see
+  // JUST_ONBOARDED_KEY above) — never on a normal login.
+  if (
+    isAuthenticated &&
+    hasOnboarded &&
+    !hasSeenFeatureTour &&
+    sessionStorage.getItem(JUST_ONBOARDED_KEY) === '1'
+  ) {
+    return (
+      <Suspense fallback={<div className="min-h-screen" style={{ background: '#080808' }} />}>
+        <FeatureTour onDone={handleTourDone} />
+      </Suspense>
     )
   }
 
