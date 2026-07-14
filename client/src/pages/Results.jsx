@@ -1358,7 +1358,7 @@ export default function Results() {
     )
   }
 
-  const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches } = currentScan
+  const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars, celebrityMatches, celebrityStatus } = currentScan
   const glowScore = currentScan.glowScore != null ? (currentScan.glowScore > 10 ? Math.round(currentScan.glowScore) / 10 : currentScan.glowScore) : null
   // TEMP TRACE — remove after tier-consistency verification is done.
   console.log('[TIER-TRACE] Results.jsx currentScan fields:', { umaxScore, glowScore, tierUsedByReveal: tier, gender })
@@ -2517,7 +2517,19 @@ export default function Results() {
       {/* ── Celebrity Lookalikes ──────────────────────────────────── */}
       <Section title="Celebrity Lookalikes" icon={<Star size={16} style={{ color: '#C6A85C', fill: '#C6A85C' }} />} defaultOpen={false}>
         <div className="space-y-0">
-          {resolvedMatches.every(m => !m.similarity || m.celebrity === 'No close match found') ? (
+          {celebrityStatus === 'pending' ? (
+            <div className="space-y-2.5 py-1" aria-live="polite" aria-busy="true">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="flex items-center gap-3 py-1.5">
+                  <div className="w-9 h-9 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'rgba(198,168,92,0.12)' }} />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-28 rounded-full animate-pulse" style={{ background: 'rgba(198,168,92,0.12)' }} />
+                    <div className="h-2 w-40 rounded-full animate-pulse" style={{ background: 'rgba(198,168,92,0.08)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : resolvedMatches.every(m => !m.similarity || m.celebrity === 'No close match found') ? (
             <div className="py-4 flex flex-col items-center gap-1.5 text-center">
               <p className="text-sm font-heading font-bold text-primary">No celebrity match found</p>
               <p className="text-[11px] font-body text-secondary">Try a clearer, front-facing photo for better matching.</p>

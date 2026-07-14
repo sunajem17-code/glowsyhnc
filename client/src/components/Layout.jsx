@@ -42,7 +42,7 @@ export default function Layout() {
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="h-full"
           >
             {outlet}

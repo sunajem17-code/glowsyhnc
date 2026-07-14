@@ -129,6 +129,7 @@ export const api = {
   },
   ai: {
     score: (data) => request('/ai/score', { method: 'POST', body: JSON.stringify(data) }),
+    scoreEnrich: (data) => request('/ai/score/enrich', { method: 'POST', body: JSON.stringify(data) }),
     workoutPlan: (data) => request('/ai/workout-plan', { method: 'POST', body: JSON.stringify(data) }),
   },
   coach: {

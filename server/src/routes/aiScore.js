@@ -31,6 +31,19 @@ const scoreCache = new Map()
 // (cache is in-memory only anyway — this is a no-op on fresh process starts)
 scoreCache.clear()
 
+// ── Celebrity cache: hash(face+gender) → celebrity match result ────────────────
+// Separate from scoreCache since celebrity match is now resolved by a later,
+// independent request (POST /score/enrich) — see that route below.
+const celebCache = new Map()
+celebCache.clear()
+
+function hashFaceForCeleb(faceB64, gender) {
+  return crypto.createHash('sha256')
+    .update(sampleB64(faceB64) + '||gender=' + gender)
+    .digest('hex')
+    .slice(0, 24)
+}
+
 function sampleB64(s) {
   if (!s) return 'null'
   const mid = Math.floor(s.length / 2)
@@ -703,7 +716,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     // Acquire concurrency slot only now — cache hits above never need it
     await acquireSlot()
-    let faceResult, celebResult = null, physiqueResult = null, computedScores
+    let faceResult, physiqueResult = null, computedScores
 
     try {
       // ── STEP 1: Face scoring (REQUIRED) ──────────────────────────────────────
@@ -721,36 +734,21 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         throw faceErr  // only face failure escalates to a full error response
       }
 
-      // ── STEP 2 + 3: Celebrity matching + Physique scoring (both OPTIONAL) ─────
-      // Run in parallel. Promise.allSettled never rejects — each step lives or dies
-      // independently. A physique failure degrades to face-only, never kills the result.
-      console.log('[aiScore] STEP 2+3 — Celebrity match + Physique scoring in parallel...')
-      const [celebSettled, physiqueSettled] = await Promise.allSettled([
-        getCelebrityMatch(faceBase64, gender),
-        bodyBase64
-          ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
-          : Promise.resolve(null),
-      ])
-
-      if (celebSettled.status === 'fulfilled') {
-        celebResult = celebSettled.value
-        console.log('[aiScore] STEP 2 OK — celeb matches:',
-          celebResult
-            ? [celebResult.match1, celebResult.match2, celebResult.match3]
-                .filter(Boolean).map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')
-            : 'none')
+      // ── STEP 3: Physique scoring (OPTIONAL) ───────────────────────────────────
+      // Celebrity matching used to run here too, in parallel — it's now resolved
+      // by a separate, later request (POST /score/enrich) so it's off the critical
+      // path entirely. See that route below for why.
+      console.log('[aiScore] STEP 3 — Physique scoring...')
+      if (bodyBase64) {
+        try {
+          physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
+          console.log('[aiScore] STEP 3 OK — physique overall:', physiqueResult.overall)
+        } catch (physiqueErr) {
+          console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueErr.message}" | userId=${req.userId} gender=${gender}`)
+          physiqueResult = null
+        }
       } else {
-        console.warn(`[aiScore] STEP 2 FAILED — celeb match non-fatal: "${celebSettled.reason?.message}" | userId=${req.userId}`)
-        celebResult = null
-      }
-
-      if (physiqueSettled.status === 'fulfilled') {
-        physiqueResult = physiqueSettled.value
-        if (physiqueResult) console.log('[aiScore] STEP 3 OK — physique overall:', physiqueResult.overall)
-        else console.log('[aiScore] STEP 3 — no body photo, skipped')
-      } else {
-        console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueSettled.reason?.message}" | userId=${req.userId} gender=${gender}`)
-        physiqueResult = null
+        console.log('[aiScore] STEP 3 — no body photo, skipped')
       }
 
       // ── STEP 4: Overall score calculation ─────────────────────────────────────
@@ -839,18 +837,12 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
           facialThirds:          metric('facial_thirds'),
         }
       })(),
-      celebrityMatches:  celebResult
-        ? [celebResult.match1, celebResult.match2, celebResult.match3]
-            .filter(Boolean)
-            .map(m => ({
-              celebrity:    m.celebrity,
-              profession:   m.profession   ?? null,
-              similarity:   m.similarity,
-              reason:       m.shared_traits ?? m.reason ?? '',
-              shared_traits: m.shared_traits ?? m.reason ?? '',
-            }))
-        : null,
-      faceTraits: celebResult?.face_traits ?? null,
+      // Celebrity match is resolved by a separate, later request — see
+      // POST /score/enrich below. The client shows a skeleton for this section
+      // until that call lands and patches the scan record in place.
+      celebrityMatches: null,
+      celebrityStatus:  'pending',
+      faceTraits: null,
       // Side profile — null when no side photo was provided
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,
@@ -913,6 +905,97 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     // Generic server error — client shows fallback message
     res.status(500).json({ error: 'server_error' })
+  }
+})
+
+// ── POST /api/ai/score/enrich ─────────────────────────────────────────────────
+// Celebrity match, resolved separately from the main /score response so it's
+// off the critical path — that endpoint returns the moment face scoring (and
+// physique, if present) is done. Stateless: the client resends the face image
+// rather than the server caching it keyed by a request id, so this works the
+// same whether or not the app ever runs more than one server instance.
+// No scanLimit here — this is the second half of a scan already counted
+// against quota by /score, not a new scan.
+router.post('/score/enrich', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey || apiKey.trim() === '') {
+      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+    }
+
+    const { faceImage, gender = 'male' } = req.body
+    if (!faceImage) {
+      return res.status(400).json({ error: 'Face image is required' })
+    }
+    const faceBase64 = stripPrefix(faceImage)
+
+    const cacheKey = hashFaceForCeleb(faceBase64, gender)
+    if (celebCache.has(cacheKey)) {
+      console.log('[aiScore:enrich] L1 cache hit:', cacheKey)
+      return res.json(celebCache.get(cacheKey))
+    }
+
+    const fullHash = 'celeb-' + computeFullHash(faceBase64, null, null)
+    const sbCached = await getScanCache(fullHash)
+    if (sbCached) {
+      console.log('[aiScore:enrich] L2 Supabase cache hit:', fullHash.slice(0, 16))
+      if (celebCache.size >= 500) celebCache.delete(celebCache.keys().next().value)
+      celebCache.set(cacheKey, sbCached)
+      return res.json(sbCached)
+    }
+
+    await acquireSlot()
+    let celebResult
+    try {
+      celebResult = await getCelebrityMatch(faceBase64, gender)
+      console.log('[aiScore:enrich] celeb matches:',
+        celebResult
+          ? [celebResult.match1, celebResult.match2, celebResult.match3]
+              .filter(Boolean).map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')
+          : 'none')
+    } catch (celebErr) {
+      console.warn(`[aiScore:enrich] celeb match failed non-fatal: "${celebErr.message}" | userId=${req.userId}`)
+      celebResult = null
+    } finally {
+      releaseSlot()
+    }
+
+    const result = {
+      celebrityMatches: celebResult
+        ? [celebResult.match1, celebResult.match2, celebResult.match3]
+            .filter(Boolean)
+            .map(m => ({
+              celebrity:     m.celebrity,
+              profession:    m.profession ?? null,
+              similarity:    m.similarity,
+              reason:        m.shared_traits ?? m.reason ?? '',
+              shared_traits: m.shared_traits ?? m.reason ?? '',
+            }))
+        : null,
+      faceTraits: celebResult?.face_traits ?? null,
+      celebrityStatus: 'resolved',
+    }
+
+    if (celebCache.size >= 500) celebCache.delete(celebCache.keys().next().value)
+    celebCache.set(cacheKey, result)
+    try {
+      setScanCache(fullHash, result).then(() => {
+        console.log('[aiScore:enrich] L2 Supabase cache written:', fullHash.slice(0, 16))
+      }).catch(err => {
+        console.warn('[aiScore:enrich] L2 Supabase cache write failed (non-fatal):', err.message)
+      })
+    } catch (e) {
+      console.warn('[aiScore:enrich] L2 cache call error (non-fatal):', e.message)
+    }
+
+    res.json(result)
+  } catch (err) {
+    const status = err.status ?? err.statusCode ?? 0
+    const msg    = err.message || ''
+    console.error(`[aiScore:enrich] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
+    // Non-fatal from the client's perspective — it already has the real score.
+    // Client treats this as "celebrity match unavailable" rather than a hard error.
+    res.status(500).json({ celebrityMatches: null, celebrityStatus: 'failed' })
   }
 })
 

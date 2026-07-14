@@ -376,8 +376,8 @@ export function AnalyzingScreen({ currentStep, slow }) {
         {slow ? (
           <motion.div key="slow" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="mb-6 text-center">
-            <h2 className="font-heading font-bold text-xl text-primary mb-1">Still working…</h2>
-            <p className="text-xs font-body" style={{ color: '#C6A85C' }}>Celebrity matching takes a little longer</p>
+            <h2 className="font-heading font-bold text-xl text-primary mb-1">Almost there…</h2>
+            <p className="text-xs font-body" style={{ color: '#C6A85C' }}>Finalizing your full analysis</p>
           </motion.div>
         ) : (
           <motion.div key="normal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -430,6 +430,7 @@ export default function Scan() {
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
   const addScan           = useStore(s => s.addScan)
   const setCurrentScan    = useStore(s => s.setCurrentScan)
+  const patchScanEnrichment = useStore(s => s.patchScanEnrichment)
   const setCurrentPlan    = useStore(s => s.setCurrentPlan)
   const setGender         = useStore(s => s.setGender)
   const incrementScanCount = useStore(s => s.incrementScanCount)
@@ -643,6 +644,10 @@ export default function Scan() {
         },
         pillars:          aiResult.pillars         ?? null,
         celebrityMatches: aiResult.celebrityMatches ?? null,
+        // Demo scans set celebrityMatches directly with no status field — treat
+        // those as already resolved. Real scans come back 'pending' from /score
+        // and get patched in place once /score/enrich resolves, below.
+        celebrityStatus:  aiResult.celebrityStatus ?? 'resolved',
         physiqueScore:    aiResult.physiqueScore    ?? null,
         bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
       }
@@ -654,6 +659,28 @@ export default function Scan() {
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
+
+      // Celebrity match — resolved separately, off the critical path. Fired
+      // here (not awaited) so it never delays navigation to results; when it
+      // resolves it patches the scan record in place, wherever the user is.
+      if (scanRecord.celebrityStatus === 'pending') {
+        api.ai.scoreEnrich({ faceImage: faceB64, gender: g })
+          .then(enrichResult => {
+            patchScanEnrichment(scanRecord.id, {
+              celebrityMatches: enrichResult.celebrityMatches,
+              celebrityStatus:  enrichResult.celebrityStatus,
+              aiScore: {
+                ...scanRecord.aiScore,
+                celebrityMatches: enrichResult.celebrityMatches,
+                faceTraits:       enrichResult.faceTraits,
+                celebrityStatus:  enrichResult.celebrityStatus,
+              },
+            })
+          })
+          .catch(() => {
+            patchScanEnrichment(scanRecord.id, { celebrityStatus: 'failed' })
+          })
+      }
 
       // Persist to Supabase (non-blocking)
       api.supabase.saveScan({
