@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
-
-const GOLD = '#d4af37'
+import { GOLD } from '../utils/theme'
 
 import BEFORE_IMG from '../assets/transformations/before.jpg'
 import AFTER_IMG  from '../assets/transformations/after.jpg'

@@ -1,8 +1,7 @@
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
+import PageHeader from '../components/PageHeader'
+import { GOLD } from '../utils/theme'
 
-const GOLD = '#C6A85C'
 const TEXT = '#F0EDE8'
 const TEXT_DIM = '#5A5652'
 const BORDER = 'rgba(255,255,255,0.07)'
@@ -19,23 +18,10 @@ function Section({ title, children }) {
 }
 
 export default function PrivacyPolicy() {
-  const navigate = useNavigate()
-
   return (
     <div className="page-scroll-full" style={{ background: '#080808' }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-14 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-        <button
-          onClick={() => navigate(-1)}
-          className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.05)' }}
-        >
-          <ChevronLeft size={18} style={{ color: TEXT }} />
-        </button>
-        <div>
-          <h1 className="font-heading font-bold text-[17px]" style={{ color: TEXT }}>Privacy Policy</h1>
-          <p className="text-[11px] font-body" style={{ color: TEXT_DIM }}>Last updated: April 2025</p>
-        </div>
+      <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <PageHeader title="Privacy Policy" subtitle="Last updated: April 2025" back />
       </div>
 
       <div className="px-5 py-6 pb-20 max-w-2xl mx-auto">

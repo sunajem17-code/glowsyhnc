@@ -3,8 +3,8 @@ import { motion } from 'framer-motion'
 import { Crown } from 'lucide-react'
 import useStore from '../store/useStore'
 import appIcon from '../assets/ascendus-icon-transparent.png'
+import { GOLD } from '../utils/theme'
 
-const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.55)'
 
 // Deterministic particle positions — stable, not recalculated per render

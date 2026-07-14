@@ -7,9 +7,9 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import { isNative, purchasePro, restorePurchases, initRevenueCat, checkTrialEligibility } from '../utils/iap'
+import { GOLD } from '../utils/theme'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
-const GOLD = '#C6A85C'
 const GOLD_LIGHT = '#D4B96A'
 const GOLD_DARK = '#A8893A'
 const SURFACE = '#0D0D0D'
@@ -241,7 +241,7 @@ export default function Premium() {
       </Helmet>
 
       {/* ── Hero Header ─────────────────────────────────────────────── */}
-      <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden">
+      <div className="relative px-6 pb-10 text-center overflow-hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         {/* Subtle gold radial bg */}
         <div
           className="absolute inset-0 pointer-events-none"

@@ -17,6 +17,7 @@ import PageHeader from '../components/PageHeader'
 import GlowScoreRing from '../components/GlowScoreRing'
 import { ACHIEVEMENTS } from '../utils/achievements'
 import { api } from '../utils/api'
+import { GOLD } from '../utils/theme'
 
 // ─── Cancel Subscription Modal ────────────────────────────────────────────────
 
@@ -29,12 +30,12 @@ const CANCEL_REASONS = [
 ]
 
 const LOSES = [
-  { icon: <Ruler size={16} style={{ color: '#C6A85C' }} />, label: 'Detailed face metrics (6 pillars + profile)' },
-  { icon: <Star size={16} style={{ color: '#C6A85C', fill: '#C6A85C' }} />, label: 'Celebrity lookalike matching' },
-  { icon: <Map size={16} style={{ color: '#C6A85C' }} />, label: 'Your 12-week transformation plan' },
-  { icon: <TrendingUp size={16} style={{ color: '#C6A85C' }} />, label: 'Progress tracking & before/after' },
-  { icon: <RefreshCw size={16} style={{ color: '#C6A85C' }} />, label: 'Unlimited monthly scans' },
-  { icon: <Bot size={16} style={{ color: '#C6A85C' }} />, label: 'AI Improvement Coach' },
+  { icon: <Ruler size={16} style={{ color: GOLD }} />, label: 'Detailed face metrics (6 pillars + profile)' },
+  { icon: <Star size={16} style={{ color: GOLD, fill: GOLD }} />, label: 'Celebrity lookalike matching' },
+  { icon: <Map size={16} style={{ color: GOLD }} />, label: 'Your 12-week transformation plan' },
+  { icon: <TrendingUp size={16} style={{ color: GOLD }} />, label: 'Progress tracking & before/after' },
+  { icon: <RefreshCw size={16} style={{ color: GOLD }} />, label: 'Unlimited monthly scans' },
+  { icon: <Bot size={16} style={{ color: GOLD }} />, label: 'AI Improvement Coach' },
 ]
 
 function CancelModal({ onClose }) {
@@ -77,7 +78,7 @@ function CancelModal({ onClose }) {
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-        className="w-full rounded-t-3xl overflow-y-auto"
+        className="w-full rounded-t-2xl overflow-y-auto"
         style={{ background: '#0D0D0D', maxHeight: '90vh', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}
       >
         <div className="flex justify-center pt-3 pb-1">
@@ -228,7 +229,6 @@ function CancelModal({ onClose }) {
   )
 }
 
-const GOLD = '#C6A85C'
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
 const SURFACE = '#111111'
 const SURFACE_2 = '#181818'
@@ -786,7 +786,7 @@ export default function Profile() {
               animate={{ y: 0 }}
               exit={{ y: 300 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="w-full rounded-t-3xl p-6"
+              className="w-full rounded-t-2xl p-6"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none' }}
               onClick={e => e.stopPropagation()}
             >
@@ -895,7 +895,7 @@ export default function Profile() {
               animate={{ y: 0 }}
               exit={{ y: 400 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="w-full rounded-t-3xl p-6"
+              className="w-full rounded-t-2xl p-6"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none', maxHeight: '85vh', overflowY: 'auto' }}
               onClick={e => e.stopPropagation()}
             >
@@ -1059,7 +1059,7 @@ export default function Profile() {
               animate={{ y: 0 }}
               exit={{ y: 300 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="relative w-full rounded-t-3xl p-6 text-center"
+              className="relative w-full rounded-t-2xl p-6 text-center"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none' }}
               onClick={e => e.stopPropagation()}
             >

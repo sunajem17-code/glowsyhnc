@@ -2,8 +2,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Shield, X } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 
-const GOLD = '#C6A85C'
 const SURFACE = '#111111'
 const BORDER = 'rgba(255,255,255,0.08)'
 const TEXT = '#F0EDE8'
@@ -37,7 +37,7 @@ export default function AIConsentModal({ onAgree, onDecline }) {
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-          className="w-full rounded-t-3xl overflow-hidden"
+          className="w-full rounded-t-2xl overflow-hidden"
           style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderBottom: 'none', maxHeight: '85vh', overflowY: 'auto' }}
         >
           {/* drag handle */}
@@ -79,7 +79,7 @@ export default function AIConsentModal({ onAgree, onDecline }) {
                 onAgree()
               }}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] text-black mb-3"
-              style={{ background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 50%, #A8893A 100%)` }}
+              style={{ background: GOLD_GRADIENT }}
             >
               I Agree &amp; Continue
             </button>

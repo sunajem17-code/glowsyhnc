@@ -42,7 +42,7 @@ function GenderSelector({ selected, onSelect }) {
               key={key}
               whileTap={{ scale: 0.96 }}
               onClick={() => onSelect(key)}
-              className="flex flex-col items-center gap-3 p-5 rounded-3xl border-2 transition-all duration-200"
+              className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-200"
               style={{ borderColor: selected === key ? color : 'var(--border)', background: selected === key ? bg : 'var(--card)' }}
             >
               <GenderIcon size={40} style={{ color }} />
@@ -188,6 +188,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
         {/* Close */}
         <button
           onClick={() => { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }}
+          aria-label="Close camera"
           className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center"
         >
           <X size={20} className="text-white" />
@@ -196,6 +197,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
         {/* Flip */}
         {!error && (
           <button onClick={() => { setReady(false); setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
+            aria-label="Flip camera"
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
             <RefreshCw size={18} className="text-white" />
           </button>
@@ -206,6 +208,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
       {!error && (
         <div className="flex items-center justify-center py-8 bg-black">
           <button onClick={capture} disabled={!ready}
+            aria-label="Take photo"
             className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40">
             <div className="w-14 h-14 rounded-full bg-white" />
           </button>
@@ -221,6 +224,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
 export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleCameraClick() {
     if (isNative()) {
@@ -229,7 +233,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
         if (dataUrl) onPhoto(dataUrl, dataUrl)
       } catch (err) {
         if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-          alert('Camera error: ' + (err?.message || 'Unknown error'))
+          setError('Camera error: ' + (err?.message || 'Unknown error'))
         }
       }
     } else {
@@ -244,7 +248,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
         if (dataUrl) onPhoto(dataUrl, dataUrl)
       } catch (err) {
         if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-          alert('Photo error: ' + (err?.message || 'Unknown error'))
+          setError('Photo error: ' + (err?.message || 'Unknown error'))
         }
       }
     } else {
@@ -259,7 +263,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
       )}
 
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below */}
-      <div className="relative flex-1 max-h-80 rounded-3xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
+      <div className="relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
         {photo ? (
           <>
             <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-cover" />
@@ -306,6 +310,16 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
         )}
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 mb-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
+          <AlertCircle size={15} className="text-warning flex-shrink-0" />
+          <p className="text-sm text-warning font-body flex-1">{error}</p>
+          <button onClick={() => setError('')} aria-label="Dismiss error" className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100">
+            <X size={14} className="text-warning" />
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-1">
         <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
         {/* Take Photo — solid gold border */}
@@ -314,12 +328,12 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
           className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
           style={{
             background: 'rgba(201,168,76,0.06)',
-            border: '2px solid #C9A84C',
+            border: '2px solid #C6A85C',
             borderRadius: 12,
             boxShadow: '0 0 12px rgba(201,168,76,0.3)',
           }}
         >
-          <Camera size={20} style={{ color: '#C9A84C' }} />
+          <Camera size={20} style={{ color: '#C6A85C' }} />
           <span className="text-xs font-heading font-bold text-white">Take Photo</span>
         </button>
         {/* Upload Photo — identical gold border, no greyed-out look */}
@@ -328,12 +342,12 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
           className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
           style={{
             background: 'rgba(201,168,76,0.06)',
-            border: '2px solid #C9A84C',
+            border: '2px solid #C6A85C',
             borderRadius: 12,
             boxShadow: '0 0 12px rgba(201,168,76,0.3)',
           }}
         >
-          <Upload size={20} style={{ color: '#C9A84C' }} />
+          <Upload size={20} style={{ color: '#C6A85C' }} />
           <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
         </button>
       </div>
@@ -846,7 +860,7 @@ export default function Scan() {
           <motion.div
             initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-            className="w-full max-w-sm rounded-3xl overflow-hidden"
+            className="w-full max-w-sm rounded-2xl overflow-hidden"
             style={{ background: 'var(--card)', border: '1px solid rgba(255,255,255,0.08)' }}
             onClick={e => e.stopPropagation()}
           >
@@ -966,14 +980,14 @@ export default function Scan() {
                 onClick={() => { setStep(3); setError('') }}
                 className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
                 style={{
-                  border: '3px solid #C9A84C',
+                  border: '3px solid #C6A85C',
                   background: 'rgba(201,168,76,0.04)',
                   borderRadius: 12,
                   padding: '16px 20px',
                   boxShadow: '0 0 16px rgba(201,168,76,0.4)',
                 }}
               >
-                <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
+                <SkipForward size={18} style={{ color: '#C6A85C', flexShrink: 0 }} />
                 <div className="text-left">
                   <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
                     Skip Side Profile
@@ -1001,14 +1015,14 @@ export default function Scan() {
                 onClick={() => startAnalysis(!sidePhoto, true)}
                 className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
                 style={{
-                  border: '3px solid #C9A84C',
+                  border: '3px solid #C6A85C',
                   background: 'rgba(201,168,76,0.04)',
                   borderRadius: 12,
                   padding: '16px 20px',
                   boxShadow: '0 0 16px rgba(201,168,76,0.4)',
                 }}
               >
-                <SkipForward size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
+                <SkipForward size={18} style={{ color: '#C6A85C', flexShrink: 0 }} />
                 <div className="text-left">
                   <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
                     Skip Body Photo

@@ -19,10 +19,10 @@ import {
   MAINTENANCE_COLORS,
   MAINTENANCE_LABELS,
 } from '../utils/haircuts'
+import { GOLD } from '../utils/theme'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
-const GOLD      = '#C9A84C'
-const GOLD_DIM  = '#8C7035'
+const GOLD_DIM  = '#8A7140'
 const SURFACE   = '#141414'
 const SURFACE_2 = '#1C1C1C'
 const SURFACE_3 = '#242424'
@@ -449,7 +449,7 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
 }
 
 // ─── Existing manual flow components (unchanged) ───────────────────────────────
-function FaceShapeSelector({ selected, onSelect }) {
+export function FaceShapeSelector({ selected, onSelect }) {
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>Select your face shape</h2>
@@ -556,7 +556,7 @@ function BarberScriptModal({ cut, onClose }) {
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-3xl p-6"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl p-6"
         style={{ background: SURFACE_2 }}
         onClick={e => e.stopPropagation()}
       >
@@ -664,7 +664,7 @@ function CutCard({ cut, rank, saved, onSave, onScript, delay = 0 }) {
   )
 }
 
-function ManualResultsView({ faceShape, density, hairline, savedCuts, onSave, isPremium, onUpgrade, onReset }) {
+export function ManualResultsView({ faceShape, density, hairline, savedCuts, onSave, isPremium, onUpgrade, onReset }) {
   const [scriptCut, setScriptCut] = useState(null)
   const profile = FACE_PROFILES[faceShape]
   const recommendations = getModifiedRecommendations(faceShape, hairline, density)
@@ -805,8 +805,8 @@ export default function HairMaxx() {
         <meta name="keywords" content="hairmaxx, hair analysis, AI hair type scanner, looksmax hair, hair glow up, curl type identifier, hair routine" />
       </Helmet>
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 pt-12 pb-4"
-        style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}` }}>
+      <div className="sticky top-0 z-20 flex items-center justify-between px-4 pb-4"
+        style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
         <button onClick={handleBack} className="p-2 -ml-2 rounded-xl" style={{ color: TEXT_SEC }}>
           <ChevronLeft size={22} />
         </button>
@@ -892,8 +892,11 @@ export default function HairMaxx() {
 
       {/* Manual flow next button */}
       {mode === 'manual' && manualStep < 2 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-8 pt-4"
-          style={{ background: `linear-gradient(to top, ${SURFACE} 60%, transparent)` }}>
+        <div className="fixed bottom-0 left-0 right-0 px-4 pt-4"
+          style={{
+            background: `linear-gradient(to top, ${SURFACE} 60%, transparent)`,
+            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))',
+          }}>
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleManualNext}

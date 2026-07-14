@@ -76,7 +76,7 @@ export default function PromoModal({ onClose, onSuccess }) {
         animate={{ opacity: 1, scale: 1,    y: 0  }}
         exit={{    opacity: 0, scale: 0.94, y: 12 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[320px] rounded-3xl p-6"
+        className="w-full max-w-[320px] rounded-2xl p-6"
         style={{
           background: '#111111',
           border: '1px solid rgba(198,168,92,0.22)',

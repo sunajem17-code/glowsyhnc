@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion'
 import { Share2, ArrowRight, ChevronDown, ChevronUp, ChevronRight, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Beef, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
@@ -9,11 +9,13 @@ import logo from '../assets/ascendus-icon.png'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
+import PageHeader from '../components/PageHeader'
 import ShareCardModal from '../components/ShareCardModal'
 import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
 import { scoreColor } from '../utils/analysis'
 import { isNative, purchasePro, restorePurchases } from '../utils/iap'
+import { GOLD_GRADIENT } from '../utils/theme'
 
 // Keys must match tier.label values from analysis.js MALE_TIERS / FEMALE_TIERS
 const TIER_COLORS = {
@@ -37,6 +39,7 @@ const TIER_COLORS = {
 }
 
 function ScoreReveal({ score, tier, onDone }) {
+  const reducedMotion = useReducedMotion()
   const [phase, setPhase] = useState('dark')   // dark → counting → tier → done
   const [display, setDisplay] = useState(0)
   const tierColor = TIER_COLORS[tier] ?? '#C6A85C'
@@ -93,9 +96,9 @@ function ScoreReveal({ score, tier, onDone }) {
           <AnimatePresence>
             {phase !== 'dark' && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.6 }}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                transition={reducedMotion ? { duration: 0.2, ease: 'easeOut' } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                 className="text-center"
               >
                 <p
@@ -121,9 +124,9 @@ function ScoreReveal({ score, tier, onDone }) {
           <AnimatePresence>
             {phase === 'tier' && (
               <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.85 }}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.85 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                transition={reducedMotion ? { duration: 0.2, ease: 'easeOut' } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-6 text-center"
               >
                 <div className="flex justify-center mb-2">{getScoreIcon(score ?? 0)}</div>
@@ -851,6 +854,7 @@ function ProGate({ onUpgrade }) {
 // ─── Paywall Full-Screen ──────────────────────────────────────────────────────
 
 function PaywallSheet({ glowScore, pillars, gender, onClose }) {
+  const reducedMotion = useReducedMotion()
   const navigate = useNavigate()
   const { setIsPremium } = useStore()
   const [plan, setPlan]       = useState('monthly')
@@ -929,9 +933,10 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 24 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 24 }}
+      transition={reducedMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', bounce: 0, duration: 0.35 }}
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: '#080604' }}
     >
@@ -1017,17 +1022,24 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
                 key={key}
                 type="button"
                 onClick={() => setPlan(key)}
-                className="py-2 rounded-lg text-center transition-all"
+                className="relative py-2 rounded-lg text-center transition-colors duration-200 ease-out"
                 style={{
-                  background: plan === key ? 'rgba(198,168,92,0.18)' : 'transparent',
                   border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
                 }}
               >
-                <p className="text-[10px] font-heading font-bold leading-none mb-0.5"
+                {plan === key && (
+                  <motion.div
+                    layoutId="planHighlight"
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: 'rgba(198,168,92,0.18)' }}
+                    transition={reducedMotion ? { duration: 0.15 } : { type: 'spring', bounce: 0, duration: 0.3 }}
+                  />
+                )}
+                <p className="relative text-[10px] font-heading font-bold leading-none mb-0.5"
                   style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.3)' }}>
                   {label}{badge && plan === key ? ` · ${badge}` : ''}
                 </p>
-                <p className="text-[12px] font-mono font-bold"
+                <p className="relative text-[12px] font-mono font-bold"
                   style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.25)' }}>
                   {price}
                 </p>
@@ -1044,7 +1056,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           type="button"
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
           style={{
-            background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)',
+            background: GOLD_GRADIENT,
             color: '#0A0A0A',
             boxShadow: '0 4px 20px rgba(198,168,92,0.35)',
             letterSpacing: '0.01em',
@@ -1291,9 +1303,18 @@ export default function Results() {
   const [showShareCard,   setShowShareCard]   = useState(false)
   const [revealDone, setRevealDone] = useState(false)
 
-  // Show reveal only on first load for a fresh scan (within last 10s)
+  // Show reveal only on first load for a fresh scan (within last 10s), and only
+  // if ScanUnlockGate's own UnlockReveal hasn't already played this score —
+  // promo-code unlocks flag this so the user doesn't watch the same score
+  // count up twice in one session.
   const isNewScan = currentScan && (Date.now() - new Date(currentScan.analyzedAt).getTime()) < 10000
-  const [showReveal] = useState(() => !!isNewScan)
+  const [showReveal] = useState(() => {
+    if (!isNewScan) return false
+    try {
+      if (sessionStorage.getItem('asc_reveal_shown') === (currentScan?.id ?? '')) return false
+    } catch {}
+    return true
+  })
 
   // Show paywall after a short delay — let free users see their scores first
   const [showPaywall, setShowPaywall] = useState(false)
@@ -1804,19 +1825,20 @@ export default function Results() {
       />
     )}
     <MotionPage className="px-4">
-      {/* Header */}
-      <div className="pt-10 pb-3 flex items-center justify-between">
-        <div>
-          <h1 className="font-heading font-bold text-2xl text-primary">Your Results</h1>
-          <p className="text-xs text-secondary font-body">
+      <PageHeader
+        title="Your Results"
+        subtitle={
+          <>
             {new Date(currentScan.analyzedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             {gender && <span className="ml-1 capitalize">· {gender}</span>}
-          </p>
-        </div>
-        <button onClick={handleShare} className="w-9 h-9 bg-card border border-default rounded-xl flex items-center justify-center">
-          <Share2 size={15} className="text-secondary" />
-        </button>
-      </div>
+          </>
+        }
+        action={
+          <button onClick={handleShare} className="w-9 h-9 bg-card border border-default rounded-xl flex items-center justify-center">
+            <Share2 size={15} className="text-secondary" />
+          </button>
+        }
+      />
 
       {/* ── Citations / Medical Disclaimer ──────────────────────── */}
       <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2"

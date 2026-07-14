@@ -1,8 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Camera, ClipboardList, TrendingUp, Users } from 'lucide-react'
 import { motion } from 'framer-motion'
-
-const GOLD = '#C6A85C'
+import { GOLD } from '../utils/theme'
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },

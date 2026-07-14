@@ -7,9 +7,10 @@ import useStore from '../store/useStore'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 
-const G = '#C6A85C'
-const GOLD_GRAD = 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)'
+const G = GOLD
+const GOLD_GRAD = GOLD_GRADIENT
 const BG = '#080808'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.38)'

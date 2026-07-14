@@ -25,6 +25,14 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   const { plan, noTrial } = req.body // plan: 'monthly' | 'annual', noTrial: bool
   if (!PRICES[plan]) return res.status(400).json({ error: 'Invalid plan' })
 
+  // Fail fast with a clear log if the real price ID was never configured —
+  // this used to reach Stripe, fail with an opaque API error, and surface a
+  // raw 'internal_error' code straight to the user.
+  if (PRICES[plan].endsWith('_placeholder')) {
+    console.error(`[Stripe] STRIPE_PRICE_${plan.toUpperCase()} env var is not set — checkout cannot run until it's configured.`)
+    return res.status(500).json({ error: 'Checkout is temporarily unavailable. Please try again later.' })
+  }
+
   // Look up user in Supabase (primary) or SQLite (fallback)
   let user = await getUserById(req.userId)
   if (!user && !isConfigured()) user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(req.userId)
@@ -73,7 +81,7 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[Stripe] checkout error:', err.type, err.code, err.message)
     console.error('[Stripe] price used:', PRICES[plan])
-    res.status(500).json({ error: 'internal_error' })
+    res.status(500).json({ error: 'Unable to start checkout. Please try again.' })
   }
 })
 

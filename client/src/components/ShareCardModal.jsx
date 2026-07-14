@@ -5,6 +5,7 @@ import { MALE_TIERS, FEMALE_TIERS } from '../utils/analysis'
 import html2canvas from 'html2canvas'
 import logoSrc from '../assets/ascendus-icon.png'
 import { isNative } from '../utils/camera'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 
 // ── Tier helpers ──────────────────────────────────────────────────────────────
 const ALL_TIERS = [...MALE_TIERS, ...FEMALE_TIERS]
@@ -469,7 +470,10 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
       <ShareCard scan={scan} facePhotoUrl={facePhotoUrl} cardRef={cardRef} />
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-10 pb-3 flex-shrink-0">
+      <div
+        className="flex items-center justify-between px-5 pb-3 flex-shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <p className="font-heading font-bold text-[15px] text-white">Share Your Card</p>
         <button
           onClick={onClose}
@@ -484,13 +488,13 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
       <div className="flex-1 flex items-center justify-center min-h-0 px-4">
         {generating ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-3">
-            <Loader2 size={28} className="animate-spin" style={{ color: '#C9A84C' }} />
+            <Loader2 size={28} className="animate-spin" style={{ color: GOLD }} />
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Generating card…</p>
           </motion.div>
         ) : error ? (
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-red-400">{error}</p>
-            <button onClick={generate} className="text-sm underline" style={{ color: '#C9A84C' }}>Retry</button>
+            <button onClick={generate} className="text-sm underline" style={{ color: GOLD }}>Retry</button>
           </div>
         ) : preview ? (
           <motion.img
@@ -506,7 +510,10 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
       </div>
 
       {/* Actions */}
-      <div className="px-5 pb-10 pt-4 flex gap-3 flex-shrink-0">
+      <div
+        className="px-5 pt-4 flex gap-3 flex-shrink-0"
+        style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom, 0px))' }}
+      >
         <button
           onClick={handleSave}
           disabled={!preview || generating}
@@ -520,7 +527,7 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
           onClick={handleShare}
           disabled={!preview || generating || sharing}
           className="flex items-center justify-center gap-2 h-14 rounded-2xl font-bold text-[15px]"
-          style={{ flex: 2, background: 'linear-gradient(135deg, #C9A84C, #d4af37)', color: '#000' }}
+          style={{ flex: 2, background: GOLD_GRADIENT, color: '#000' }}
         >
           {sharing ? <Loader2 size={17} className="animate-spin" /> : <Share2 size={17} />}
           {sharing ? 'Sharing…' : 'Share'}

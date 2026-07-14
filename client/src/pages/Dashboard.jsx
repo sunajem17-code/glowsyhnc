@@ -7,6 +7,7 @@ import useStore from '../store/useStore'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
+import { GOLD } from '../utils/theme'
 
 const RESCAN_DAYS = 14
 
@@ -66,7 +67,7 @@ export default function Dashboard() {
   return (
     <MotionPage className="px-4">
       {/* Header */}
-      <div className="pt-14 pb-5 flex items-center justify-between">
+      <div className="pb-5 flex items-center justify-between" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div>
           <p className="text-[11px] text-secondary font-body uppercase tracking-widest mb-0.5">
             {greeting()}
@@ -471,9 +472,9 @@ export default function Dashboard() {
       >
         <div
           className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(201,146,10,0.12)', border: '1px solid rgba(201,146,10,0.25)' }}
+          style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Scissors size={19} style={{ color: '#C9A84C' }} />
+          <Scissors size={19} style={{ color: GOLD }} />
         </div>
         <div className="text-left flex-1">
           <p className="font-heading font-bold text-sm" style={{ color: '#F0EDE8' }}>
@@ -483,7 +484,7 @@ export default function Dashboard() {
             Face analysis · Barber scripts · Cut rankings
           </p>
         </div>
-        <ChevronRight size={15} style={{ color: '#C9A84C' }} />
+        <ChevronRight size={15} style={{ color: GOLD }} />
       </motion.button>
 
       {/* SwipeMaxx */}
@@ -499,9 +500,9 @@ export default function Dashboard() {
       >
         <div
           className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(201,146,10,0.12)', border: '1px solid rgba(201,146,10,0.25)' }}
+          style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Sparkles size={19} style={{ color: '#C9A84C' }} />
+          <Sparkles size={19} style={{ color: GOLD }} />
         </div>
         <div className="text-left flex-1">
           <p className="font-heading font-bold text-sm" style={{ color: '#F0EDE8' }}>
@@ -511,7 +512,7 @@ export default function Dashboard() {
             AI picks your best dating photo
           </p>
         </div>
-        <ChevronRight size={15} style={{ color: '#C9A84C' }} />
+        <ChevronRight size={15} style={{ color: GOLD }} />
       </motion.button>
 
       {/* CTA Buttons */}

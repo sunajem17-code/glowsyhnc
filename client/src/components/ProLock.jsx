@@ -12,8 +12,7 @@
 
 import { motion } from 'framer-motion'
 import { Lock } from 'lucide-react'
-
-const GOLD = '#C6A85C'
+import { GOLD } from '../utils/theme'
 
 export default function ProLock({
   children,

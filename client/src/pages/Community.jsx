@@ -6,8 +6,8 @@ import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import { pickPhoto, isNative } from '../utils/camera'
+import { GOLD } from '../utils/theme'
 
-const GOLD   = '#C6A85C'
 const BORDER = 'rgba(255,255,255,0.07)'
 
 function timeAgo(dateStr) {
@@ -175,7 +175,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl overflow-hidden"
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
       style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '75vh' }}
     >
       <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
@@ -304,7 +304,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-        className="w-full rounded-t-3xl flex flex-col"
+        className="w-full rounded-t-2xl flex flex-col"
         style={{
           background: '#1A1A1A',
           border: '1px solid rgba(255,255,255,0.1)',
@@ -601,7 +601,7 @@ function PostShareSheet({ post, onClose }) {
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-        className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl pb-safe"
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl pb-safe"
         style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
       >
         <div className="flex justify-center pt-3 pb-4">
@@ -756,7 +756,7 @@ function ReportSheet({ postId, onClose }) {
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-        className="fixed bottom-0 inset-x-0 z-50 rounded-t-3xl px-5 pt-5 pb-10"
+        className="fixed bottom-0 inset-x-0 z-50 rounded-t-2xl px-5 pt-5 pb-10"
         style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.15)' }} />
@@ -833,7 +833,7 @@ function EditSheet({ post, onClose, onSaved }) {
         animate={{ y: 0,  opacity: 1 }}
         exit={{    y: 80, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="w-full rounded-t-3xl p-6"
+        className="w-full rounded-t-2xl p-6"
         style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -918,7 +918,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
   )
 }
 
-const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onEdit, onRate }) {
+export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onEdit, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
   const [showMenu, setShowMenu]             = useState(false)
@@ -1201,7 +1201,7 @@ export default function Community() {
 
   return (
     <MotionPage className="px-4 pb-8">
-      <div className="flex items-center justify-between pt-14 pb-5">
+      <div className="flex items-center justify-between pb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div>
           <p className="text-[11px] text-secondary font-body uppercase tracking-widest mb-0.5">Community</p>
           <h1 className="font-heading font-bold text-[26px] text-primary" style={{ letterSpacing: '-0.02em' }}>

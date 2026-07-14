@@ -7,8 +7,8 @@ import { api } from '../utils/api'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
+import { GOLD } from '../utils/theme'
 
-const GOLD    = '#C6A85C'
 const SURFACE = '#141414'
 const BORDER  = 'rgba(255,255,255,0.07)'
 
@@ -109,7 +109,7 @@ export default function SwipeMaxx() {
       <MotionPage className="px-4">
         <PageHeader title="SwipeMaxx" />
         <div
-          className="mt-8 rounded-3xl p-8 flex flex-col items-center text-center gap-4"
+          className="mt-8 rounded-2xl p-8 flex flex-col items-center text-center gap-4"
           style={{ background: 'rgba(198,168,92,0.04)', border: `1px solid rgba(198,168,92,0.18)` }}
         >
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center"

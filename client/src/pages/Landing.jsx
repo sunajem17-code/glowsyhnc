@@ -6,9 +6,9 @@ import {
   ArrowRight, Camera, TrendingUp, Star, Zap,
   ShieldCheck, Users, ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { GOLD } from '../utils/theme'
 
 // ── Design tokens (match app dark theme) ──────────────────────────────────────
-const GOLD       = '#C6A85C'
 const GOLD_LIGHT = '#D4B96A'
 const GOLD_DARK  = '#A8893A'
 const GOLD_BORDER = 'rgba(198,168,92,0.22)'

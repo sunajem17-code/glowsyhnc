@@ -5,8 +5,7 @@ import { Send, Sparkles, Lock, ChevronRight, RotateCcw, Check } from 'lucide-rea
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
-
-const GOLD = '#C6A85C'
+import { GOLD } from '../utils/theme'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -222,8 +221,8 @@ export default function AICoach() {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="px-4 pt-12 pb-3 flex items-center justify-between flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        className="px-4 pb-3 flex items-center justify-between flex-shrink-0"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
       >
         <div className="flex items-center gap-3">
           <div

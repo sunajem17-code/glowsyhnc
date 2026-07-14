@@ -1,22 +1,22 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { checkTrialEligibility, isNative } from '../utils/iap'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
-  Lock, Sparkles, Star, Eye, Zap, BarChart2, Smile, Dumbbell, Brain,
-  TrendingUp, Activity,
+  Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import logo from '../assets/ascendus-icon.png'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 
-const G    = '#C6A85C'
-const GRAD = 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 50%, #A8893A 100%)'
+const G    = GOLD
+const GRAD = GOLD_GRADIENT
 const BG   = '#080808'
 const TEXT = '#F0EDE8'
-const DIM  = 'rgba(255,255,255,0.38)'
+const DIM  = 'rgba(255,255,255,0.5)'  // 5.3:1 against BG — 0.38 measured ~3.5:1, under the 4.5:1 body-text floor
 const SURF = 'rgba(255,255,255,0.04)'
 
 // ── Helpers (copied from OnboardingFinalSteps) ────────────────────────────────
@@ -272,70 +272,6 @@ function Card1Score({ scan }) {
   )
 }
 
-// ── Card 2: Biggest Growth Area ───────────────────────────────────────────────
-
-function Card2Growth({ scan }) {
-  const area = getBiggestGrowthArea(scan)
-  if (!area) return (
-    <CardShell badge="GROWTH AREA" icon={TrendingUp}>
-      <p className="font-body text-[13px]" style={{ color: DIM }}>Not enough data to determine growth area.</p>
-    </CardShell>
-  )
-
-  return (
-    <CardShell badge="BIGGEST GROWTH AREA" icon={TrendingUp}>
-      <p
-        className="font-heading font-bold text-[26px] leading-tight mb-5"
-        style={{ color: TEXT, letterSpacing: '-0.01em' }}
-      >
-        {area.label}
-      </p>
-
-      {/* Score card */}
-      <div
-        className="flex items-center justify-between rounded-2xl px-4 py-4 mb-4"
-        style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.14)' }}
-      >
-        <div>
-          <p className="font-body text-[10px] mb-1" style={{ color: 'rgba(198,168,92,0.6)', letterSpacing: '0.1em' }}>
-            CURRENT SCORE
-          </p>
-          <div className="flex items-end gap-1">
-            <BlurLock size="lg">
-              <span className="font-heading font-bold text-[34px] leading-none" style={{ color: TEXT }}>
-                {area.score.toFixed(1)}
-              </span>
-            </BlurLock>
-            <span className="font-heading font-bold text-[16px] mb-1" style={{ color: DIM }}>/10</span>
-          </div>
-        </div>
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.18)' }}
-        >
-          <Lock size={16} style={{ color: G }} />
-        </div>
-      </div>
-
-      {/* Detail blurred */}
-      <div
-        className="rounded-2xl px-4 py-4"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <Lock size={11} style={{ color: G }} />
-          <p className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em' }}>AI ANALYSIS</p>
-        </div>
-        <BlurLock size="sm">
-          <p className="font-body text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            {area.detail}
-          </p>
-        </BlurLock>
-      </div>
-    </CardShell>
-  )
-}
-
 // ── Card 3: Face Metrics ──────────────────────────────────────────────────────
 
 function Card3FaceMetrics({ scan }) {
@@ -417,146 +353,6 @@ function Card3FaceMetrics({ scan }) {
   )
 }
 
-// ── Card 4: Celebrity Match ───────────────────────────────────────────────────
-
-function Card4Celebrity({ scan }) {
-  // Prefer Rekognition data (array of { Name, MatchConfidence }) if present
-  const rcMatches = (scan?.celebrityMatches ?? [])
-    .filter(m => m?.Name && m?.MatchConfidence > 0)
-    .slice(0, 3)
-    .map(m => ({ name: m.Name, sim: Math.round(m.MatchConfidence), source: 'rekognition' }))
-
-  const fallback = getCelebMatch(scan)
-  const matches  = rcMatches.length > 0 ? rcMatches : (fallback ? [fallback] : [])
-
-  if (!matches.length) return (
-    <CardShell badge="CELEBRITY MATCH" icon={Star}>
-      <p className="font-body text-[13px]" style={{ color: DIM }}>Celebrity matching requires a clear face scan.</p>
-    </CardShell>
-  )
-
-  return (
-    <CardShell badge="CELEBRITY MATCH" icon={Star}>
-      <p className="font-heading font-bold text-[13px] mb-5" style={{ color: DIM }}>
-        Your face most resembles…
-      </p>
-
-      <div className="flex flex-col gap-3">
-        {matches.map((match, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5"
-            style={{
-              background: i === 0 ? 'rgba(198,168,92,0.06)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${i === 0 ? 'rgba(198,168,92,0.20)' : 'rgba(255,255,255,0.07)'}`,
-            }}
-          >
-            <div
-              className="flex-shrink-0 flex items-center justify-center rounded-full"
-              style={{
-                width: 44, height: 44,
-                background: 'rgba(198,168,92,0.10)',
-                border: `1px solid ${i === 0 ? 'rgba(198,168,92,0.3)' : 'rgba(255,255,255,0.1)'}`,
-              }}
-            >
-              <span style={{ fontSize: 20 }}>{i === 0 ? '⭐' : '🌟'}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-[10px] mb-1" style={{ color: DIM }}>
-                {match.source === 'rekognition' ? `${match.sim}% facial similarity` : 'Shared facial features'}
-              </p>
-              <BlurLock>
-                <p className="font-heading font-bold text-[17px]" style={{ color: TEXT }}>
-                  {match.name}
-                </p>
-              </BlurLock>
-            </div>
-            <Lock size={13} style={{ color: G, flexShrink: 0 }} />
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 rounded-xl px-3 py-2.5"
-        style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.12)' }}>
-        <p className="font-body text-[11px] text-center" style={{ color: 'rgba(198,168,92,0.6)' }}>
-          Unlock to see full celebrity analysis
-        </p>
-      </div>
-    </CardShell>
-  )
-}
-
-// ── Card 5: PSL Tier + Potential ──────────────────────────────────────────────
-
-function Card5Potential({ scan }) {
-  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
-  const tier      = scan?.tier ?? null
-
-  const physiqueUpside = scan?.physiqueScore
-    ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.09)
-    : 0
-  const potential = glowScore != null
-    ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
-    : null
-
-  const pslNumber = scan?.aiScore?.pslScore ?? scan?.aiScore?.pslRating
-    ?? (glowScore != null ? (glowScore * 1.0).toFixed(1) : null)
-
-  return (
-    <CardShell badge="PSL TIER & POTENTIAL" icon={Zap}>
-      <div className="flex flex-col gap-4">
-        {/* PSL Tier */}
-        <div
-          className="rounded-2xl px-5 py-5 flex flex-col"
-          style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-heading font-bold text-[10px] tracking-[0.2em]" style={{ color: 'rgba(198,168,92,0.7)' }}>
-              PSL TIER
-            </p>
-            <Lock size={13} style={{ color: G }} />
-          </div>
-          <BlurLock size="lg">
-            <div className="flex items-end gap-1.5">
-              <span className="font-heading font-bold leading-none" style={{ fontSize: 56, color: TEXT, letterSpacing: '-0.03em' }}>
-                {pslNumber ?? tier ?? '—'}
-              </span>
-              {pslNumber && <span className="font-heading font-bold text-[20px] mb-2" style={{ color: DIM }}>/10</span>}
-            </div>
-          </BlurLock>
-          <p className="font-body text-[11px] mt-2" style={{ color: DIM }}>
-            Rated against global male attractiveness benchmarks
-          </p>
-        </div>
-
-        {/* Potential */}
-        <div
-          className="rounded-2xl px-5 py-5 flex flex-col"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-heading font-bold text-[10px] tracking-[0.2em]" style={{ color: DIM }}>
-              YOUR POTENTIAL
-            </p>
-            <Lock size={13} style={{ color: G }} />
-          </div>
-          <BlurLock size="lg">
-            <div className="flex items-end gap-1.5">
-              <span className="font-heading font-bold leading-none" style={{ fontSize: 56, color: TEXT, letterSpacing: '-0.03em' }}>
-                {potential ?? '—'}
-              </span>
-              {potential && <span className="font-heading font-bold text-[20px] mb-2" style={{ color: DIM }}>/10</span>}
-            </div>
-          </BlurLock>
-          <p className="font-body text-[11px] mt-2" style={{ color: DIM }}>
-            Achievable score after completing your 12-week plan
-          </p>
-        </div>
-      </div>
-    </CardShell>
-  )
-}
-
 // ── Card 6: AI Analysis Preview ───────────────────────────────────────────────
 
 function Card6AIAnalysis({ scan }) {
@@ -611,67 +407,6 @@ function Card6AIAnalysis({ scan }) {
   )
 }
 
-// ── Card 7: Physique (conditional) ────────────────────────────────────────────
-
-function Card7Physique({ scan }) {
-  const phy = scan?.physiqueScore ?? {}
-
-  const metrics = [
-    { label: 'OVERALL',      value: phy.overall      ?? null },
-    { label: 'MUSCLE TONE',  value: phy.muscleTone   ?? phy.muscle    ?? null },
-    { label: 'BODY FAT',     value: phy.bodyFat      ?? scan?.bodyFatLevel ?? null },
-    { label: 'FRAME',        value: phy.frame        ?? phy.structure ?? null },
-  ].filter(m => m.value != null)
-
-  return (
-    <CardShell badge="PHYSIQUE SCORE" icon={Dumbbell}>
-      {phy.overall != null && (
-        <div
-          className="rounded-2xl px-5 py-5 mb-4 flex items-center justify-between"
-          style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}
-        >
-          <div>
-            <p className="font-heading font-bold text-[10px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.7)' }}>
-              PHYSIQUE OVERALL
-            </p>
-            <BlurLock size="lg">
-              <div className="flex items-end gap-1">
-                <span className="font-heading font-bold leading-none" style={{ fontSize: 52, color: TEXT, letterSpacing: '-0.03em' }}>
-                  {phy.overall.toFixed(1)}
-                </span>
-                <span className="font-heading font-bold text-[18px] mb-1.5" style={{ color: DIM }}>/10</span>
-              </div>
-            </BlurLock>
-          </div>
-          <Lock size={18} style={{ color: G }} />
-        </div>
-      )}
-
-      {metrics.filter(m => m.label !== 'OVERALL').length > 0 && (
-        <div className="flex flex-col gap-2">
-          {metrics.filter(m => m.label !== 'OVERALL').map(({ label, value }) => (
-            <div
-              key={label}
-              className="flex items-center justify-between rounded-xl px-4 py-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-            >
-              <p className="font-body text-[11px] tracking-wide" style={{ color: DIM }}>{label}</p>
-              <div className="flex items-center gap-1.5">
-                <BlurLock size="sm">
-                  <span className="font-heading font-bold text-[14px]" style={{ color: TEXT }}>
-                    {typeof value === 'number' ? value.toFixed(1) : value}
-                  </span>
-                </BlurLock>
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </CardShell>
-  )
-}
-
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
 const SLIDE_VARIANTS = {
@@ -680,21 +415,17 @@ const SLIDE_VARIANTS = {
   exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, trialEligibility = {} }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {} }) {
   const [cardIdx, setCardIdx]   = useState(0)
   const [direction, setDirection] = useState(1)
-  const touchStartX = useRef(null)
-  const touchStartY = useRef(null)
 
-  // Build card list — card 7 only if physique data present
+  // Three high-value cards, not seven. Growth area, celebrity match, and PSL
+  // tier/potential are already teased inside Card1Score itself — repeating
+  // them as separate near-identical locked cards was pure padding.
   const cards = [
-    { id: 'score',     el: <Card1Score scan={scan} /> },
-    { id: 'growth',    el: <Card2Growth scan={scan} /> },
-    { id: 'face',      el: <Card3FaceMetrics scan={scan} /> },
-    { id: 'celebrity', el: <Card4Celebrity scan={scan} /> },
-    { id: 'potential', el: <Card5Potential scan={scan} /> },
-    { id: 'ai',        el: <Card6AIAnalysis scan={scan} /> },
-    ...(scan?.physiqueScore ? [{ id: 'physique', el: <Card7Physique scan={scan} /> }] : []),
+    { id: 'score', el: <Card1Score scan={scan} /> },
+    { id: 'face',  el: <Card3FaceMetrics scan={scan} /> },
+    { id: 'ai',    el: <Card6AIAnalysis scan={scan} /> },
   ]
 
   function goTo(idx) {
@@ -703,22 +434,17 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
     setCardIdx(idx)
   }
 
-  function onTouchStart(e) {
-    touchStartX.current = e.touches[0].clientX
-    touchStartY.current = e.touches[0].clientY
-  }
-
-  function onTouchEnd(e) {
-    if (touchStartX.current === null) return
-    const dx = touchStartX.current - e.changedTouches[0].clientX
-    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY)
-    // Only handle horizontal swipes (dx dominant)
-    if (Math.abs(dx) > 48 && Math.abs(dx) > dy * 1.5) {
-      if (dx > 0 && cardIdx < cards.length - 1) goTo(cardIdx + 1)
-      else if (dx < 0 && cardIdx > 0) goTo(cardIdx - 1)
+  // Velocity-aware, not just distance-aware — a fast flick commits even on a
+  // short drag, matching how the rest of the app's card gestures behave
+  // (PremiumOnboarding's slide cards, the Feature Tour's Photo Ranker).
+  function handleDragEnd(_, info) {
+    const DISTANCE = 60
+    const VELOCITY = 400
+    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
+      goTo(cardIdx + 1)
+    } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
+      goTo(cardIdx - 1)
     }
-    touchStartX.current = null
-    touchStartY.current = null
   }
 
   return (
@@ -732,11 +458,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
       }} />
 
       {/* Swipeable area */}
-      <div
-        className="flex-1 relative overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
+      <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={cardIdx}
@@ -747,6 +469,10 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
             exit="exit"
             transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
             className="absolute inset-0"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
+            onDragEnd={handleDragEnd}
           >
             {cards[cardIdx].el}
           </motion.div>
@@ -786,29 +512,47 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
                 className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
                 style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
               >
-                {isPurchasing
-                  ? <Loader2 size={16} className="animate-spin" />
-                  : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
-                }
-                {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={isPurchasing ? 'processing' : 'ready'}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    {isPurchasing
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+                    }
+                    {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
+                  </motion.span>
+                </AnimatePresence>
               </motion.button>
               {trialReady && !isPurchasing && (
                 <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
                   3 days free, then $7.99/mo or $49.99/yr · Cancel anytime
                 </p>
               )}
+              {error && (
+                <p className="text-center text-[11px] font-body" style={{ color: '#EF4444' }}>{error}</p>
+              )}
             </>
           )
         })()}
 
-        <button
-          onClick={onInvite}
-          disabled={isPurchasing}
-          className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
-        >
-          <UserPlus size={14} /> Invite 3 Friends — Get Free Access
-        </button>
+        {/* Invite is a secondary path, surfaced only once the user has seen every
+            card — not stacked as a competing ask on the very first reveal. */}
+        {cardIdx === cards.length - 1 && (
+          <button
+            onClick={onInvite}
+            disabled={isPurchasing}
+            className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
+          >
+            <UserPlus size={14} /> Invite 3 Friends — Get Free Access
+          </button>
+        )}
 
         <button
           onClick={onPromo}
@@ -826,12 +570,13 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
 // ── Unlock Reveal Animation ───────────────────────────────────────────────────
 
 function UnlockReveal({ score, onContinue }) {
+  const reducedMotion = useReducedMotion()
   const [revealed, setRevealed] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setRevealed(true), 1400)
+    const t = setTimeout(() => setRevealed(true), reducedMotion ? 300 : 1400)
     return () => clearTimeout(t)
-  }, [])
+  }, [reducedMotion])
 
   const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
     angle: (i / 22) * 360,
@@ -847,40 +592,48 @@ function UnlockReveal({ score, onContinue }) {
       className="fixed inset-0 flex flex-col items-center justify-center z-50"
       style={{ background: '#000' }}
     >
-      <motion.div
-        initial={{ scale: 0.2, opacity: 0.9 }}
-        animate={{ scale: revealed ? 3.5 : 0.2, opacity: revealed ? 0 : 0.9 }}
-        transition={{ duration: 1.2, ease: 'easeOut' }}
-        style={{ position: 'absolute', width: 240, height: 240, borderRadius: '50%', border: `2px solid ${G}`, pointerEvents: 'none' }}
-      />
-      {PARTICLES.map((p, i) => (
-        <motion.div
-          key={i}
-          initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
-          animate={revealed ? { x: Math.cos((p.angle * Math.PI) / 180) * p.radius, y: Math.sin((p.angle * Math.PI) / 180) * p.radius, opacity: 0, scale: 0 } : {}}
-          transition={{ duration: 0.85, delay: p.delay, ease: 'easeOut' }}
-          style={{ position: 'absolute', width: p.size, height: p.size, borderRadius: '50%', background: G, pointerEvents: 'none' }}
-        />
-      ))}
+      {!reducedMotion && (
+        <>
+          <motion.div
+            initial={{ scale: 0.2, opacity: 0.9 }}
+            animate={{ scale: revealed ? 3.5 : 0.2, opacity: revealed ? 0 : 0.9 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            style={{ position: 'absolute', width: 240, height: 240, borderRadius: '50%', border: `2px solid ${G}`, pointerEvents: 'none' }}
+          />
+          {PARTICLES.map((p, i) => (
+            <motion.div
+              key={i}
+              initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
+              animate={revealed ? { x: Math.cos((p.angle * Math.PI) / 180) * p.radius, y: Math.sin((p.angle * Math.PI) / 180) * p.radius, opacity: 0, scale: 0 } : {}}
+              transition={{ duration: 0.85, delay: p.delay, ease: [0.22, 1, 0.36, 1] }}
+              style={{ position: 'absolute', width: p.size, height: p.size, borderRadius: '50%', background: G, pointerEvents: 'none' }}
+            />
+          ))}
+        </>
+      )}
       <motion.div
         animate={{ opacity: revealed ? 0.25 : 0 }}
-        transition={{ duration: 1.0, delay: 0.4 }}
+        transition={{ duration: 1.0, delay: reducedMotion ? 0 : 0.4 }}
         style={{ position: 'absolute', width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(198,168,92,0.5) 0%, transparent 65%)', filter: 'blur(20px)', pointerEvents: 'none' }}
       />
       <div className="relative z-10 text-center">
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: reducedMotion ? 0 : 0.2 }}
           className="font-heading font-bold text-[11px] tracking-[0.22em] mb-6"
           style={{ color: 'rgba(198,168,92,0.65)' }}
         >
           YOUR ASCENDUS SCORE
         </motion.p>
         <motion.div
-          initial={{ filter: 'blur(28px)', scale: 0.8, opacity: 0 }}
-          animate={{ filter: revealed ? 'blur(0px)' : 'blur(28px)', scale: revealed ? 1 : 0.8, opacity: 1 }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          initial={reducedMotion ? { opacity: 0 } : { filter: 'blur(28px)', scale: 0.8, opacity: 0 }}
+          animate={reducedMotion
+            ? { opacity: 1 }
+            : { filter: revealed ? 'blur(0px)' : 'blur(28px)', scale: revealed ? 1 : 0.8, opacity: 1 }}
+          transition={reducedMotion
+            ? { duration: 0.2, ease: 'easeOut' }
+            : { duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
         >
           <span className="font-heading font-bold" style={{ fontSize: 100, color: TEXT, letterSpacing: '-0.04em', lineHeight: 1, display: 'block' }}>
             {score.toFixed(1)}
@@ -891,9 +644,9 @@ function UnlockReveal({ score, onContinue }) {
       <AnimatePresence>
         {revealed && (
           <motion.button
-            initial={{ opacity: 0, y: 28 }}
+            initial={{ opacity: 0, y: reducedMotion ? 0 : 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
+            transition={{ delay: reducedMotion ? 0 : 0.55 }}
             whileTap={{ scale: 0.97 }}
             onClick={onContinue}
             className="relative z-10 mt-14 px-12 py-4 rounded-2xl font-heading font-bold text-[16px]"
@@ -963,7 +716,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
     <motion.div
       initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
       transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-      className="absolute inset-x-0 bottom-0 rounded-t-3xl z-10 flex flex-col"
+      className="absolute inset-x-0 bottom-0 rounded-t-2xl z-10 flex flex-col"
       style={{ background: '#111', border: '1px solid rgba(198,168,92,0.15)', borderBottom: 0, maxHeight: '85vh' }}
     >
       <div className="flex justify-center pt-3 pb-1">
@@ -1045,6 +798,8 @@ export default function ScanUnlockGate() {
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
   const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState('')
 
   useEffect(() => {
     if (isPremium) navigate('/results', { replace: true })
@@ -1072,8 +827,48 @@ export default function ScanUnlockGate() {
     return <UnlockReveal score={revealScore} onContinue={() => navigate('/results', { replace: true })} />
   }
 
-  function handleAscend() {
-    navigate('/premium')
+  async function handleAscend() {
+    setIsPurchasing(true)
+    setPurchaseError('')
+    try {
+      if (isNative()) {
+        // Prefer whichever plan the "3-Day Free Trial" copy is actually
+        // promising — monthly by default, but fall back to yearly if only
+        // that one is trial-eligible.
+        const plan = trialEligibility.monthly === 'eligible' ? 'monthly'
+          : trialEligibility.yearly === 'eligible' ? 'yearly' : 'monthly'
+        const result = await purchasePro(plan)
+        if (result?.success) {
+          const rcUserId = result.customerInfo?.originalAppUserId
+          api.payments.syncRc(rcUserId).catch(() => {})
+          sessionStorage.setItem('asc_pro_splash_shown', '1')
+          setIsPremium(true)
+          navigate('/results', { replace: true })
+          return
+        }
+        // Resolved without granting the entitlement — either the user
+        // cancelled or something else went wrong without throwing. Reset so
+        // the button never gets stuck spinning either way.
+        if (result?.reason !== 'cancelled') {
+          setPurchaseError('Unable to complete purchase. Please try again.')
+        }
+        setIsPurchasing(false)
+        return
+      }
+      // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
+      const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+      const token  = stored?.state?.token
+      if (!token || token === 'demo-token') { setIsPurchasing(false); navigate('/auth'); return }
+      const { url } = await api.payments.createCheckout('monthly', false)
+      window.location.href = url
+      // Leave isPurchasing=true — the page is about to navigate away.
+    } catch (err) {
+      const msg = (err?.message || '').toLowerCase()
+      if (!msg.includes('cancel')) {
+        setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
+      }
+      setIsPurchasing(false)
+    }
   }
 
   return (
@@ -1083,14 +878,21 @@ export default function ScanUnlockGate() {
         onAscend={handleAscend}
         onInvite={() => setShowInvite(true)}
         onPromo={() => setShowPromo(true)}
-        isPurchasing={false}
+        isPurchasing={isPurchasing}
+        error={purchaseError}
         trialEligibility={trialEligibility}
       />
 
       <AnimatePresence>
         {showPromo && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30">
-            <PromoModal onClose={() => setShowPromo(false)} onSuccess={() => { setShowPromo(false); setShowReveal(true) }} />
+            <PromoModal onClose={() => setShowPromo(false)} onSuccess={() => {
+              setShowPromo(false)
+              // Flag this scan's reveal as shown so Results.jsx's own ScoreReveal
+              // doesn't replay the same score count-up seconds later.
+              try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
+              setShowReveal(true)
+            }} />
           </motion.div>
         )}
       </AnimatePresence>

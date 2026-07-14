@@ -1,6 +1,18 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
 const BASE = `https://${API_URL.replace(/^https?:\/\//, '')}/api`
 
+// Several server routes' generic catch-alls return machine-readable codes
+// (not sentences) as `error` — safe for logs, never safe to render as-is.
+// Map known ones to a human message; anything else falls through unchanged
+// since most routes already send a proper sentence.
+const RAW_ERROR_CODES = {
+  internal_error: 'Something went wrong on our end. Please try again.',
+}
+function friendlyError(raw, fallback) {
+  if (raw && RAW_ERROR_CODES[raw]) return RAW_ERROR_CODES[raw]
+  return raw || fallback
+}
+
 async function request(path, options = {}) {
   const token = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token
   const headers = {
@@ -47,15 +59,15 @@ async function request(path, options = {}) {
             window.dispatchEvent(new CustomEvent('auth:session-expired'))
           }
         } catch {}
-        const sessionErr = new Error(errBody.error || 'Session expired. Please sign in again.')
+        const sessionErr = new Error(friendlyError(errBody.error, 'Session expired. Please sign in again.'))
         sessionErr.status = 401
         sessionErr.isSessionExpired = true
         throw sessionErr
       }
-      throw new Error(errBody.error || 'Invalid email or password')
+      throw new Error(friendlyError(errBody.error, 'Invalid email or password'))
     }
     // Attach structured fields (retryAfter, plan, status, etc.) to the thrown error
-    const err = new Error(errBody.error || `Something went wrong (${res.status})`)
+    const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status = res.status
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan

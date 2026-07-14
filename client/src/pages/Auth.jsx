@@ -134,7 +134,7 @@ export default function Auth() {
       style={{ background: 'var(--bg)' }}
     >
       {/* Header */}
-      <div className="px-6 pt-16 pb-10">
+      <div className="px-6 pb-10" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -239,19 +239,21 @@ export default function Auth() {
                 background: 'var(--card)',
               }}
               required
-              minLength={isSignup ? 6 : undefined}
+              minLength={isSignup ? 8 : undefined}
               autoComplete={isSignup ? 'new-password' : 'current-password'}
             />
             <button
               type="button"
               onClick={() => setShowPw(v => !v)}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+              aria-pressed={showPw}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary"
             >
               {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
           {isSignup && (
-            <p className="text-[11px] text-secondary font-body mt-1.5">Minimum 6 characters</p>
+            <p className="text-[11px] text-secondary font-body mt-1.5">Minimum 8 characters</p>
           )}
         </div>
 

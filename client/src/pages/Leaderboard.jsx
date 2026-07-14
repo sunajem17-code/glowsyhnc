@@ -6,8 +6,8 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import { api } from '../utils/api'
+import { GOLD } from '../utils/theme'
 
-const GOLD = '#C6A85C'
 const GOLD_DIM = 'rgba(198,168,92,0.1)'
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
 

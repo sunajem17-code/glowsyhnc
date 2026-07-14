@@ -32,7 +32,7 @@ function diffColor(d) {
 
 // ─── Comparison Slider ────────────────────────────────────────────────────────
 
-function CompareSlider({ before, after }) {
+export function CompareSlider({ before, after }) {
   const [pos, setPos] = useState(50)
   const containerRef = useRef()
   const dragging = useRef(false)
@@ -476,7 +476,10 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: 'rgba(6,4,1,0.95)', backdropFilter: 'blur(20px)' }}
     >
-      <div className="flex items-center justify-between px-4 pt-10 pb-2 flex-shrink-0">
+      <div
+        className="flex items-center justify-between px-4 pb-2 flex-shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <div>
           <p className="font-heading font-bold text-base text-white">Share Your Glow Up</p>
           <p className="text-[11px] text-white/40 font-body mt-0.5">9:16 · Instagram / TikTok Stories</p>
@@ -561,7 +564,7 @@ export default function Compare() {
     return (
       <MotionPage>
         <div className="flex flex-col h-full bg-page">
-          <PageHeader title="Before & After" onBack={() => navigate(-1)} />
+          <PageHeader title="Before & After" back />
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center mb-2"
@@ -604,7 +607,10 @@ export default function Compare() {
     <MotionPage>
       <div className="flex flex-col h-full bg-page overflow-y-auto">
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-safe-top pt-4 pb-3">
+        <div
+          className="flex-shrink-0 flex items-center justify-between px-4 pb-3"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+        >
           <button
             onClick={() => navigate(-1)}
             className="w-9 h-9 rounded-full flex items-center justify-center"

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, Check, ChevronLeft, Gift, Users, Share2, MessageCircle } from 'lucide-react'
+import { Copy, Check, Gift, Users, Share2, MessageCircle } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
+import PageHeader from '../components/PageHeader'
 import { api } from '../utils/api'
+import { GOLD } from '../utils/theme'
 
-const GOLD = '#C6A85C'
 const TOTAL_REFS = 5
 
 function getReferralCode(user) {
@@ -19,7 +19,6 @@ function getReferralLink(code) {
 }
 
 export default function Referral() {
-  const navigate = useNavigate()
   const { user, referralCount, isPremium, proTrialActive, startProTrial } = useStore()
 
   const code = getReferralCode(user)
@@ -75,22 +74,7 @@ export default function Referral() {
 
   return (
     <MotionPage className="flex flex-col min-h-full bg-page">
-      {/* Header */}
-      <div className="pt-14 pb-4 px-4 flex items-center gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-        >
-          <ChevronLeft size={18} className="text-primary" />
-        </button>
-        <h1
-          className="font-heading font-bold text-xl text-primary"
-          style={{ letterSpacing: '-0.02em' }}
-        >
-          Refer Friends
-        </h1>
-      </div>
+      <PageHeader title="Refer Friends" back />
 
       <div className="px-4 flex-1 pb-10">
 
