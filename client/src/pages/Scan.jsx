@@ -87,6 +87,10 @@ function FaceGuide() {
 
 function SideGuide({ size = 'normal' }) {
   const maxW = size === 'small' ? 115 : size === 'overlay' ? 220 : 260
+  // sideProfileGuide is now a full reference photo (not line art), so when this
+  // is overlaid live on top of the camera feed it needs plain reduced opacity
+  // instead of a screen blend — screen mode on a photo (vs. line art) would
+  // just wash it out into a ghostly white blob rather than a visible reference.
   return (
     <img
       src={sideProfileGuide}
@@ -96,8 +100,8 @@ function SideGuide({ size = 'normal' }) {
         maxWidth: maxW,
         display: 'block',
         margin: '0 auto',
-        mixBlendMode: 'screen',
-        filter: 'contrast(1.4) brightness(1.1)',
+        opacity: 0.4,
+        borderRadius: 16,
       }}
     />
   )
@@ -279,8 +283,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             src={sideProfileGuide}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ mixBlendMode: 'screen', filter: 'contrast(1.4) brightness(1.1)' }}
+            className="absolute inset-0 w-full h-full object-cover object-top"
           />
         ) : stepNum === 3 ? (
           <img
@@ -329,54 +332,80 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mb-1">
-        <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
-        {/* Take Photo — solid gold border */}
-        <button
-          onClick={handleCameraClick}
-          className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-          style={{
-            background: 'rgba(201,168,76,0.06)',
-            border: '2px solid #C6A85C',
-            borderRadius: 12,
-            boxShadow: '0 0 12px rgba(201,168,76,0.3)',
-          }}
-        >
-          <Camera size={20} style={{ color: '#C6A85C' }} />
-          <span className="text-xs font-heading font-bold text-white">Take Photo</span>
-        </button>
-        {/* Upload Photo — identical gold border, no greyed-out look */}
-        <button
-          onClick={handleUploadClick}
-          className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-          style={{
-            background: 'rgba(201,168,76,0.06)',
-            border: '2px solid #C6A85C',
-            borderRadius: 12,
-            boxShadow: '0 0 12px rgba(201,168,76,0.3)',
-          }}
-        >
-          <Upload size={20} style={{ color: '#C6A85C' }} />
-          <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
-        </button>
-      </div>
+      <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
-      {/* Live Face Scan — native iOS + TrueDepth only, Step 1 only */}
-      {stepNum === 1 && isNative() && onLiveScan && (
-        <button
-          onClick={onLiveScan}
-          className="w-full flex items-center justify-center gap-2 py-3.5 mt-2 active:scale-95 transition-transform"
-          style={{
-            background: arScanDone ? 'rgba(0,255,255,0.08)' : 'rgba(0,255,255,0.04)',
-            border: `1.5px solid ${arScanDone ? 'cyan' : 'rgba(0,255,255,0.35)'}`,
-            borderRadius: 12,
-          }}
-        >
-          <Star size={16} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.7)' }} />
-          <span className="text-xs font-heading font-bold" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.7)' }}>
-            {arScanDone ? '✓ Live Face Scan Done — Rescan' : 'Live Face Scan (TrueDepth)'}
-          </span>
-        </button>
+      {/* Step 1 (face) on a TrueDepth-capable device: Live Face Scan is the
+          standard/primary method — bigger, first, gold-cyan treatment.
+          Take/Upload Photo become smaller fallback options underneath, for
+          older devices or anyone who prefers a regular photo. */}
+      {stepNum === 1 && isNative() && onLiveScan ? (
+        <>
+          <button
+            onClick={onLiveScan}
+            className="w-full flex items-center justify-center gap-2 py-4 mb-2.5 active:scale-95 transition-transform"
+            style={{
+              background: arScanDone ? 'rgba(0,255,255,0.1)' : 'linear-gradient(135deg, rgba(0,255,255,0.14) 0%, rgba(198,168,92,0.10) 100%)',
+              border: `2px solid ${arScanDone ? 'cyan' : 'rgba(0,255,255,0.55)'}`,
+              borderRadius: 14,
+              boxShadow: '0 0 16px rgba(0,255,255,0.2)',
+            }}
+          >
+            <Star size={20} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.85)' }} />
+            <span className="text-sm font-heading font-bold" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.9)' }}>
+              {arScanDone ? '✓ Live Face Scan Done — Rescan' : 'Live Face Scan (Recommended)'}
+            </span>
+          </button>
+
+          <div className="grid grid-cols-2 gap-2.5 mb-1">
+            <button
+              onClick={handleCameraClick}
+              className="flex items-center justify-center gap-1.5 py-2.5 active:scale-95 transition-transform"
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10 }}
+            >
+              <Camera size={15} className="text-secondary" />
+              <span className="text-[11px] font-heading font-semibold text-secondary">Take Photo Instead</span>
+            </button>
+            <button
+              onClick={handleUploadClick}
+              className="flex items-center justify-center gap-1.5 py-2.5 active:scale-95 transition-transform"
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10 }}
+            >
+              <Upload size={15} className="text-secondary" />
+              <span className="text-[11px] font-heading font-semibold text-secondary">Upload Instead</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 mb-1">
+          {/* Take Photo — solid gold border */}
+          <button
+            onClick={handleCameraClick}
+            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
+            style={{
+              background: 'rgba(201,168,76,0.06)',
+              border: '2px solid #C6A85C',
+              borderRadius: 12,
+              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
+            }}
+          >
+            <Camera size={20} style={{ color: '#C6A85C' }} />
+            <span className="text-xs font-heading font-bold text-white">Take Photo</span>
+          </button>
+          {/* Upload Photo — identical gold border, no greyed-out look */}
+          <button
+            onClick={handleUploadClick}
+            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
+            style={{
+              background: 'rgba(201,168,76,0.06)',
+              border: '2px solid #C6A85C',
+              borderRadius: 12,
+              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
+            }}
+          >
+            <Upload size={20} style={{ color: '#C6A85C' }} />
+            <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
+          </button>
+        </div>
       )}
     </div>
   )
@@ -463,6 +492,7 @@ export default function Scan() {
   const incrementScanCount = useStore(s => s.incrementScanCount)
   const setAssignedPhase  = useStore(s => s.setAssignedPhase)
   const setLastScanDate   = useStore(s => s.setLastScanDate)
+  const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
   const logout            = useStore(s => s.logout)
 
   // Monthly scan gate for free users
@@ -552,13 +582,36 @@ export default function Scan() {
   async function handleLiveScan() {
     const result = await startFaceScan()
     if (!result.supported) {
-      setError('Live face scan requires a device with a TrueDepth camera (iPhone X or later).')
+      if (result.nativeError) {
+        // The native plugin call itself failed — this is a build/wiring issue,
+        // not a hardware limitation. Don't tell the user their phone is unsupported.
+        console.error('[Scan] FaceScanPlugin call failed (not a hardware issue):', result.message)
+        setError('Live face scan couldn’t start due to an app error. Try closing and reopening the app, or reinstalling it.')
+      } else {
+        setError('Live face scan requires a device with a TrueDepth camera (iPhone X or later).')
+      }
       return
     }
     if (result.cancelled) return
-    setFaceMetrics(result)
+
+    // IMPORTANT: strip the large capturedImage/landmarks2D fields out before
+    // this goes anywhere near faceMetrics state — faceMetrics ends up on
+    // scanRecord.faceMetrics, which ends up in currentScan, which IS
+    // persisted to localStorage (see useStore.js partialize). Embedding the
+    // photo there would reintroduce the exact quota bug we already fixed
+    // once this session, just through a different path. Numbers only here.
+    const { capturedImage, landmarks2D, ...metricsOnly } = result
+    setFaceMetrics(metricsOnly)
     setArScanDone(true)
     setError('')
+
+    // Photo + 2D landmark positions go to session-only store state instead
+    // (NOT persisted — see setLastFaceScanCapture's comment in useStore.js)
+    // so the interactive "tap a stat, see it on your face" UI in Progress
+    // can use them without touching localStorage at all.
+    if (capturedImage && landmarks2D) {
+      setLastFaceScanCapture(capturedImage, landmarks2D)
+    }
   }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
@@ -793,17 +846,28 @@ export default function Scan() {
         setClaudeRateLimited(true)
         setStep(3)
       } else {
-        const m = (err.message || '').toLowerCase()
-        const isRateLimit = err.errorCode === 'rate_limited' || err.message === 'rate_limited'
-          || err.status === 429
-          || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
-          || m.includes('rate_limit') || m.includes('too many') || m.includes('overloaded')
-          || m.includes('capacity') || m.includes('credit') || m.includes('high demand')
+        // IMPORTANT: only trust err.status/err.errorCode here, both of which are
+        // exclusively set by api.js's request() helper when parsing a REAL HTTP
+        // response from our backend (see utils/api.js). Do NOT substring-match
+        // err.message against words like "exceeded"/"capacity"/"quota" — that
+        // used to catch unrelated client-side errors too (e.g. a browser
+        // QuotaExceededError from localStorage being full contains the word
+        // "exceeded" and was getting shown as "Claude is rate limited", which
+        // was flat-out wrong and sent debugging down the wrong path for hours).
+        const isRateLimit = err.errorCode === 'rate_limited' || err.status === 429
+        const isStorageQuotaError = err.name === 'QuotaExceededError'
+          || (err.message || '').toLowerCase().includes('quota') && err.status === undefined
+
         if (isRateLimit) {
           const cd = err.retryAfter || 30
           rateLimitInitial.current = cd
           setRateLimited(true)
           setRetryCountdown(cd)
+        } else if (isStorageQuotaError) {
+          // The analysis itself may have already succeeded server-side — this
+          // fires when saving the result locally fails, not when scoring fails.
+          console.error('[Scan] Local storage full while saving scan result:', err.message)
+          setError('Your device storage for this app is full. Try clearing some scan history, or reinstalling the app.')
         } else {
           setError(err.message || 'Analysis failed. Please try again.')
         }

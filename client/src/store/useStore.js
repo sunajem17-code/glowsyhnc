@@ -49,9 +49,24 @@ const useStore = create(
       scans: [],
       currentScan: null,
 
-      addScan: (scan) => set(state => ({ scans: [scan, ...state.scans] })),
+      // Capped at 100 to bound localStorage growth over time — history beyond
+      // that lives server-side (scan_history / Supabase) if it's ever needed.
+      addScan: (scan) => set(state => ({ scans: [scan, ...state.scans].slice(0, 100) })),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
+
+      // Live Face Scan photo + 2D landmark positions, for the "tap a stat, see
+      // it pointed out on your face" UI. Deliberately session-only — NOT in
+      // partialize below, so this never gets written to localStorage. It's a
+      // full-size base64 JPEG, persisting it is exactly what blew up local
+      // storage before (see partialize comment on `scans`). Lasts for the
+      // current app session, cleared on a fresh scan or app relaunch.
+      lastFaceScanImage: null,
+      lastFaceScanLandmarks2D: null,
+      setLastFaceScanCapture: (image, landmarks2D) => set({
+        lastFaceScanImage: image,
+        lastFaceScanLandmarks2D: landmarks2D,
+      }),
 
       // Patches celebrity-match data onto an already-saved scan once
       // POST /score/enrich resolves — updates both currentScan and the
@@ -284,7 +299,17 @@ const useStore = create(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
-        scans: state.scans,
+        // IMPORTANT: strip full base64 photo data URLs before persisting scan
+        // history to localStorage. Each scan's facePhotoUrl/sidePhotoUrl can be
+        // a few hundred KB as base64, and localStorage in a WKWebView typically
+        // caps out around 5-10MB total. Repeated scans during testing (or just
+        // normal use over time) will otherwise blow that quota, throwing a
+        // QuotaExceededError on the next setItem — which was previously getting
+        // misclassified as a Claude/Anthropic rate limit because its message
+        // contains the word "exceeded". The photos aren't needed in long-term
+        // local history (scoring data is what matters there); the current
+        // session's in-memory currentScan still has them for the Results screen.
+        scans: state.scans.map(({ facePhotoUrl, sidePhotoUrl, ...rest }) => rest),
         currentPlan: state.currentPlan,
         checkins: state.checkins,
         todayCheckin: state.todayCheckin,
@@ -308,7 +333,17 @@ const useStore = create(
         privacySettings: state.privacySettings,
         assignedPhase: state.assignedPhase,
         scanCount: state.scanCount,
-        currentScan: state.currentScan,
+        // Defensive strip, same reasoning as `scans` above: even though the
+        // capture flow is written to keep capturedImage/landmarks2D out of
+        // faceMetrics before it ever reaches here, this is cheap insurance
+        // against a future code path reintroducing large photo data into
+        // persisted state and blowing the localStorage quota again.
+        currentScan: state.currentScan ? {
+          ...state.currentScan,
+          faceMetrics: state.currentScan.faceMetrics
+            ? (({ capturedImage, landmarks2D, ...rest }) => rest)(state.currentScan.faceMetrics)
+            : state.currentScan.faceMetrics,
+        } : state.currentScan,
         achievements: state.achievements,
         freeCoachMessages: state.freeCoachMessages,
       }),

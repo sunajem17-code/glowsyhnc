@@ -999,6 +999,59 @@ router.post('/score/enrich', verifyToken, resolvePro, claudeLimit, async (req, r
   }
 })
 
+// ── POST /api/ai/score/physique ───────────────────────────────────────────────
+// Body-only physique scoring — no face photo required at all. Exists so the
+// Training Plan flow can be unlocked with just a body photo, without forcing
+// the user through the full face+side+body scan. Deliberately NOT gated by
+// scanLimit (that's for full scans) — only claudeLimit applies, since this
+// still makes one real Claude call.
+router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey || apiKey.trim() === '') {
+      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+    }
+
+    const { bodyImage, gender = 'male' } = req.body
+    if (!bodyImage) {
+      return res.status(400).json({ error: 'Body image is required' })
+    }
+
+    const bodyMediaType = getMediaType(bodyImage)
+    const bodyBase64    = stripPrefix(bodyImage)
+
+    console.log('[aiScore:physique-only] Inputs — gender:', gender)
+
+    await acquireSlot()
+    let physiqueResult
+    try {
+      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique-only')
+      console.log('[aiScore:physique-only] OK — overall:', physiqueResult.overall)
+    } finally {
+      releaseSlot()
+    }
+
+    res.json({ physiqueScore: physiqueResult })
+  } catch (err) {
+    const status = err.status ?? err.statusCode ?? 0
+    const msg    = err.message || ''
+    const lower  = msg.toLowerCase()
+    const isRateLimit =
+      status === 429 || status === 529 || err.retryExhausted ||
+      lower.includes('quota') || lower.includes('rate limit') ||
+      lower.includes('rate_limit') || lower.includes('exceeded') ||
+      lower.includes('overloaded') || lower.includes('capacity') ||
+      lower.includes('too many')
+
+    console.error(`[aiScore:physique-only] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
+
+    if (isRateLimit) {
+      return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
+    }
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 // ── POST /api/ai/workout-plan ─────────────────────────────────────────────────
 // Generates a personalized weekly workout split from physique sub-scores.
 // Uses haiku for speed + cost. Falls back to 500 so the client can show a

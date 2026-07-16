@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame } from 'lucide-react'
@@ -6,6 +6,30 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
+
+// Resize + JPEG-compress a raw File before sending to the server, same
+// approach used in Scan.jsx's toBase64 — keeps payloads small and fast.
+function fileToResizedBase64(file, maxPx = 1024) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read photo'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = () => reject(new Error('Could not load photo'))
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 // ── Fallback plan (used if AI call fails) ─────────────────────────────────────
 function buildFallback(physiqueScores, gender) {
@@ -296,12 +320,50 @@ const SPLIT_ICONS = {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function WorkoutPlan() {
-  const navigate      = useNavigate()
-  const currentScan   = useStore(s => s.currentScan)
-  const gender        = useStore(s => s.gender) ?? currentScan?.gender ?? 'male'
-  const isPremium     = useStore(s => s.isPremium)
+  const navigate       = useNavigate()
+  const currentScan    = useStore(s => s.currentScan)
+  const setCurrentScan = useStore(s => s.setCurrentScan)
+  const gender         = useStore(s => s.gender) ?? currentScan?.gender ?? 'male'
+  const isPremium      = useStore(s => s.isPremium)
 
   const physiqueScores = currentScan?.physiqueScore
+
+  // ── Body-only quick scan (no face required) ──────────────────────────────────
+  const bodyFileInputRef = useRef(null)
+  const [bodyScanLoading, setBodyScanLoading] = useState(false)
+  const [bodyScanError, setBodyScanError]     = useState('')
+
+  async function handleBodyPhotoSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+
+    setBodyScanLoading(true)
+    setBodyScanError('')
+    try {
+      const bodyImage = await fileToResizedBase64(file)
+      const { physiqueScore } = await api.ai.scorePhysique({ bodyImage, gender })
+      // Merge into currentScan if one exists (keeps any face data around),
+      // otherwise start a minimal scan record — Training Plan only ever
+      // reads physiqueScore + gender off this object.
+      setCurrentScan({
+        id: currentScan?.id ?? `scan-${Date.now()}`,
+        scanDate: currentScan?.scanDate ?? new Date().toISOString(),
+        ...currentScan,
+        gender,
+        physiqueScore,
+      })
+    } catch (err) {
+      console.error('[WorkoutPlan] body-only scan failed:', err.message)
+      setBodyScanError(
+        err.errorCode === 'rate_limited' || err.status === 429
+          ? 'High demand right now — please try again in a moment.'
+          : err.message || 'Could not analyze your photo. Please try again.'
+      )
+    } finally {
+      setBodyScanLoading(false)
+    }
+  }
 
   // Infer training level from physique overall score
   const overall = physiqueScores?.overall ?? 5
@@ -361,21 +423,49 @@ export default function WorkoutPlan() {
               Add Your Physique Photo
             </p>
             <p className="font-body text-[13px] text-secondary leading-relaxed">
-              Your training plan is built from your physique scan. Upload a body photo to get a plan tailored to your actual weak areas.
+              That's the only thing needed — take or upload one body photo and your plan is built from it. No face scan required here.
             </p>
           </div>
+
+          {bodyScanError && (
+            <div className="w-full flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <AlertCircle size={15} className="text-warning flex-shrink-0" />
+              <p className="text-xs text-warning font-body flex-1 text-left">{bodyScanError}</p>
+            </div>
+          )}
+
+          <input
+            ref={bodyFileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleBodyPhotoSelected}
+          />
+
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate('/scan')}
+            whileTap={{ scale: bodyScanLoading ? 1 : 0.97 }}
+            disabled={bodyScanLoading}
+            onClick={() => bodyFileInputRef.current?.click()}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
             style={{
               background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)',
               color: '#0A0A0A',
               boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+              opacity: bodyScanLoading ? 0.6 : 1,
             }}
           >
-            <Target size={16} />
-            Scan Your Physique
+            {bodyScanLoading ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Analyzing your photo…
+              </>
+            ) : (
+              <>
+                <Target size={16} />
+                Take or Upload Body Photo
+              </>
+            )}
           </motion.button>
         </div>
       </MotionPage>

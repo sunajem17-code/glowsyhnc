@@ -25,7 +25,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Ascendus uses your camera to capture your photo for AI-powered facial analysis and looksmax scoring.</string>
+	<string>Ascendus uses your camera to capture photos for AI-powered facial analysis and to run a live TrueDepth face scan that measures facial geometry.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Ascendus uses Face ID for secure account authentication.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

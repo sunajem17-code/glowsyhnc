@@ -11,6 +11,7 @@ import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import ShareCardModal from '../components/ShareCardModal'
+import DevRankCard from '../components/DevRankCard'
 import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
 import { scoreColor } from '../utils/analysis'
@@ -1299,8 +1300,14 @@ const CELEB_GROUPS = {
 
 export default function Results() {
   const navigate = useNavigate()
-  const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, userProfile } = useStore()
+  const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, userProfile, user } = useStore()
   const [showShareCard,   setShowShareCard]   = useState(false)
+  // Secret dev-only score override — only ever true for the account that
+  // redeemed the SOHAIL promo code (checked server-side, see user.promoRedeemed
+  // in server/src/routes/user.js). Completely separate from the real share
+  // card; see DevRankCard.jsx.
+  const isDevUnlocked = user?.promoRedeemed === true
+  const [showDevCard, setShowDevCard] = useState(false)
   const [revealDone, setRevealDone] = useState(false)
 
   // Show reveal only on first load for a fresh scan (within last 10s), and only
@@ -2870,6 +2877,16 @@ export default function Results() {
           <Share2 size={17} />
           Share Your Results Card
         </button>
+        {isDevUnlocked && (
+          <button
+            onClick={() => setShowDevCard(true)}
+            className="w-full py-3 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2"
+            style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.25)', color: '#C6A85C' }}
+          >
+            <FlaskConical size={14} />
+            Dev Override
+          </button>
+        )}
         {isPremium && (
           <>
             <button onClick={() => navigate('/workout-plan')} className="btn-primary flex items-center justify-center gap-2">
@@ -2950,6 +2967,13 @@ export default function Results() {
             onClose={() => setShowShareCard(false)}
           />
         </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* ── Dev Override Card (SOHAIL-only, fully separate from the real card) ── */}
+    <AnimatePresence>
+      {isDevUnlocked && showDevCard && (
+        <DevRankCard scan={currentScan} onClose={() => setShowDevCard(false)} />
       )}
     </AnimatePresence>
 

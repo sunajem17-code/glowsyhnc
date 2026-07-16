@@ -9,6 +9,7 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import ProLock from '../components/ProLock'
+import FaceMetricsExplorer from '../components/FaceMetricsExplorer'
 import { api } from '../utils/api'
 
 const METRIC_TABS = [
@@ -262,6 +263,8 @@ export default function Progress() {
       <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
       <PageHeader title="Your Progress" subtitle="Track your glow-up journey" />
+
+      <FaceMetricsExplorer />
 
       {/* ── Overview cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-4">

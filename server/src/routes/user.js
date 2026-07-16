@@ -32,6 +32,11 @@ router.get('/profile', authMiddleware, async (req, res) => {
     is_pro: sbUser?.is_pro === true || sbUser?.is_pro === 1 || false,
     stripe_subscription_id: sbUser?.stripe_subscription_id || null,
     createdAt: base.created_at,
+    // Only ever true for the account that redeemed the SOHAIL promo code —
+    // there is currently exactly one promo code in the system (see
+    // routes/promo.js VALID_CODE), so this flag is unambiguous. Gates the
+    // dev-only share-card score override in the client.
+    promoRedeemed: sbUser?.promo_redeemed === true || sbUser?.promo_redeemed === 1 || false,
   }
 
   res.json({ user, streak })
