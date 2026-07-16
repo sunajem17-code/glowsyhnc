@@ -88,6 +88,22 @@ final class FaceScanARViewController: UIViewController, ARSCNViewDelegate, ARSes
     /// landmark point (from FaceMetrics.landmarkPoints, local face-mesh space)
     /// into that image's 2D coordinate space via ARKit's camera projection —
     /// this is real math (a projection matrix multiply), not an estimate.
+    ///
+    /// FIXED: this used to project into `view.bounds.size` (the on-screen AR
+    /// view, which SceneKit fills/crops the camera feed into) and then treat
+    /// those fractions as if they applied to `frame.capturedImage` (the full,
+    /// UNCROPPED sensor buffer — a different aspect ratio/resolution than the
+    /// screen). Since the full buffer shows more vertical content than the
+    /// cropped on-screen view, every landmark came out shifted toward the top
+    /// once applied to the real photo — jaw dots landing near the mouth,
+    /// cheekbone dots landing near the eyebrows, that kind of thing. Fix:
+    /// project into the pixel buffer's OWN dimensions (rotated to portrait to
+    /// match how it's actually oriented/saved below), so the fractions are
+    /// computed in the same coordinate space as the image they'll be drawn
+    /// on. Also mirrors X to match `.leftMirrored`, the orientation the saved
+    /// photo is encoded with — projectPoint's `orientation:` param only
+    /// rotates, it doesn't mirror, so left/right landmarks were silently
+    /// unflipped relative to the mirrored photo.
     private func captureImageAndProjectLandmarks(
         metrics: FaceMetrics, transform: simd_float4x4
     ) -> (UIImage?, [String: CGPoint]) {
@@ -102,16 +118,26 @@ final class FaceScanARViewController: UIViewController, ARSCNViewDelegate, ARSes
             image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .leftMirrored)
         }
 
-        let viewportSize = view.bounds.size
+        // The pixel buffer comes out of the camera in its native landscape
+        // orientation; once rotated to portrait (matching .leftMirrored
+        // above) width and height swap. This — not view.bounds — is the
+        // coordinate space frame.capturedImage actually lives in.
+        let bufferWidth  = CVPixelBufferGetWidth(frame.capturedImage)
+        let bufferHeight = CVPixelBufferGetHeight(frame.capturedImage)
+        let portraitImageSize = CGSize(width: bufferHeight, height: bufferWidth)
+
         var points2D: [String: CGPoint] = [:]
+        guard portraitImageSize.width > 0, portraitImageSize.height > 0 else { return (image, [:]) }
         for (name, localPoint) in metrics.landmarkPoints {
             let local4 = simd_float4(localPoint.x, localPoint.y, localPoint.z, 1)
             let world4 = transform * local4
             guard world4.w != 0 else { continue }
             let worldPoint = simd_float3(world4.x, world4.y, world4.z) / world4.w
-            let projected = frame.camera.projectPoint(worldPoint, orientation: .portrait, viewportSize: viewportSize)
-            guard viewportSize.width > 0, viewportSize.height > 0 else { continue }
-            points2D[name] = CGPoint(x: projected.x / viewportSize.width, y: projected.y / viewportSize.height)
+            let projected = frame.camera.projectPoint(worldPoint, orientation: .portrait, viewportSize: portraitImageSize)
+            let fx = projected.x / portraitImageSize.width
+            let fy = projected.y / portraitImageSize.height
+            // Mirror X to match the saved image's .leftMirrored orientation.
+            points2D[name] = CGPoint(x: 1.0 - fx, y: fy)
         }
         return (image, points2D)
     }

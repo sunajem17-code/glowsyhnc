@@ -266,11 +266,13 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
               <CheckCircle2 size={32} style={{ color: 'cyan' }} />
             </div>
-            <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
+            <p className="text-cyan-400 text-sm font-heading font-bold text-center">
+              {stepNum === 1 ? 'Live Face Scan Complete' : 'Carried Over From Face Photo Step'}
+            </p>
             <p className="text-white/50 text-[11px] font-body text-center">
               {stepNum === 1
                 ? 'Geometry captured · Take a photo too — both are required'
-                : 'Profile geometry already included, same scan · Take a photo too — both are required'}
+                : "This is your scan from the Face Photo step, not a new one — ARKit can't track a real 90° turn, so one scan covers both. Tap Rescan below to redo it if needed. Take a photo too — both are required"}
             </p>
           </div>
         ) : stepNum === 2 ? (
