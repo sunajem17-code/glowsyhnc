@@ -64,7 +64,9 @@ async function claudeLimit(req, res, next) {
   const tier    = req.isPro ? 'pro' : req.isDemo ? 'demo' : 'free'
   const allowed = await checkClaude[tier](req.userId)
   if (!allowed) {
-    return res.status(429).json({ error: 'Rate limit reached — please try again in a few minutes' })
+    // retryAfter=3600 signals "hourly limit" to the client so it shows a
+    // "limit reached" message instead of a 30-second server-busy countdown.
+    return res.status(429).json({ error: 'claude_rate_limited', retryAfter: 3600 })
   }
   next()
 }

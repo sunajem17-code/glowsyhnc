@@ -14,6 +14,7 @@ import bodyGuideMale from '../assets/body-guide-male.jpg'
 import bodyGuideFemale from '../assets/body-guide-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
+import { startFaceScan } from '../utils/faceScan'
 import { scheduleRescanNotification } from '../utils/notifications'
 
 export const ANALYSIS_STEPS = [
@@ -221,7 +222,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
@@ -288,6 +289,14 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
+        ) : stepNum === 1 && arScanDone ? (
+          <div className="flex flex-col items-center gap-3 p-8">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
+              <CheckCircle2 size={32} style={{ color: 'cyan' }} />
+            </div>
+            <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
+            <p className="text-white/50 text-[11px] font-body text-center">Geometry captured · You can still add a photo below</p>
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
             {stepNum === 1 && <FaceGuide />}
@@ -351,6 +360,24 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender }) {
           <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
         </button>
       </div>
+
+      {/* Live Face Scan — native iOS + TrueDepth only, Step 1 only */}
+      {stepNum === 1 && isNative() && onLiveScan && (
+        <button
+          onClick={onLiveScan}
+          className="w-full flex items-center justify-center gap-2 py-3.5 mt-2 active:scale-95 transition-transform"
+          style={{
+            background: arScanDone ? 'rgba(0,255,255,0.08)' : 'rgba(0,255,255,0.04)',
+            border: `1.5px solid ${arScanDone ? 'cyan' : 'rgba(0,255,255,0.35)'}`,
+            borderRadius: 12,
+          }}
+        >
+          <Star size={16} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.7)' }} />
+          <span className="text-xs font-heading font-bold" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.7)' }}>
+            {arScanDone ? '✓ Live Face Scan Done — Rescan' : 'Live Face Scan (TrueDepth)'}
+          </span>
+        </button>
+      )}
     </div>
   )
 }
@@ -452,16 +479,20 @@ export default function Scan() {
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
   const [bodyPhoto, setBodyPhoto]         = useState(null)
+  const [faceMetrics, setFaceMetrics]     = useState(null)   // ARKit geometry results
+  const [arScanDone, setArScanDone]       = useState(false)  // true when ARKit replaced photo
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
   const [error, setError]                 = useState('')
   const [rateLimited, setRateLimited]     = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
+  const [claudeRateLimited, setClaudeRateLimited] = useState(false)
   const [scanCapReached, setScanCapReached] = useState(false)
   const [scanCapPlan, setScanCapPlan]     = useState('free')
   const [showConsent, setShowConsent]     = useState(() => !hasAIConsent())
 
-  const startAnalysisRef = useRef(null)
+  const startAnalysisRef  = useRef(null)
+  const rateLimitInitial  = useRef(30)
 
   // Countdown → auto-retry
   useEffect(() => {
@@ -518,6 +549,18 @@ export default function Scan() {
     return Promise.race([convert, timeout])
   }
 
+  async function handleLiveScan() {
+    const result = await startFaceScan()
+    if (!result.supported) {
+      setError('Live face scan requires a device with a TrueDepth camera (iPhone X or later).')
+      return
+    }
+    if (result.cancelled) return
+    setFaceMetrics(result)
+    setArScanDone(true)
+    setError('')
+  }
+
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false, skipBodyOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
@@ -531,8 +574,9 @@ export default function Scan() {
     setAnalysisStep(0)
 
     try {
-      const faceB64 = await toBase64(facePhoto)
-      setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
+      const usingARKit = arScanDone && !facePhoto
+      const faceB64    = usingARKit ? null : await toBase64(facePhoto)
+      if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
       const bodyB64 = (!skipBody && bodyPhoto) ? await toBase64(bodyPhoto) : null
@@ -544,7 +588,30 @@ export default function Scan() {
       const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       let aiResult
-      if (token === 'demo-token') {
+      if (usingARKit) {
+        // ARKit-only path: derive score from live symmetry geometry (0-100 → 0-10)
+        clearInterval(stageTimer)
+        clearTimeout(slowTimer)
+        setSlowAnalysis(false)
+        const sym   = (faceMetrics?.symmetryScore ?? 50) / 10
+        const score = Math.round(Math.min(9.5, Math.max(1.0, sym)) * 10) / 10
+        const tier  = getTier(score, g)
+        aiResult = {
+          overallScore:    score,
+          faceScore:       score,
+          faceOnlyScore:   score,
+          groomingScore:   null,
+          tier:            tier.label,
+          hasSideProfile:  false,
+          faceSubScores:   { symmetry: score, jawlineDefinition: null, skinClarity: null, facialProportions: null, eyeArea: null, facialHarmony: null },
+          pillars:         null,
+          celebrityMatches: [],
+          celebrityStatus: 'resolved',
+          physiqueScore:   null,
+          bodyFatLevel:    null,
+          insights:        ['Score derived from live TrueDepth face geometry. Take a photo scan for full AI analysis.'],
+        }
+      } else if (token === 'demo-token') {
         // Demo users: return mock results instead of hitting the backend
         await new Promise(r => setTimeout(r, 2500))
         clearInterval(stageTimer)
@@ -650,12 +717,14 @@ export default function Scan() {
         celebrityStatus:  aiResult.celebrityStatus ?? 'resolved',
         physiqueScore:    aiResult.physiqueScore    ?? null,
         bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
+        // ARKit live scan geometry — present when user used TrueDepth face scan
+        faceMetrics:      faceMetrics ?? undefined,
       }
 
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
       const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, assignedPh, g)
       setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
-      setPendingFacePhoto(faceB64)
+      if (faceB64) setPendingFacePhoto(faceB64)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
@@ -714,20 +783,27 @@ export default function Scan() {
       navigate(isPremium ? '/results' : '/unlock')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
-      if (err.message === 'hourly_cap_reached') {
+      if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
         setStep(3)
+      } else if (err.errorCode === 'claude_rate_limited') {
+        // User hit their own hourly Claude limit — retrying in 30s won't help.
+        // Show a static "limit reached" card instead of an auto-retry countdown.
+        setClaudeRateLimited(true)
+        setStep(3)
       } else {
         const m = (err.message || '').toLowerCase()
-        const isRateLimit = err.message === 'rate_limited' || err.status === 429
+        const isRateLimit = err.errorCode === 'rate_limited' || err.message === 'rate_limited'
+          || err.status === 429
           || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
           || m.includes('rate_limit') || m.includes('too many') || m.includes('overloaded')
           || m.includes('capacity') || m.includes('credit') || m.includes('high demand')
-          || m.includes('server_error')
         if (isRateLimit) {
+          const cd = err.retryAfter || 30
+          rateLimitInitial.current = cd
           setRateLimited(true)
-          setRetryCountdown(err.retryAfter || 30)
+          setRetryCountdown(cd)
         } else {
           setError(err.message || 'Analysis failed. Please try again.')
         }
@@ -791,7 +867,7 @@ export default function Scan() {
           )}
           {step === 1 && (
             <motion.div key="face" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => setFacePhoto(url)} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setArScanDone(false); setFaceMetrics(null) }} arScanDone={arScanDone} onLiveScan={handleLiveScan} />
             </motion.div>
           )}
           {step === 3 && (
@@ -916,6 +992,29 @@ export default function Scan() {
         </div>
       )}
 
+      {/* Claude hourly limit — static message, no countdown loop */}
+      {claudeRateLimited && (
+        <div className="px-4 pb-2">
+          <div className="flex flex-col items-center gap-3 px-4 py-4 rounded-2xl border text-center"
+            style={{ background: 'rgba(201,168,76,0.08)', borderColor: 'rgba(201,168,76,0.3)' }}>
+            <p className="text-sm font-heading font-bold text-primary">Analysis limit reached</p>
+            <p className="text-xs text-secondary font-body">You've used all your AI scans for this hour. Try again in a few minutes, or upgrade to Pro for higher limits.</p>
+            <div className="flex gap-2 w-full">
+              <button onClick={() => { setClaudeRateLimited(false); setStep(1) }}
+                className="flex-1 text-xs font-heading font-bold px-4 py-2 rounded-xl active:opacity-70 transition-opacity"
+                style={{ background: 'rgba(201,168,76,0.18)', color: '#C6A85C' }}>
+                Try Again
+              </button>
+              <button onClick={() => navigate('/premium')}
+                className="flex-1 text-xs font-heading font-bold px-4 py-2 rounded-xl active:opacity-70 transition-opacity"
+                style={{ background: 'rgba(201,168,76,0.35)', color: '#C6A85C' }}>
+                Upgrade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rate-limit countdown ring */}
       {rateLimited && (
         <div className="px-4 pb-2">
@@ -926,7 +1025,7 @@ export default function Scan() {
                 <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(201,168,76,0.2)" strokeWidth="4" />
                 <circle cx="32" cy="32" r="28" fill="none" stroke="#C6A85C" strokeWidth="4" strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 28}`}
-                  strokeDashoffset={`${2 * Math.PI * 28 * (retryCountdown / 30)}`}
+                  strokeDashoffset={`${2 * Math.PI * 28 * (retryCountdown / rateLimitInitial.current)}`}
                   style={{ transition: 'stroke-dashoffset 1s linear' }} />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -986,9 +1085,9 @@ export default function Scan() {
 
           {/* Step 1: face */}
           {step === 1 && (
-            <button onClick={() => facePhoto && (setStep(2), setError(''))} disabled={!facePhoto}
-              className={`btn-primary ${!facePhoto ? 'opacity-50' : ''}`}>
-              {facePhoto ? 'Continue →' : 'Take or upload face photo first'}
+            <button onClick={() => (facePhoto || arScanDone) && (setStep(2), setError(''))} disabled={!facePhoto && !arScanDone}
+              className={`btn-primary ${!facePhoto && !arScanDone ? 'opacity-50' : ''}`}>
+              {(facePhoto || arScanDone) ? 'Continue →' : 'Take a photo or run Live Face Scan first'}
             </button>
           )}
 

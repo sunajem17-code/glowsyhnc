@@ -66,9 +66,10 @@ async function request(path, options = {}) {
       }
       throw new Error(friendlyError(errBody.error, 'Invalid email or password'))
     }
-    // Attach structured fields (retryAfter, plan, status, etc.) to the thrown error
+    // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
     const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
-    err.status = res.status
+    err.status     = res.status
+    err.errorCode  = errBody.error  // machine-readable code, e.g. 'rate_limited', 'claude_rate_limited'
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan
     throw err
