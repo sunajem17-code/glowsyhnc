@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { X, FlaskConical, Download, Loader2, RotateCcw } from 'lucide-react'
+import { X, FlaskConical, Download, Loader2, RotateCcw, ChevronDown } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import { getTiersForGender } from '../utils/analysis'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
@@ -15,22 +15,23 @@ import logoSrc from '../assets/ascendus-icon.png'
 // the same JSX tree as the card real users see, and has zero risk of leaking
 // into or altering the actual share-card flow. Purely a standalone scratchpad
 // for previewing "what would a 9.2 Chad card look like."
+
+// 0.0 – 10.0 in 0.1 steps. Using a real <select> instead of a number input
+// sidesteps the native-input formatting quirks (padded "04", refusing single
+// digits) — a select just shows exactly the option text you picked, always.
+const SCORE_OPTIONS = Array.from({ length: 101 }, (_, i) => (i / 10).toFixed(1))
+
 function barColor(val) {
   if (val >= 7) return { from: '#1a7a3a', to: '#2ecc71' }
   if (val >= 5) return { from: '#7a5a1a', to: '#C9A84C' }
   return { from: '#7a2a1a', to: '#E07A5F' }
 }
 
-function clampScore(n) {
-  const v = parseFloat(n)
-  if (isNaN(v)) return 0
-  return Math.max(0, Math.min(10, v))
-}
-
-// Big editable number — tap in, type, done. Styled to look like a stat, not a form field.
-function BigStatInput({ label, value, onChange, color }) {
-  const pct = Math.max(0, Math.min(100, (value / 10) * 100))
-  const { from, to } = barColor(value)
+// Labeled dropdown + progress bar for Overall/Potential.
+function StatDropdown({ label, value, onChange, color }) {
+  const v = Number(value)
+  const pct = Math.max(0, Math.min(100, (v / 10) * 100))
+  const { from, to } = barColor(v)
   return (
     <div
       className="flex-1 rounded-2xl p-4"
@@ -39,18 +40,20 @@ function BigStatInput({ label, value, onChange, color }) {
       <div className="text-[10px] font-heading font-bold tracking-[0.16em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
         {label}
       </div>
-      <div className="flex items-baseline gap-1 mb-3">
-        <input
-          type="number"
-          min="0"
-          max="10"
-          step="0.1"
+      <div className="relative mb-3">
+        <select
           value={value}
-          onChange={e => onChange(clampScore(e.target.value))}
-          className="bg-transparent font-heading font-black outline-none"
-          style={{ color: color ?? '#fff', fontSize: 34, width: 74, letterSpacing: '-0.03em' }}
-        />
-        <span className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.25)' }}>/10</span>
+          onChange={e => onChange(e.target.value)}
+          className="w-full bg-transparent font-heading font-black outline-none appearance-none"
+          style={{ color: color ?? '#fff', fontSize: 28, letterSpacing: '-0.02em', paddingRight: 18 }}
+        >
+          {SCORE_OPTIONS.map(opt => (
+            <option key={opt} value={opt} style={{ background: '#111', color: '#fff' }}>
+              {opt} /10
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'rgba(255,255,255,0.3)' }} />
       </div>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${from}, ${to})` }} />
@@ -72,15 +75,15 @@ export default function DevRankCard({ scan, onClose }) {
   const realPotential = Math.min(10, realOverall + 1.4)
   const realTier       = tiers.find(t => t.label === scan?.tier) ?? tiers[Math.floor(tiers.length / 2)]
 
-  const [overall,   setOverall]   = useState(Number(realOverall.toFixed(1)))
-  const [potential, setPotential] = useState(Number(realPotential.toFixed(1)))
+  const [overall,   setOverall]   = useState(realOverall.toFixed(1))
+  const [potential, setPotential] = useState(realPotential.toFixed(1))
   const [tierLabel, setTierLabel] = useState(realTier.label)
 
   const activeTier = tiers.find(t => t.label === tierLabel) ?? realTier
 
   function resetToReal() {
-    setOverall(Number(realOverall.toFixed(1)))
-    setPotential(Number(realPotential.toFixed(1)))
+    setOverall(realOverall.toFixed(1))
+    setPotential(realPotential.toFixed(1))
     setTierLabel(realTier.label)
     setPreview(null)
   }
@@ -93,7 +96,7 @@ export default function DevRankCard({ scan, onClose }) {
       const canvas = await html2canvas(cardRef.current, {
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#050505',
+        backgroundColor: '#000000',
         scale: 2,
         logging: false,
       })
@@ -154,7 +157,7 @@ export default function DevRankCard({ scan, onClose }) {
         Not visible to real users, not connected to any real scan. Edit freely below — nothing here ever touches your Progress or Results data.
       </p>
 
-      {/* ── Editable card preview ── */}
+      {/* ── Editable card preview — flat black, no gradient/glow background ── */}
       <div className="px-5">
         <div
           ref={cardRef}
@@ -162,8 +165,8 @@ export default function DevRankCard({ scan, onClose }) {
           style={{
             width: '100%',
             maxWidth: 360,
-            background: 'radial-gradient(ellipse at 50% 0%, rgba(198,168,92,0.10) 0%, #050505 60%)',
-            border: `1px solid ${activeTier.color}33`,
+            background: '#000000',
+            border: '1px solid rgba(255,255,255,0.08)',
           }}
         >
           {/* Topbar */}
@@ -174,42 +177,40 @@ export default function DevRankCard({ scan, onClose }) {
             </div>
           </div>
 
-          {/* Ranking */}
-          <div className="text-center pt-6 pb-2">
-            <div className="text-[10px] font-heading font-bold tracking-[0.3em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Ranking
+          {/* Ranking — a single dropdown styled as the headline, colored by
+              tier (already gold→purple→blue→teal→amber→red in analysis.js,
+              so a lower tier just naturally reads as a "worse" color). No
+              separate "Ranking" caption and no second copy of the label —
+              this select IS the label. */}
+          <div className="text-center pt-6 pb-3 px-4">
+            <div className="relative inline-block max-w-full">
+              <select
+                value={tierLabel}
+                onChange={e => setTierLabel(e.target.value)}
+                className="bg-transparent font-heading font-black outline-none appearance-none text-center"
+                style={{
+                  fontSize: 'clamp(22px, 7.5vw, 34px)',
+                  color: activeTier.color,
+                  textShadow: `0 0 24px ${activeTier.color}55`,
+                  letterSpacing: '-0.02em',
+                  paddingRight: 22,
+                  maxWidth: '100%',
+                }}
+              >
+                {tiers.map(t => (
+                  <option key={t.label} value={t.label} style={{ background: '#111', color: '#fff' }}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: activeTier.color }} />
             </div>
-            <div
-              className="font-heading font-black leading-none"
-              style={{
-                fontSize: 42,
-                color: activeTier.color,
-                textShadow: `0 0 30px ${activeTier.color}55`,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {activeTier.label}
-            </div>
-            {/* Tier picker — same visual weight as the label above it so
-                editing feels native, not like a bolted-on form control. */}
-            <select
-              value={tierLabel}
-              onChange={e => setTierLabel(e.target.value)}
-              className="mt-2 bg-transparent text-center text-[11px] font-heading font-semibold outline-none"
-              style={{ color: 'rgba(255,255,255,0.4)' }}
-            >
-              {tiers.map(t => (
-                <option key={t.label} value={t.label} style={{ background: '#111' }}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
           </div>
 
-          {/* Stat cards */}
-          <div className="flex gap-3 px-5 pt-4 pb-6">
-            <BigStatInput label="Overall"   value={overall}   onChange={setOverall}   color="#fff" />
-            <BigStatInput label="Potential" value={potential} onChange={setPotential} color={GOLD} />
+          {/* Stat dropdowns */}
+          <div className="flex gap-3 px-5 pt-1 pb-6">
+            <StatDropdown label="Overall"   value={overall}   onChange={setOverall}   color="#fff" />
+            <StatDropdown label="Potential" value={potential} onChange={setPotential} color={GOLD} />
           </div>
         </div>
       </div>

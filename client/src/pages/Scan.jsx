@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowUpRight, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api } from '../utils/api'
@@ -12,6 +12,7 @@ import PageHeader from '../components/PageHeader'
 import sideProfileGuide from '../assets/side-profile-guide.png'
 import bodyGuideMale from '../assets/body-guide-male.jpg'
 import bodyGuideFemale from '../assets/body-guide-female.jpg'
+import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { startFaceScan } from '../utils/faceScan'
@@ -66,24 +67,6 @@ function GenderSelector({ selected, onSelect }) {
 }
 
 // ─── Side-profile guide SVGs (reused in both camera overlay and upload card) ──
-
-function FaceGuide() {
-  return (
-    <svg width="130" height="170" viewBox="0 0 130 170">
-      <ellipse cx="65" cy="85" rx="52" ry="72" fill="none" stroke="#C6A85C" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
-      <line x1="65" y1="5"   x2="65"  y2="165" stroke="#C6A85C" strokeWidth="1" opacity="0.25"/>
-      <line x1="5"  y1="85"  x2="125" y2="85"  stroke="#C6A85C" strokeWidth="1" opacity="0.25"/>
-      {/* Golden-ratio thirds */}
-      <line x1="5" y1="50"  x2="125" y2="50"  stroke="#F5A623" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"/>
-      <line x1="5" y1="85"  x2="125" y2="85"  stroke="#F5A623" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"/>
-      <line x1="5" y1="120" x2="125" y2="120" stroke="#F5A623" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"/>
-      <text x="110" y="38"  fill="#F5A623" fontSize="8" opacity="0.7">⅓</text>
-      <text x="110" y="73"  fill="#F5A623" fontSize="8" opacity="0.7">⅓</text>
-      <text x="110" y="108" fill="#F5A623" fontSize="8" opacity="0.7">⅓</text>
-    </svg>
-  )
-}
-
 
 function SideGuide({ size = 'normal' }) {
   const maxW = size === 'small' ? 115 : size === 'overlay' ? 220 : 260
@@ -278,12 +261,26 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               </div>
             </div>
           </>
+        ) : (stepNum === 1 || stepNum === 2) && arScanDone ? (
+          <div className="flex flex-col items-center gap-3 p-8">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
+              <CheckCircle2 size={32} style={{ color: 'cyan' }} />
+            </div>
+            <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
+            <p className="text-white/50 text-[11px] font-body text-center">
+              {stepNum === 1
+                ? 'Geometry captured · You can still add a photo below'
+                : 'Profile geometry already included — same scan, no separate capture needed'}
+            </p>
+          </div>
         ) : stepNum === 2 ? (
+          // object-contain (not cover) so the full reference photo shows —
+          // cover was cropping it to fill the box.
           <img
             src={sideProfileGuide}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-top"
+            className="absolute inset-0 w-full h-full object-contain"
           />
         ) : stepNum === 3 ? (
           <img
@@ -292,17 +289,15 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
-        ) : stepNum === 1 && arScanDone ? (
-          <div className="flex flex-col items-center gap-3 p-8">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
-              <CheckCircle2 size={32} style={{ color: 'cyan' }} />
-            </div>
-            <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
-            <p className="text-white/50 text-[11px] font-body text-center">Geometry captured · You can still add a photo below</p>
-          </div>
+        ) : stepNum === 1 ? (
+          <img
+            src={faceGuidePhoto}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-top"
+          />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
-            {stepNum === 1 && <FaceGuide />}
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
         )}
@@ -334,11 +329,15 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
 
       <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
-      {/* Step 1 (face) on a TrueDepth-capable device: Live Face Scan is the
-          standard/primary method — bigger, first, gold-cyan treatment.
-          Take/Upload Photo become smaller fallback options underneath, for
-          older devices or anyone who prefers a regular photo. */}
-      {stepNum === 1 && isNative() && onLiveScan ? (
+      {/* Live Face Scan is the standard/primary capture method on a
+          TrueDepth-capable device — offered on both the face step (1) and
+          the side-profile step (2), since one scan covers both: ARKit can't
+          reliably track a real 90° head turn, so profile-style metrics
+          (facial angle, gonial angle, etc.) are derived from this same
+          front-facing capture rather than a second one. Take/Upload Photo
+          are smaller fallback options underneath for older devices or
+          anyone who prefers a regular photo. */}
+      {(stepNum === 1 || stepNum === 2) && isNative() && onLiveScan ? (
         <>
           <button
             onClick={onLiveScan}
@@ -352,7 +351,11 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           >
             <Star size={20} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.85)' }} />
             <span className="text-sm font-heading font-bold" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.9)' }}>
-              {arScanDone ? '✓ Live Face Scan Done — Rescan' : 'Live Face Scan (Recommended)'}
+              {arScanDone
+                ? '✓ Live Face Scan Done — Rescan'
+                : stepNum === 2
+                ? 'Live Face Scan (Covers Profile Too)'
+                : 'Live Face Scan (Recommended)'}
             </span>
           </button>
 
@@ -936,34 +939,6 @@ export default function Scan() {
           )}
           {step === 3 && (
             <motion.div key="body" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <div className="mx-4 mb-1 px-3 py-2 rounded-xl flex items-start gap-2.5"
-                style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.2)' }}>
-                <Zap size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#C6A85C' }} />
-                <div>
-                  <p className="text-[11px] font-heading font-bold text-primary leading-snug">Unlocks Physique Score</p>
-                  <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">
-                    Proportions · Leanness · Frame · Posture · Presentation
-                  </p>
-                </div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-                  style={{ background: 'rgba(198,168,92,0.15)', color: '#C6A85C' }}>
-                  OPTIONAL
-                </span>
-              </div>
-              <div className="mx-4 mb-3 grid grid-cols-2 gap-2">
-                {[
-                  { icon: '🧍', text: 'Full body visible' },
-                  { icon: '📏', text: 'Stand straight' },
-                  { icon: '👕', text: 'Fitted clothing' },
-                  { icon: '☀️', text: 'Natural lighting' },
-                ].map(({ icon, text }) => (
-                  <div key={text} className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl"
-                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                    <span className="text-sm">{icon}</span>
-                    <span className="text-[11px] font-body text-primary">{text}</span>
-                  </div>
-                ))}
-              </div>
               <PhotoUploadStep stepNum={3}
                 guide="Stand facing the camera. Full body visible from head to feet. Good lighting, fitted clothing for accurate physique scoring."
                 photo={bodyPhoto}
@@ -973,39 +948,11 @@ export default function Scan() {
           )}
           {step === 2 && (
             <motion.div key="side" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              {/* Side-profile tips banner */}
-              <div className="mx-4 mb-1 px-3 py-2 rounded-xl flex items-start gap-2.5"
-                style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.2)' }}>
-                <ArrowUpRight size={16} className="flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[11px] font-heading font-bold text-primary leading-snug">Unlocks Profile Analysis</p>
-                  <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">
-                    Nose bridge · Jawline projection · Chin projection · Profile score
-                  </p>
-                </div>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-                  style={{ background: 'rgba(198,168,92,0.15)', color: '#C6A85C' }}>
-                  OPTIONAL
-                </span>
-              </div>
-              {/* Pose guide chips */}
-              <div className="mx-4 mb-3 grid grid-cols-2 gap-2">
-                {[
-                  { icon: '→', text: 'Face right 90°' },
-                  { icon: '🧍', text: 'Stand straight up' },
-                  { icon: '💪', text: 'Arms at your sides' },
-                  { icon: '☀️', text: 'Natural lighting' },
-                ].map(({ icon, text }) => (
-                  <div key={text} className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl"
-                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                    <span className="text-sm">{icon}</span>
-                    <span className="text-[11px] font-body text-primary">{text}</span>
-                  </div>
-                ))}
-              </div>
               <PhotoUploadStep stepNum={2}
                 guide="Turn 90° to the right. Stand straight — arms relaxed at sides. 3–6 feet from camera. Natural lighting."
                 photo={sidePhoto}
+                arScanDone={arScanDone}
+                onLiveScan={handleLiveScan}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
             </motion.div>
           )}
@@ -1158,7 +1105,7 @@ export default function Scan() {
           {/* Step 2: side profile → advance to body step */}
           {step === 2 && (
             <>
-              {sidePhoto && (
+              {(sidePhoto || arScanDone) && (
                 <button
                   onClick={() => { setStep(3); setError('') }}
                   className="btn-amber"
@@ -1168,24 +1115,18 @@ export default function Scan() {
               )}
               <button
                 onClick={() => { setStep(3); setError('') }}
-                className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
+                className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
                 style={{
-                  border: '3px solid #C6A85C',
-                  background: 'rgba(201,168,76,0.04)',
-                  borderRadius: 12,
-                  padding: '16px 20px',
-                  boxShadow: '0 0 16px rgba(201,168,76,0.4)',
+                  border: '1px solid rgba(201,168,76,0.4)',
+                  background: 'transparent',
+                  borderRadius: 10,
+                  padding: '10px 14px',
                 }}
               >
-                <SkipForward size={18} style={{ color: '#C6A85C', flexShrink: 0 }} />
-                <div className="text-left">
-                  <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
-                    Skip Side Profile
-                  </p>
-                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Continue without side profile
-                  </p>
-                </div>
+                <SkipForward size={14} style={{ color: '#C6A85C', flexShrink: 0 }} />
+                <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  Skip Side Profile
+                </span>
               </button>
             </>
           )}

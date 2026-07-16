@@ -20,23 +20,27 @@ struct FaceScanView: View {
     @State private var capturedResult: FaceScanCapture?
     @State private var trackingUnavailable = false
 
+    // When presented by the plugin (the only real path the app uses), the
+    // numbers-heavy results card used to show immediately after capture —
+    // right before the app immediately dismissed it and showed its own
+    // "Live Face Scan Complete" confirmation. That was a redundant extra
+    // screen: capture → this card → app's card. Now capture goes straight to
+    // onComplete, and the full breakdown only ever lives in one place: the
+    // Face Feature Breakdown section on Results. The results card below is
+    // kept only for the standalone/no-callback preview path (dev use).
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
             if trackingUnavailable {
                 unavailableState
-            } else if let result = capturedResult {
+            } else if let result = capturedResult, onComplete == nil {
                 ScrollView {
                     FaceScanResultsCard(
                         metrics: result.metrics,
-                        buttonLabel: onComplete != nil ? "Done" : "Scan Again"
+                        buttonLabel: "Scan Again"
                     ) {
-                        if let onComplete {
-                            onComplete(result)
-                        } else {
-                            capturedResult = nil
-                        }
+                        capturedResult = nil
                     }
                 }
             } else {
@@ -70,7 +74,18 @@ struct FaceScanView: View {
         ZStack(alignment: .bottom) {
             FaceScanARViewRepresentable(
                 controllerHolder: scanController,
-                onCapture: { result in capturedResult = result },
+                onCapture: { result in
+                    if let onComplete {
+                        // Plugin mode — save straight to the app, no intermediate
+                        // numbers screen. Scan.jsx shows its own lightweight
+                        // "Live Face Scan Complete" confirmation, and the full
+                        // breakdown lives on Results' Face Feature Breakdown.
+                        onComplete(result)
+                    } else {
+                        // Standalone/dev preview — nowhere else to show this.
+                        capturedResult = result
+                    }
+                },
                 onUnavailable: { trackingUnavailable = true }
             )
             .ignoresSafeArea()
