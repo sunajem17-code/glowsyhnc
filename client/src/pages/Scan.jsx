@@ -251,7 +251,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
       )}
 
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below */}
-      <div className="relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : '#111827' }}>
+      <div className="relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : (stepNum === 1 || stepNum === 2) ? '#000000' : '#111827' }}>
         {photo ? (
           <>
             <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-cover" />
@@ -269,8 +269,8 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
             <p className="text-white/50 text-[11px] font-body text-center">
               {stepNum === 1
-                ? 'Geometry captured · You can still add a photo below'
-                : 'Profile geometry already included — same scan, no separate capture needed'}
+                ? 'Geometry captured · Take a photo too — both are required'
+                : 'Profile geometry already included, same scan · Take a photo too — both are required'}
             </p>
           </div>
         ) : stepNum === 2 ? (
@@ -290,11 +290,13 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
         ) : stepNum === 1 ? (
+          // object-contain (not cover/top) so the whole face shows — cover+top
+          // was cropping this tall portrait down to just forehead/eyes.
           <img
             src={faceGuidePhoto}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-top"
+            className="absolute inset-0 w-full h-full object-contain"
           />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
@@ -334,50 +336,40 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           the side-profile step (2), since one scan covers both: ARKit can't
           reliably track a real 90° head turn, so profile-style metrics
           (facial angle, gonial angle, etc.) are derived from this same
-          front-facing capture rather than a second one. Take/Upload Photo
-          are smaller fallback options underneath for older devices or
-          anyone who prefers a regular photo. */}
+          front-facing capture rather than a second one. Exactly two equal
+          options here — Take Photo and Live Face Scan — no Upload, since
+          this is meant to be a real-time capture, not a file picker. */}
       {(stepNum === 1 || stepNum === 2) && isNative() && onLiveScan ? (
-        <>
+        <div className="grid grid-cols-2 gap-2.5 mb-1">
+          <button
+            onClick={handleCameraClick}
+            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
+            style={{
+              background: 'rgba(201,168,76,0.06)',
+              border: '2px solid #C6A85C',
+              borderRadius: 12,
+              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
+            }}
+          >
+            <Camera size={20} style={{ color: '#C6A85C' }} />
+            <span className="text-xs font-heading font-bold text-white">Take Photo</span>
+          </button>
           <button
             onClick={onLiveScan}
-            className="w-full flex items-center justify-center gap-2 py-4 mb-2.5 active:scale-95 transition-transform"
+            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
             style={{
               background: arScanDone ? 'rgba(0,255,255,0.1)' : 'linear-gradient(135deg, rgba(0,255,255,0.14) 0%, rgba(198,168,92,0.10) 100%)',
               border: `2px solid ${arScanDone ? 'cyan' : 'rgba(0,255,255,0.55)'}`,
-              borderRadius: 14,
-              boxShadow: '0 0 16px rgba(0,255,255,0.2)',
+              borderRadius: 12,
+              boxShadow: '0 0 12px rgba(0,255,255,0.25)',
             }}
           >
             <Star size={20} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.85)' }} />
-            <span className="text-sm font-heading font-bold" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.9)' }}>
-              {arScanDone
-                ? '✓ Live Face Scan Done — Rescan'
-                : stepNum === 2
-                ? 'Live Face Scan (Covers Profile Too)'
-                : 'Live Face Scan (Recommended)'}
+            <span className="text-xs font-heading font-bold text-center" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.9)' }}>
+              {arScanDone ? '✓ Rescan' : 'Live Face Scan'}
             </span>
           </button>
-
-          <div className="grid grid-cols-2 gap-2.5 mb-1">
-            <button
-              onClick={handleCameraClick}
-              className="flex items-center justify-center gap-1.5 py-2.5 active:scale-95 transition-transform"
-              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10 }}
-            >
-              <Camera size={15} className="text-secondary" />
-              <span className="text-[11px] font-heading font-semibold text-secondary">Take Photo Instead</span>
-            </button>
-            <button
-              onClick={handleUploadClick}
-              className="flex items-center justify-center gap-1.5 py-2.5 active:scale-95 transition-transform"
-              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10 }}
-            >
-              <Upload size={15} className="text-secondary" />
-              <span className="text-[11px] font-heading font-semibold text-secondary">Upload Instead</span>
-            </button>
-          </div>
-        </>
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
           {/* Take Photo — solid gold border */}
@@ -934,7 +926,10 @@ export default function Scan() {
           )}
           {step === 1 && (
             <motion.div key="face" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setArScanDone(false); setFaceMetrics(null) }} arScanDone={arScanDone} onLiveScan={handleLiveScan} />
+              {/* Photo and Live Face Scan are now both required, so taking a
+                  photo must NOT clear an already-completed scan (or vice
+                  versa) — they need to accumulate, not replace each other. */}
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} />
             </motion.div>
           )}
           {step === 3 && (
@@ -1094,25 +1089,39 @@ export default function Scan() {
             </button>
           )}
 
-          {/* Step 1: face */}
+          {/* Step 1: face — both a regular photo AND a Live Face Scan are
+              required before continuing (not either/or). */}
           {step === 1 && (
-            <button onClick={() => (facePhoto || arScanDone) && (setStep(2), setError(''))} disabled={!facePhoto && !arScanDone}
-              className={`btn-primary ${!facePhoto && !arScanDone ? 'opacity-50' : ''}`}>
-              {(facePhoto || arScanDone) ? 'Continue →' : 'Take a photo or run Live Face Scan first'}
+            <button onClick={() => (facePhoto && arScanDone) && (setStep(2), setError(''))} disabled={!facePhoto || !arScanDone}
+              className={`btn-primary ${!facePhoto || !arScanDone ? 'opacity-50' : ''}`}>
+              {facePhoto && arScanDone
+                ? 'Continue →'
+                : !facePhoto && !arScanDone
+                ? 'Take a photo and run Live Face Scan first'
+                : !facePhoto
+                ? 'Take a photo too to continue'
+                : 'Run a Live Face Scan too to continue'}
             </button>
           )}
 
-          {/* Step 2: side profile → advance to body step */}
+          {/* Step 2: side profile → advance to body step.
+              Continue requires BOTH a regular photo AND a Live Face Scan —
+              Skip Side Profile remains the escape hatch since this whole
+              step is optional. */}
           {step === 2 && (
             <>
-              {(sidePhoto || arScanDone) && (
+              {sidePhoto && arScanDone ? (
                 <button
                   onClick={() => { setStep(3); setError('') }}
                   className="btn-amber"
                 >
                   Continue →
                 </button>
-              )}
+              ) : (sidePhoto || arScanDone) ? (
+                <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {sidePhoto ? 'Run a Live Face Scan too to continue' : 'Take a photo too to continue'}
+                </p>
+              ) : null}
               <button
                 onClick={() => { setStep(3); setError('') }}
                 className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
