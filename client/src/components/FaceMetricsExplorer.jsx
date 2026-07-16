@@ -126,11 +126,20 @@ export default function FaceMetricsExplorer() {
         </button>
       )}
 
+      {/* No forced aspectRatio/object-cover here on purpose — the landmark
+          dots below are positioned as % of this box's width/height, which
+          only lines up with where they actually are on the photo if this
+          box IS the photo's real aspect ratio. Forcing a fixed 3:4 box with
+          object-cover was cropping differently-shaped captures (e.g. a
+          near-square ARKit frame) and silently shifting every dot off the
+          face. Letting the <img> size itself naturally (w-full h-auto) keeps
+          the box and the coordinate system in sync no matter what shape the
+          source photo is. */}
       <div
         className="relative w-full rounded-2xl overflow-hidden mb-3"
-        style={{ aspectRatio: '3 / 4', background: '#0a0a0a', border: `1px solid ${isDemo ? 'rgba(198,168,92,0.35)' : 'rgba(0,255,255,0.2)'}` }}
+        style={{ background: '#0a0a0a', border: `1px solid ${isDemo ? 'rgba(198,168,92,0.35)' : 'rgba(0,255,255,0.2)'}` }}
       >
-        <img src={image} alt={isDemo ? 'Example face scan' : 'Your face scan'} className="absolute inset-0 w-full h-full object-cover" />
+        <img src={image} alt={isDemo ? 'Example face scan' : 'Your face scan'} className="block w-full h-auto" />
 
         {isDemo && (
           <div

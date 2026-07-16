@@ -275,12 +275,15 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           </div>
         ) : stepNum === 2 ? (
           // object-contain (not cover) so the full reference photo shows —
-          // cover was cropping it to fill the box.
+          // cover was cropping it to fill the box. Inline style too, not just
+          // the Tailwind class — belt-and-suspenders against any build/purge
+          // weirdness silently dropping the utility class.
           <img
             src={sideProfileGuide}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-contain"
+            className="absolute inset-0 w-full h-full"
+            style={{ objectFit: 'contain' }}
           />
         ) : stepNum === 3 ? (
           <img
@@ -291,12 +294,18 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           />
         ) : stepNum === 1 ? (
           // object-contain (not cover/top) so the whole face shows — cover+top
-          // was cropping this tall portrait down to just forehead/eyes.
+          // was cropping this tall portrait down to just forehead/eyes. Also
+          // re-cropped the source asset itself tighter to the face (was
+          // 1000x2167 with a lot of dead neck/torso/black space below the
+          // chin, now 1000x1400) so contain doesn't shrink it down to a tiny
+          // letterboxed strip. Inline style, not just the Tailwind class —
+          // belt-and-suspenders against any build/purge weirdness.
           <img
             src={faceGuidePhoto}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-contain"
+            className="absolute inset-0 w-full h-full"
+            style={{ objectFit: 'contain' }}
           />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
@@ -340,7 +349,13 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           options here — Take Photo and Live Face Scan — no Upload, since
           this is meant to be a real-time capture, not a file picker. */}
       {(stepNum === 1 || stepNum === 2) && isNative() && onLiveScan ? (
-        <div className="grid grid-cols-2 gap-2.5 mb-1">
+        <div className="mb-1">
+          {stepNum === 2 && (
+            <p className="text-center text-[10.5px] font-body mb-2 leading-snug" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Take Photo: turn 90° like above. Live Face Scan: <span style={{ color: 'rgba(0,255,255,0.85)' }}>face the camera straight-on</span> — it reuses your front-facing scan, turning sideways breaks tracking.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={handleCameraClick}
             className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
@@ -369,6 +384,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               {arScanDone ? '✓ Rescan' : 'Live Face Scan'}
             </span>
           </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
