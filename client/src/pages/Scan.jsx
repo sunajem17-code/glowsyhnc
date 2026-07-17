@@ -211,7 +211,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
@@ -397,6 +397,18 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <Upload size={18} style={{ color: '#C6A85C' }} />
             <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
           </button>
+          {photo && !arScanDone && !arScanSkipped && onSkipScan && (
+            <button
+              onClick={onSkipScan}
+              className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
+              style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', borderRadius: 10, padding: '10px 14px' }}
+            >
+              <SkipForward size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
+              <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                Skip Live Face Scan — use photo only
+              </span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
@@ -534,6 +546,8 @@ export default function Scan() {
   const [bodyPhoto, setBodyPhoto]         = useState(null)
   const [faceMetrics, setFaceMetrics]     = useState(null)   // ARKit geometry results
   const [arScanDone, setArScanDone]       = useState(false)  // true when ARKit replaced photo
+  const [arScanSkipped, setArScanSkipped] = useState(false)  // user opted out of Live Face Scan after uploading/taking a static photo
+  const geometrySatisfied = arScanDone || arScanSkipped
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
   const [error, setError]                 = useState('')
@@ -626,6 +640,7 @@ export default function Scan() {
     const { capturedImage, landmarks2D, ...metricsOnly } = result
     setFaceMetrics(metricsOnly)
     setArScanDone(true)
+    setArScanSkipped(false) // a real scan just happened, any earlier skip no longer applies
     setError('')
 
     // Photo + 2D landmark positions go to session-only store state instead
@@ -957,7 +972,7 @@ export default function Scan() {
               {/* Photo and Live Face Scan are now both required, so taking a
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} />
             </motion.div>
           )}
           {step === 3 && (
@@ -1118,14 +1133,16 @@ export default function Scan() {
             </button>
           )}
 
-          {/* Step 1: face — both a regular photo AND a Live Face Scan are
-              required before continuing (not either/or). */}
+          {/* Step 1: face — a regular photo is always required; the Live Face
+              Scan requirement can be satisfied either by actually running it
+              or by explicitly skipping it (arScanSkipped) after uploading/
+              taking a static photo. */}
           {step === 1 && (
-            <button onClick={() => (facePhoto && arScanDone) && (setStep(2), setError(''))} disabled={!facePhoto || !arScanDone}
-              className={`btn-primary ${!facePhoto || !arScanDone ? 'opacity-50' : ''}`}>
-              {facePhoto && arScanDone
+            <button onClick={() => (facePhoto && geometrySatisfied) && (setStep(2), setError(''))} disabled={!facePhoto || !geometrySatisfied}
+              className={`btn-primary ${!facePhoto || !geometrySatisfied ? 'opacity-50' : ''}`}>
+              {facePhoto && geometrySatisfied
                 ? 'Continue →'
-                : !facePhoto && !arScanDone
+                : !facePhoto && !geometrySatisfied
                 ? 'Take a photo and run Live Face Scan first'
                 : !facePhoto
                 ? 'Take a photo too to continue'
@@ -1134,19 +1151,20 @@ export default function Scan() {
           )}
 
           {/* Step 2: side profile → advance to body step.
-              Continue requires BOTH a regular photo AND a Live Face Scan —
-              Skip Side Profile remains the escape hatch since this whole
-              step is optional. */}
+              Continue requires a photo, plus the same geometrySatisfied
+              condition from step 1 (already true by the time you get here in
+              the normal flow). Skip Side Profile remains the escape hatch
+              since this whole step is optional. */}
           {step === 2 && (
             <>
-              {sidePhoto && arScanDone ? (
+              {sidePhoto && geometrySatisfied ? (
                 <button
                   onClick={() => { setStep(3); setError('') }}
                   className="btn-amber"
                 >
                   Continue →
                 </button>
-              ) : (sidePhoto || arScanDone) ? (
+              ) : (sidePhoto || geometrySatisfied) ? (
                 <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                   {sidePhoto ? 'Run a Live Face Scan too to continue' : 'Take a photo too to continue'}
                 </p>
