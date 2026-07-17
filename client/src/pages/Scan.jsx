@@ -10,9 +10,11 @@ import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import sideProfileGuide from '../assets/side-profile-guide.png'
+import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
 import bodyGuideMale from '../assets/body-guide-male.jpg'
 import bodyGuideFemale from '../assets/body-guide-female.jpg'
 import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
+import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { startFaceScan } from '../utils/faceScan'
@@ -68,7 +70,7 @@ function GenderSelector({ selected, onSelect }) {
 
 // ─── Side-profile guide SVGs (reused in both camera overlay and upload card) ──
 
-function SideGuide({ size = 'normal' }) {
+function SideGuide({ size = 'normal', gender }) {
   const maxW = size === 'small' ? 115 : size === 'overlay' ? 220 : 260
   // sideProfileGuide is now a full reference photo (not line art), so when this
   // is overlaid live on top of the camera feed it needs plain reduced opacity
@@ -76,7 +78,7 @@ function SideGuide({ size = 'normal' }) {
   // just wash it out into a ghostly white blob rather than a visible reference.
   return (
     <img
-      src={sideProfileGuide}
+      src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
       alt="Side profile alignment guide"
       style={{
         width: '85%',
@@ -92,7 +94,7 @@ function SideGuide({ size = 'normal' }) {
 
 // ─── Live Camera Overlay ──────────────────────────────────────────────────────
 
-function CameraOverlay({ stepNum, onCapture, onClose }) {
+function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const videoRef   = useRef()
   const canvasRef  = useRef()
   const streamRef  = useRef()
@@ -161,7 +163,7 @@ function CameraOverlay({ stepNum, onCapture, onClose }) {
                   </svg>
                 ) : (
                   /* Side-profile wireframe overlay */
-                  <SideGuide size="overlay" />
+                  <SideGuide size="overlay" gender={gender} />
                 )}
               </div>
             )}
@@ -247,7 +249,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
   return (
     <div className="flex flex-col h-full px-4">
       {cameraOpen && (
-        <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} />
+        <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
       )}
 
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below */}
@@ -281,7 +283,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           // the Tailwind class — belt-and-suspenders against any build/purge
           // weirdness silently dropping the utility class.
           <img
-            src={sideProfileGuide}
+            src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
@@ -303,7 +305,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           // letterboxed strip. Inline style, not just the Tailwind class —
           // belt-and-suspenders against any build/purge weirdness.
           <img
-            src={faceGuidePhoto}
+            src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
@@ -947,7 +949,7 @@ export default function Scan() {
               {/* Photo and Live Face Scan are now both required, so taking a
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} />
             </motion.div>
           )}
           {step === 3 && (
@@ -966,6 +968,7 @@ export default function Scan() {
                 photo={sidePhoto}
                 arScanDone={arScanDone}
                 onLiveScan={handleLiveScan}
+                gender={gender}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
             </motion.div>
           )}

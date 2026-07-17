@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 import demoFaceImage from '../assets/face-metrics-demo.jpg'
+import demoFaceImageFemale from '../assets/face-metrics-demo-female.jpg'
 
 // Fallback content shown before the user has ever run a Live Face Scan, so
 // this section of Progress isn't just empty. Landmark positions were hand-
@@ -85,13 +86,18 @@ export default function FaceMetricsExplorer() {
   const realImage       = useStore(s => s.lastFaceScanImage)
   const realLandmarks2D = useStore(s => s.lastFaceScanLandmarks2D)
   const currentScan     = useStore(s => s.currentScan)
+  const storeGender     = useStore(s => s.gender)
   const realFaceMetrics = currentScan?.faceMetrics
+  // Prefer the current/most recent scan's own gender over the app-wide
+  // saved preference, so the demo photo matches whichever gender the user
+  // most recently scanned as.
+  const demoGender = currentScan?.gender ?? storeGender
 
   const [activeKey, setActiveKey] = useState(null)
 
   const hasRealScan = Boolean(realImage && realLandmarks2D && realFaceMetrics)
   const isDemo       = !hasRealScan
-  const image        = hasRealScan ? realImage : demoFaceImage
+  const image        = hasRealScan ? realImage : (demoGender === 'female' ? demoFaceImageFemale : demoFaceImage)
   const landmarks2D  = hasRealScan ? realLandmarks2D : DEMO_LANDMARKS_2D
   const faceMetrics  = hasRealScan ? realFaceMetrics : DEMO_METRICS
 
