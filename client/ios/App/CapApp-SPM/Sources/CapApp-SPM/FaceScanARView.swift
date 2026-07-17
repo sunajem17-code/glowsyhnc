@@ -89,54 +89,85 @@ final class FaceScanARViewController: UIViewController, ARSCNViewDelegate, ARSes
     /// into that image's 2D coordinate space via ARKit's camera projection —
     /// this is real math (a projection matrix multiply), not an estimate.
     ///
-    /// FIXED: this used to project into `view.bounds.size` (the on-screen AR
-    /// view, which SceneKit fills/crops the camera feed into) and then treat
-    /// those fractions as if they applied to `frame.capturedImage` (the full,
-    /// UNCROPPED sensor buffer — a different aspect ratio/resolution than the
-    /// screen). Since the full buffer shows more vertical content than the
-    /// cropped on-screen view, every landmark came out shifted toward the top
-    /// once applied to the real photo — jaw dots landing near the mouth,
-    /// cheekbone dots landing near the eyebrows, that kind of thing. Fix:
-    /// project into the pixel buffer's OWN dimensions (rotated to portrait to
-    /// match how it's actually oriented/saved below), so the fractions are
-    /// computed in the same coordinate space as the image they'll be drawn
-    /// on. Also mirrors X to match `.leftMirrored`, the orientation the saved
-    /// photo is encoded with — projectPoint's `orientation:` param only
-    /// rotates, it doesn't mirror, so left/right landmarks were silently
-    /// unflipped relative to the mirrored photo.
+    /// ROUND 2 FIX: round 1 switched the projection viewport from
+    /// `view.bounds.size` to the raw capture buffer's own dimensions, on the
+    /// theory that the buffer (not the screen) is what the photo is measured
+    /// against. That got dots onto the face instead of the background, but
+    /// they were still consistently offset — every landmark shifted toward
+    /// the top by roughly the same amount, spacing between them preserved.
+    /// That pattern points at the OTHER half of the original mismatch:
+    /// `ARSCNView` renders the camera feed into `view.bounds` using
+    /// aspect-FILL, i.e. it crops the full sensor buffer down to that
+    /// viewport's aspect ratio. `projectPoint(orientation:viewportSize:)` is
+    /// built specifically to simulate that exact aspect-fill crop — that's
+    /// what the viewportSize argument is *for*. So `view.bounds` was likely
+    /// the right viewport all along; the actual bug was returning the
+    /// UNCROPPED full buffer as the saved photo while projecting into a
+    /// cropped viewport. Fix this time: keep projecting into `view.bounds`
+    /// (well-trodden, matches how the live AR overlay itself renders), and
+    /// instead crop the SAVED PHOTO to that same aspect ratio (centered),
+    /// so image and landmark fractions are guaranteed to describe the same
+    /// pixels — by construction, not by hoping two independent size
+    /// calculations happen to agree.
     private func captureImageAndProjectLandmarks(
         metrics: FaceMetrics, transform: simd_float4x4
     ) -> (UIImage?, [String: CGPoint]) {
         guard let frame = sceneView.session.currentFrame else { return (nil, [:]) }
 
-        let ciImage = CIImage(cvPixelBuffer: frame.capturedImage)
+        let viewportSize = view.bounds.size
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return (nil, [:]) }
+
+        // Rotate + mirror the raw (landscape) sensor buffer into upright,
+        // selfie-mirrored portrait — using CIImage's oriented(), which
+        // physically rearranges pixels/extent, not just metadata. This keeps
+        // the crop math below unambiguous (no relying on a downstream
+        // decoder to interpret an EXIF tag the same way we assume).
+        let rawCIImage = CIImage(cvPixelBuffer: frame.capturedImage)
+        let oriented = rawCIImage.oriented(.leftMirrored)
+
+        // Crop the now-portrait image to match the AR view's own aspect
+        // ratio, centered — this is the exact crop ARSCNView's aspect-fill
+        // rendering already performs live on screen, so the saved photo now
+        // shows precisely what the user saw while scanning.
+        let targetAspect = viewportSize.width / viewportSize.height // portrait: <1
+        let srcW = oriented.extent.width
+        let srcH = oriented.extent.height
+        var cropRect = oriented.extent
+        if srcW > 0, srcH > 0 {
+            let srcAspect = srcW / srcH
+            if srcAspect > targetAspect {
+                // Source relatively wider than target — crop the sides.
+                let newW = srcH * targetAspect
+                let xOffset = (srcW - newW) / 2
+                cropRect = CGRect(x: oriented.extent.origin.x + xOffset, y: oriented.extent.origin.y, width: newW, height: srcH)
+            } else {
+                // Source relatively taller than target — crop top/bottom.
+                let newH = srcW / targetAspect
+                let yOffset = (srcH - newH) / 2
+                cropRect = CGRect(x: oriented.extent.origin.x, y: oriented.extent.origin.y + yOffset, width: srcW, height: newH)
+            }
+        }
+        let croppedCIImage = oriented.cropped(to: cropRect)
+
         let context = CIContext()
         var image: UIImage?
-        if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
-            // Front TrueDepth camera in portrait — .leftMirrored is the standard
-            // orientation fix for this combination. Verify on-device.
-            image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .leftMirrored)
+        if let cgImage = context.createCGImage(croppedCIImage, from: croppedCIImage.extent) {
+            // Pixels are already correctly rotated+mirrored+cropped — plain .up,
+            // no orientation metadata for a decoder to (mis)interpret.
+            image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
         }
 
-        // The pixel buffer comes out of the camera in its native landscape
-        // orientation; once rotated to portrait (matching .leftMirrored
-        // above) width and height swap. This — not view.bounds — is the
-        // coordinate space frame.capturedImage actually lives in.
-        let bufferWidth  = CVPixelBufferGetWidth(frame.capturedImage)
-        let bufferHeight = CVPixelBufferGetHeight(frame.capturedImage)
-        let portraitImageSize = CGSize(width: bufferHeight, height: bufferWidth)
-
         var points2D: [String: CGPoint] = [:]
-        guard portraitImageSize.width > 0, portraitImageSize.height > 0 else { return (image, [:]) }
         for (name, localPoint) in metrics.landmarkPoints {
             let local4 = simd_float4(localPoint.x, localPoint.y, localPoint.z, 1)
             let world4 = transform * local4
             guard world4.w != 0 else { continue }
             let worldPoint = simd_float3(world4.x, world4.y, world4.z) / world4.w
-            let projected = frame.camera.projectPoint(worldPoint, orientation: .portrait, viewportSize: portraitImageSize)
-            let fx = projected.x / portraitImageSize.width
-            let fy = projected.y / portraitImageSize.height
-            // Mirror X to match the saved image's .leftMirrored orientation.
+            let projected = frame.camera.projectPoint(worldPoint, orientation: .portrait, viewportSize: viewportSize)
+            let fx = projected.x / viewportSize.width
+            let fy = projected.y / viewportSize.height
+            // Mirror X to match the saved image's mirrored orientation —
+            // projectPoint's orientation param only rotates, it doesn't mirror.
             points2D[name] = CGPoint(x: 1.0 - fx, y: fy)
         }
         return (image, points2D)

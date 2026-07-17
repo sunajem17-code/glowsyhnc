@@ -44,7 +44,7 @@ function rankColor(tiers, label) {
 }
 
 // Labeled dropdown + progress bar for Overall/Potential.
-function StatDropdown({ label, value, onChange, color }) {
+function StatDropdown({ label, value, onChange, color, barOverride }) {
   const v = Number(value)
   const pct = Math.max(0, Math.min(100, (v / 10) * 100))
   return (
@@ -71,7 +71,7 @@ function StatDropdown({ label, value, onChange, color }) {
         <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'rgba(255,255,255,0.3)' }} />
       </div>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(v) }} />
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barOverride ?? barColor(v) }} />
       </div>
     </div>
   )
@@ -89,7 +89,7 @@ function StatDropdown({ label, value, onChange, color }) {
 // off-screen component from the interactive editor).
 const CARD_W = 360
 
-function StatBlock({ label, value, color }) {
+function StatBlock({ label, value, color, barOverride }) {
   const pct = Math.max(0, Math.min(100, (Number(value) / 10) * 100))
   return (
     <div style={{ flex: 1, borderRadius: 16, padding: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -100,7 +100,7 @@ function StatBlock({ label, value, color }) {
         {value} /10
       </div>
       <div style={{ height: 3, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
-        <div style={{ height: '100%', borderRadius: 999, width: `${pct}%`, background: barColor(Number(value)) }} />
+        <div style={{ height: '100%', borderRadius: 999, width: `${pct}%`, background: barOverride ?? barColor(Number(value)) }} />
       </div>
     </div>
   )
@@ -109,18 +109,18 @@ function StatBlock({ label, value, color }) {
 function CaptureCard({ overall, potential, tierLabel, tierColor }) {
   return (
     <div style={{ width: CARD_W, background: '#000000', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 28, overflow: 'hidden', fontFamily: 'inherit', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 0 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px 0 20px' }}>
         <img src={logoSrc} alt="Ascendus" style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover' }} />
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.26em', color: GOLD }}>ASCENDUS</div>
       </div>
-      <div style={{ textAlign: 'center', padding: '14px 16px 12px 16px' }}>
+      <div style={{ textAlign: 'center', padding: '6px 16px 12px 16px' }}>
         <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-0.02em', color: tierColor, textShadow: `0 0 24px ${tierColor}55`, lineHeight: 1.15 }}>
           {tierLabel}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, padding: '4px 20px 24px 20px' }}>
         <StatBlock label="Overall" value={overall} color="#ffffff" />
-        <StatBlock label="Potential" value={potential} color="#ffffff" />
+        <StatBlock label="Potential" value={potential} color="#ffffff" barOverride="#2ecc71" />
       </div>
     </div>
   )
@@ -235,7 +235,7 @@ export default function DevRankCard({ scan, onClose }) {
           }}
         >
           {/* Topbar */}
-          <div className="flex items-center justify-between px-5 pt-5">
+          <div className="flex items-center justify-between px-5 pt-3">
             <img src={logoSrc} alt="Ascendus" style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover' }} />
             <div className="text-[10px] font-heading font-bold tracking-[0.26em]" style={{ color: GOLD }}>
               ASCENDUS
@@ -246,7 +246,7 @@ export default function DevRankCard({ scan, onClose }) {
               follows the simplified 3-bucket rule (rankColor) instead of each
               tier's individual analysis.js palette color: green above High
               Tier, red below Mid Tier, gold for the two middle tiers. */}
-          <div className="text-center pt-4 pb-3 px-4">
+          <div className="text-center pt-1 pb-3 px-4">
             <div className="relative inline-block max-w-full">
               <select
                 value={tierLabel}
@@ -274,7 +274,7 @@ export default function DevRankCard({ scan, onClose }) {
           {/* Stat dropdowns */}
           <div className="flex gap-3 px-5 pt-1 pb-6">
             <StatDropdown label="Overall"   value={overall}   onChange={setOverall}   color="#fff" />
-            <StatDropdown label="Potential" value={potential} onChange={setPotential} color="#fff" />
+            <StatDropdown label="Potential" value={potential} onChange={setPotential} color="#fff" barOverride="#2ecc71" />
           </div>
         </div>
       </div>
