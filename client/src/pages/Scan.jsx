@@ -274,7 +274,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <p className="text-white/50 text-[11px] font-body text-center">
               {stepNum === 1
                 ? 'Geometry captured · Take a photo too — both are required'
-                : "This is your scan from the Face Photo step, not a new one — ARKit can't track a real 90° turn, so one scan covers both. Tap Rescan below to redo it if needed. Take a photo too — both are required"}
+                : "This is your scan from the Face Photo step, not a new one — ARKit can't track a real 90° turn, so one scan covers both. Just add a photo below."}
             </p>
           </div>
         ) : stepNum === 2 ? (
@@ -344,21 +344,16 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
 
       <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
-      {/* Live Face Scan is the standard/primary capture method on a
-          TrueDepth-capable device — offered on both the face step (1) and
-          the side-profile step (2), since one scan covers both: ARKit can't
-          reliably track a real 90° head turn, so profile-style metrics
-          (facial angle, gonial angle, etc.) are derived from this same
-          front-facing capture rather than a second one. Exactly two equal
-          options here — Take Photo and Live Face Scan — no Upload, since
-          this is meant to be a real-time capture, not a file picker. */}
-      {(stepNum === 1 || stepNum === 2) && isNative() && onLiveScan ? (
+      {/* Live Face Scan is the standard/primary capture method on the face
+          step (1) only — a TrueDepth capture there already covers profile
+          geometry too (ARKit can't reliably track a real 90° head turn, so
+          facial angle/gonial angle/etc. are derived from this same
+          front-facing capture). Offering the button again on the Side
+          Profile step just invited people to turn 90° before tapping it,
+          which broke tracking — so step 2 only ever needs a photo now, no
+          separate scan action. */}
+      {stepNum === 1 && isNative() && onLiveScan ? (
         <div className="mb-1">
-          {stepNum === 2 && (
-            <p className="text-center text-[10.5px] font-body mb-2 leading-snug" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Take Photo: turn 90° like above. Live Face Scan: <span style={{ color: 'rgba(0,255,255,0.85)' }}>face the camera straight-on</span> — it reuses your front-facing scan, turning sideways breaks tracking.
-            </p>
-          )}
           <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={handleCameraClick}
@@ -389,6 +384,19 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             </span>
           </button>
           </div>
+          <button
+            onClick={handleUploadClick}
+            className="w-full mt-2.5 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            style={{
+              background: 'rgba(201,168,76,0.06)',
+              border: '2px solid #C6A85C',
+              borderRadius: 12,
+              padding: '12px 14px',
+            }}
+          >
+            <Upload size={18} style={{ color: '#C6A85C' }} />
+            <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
