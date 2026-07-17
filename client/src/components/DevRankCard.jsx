@@ -22,11 +22,11 @@ import logoSrc from '../assets/ascendus-icon.png'
 const SCORE_OPTIONS = Array.from({ length: 101 }, (_, i) => (i / 10).toFixed(1))
 
 // Solid fill color for the stat progress bars — was a 2-stop gradient, user
-// asked for a flat solid color instead.
+// asked for a flat solid color instead. Only two buckets now: green at 7+,
+// red below — the old amber middle tier read as "gold", user wants that red.
 function barColor(val) {
   if (val >= 7) return '#2ecc71'
-  if (val >= 5) return '#C9A84C'
-  return '#E07A5F'
+  return '#E74C3C'
 }
 
 // Tier-rank text color. Independent of each tier's own palette color in
@@ -113,14 +113,14 @@ function CaptureCard({ overall, potential, tierLabel, tierColor }) {
         <img src={logoSrc} alt="Ascendus" style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover' }} />
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.26em', color: GOLD }}>ASCENDUS</div>
       </div>
-      <div style={{ textAlign: 'center', padding: '24px 16px 12px 16px' }}>
+      <div style={{ textAlign: 'center', padding: '14px 16px 12px 16px' }}>
         <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-0.02em', color: tierColor, textShadow: `0 0 24px ${tierColor}55`, lineHeight: 1.15 }}>
           {tierLabel}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, padding: '4px 20px 24px 20px' }}>
         <StatBlock label="Overall" value={overall} color="#ffffff" />
-        <StatBlock label="Potential" value={potential} color={GOLD} />
+        <StatBlock label="Potential" value={potential} color="#ffffff" />
       </div>
     </div>
   )
@@ -246,7 +246,7 @@ export default function DevRankCard({ scan, onClose }) {
               follows the simplified 3-bucket rule (rankColor) instead of each
               tier's individual analysis.js palette color: green above High
               Tier, red below Mid Tier, gold for the two middle tiers. */}
-          <div className="text-center pt-6 pb-3 px-4">
+          <div className="text-center pt-4 pb-3 px-4">
             <div className="relative inline-block max-w-full">
               <select
                 value={tierLabel}
@@ -274,7 +274,7 @@ export default function DevRankCard({ scan, onClose }) {
           {/* Stat dropdowns */}
           <div className="flex gap-3 px-5 pt-1 pb-6">
             <StatDropdown label="Overall"   value={overall}   onChange={setOverall}   color="#fff" />
-            <StatDropdown label="Potential" value={potential} onChange={setPotential} color={GOLD} />
+            <StatDropdown label="Potential" value={potential} onChange={setPotential} color="#fff" />
           </div>
         </div>
       </div>
