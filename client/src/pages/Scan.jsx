@@ -528,6 +528,7 @@ export default function Scan() {
   const setAssignedPhase  = useStore(s => s.setAssignedPhase)
   const setLastScanDate   = useStore(s => s.setLastScanDate)
   const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
+  const lastFaceScanImage = useStore(s => s.lastFaceScanImage)
   const logout            = useStore(s => s.logout)
 
   // Monthly scan gate for free users
@@ -842,29 +843,57 @@ export default function Scan() {
           })
       }
 
-      // Persist to Supabase (non-blocking)
-      api.supabase.saveScan({
-        overallScore:     aiResult.overallScore,
-        tier:             aiResult.tier,
-        faceScore:        aiResult.faceScore,
-        groomingScore:    aiResult.groomingScore,
-        harmony:          aiResult.pillars?.harmony,
-        angularity:       aiResult.pillars?.angularity,
-        features:         aiResult.pillars?.features,
-        dimorphism:       aiResult.pillars?.dimorphism,
-        potentialScore:   (() => {
-          const physiqueUpside = aiResult.physiqueScore
-            ? Math.max(0, (7.5 - (aiResult.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
-            : 0
-          return Math.min(10, (aiResult.overallScore ?? 5) + 1.4 + physiqueUpside)
-        })(),
-        celebrityMatches: aiResult.celebrityMatches,
-        hairTypeDetected: aiResult.hairType,
-        faceShape:        aiResult.facialStructure,
-        gender:           g,
-        assignedPhase:    assignedPh?.toLowerCase(),
-        tasks,
-      }).catch(() => {})
+      // Persist to Supabase (non-blocking). Upload the real scan photo to
+      // Supabase Storage first (private 'scan-images' bucket, already wired
+      // up server-side but never actually called until now) so the scan
+      // row's face_image_url is a real storage path, not empty — this is
+      // what powers Scan History thumbnails / Before-After on the Progress
+      // page across app restarts, instead of relying on localStorage (which
+      // deliberately strips photo data URLs to avoid a quota crash).
+      // For a Live-Face-Scan-only capture (no separate static photo taken),
+      // faceB64 is null but the AR capture's own photo is still available
+      // via lastFaceScanImage — fall back to that so ARKit-only scans still
+      // get a real thumbnail.
+      ;(async () => {
+        let faceImageUrl = null
+        const photoForUpload = faceB64 || (usingARKit ? lastFaceScanImage : null)
+        if (photoForUpload) {
+          try {
+            const commaIdx = photoForUpload.indexOf(',')
+            const header = commaIdx >= 0 ? photoForUpload.slice(0, commaIdx) : ''
+            const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
+            const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
+            const uploadResult = await api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' })
+            faceImageUrl = uploadResult?.path || null
+          } catch (err) {
+            console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
+          }
+        }
+
+        api.supabase.saveScan({
+          overallScore:     aiResult.overallScore,
+          tier:             aiResult.tier,
+          faceScore:        aiResult.faceScore,
+          groomingScore:    aiResult.groomingScore,
+          harmony:          aiResult.pillars?.harmony,
+          angularity:       aiResult.pillars?.angularity,
+          features:         aiResult.pillars?.features,
+          dimorphism:       aiResult.pillars?.dimorphism,
+          potentialScore:   (() => {
+            const physiqueUpside = aiResult.physiqueScore
+              ? Math.max(0, (7.5 - (aiResult.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
+              : 0
+            return Math.min(10, (aiResult.overallScore ?? 5) + 1.4 + physiqueUpside)
+          })(),
+          celebrityMatches: aiResult.celebrityMatches,
+          hairTypeDetected: aiResult.hairType,
+          faceShape:        aiResult.facialStructure,
+          faceImageUrl,
+          gender:           g,
+          assignedPhase:    assignedPh?.toLowerCase(),
+          tasks,
+        }).catch(() => {})
+      })()
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
@@ -1150,25 +1179,26 @@ export default function Scan() {
             </button>
           )}
 
-          {/* Step 2: side profile → advance to body step.
-              Continue requires a photo, plus the same geometrySatisfied
-              condition from step 1 (already true by the time you get here in
-              the normal flow). Skip Side Profile remains the escape hatch
-              since this whole step is optional. */}
+          {/* Step 2: side profile → advance to body step. geometrySatisfied
+              is already guaranteed true by the time anyone reaches this step
+              (step 1's gate requires it), and there's no Live Face Scan
+              action offered here anymore — so the only real requirement left
+              is a photo. Skip Side Profile remains the escape hatch since
+              this whole step is optional. */}
           {step === 2 && (
             <>
-              {sidePhoto && geometrySatisfied ? (
+              {sidePhoto ? (
                 <button
                   onClick={() => { setStep(3); setError('') }}
                   className="btn-amber"
                 >
                   Continue →
                 </button>
-              ) : (sidePhoto || geometrySatisfied) ? (
+              ) : (
                 <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {sidePhoto ? 'Run a Live Face Scan too to continue' : 'Take a photo too to continue'}
+                  Add a photo to continue
                 </p>
-              ) : null}
+              )}
               <button
                 onClick={() => { setStep(3); setError('') }}
                 className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"

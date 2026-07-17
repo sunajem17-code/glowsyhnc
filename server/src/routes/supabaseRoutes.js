@@ -21,6 +21,29 @@ function requireSupabase(res) {
   return true
 }
 
+// Helper: turn a stored 'scan-images' bucket path into a usable signed URL.
+// Returns null (not the raw path) if signing fails, so the client can fall
+// back to its own placeholder instead of trying to render a bare path as
+// an <img src>. Passes through unchanged if already a full URL.
+const HISTORY_SIGNED_URL_EXPIRY_SECONDS = 3600
+async function resolveImageUrl(sb, value) {
+  if (!value) return null
+  if (/^https?:\/\//i.test(value)) return value
+  try {
+    const { data, error } = await sb.storage
+      .from('scan-images')
+      .createSignedUrl(value, HISTORY_SIGNED_URL_EXPIRY_SECONDS)
+    if (error) {
+      console.warn('[Supabase] Signed URL creation failed:', error.message)
+      return null
+    }
+    return data.signedUrl
+  } catch (err) {
+    console.warn('[Supabase] Signed URL creation error (non-fatal):', err.message)
+    return null
+  }
+}
+
 // ── POST /supabase/scans ───────────────────────────────────────────────────────
 // Save a completed scan + optional plan tasks in one call.
 router.post('/scans', auth, async (req, res) => {
@@ -125,7 +148,20 @@ router.get('/scans', auth, async (req, res) => {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    res.json({ scans: scans ?? [] })
+
+    // face_image_url / body_image_url are stored as private-bucket storage
+    // paths (e.g. "scan/<uid>/<ts>.jpg"), not directly-usable URLs — the
+    // 'scan-images' bucket is private with owner-only RLS, so every read
+    // needs a freshly signed URL. Resolve them here so the client never has
+    // to know about storage paths. A 1-hour expiry is plenty for a single
+    // page view; if it's already a full URL (http/https), pass it through.
+    const resolved = await Promise.all((scans ?? []).map(async (s) => ({
+      ...s,
+      face_image_url: await resolveImageUrl(sb, s.face_image_url),
+      body_image_url: await resolveImageUrl(sb, s.body_image_url),
+    })))
+
+    res.json({ scans: resolved })
   } catch (err) {
     console.error('[Supabase] Load scans failed:', err.message)
     res.status(500).json({ error: 'internal_error' })

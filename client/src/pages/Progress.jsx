@@ -184,10 +184,16 @@ export default function Progress() {
   const isDemo = !token || token === 'demo-token'
 
   // ── Fetch scan history from API ───────────────────────────────────────────
+  // Uses /supabase/scans (real 'scans' table) rather than the old
+  // /user/scan-history endpoint — that one queried a table name that was
+  // never actually created in Supabase, so it always silently returned an
+  // empty array. /supabase/scans is the same endpoint that already backs
+  // the scan-save flow, and now also carries face_image_url (a signed URL
+  // to the real uploaded photo), which is what powers the thumbnails below.
   useEffect(() => {
     if (isDemo) { setLoading(false); return }
-    api.user.scanHistory()
-      .then(({ history: h }) => setHistory(h || []))
+    api.supabase.getScans()
+      .then(({ scans: h }) => setHistory(h || []))
       .catch(() => setHistory([]))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -407,8 +413,10 @@ export default function Progress() {
         </>
       )}
 
-      {/* ── Photo timeline (uses local store photos) ─────────────────────── */}
-      {scans.length > 0 && (
+      {/* ── Photo timeline (real photos from Supabase Storage, newest first —
+          local `scans` store has photos stripped after a reload to avoid a
+          localStorage quota crash, so this reads from the cloud instead) ─ */}
+      {history.length > 0 && (
         <div className="mb-4">
           <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
             <Calendar size={16} className="text-secondary" />
@@ -416,21 +424,23 @@ export default function Progress() {
           </h2>
           {isPremium ? (
             <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
-              {scans.map((scan, i) => (
+              {history.map((scan, i) => (
                 <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 border-transparent">
                   <div className="relative">
                     <img
-                      src={scan.facePhotoUrl || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
+                      src={scan.face_image_url || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
                       alt={`Scan ${i + 1}`}
                       className="w-24 h-24 object-cover"
                     />
                     <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
-                      <p className="text-white text-[9px] font-mono font-bold">{scan.glowScore}</p>
+                      <p className="text-white text-[9px] font-mono font-bold">
+                        {scan.overall_score != null ? Number(scan.overall_score).toFixed(1) : '—'}
+                      </p>
                     </div>
                   </div>
                   <div className="bg-card px-1.5 py-1">
                     <p className="text-[9px] text-secondary font-body text-center">
-                      {new Date(scan.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {new Date(scan.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 </div>
@@ -448,7 +458,7 @@ export default function Progress() {
       )}
 
       {/* ── Before & After comparison (premium photo slider) ─────────────── */}
-      {scans.length >= 2 && (
+      {history.length >= 2 && (
         <div className="mb-4">
           <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
             <ArrowLeftRight size={16} className="text-secondary" />
@@ -456,8 +466,8 @@ export default function Progress() {
           </h2>
           {isPremium ? (
             <ComparisonSlider
-              before={scans[scans.length - 1]?.facePhotoUrl || 'https://placehold.co/400x400/gray/white?text=Before'}
-              after={scans[0]?.facePhotoUrl || 'https://placehold.co/400x400/C6A85C/white?text=After'}
+              before={history[history.length - 1]?.face_image_url || 'https://placehold.co/400x400/gray/white?text=Before'}
+              after={history[0]?.face_image_url || 'https://placehold.co/400x400/C6A85C/white?text=After'}
             />
           ) : (
             <ProLock
