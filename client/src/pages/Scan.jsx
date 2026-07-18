@@ -18,6 +18,7 @@ import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { startFaceScan } from '../utils/faceScan'
+import { analyzeBodyPhoto, analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 
 export const ANALYSIS_STEPS = [
@@ -674,6 +675,22 @@ export default function Scan() {
       const bodyB64 = (!skipBody && bodyPhoto) ? await toBase64(bodyPhoto) : null
       if (bodyB64) setBodyPhoto(bodyB64)
 
+      // Real, on-device geometry — Apple's Vision framework measuring actual
+      // detected joints/landmarks in the photos already taken above, not an
+      // AI vision guess. Native-only (no-op on web, where these plugins
+      // resolve { supported: false } immediately). Non-fatal by design: if
+      // detection fails or confidence is too low, these stay null and the
+      // AI scorer below just falls back to its own visual read — we never
+      // invent a plausible-looking measurement to fill the gap.
+      const bodyGeometryResult = (isNative() && bodyB64) ? await analyzeBodyPhoto(bodyB64) : null
+      const bodyGeometry = bodyGeometryResult?.detected
+        ? { shoulderHipRatio: bodyGeometryResult.shoulderHipRatio ?? null, spineLeanDegrees: bodyGeometryResult.spineLeanDegrees ?? null }
+        : null
+      const sideProfileGeometryResult = (isNative() && sideB64) ? await analyzeSideProfile(sideB64) : null
+      const sideProfileGeometry = sideProfileGeometryResult?.detected
+        ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
+        : null
+
       setAnalysisStep(1)
       setSlowAnalysis(false)
       const stageTimer = setInterval(() => setAnalysisStep(prev => prev < 3 ? prev + 1 : prev), 1800)
@@ -755,6 +772,8 @@ export default function Scan() {
             faceImage: faceB64,
             ...(sideB64 ? { sideImage: sideB64 } : {}),
             ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
+            ...(bodyGeometry ? { bodyGeometry } : {}),
+            ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
             gender: g,
             ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
           })
@@ -811,6 +830,12 @@ export default function Scan() {
         bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
         // ARKit live scan geometry — present when user used TrueDepth face scan
         faceMetrics:      faceMetrics ?? undefined,
+        // Real, on-device Vision-framework geometry (body pose joints /
+        // side-profile landmarks) — present only when detection actually
+        // succeeded with adequate confidence. Same "measure, don't guess"
+        // principle as faceMetrics above, for the body and side profile.
+        bodyGeometry:         bodyGeometry ?? undefined,
+        sideProfileGeometry:  sideProfileGeometry ?? undefined,
       }
 
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)

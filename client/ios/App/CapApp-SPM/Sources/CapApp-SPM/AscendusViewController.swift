@@ -14,5 +14,6 @@ import Capacitor
 public class AscendusViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(FaceScanPlugin())
+        bridge?.registerPluginInstance(PhotoGeometryPlugin())
     }
 }

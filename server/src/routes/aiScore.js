@@ -178,10 +178,20 @@ function stripPrefix(dataUrl) {
 // Focused on facial structure, grooming, and the 4 aesthetic pillars.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
-async function getFaceScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null) {
+async function getFaceScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null) {
   const client = getClient()
   const isFemale = gender === 'female'
   const hasSide = !!sideBase64
+
+  // sideProfileGeometry (when present) comes from Apple's Vision framework
+  // running VNDetectFaceLandmarksRequest on-device against the actual side
+  // profile photo — a real angle computed from detected landmark pixels,
+  // not a visual guess. It's a 2D projection (no depth, unlike the ARKit
+  // front-face mesh) so it's an estimate too, just a measured one — give
+  // the model a factual anchor without overriding its own visual read.
+  const measuredGeometryNote = (hasSide && sideProfileGeometry?.facialConvexityDegrees != null)
+    ? `\nMEASURED REFERENCE (from on-device landmark detection, not a visual estimate): facial convexity angle ≈ ${sideProfileGeometry.facialConvexityDegrees.toFixed(1)}°. A straighter/more obtuse angle reads as a flatter profile; a sharper angle reads as more convex/protrusive. Use this as a factual anchor for jawline_projection and chin_projection — don't contradict it without clear photographic reason, but your visual read still governs profile_score and nose_bridge.`
+    : ''
 
   const profileSection = hasSide ? `
 
@@ -189,7 +199,7 @@ SIDE PROFILE ANALYSIS — A side-profile photo has been provided as Image 2. Ana
 - profile_score: Overall lateral facial aesthetics 1.0–10.0. Strong jaw/chin projection, tall straight nose bridge, and forward mid-face score highest.
 - nose_bridge: "soft" (low/flat bridge), "medium" (average height), "strong" (tall and straight), or "aquiline" (curved/Roman nose).
 - jawline_projection: "recessed" (jaw sits behind vertical), "average" (neutral), "projected" (forward jaw), or "strong" (strong forward projection).
-- chin_projection: "recessed" (chin behind Ricketts E-line), "average" (on the line), "projected" (slightly ahead), or "prominent" (well ahead of E-line).
+- chin_projection: "recessed" (chin behind Ricketts E-line), "average" (on the line), "projected" (slightly ahead), or "prominent" (well ahead of E-line).${measuredGeometryNote}
 Include a "profile" object in your JSON response.` : ''
 
   const profileSchema = hasSide ? `,
@@ -360,9 +370,25 @@ Return ONLY this JSON — no markdown, nothing else:
 }
 
 // ── CALL 2: Physique Scoring (optional — only when bodyImage provided) ────────
-async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male') {
+async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', bodyGeometry = null) {
   const client = getClient()
   const isFemale = gender === 'female'
+
+  // bodyGeometry (when present) comes from Apple's Vision framework running
+  // VNDetectHumanBodyPoseRequest on-device against the actual body photo —
+  // real joint positions, not a visual guess. shoulderHipRatio is a real
+  // scale-independent width ratio; spineLeanDegrees is a real angle off
+  // vertical between the neck and root (upper-spine) joints. Neither is a
+  // full replacement for visual judgment (Vision can't see muscle
+  // definition or clothing fit), so this is offered as a factual anchor
+  // for the proportions/posture categories specifically, not the whole score.
+  const measuredGeometryNote = bodyGeometry
+    ? `\n\nMEASURED REFERENCE (from on-device pose detection, not a visual estimate):${
+        bodyGeometry.shoulderHipRatio != null ? `\n- Shoulder-to-hip width ratio ≈ ${bodyGeometry.shoulderHipRatio.toFixed(2)} (higher = more V-taper)` : ''
+      }${
+        bodyGeometry.spineLeanDegrees != null ? `\n- Upper-spine lean off vertical ≈ ${bodyGeometry.spineLeanDegrees.toFixed(1)}° (closer to 0° = more upright)` : ''
+      }\nUse these as factual anchors for "proportions" and "posture" specifically — don't contradict them without a clear photographic reason (e.g. baggy clothing hiding true shoulder width). They don't determine leanness, frame, or overall_presentation, which stay purely visual.`
+    : ''
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -383,7 +409,7 @@ ${isFemale ? `FEMALE PHYSIQUE SCORING:
 - leanness: Visible muscle definition or separation. Body fat level. Does NOT require stage-lean — visible abs or clear muscle definition is 7+. Soft/no definition = below 5.
 - frame: Bone structure. Shoulder width, clavicle length, wrist size, natural frame. Wide natural frame = high score regardless of muscle.
 - posture: Spine alignment, shoulder position, chest position. Rounded forward posture = low score. Upright, chest out = high score.
-- overall_presentation: Grooming, clothing fit, how well the body is presented. Clean presentation = high score.`}
+- overall_presentation: Grooming, clothing fit, how well the body is presented. Clean presentation = high score.`}${measuredGeometryNote}
 
 SCORING RULES:
 - Use the FULL 1–10 range. Do not cluster around 5–6.
@@ -675,7 +701,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { faceImage, sideImage, bodyImage, gender = 'male', previousScore } = req.body
+    const { faceImage, sideImage, bodyImage, gender = 'male', previousScore, bodyGeometry, sideProfileGeometry } = req.body
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -725,7 +751,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.log('[aiScore] STEP 1 — Face scoring...')
       try {
         faceResult = await withRetry(
-          () => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType),
+          () => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry),
           'face'
         )
         console.log('[aiScore] STEP 1 OK — face_score:', faceResult.face_score, '| structure:', faceResult.facial_structure, '| grooming:', faceResult.grooming_score)
@@ -741,7 +767,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.log('[aiScore] STEP 3 — Physique scoring...')
       if (bodyBase64) {
         try {
-          physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique')
+          physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique')
           console.log('[aiScore] STEP 3 OK — physique overall:', physiqueResult.overall)
         } catch (physiqueErr) {
           console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueErr.message}" | userId=${req.userId} gender=${gender}`)
@@ -1012,7 +1038,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { bodyImage, gender = 'male' } = req.body
+    const { bodyImage, gender = 'male', bodyGeometry } = req.body
     if (!bodyImage) {
       return res.status(400).json({ error: 'Body image is required' })
     }
@@ -1025,7 +1051,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
     await acquireSlot()
     let physiqueResult
     try {
-      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender), 'physique-only')
+      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique-only')
       console.log('[aiScore:physique-only] OK — overall:', physiqueResult.overall)
     } finally {
       releaseSlot()
