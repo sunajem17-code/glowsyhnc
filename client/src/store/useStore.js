@@ -41,6 +41,7 @@ const useStore = create(
         userProfile: null,
         legalConsented: false,
         hasSeenFeatureTour: false,
+        hasSeenCostOfInaction: false,
         // age gate is device-level, intentionally NOT reset on logout
       }),
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
@@ -120,6 +121,11 @@ const useStore = create(
       // (onboarded before this shipped) never see it retroactively.
       hasSeenFeatureTour: false,
       setHasSeenFeatureTour: () => set({ hasSeenFeatureTour: true }),
+
+      // "Cost of inaction" screen — shown once, right after the Feature Tour
+      // finishes (same JUST_ONBOARDED_KEY session gate, see App.jsx Gate 4).
+      hasSeenCostOfInaction: false,
+      setHasSeenCostOfInaction: () => set({ hasSeenCostOfInaction: true }),
 
       // Legal consent (age gate + AI/biometric consent)
       legalConsented: false,
@@ -317,6 +323,7 @@ const useStore = create(
         theme: state.theme,
         hasOnboarded: state.hasOnboarded,
         hasSeenFeatureTour: state.hasSeenFeatureTour,
+        hasSeenCostOfInaction: state.hasSeenCostOfInaction,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,
         ageConfirmedAt: state.ageConfirmedAt,

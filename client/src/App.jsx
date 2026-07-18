@@ -15,6 +15,7 @@ import { JUST_ONBOARDED_KEY } from './utils/tourFlags'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const FeatureTour    = lazy(() => import('./pages/FeatureTour/FeatureTour'))
+const CostOfInactionScreen = lazy(() => import('./pages/CostOfInaction'))
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
 const Scan           = lazy(() => import('./pages/Scan'))
 const Results        = lazy(() => import('./pages/Results'))
@@ -50,6 +51,8 @@ export default function App() {
   const hasOnboarded        = useStore(s => s.hasOnboarded)
   const hasSeenFeatureTour  = useStore(s => s.hasSeenFeatureTour)
   const setHasSeenFeatureTour = useStore(s => s.setHasSeenFeatureTour)
+  const hasSeenCostOfInaction = useStore(s => s.hasSeenCostOfInaction)
+  const setHasSeenCostOfInaction = useStore(s => s.setHasSeenCostOfInaction)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
@@ -118,8 +121,14 @@ export default function App() {
 
   const handleTourDone = useCallback(() => {
     setHasSeenFeatureTour()
-    sessionStorage.removeItem(JUST_ONBOARDED_KEY)
+    // JUST_ONBOARDED_KEY stays set — Gate 4 (Cost of Inaction) below still
+    // needs it. That gate's onDone is what finally clears it.
   }, [setHasSeenFeatureTour])
+
+  const handleCostOfInactionDone = useCallback(() => {
+    setHasSeenCostOfInaction()
+    sessionStorage.removeItem(JUST_ONBOARDED_KEY)
+  }, [setHasSeenCostOfInaction])
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
@@ -147,6 +156,23 @@ export default function App() {
     return (
       <Suspense fallback={<div className="min-h-screen" style={{ background: '#080808' }} />}>
         <FeatureTour onDone={handleTourDone} />
+      </Suspense>
+    )
+  }
+
+  // ── GATE 4: Cost of Inaction ─────────────────────────────────────
+  // Plays once, right after the Feature Tour finishes on a user's first
+  // onboarding — the last screen before they land in the app for real.
+  if (
+    isAuthenticated &&
+    hasOnboarded &&
+    hasSeenFeatureTour &&
+    !hasSeenCostOfInaction &&
+    sessionStorage.getItem(JUST_ONBOARDED_KEY) === '1'
+  ) {
+    return (
+      <Suspense fallback={<div className="min-h-screen" style={{ background: '#080808' }} />}>
+        <CostOfInactionScreen onDone={handleCostOfInactionDone} />
       </Suspense>
     )
   }
