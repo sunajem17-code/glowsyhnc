@@ -8,7 +8,13 @@ let _client = null
 function getSupabase() {
   if (_client) return _client
   const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY
+  // Supabase's own dashboard labels this key SUPABASE_SERVICE_ROLE_KEY when
+  // you copy it — SUPABASE_SERVICE_KEY is just the name this app happened to
+  // use historically. Accept either so regenerating the key from Supabase's
+  // UI and pasting their suggested env var name doesn't silently break every
+  // production write (server/src/routes/email-webhooks.js already accepts
+  // both for this same reason).
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
   if (!url || !key || url.includes('your-project')) return null
   _client = createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },

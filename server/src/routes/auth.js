@@ -35,7 +35,7 @@ router.post('/register', authLimiter, async (req, res) => {
       const existing = await getUserByEmail(email)
       if (existing) return res.status(409).json({ error: 'Email already registered' })
 
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const id = uuid()
       const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
 
@@ -72,7 +72,7 @@ router.post('/register', authLimiter, async (req, res) => {
       const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
       if (existing) return res.status(409).json({ error: 'Email already registered' })
 
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const id = uuid()
       const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
 
@@ -157,11 +157,14 @@ router.post('/apple', authLimiter, async (req, res) => {
 
     if (sb) {
       // Look up by verified apple_sub first, then by verified email. Values come
-      // from the cryptographically verified token, so no filter-injection risk.
+      // from the cryptographically verified token, so the practical risk is low
+      // — but double-quote them anyway so a comma or period in either value
+      // (e.g. an edge-case private-relay address) can't be parsed as a second
+      // filter clause by PostgREST's raw .or() syntax.
       const { data: existing } = await sb
         .from('users')
         .select('*')
-        .or(`apple_sub.eq.${appleSub},email.eq.${appleEmail}`)
+        .or(`apple_sub.eq."${appleSub}",email.eq."${appleEmail}"`)
         .maybeSingle()
 
       if (existing) {

@@ -266,13 +266,24 @@ async function handleWebhook(req, res) {
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    const userId = event.data.object.metadata?.userId
-    console.log('[Webhook] subscription.deleted userId:', userId)
+    // Was reading event.data.object.metadata?.userId directly — silently did
+    // nothing (user stayed Pro forever) for any subscription where that exact
+    // key was missing: legacy subs, dashboard-created subs, or metadata keyed
+    // as user_id instead of userId. Use the same 3-step fallback chain
+    // (metadata.userId → metadata.user_id → customer.metadata) the other two
+    // handlers above already use, so a cancellation can't silently no-op.
+    const subscription = event.data.object
+    console.log('[Webhook]   subscription.deleted metadata:', JSON.stringify(subscription.metadata))
+    const { userId, resolvedBy } = await resolveUserId(subscription.metadata, subscription.customer)
+    console.log('[Webhook] subscription.deleted userId:', userId, '| resolvedBy:', resolvedBy)
     if (userId) {
       try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false, stripe_subscription_id: null }) } catch {}
       if (!isConfigured()) {
         try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
       }
+    } else {
+      console.error('[Webhook] ❌ All fallbacks exhausted for subscription.deleted — full subscription object:')
+      console.error(JSON.stringify(subscription, null, 2))
     }
   }
 
