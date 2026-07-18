@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock, AlertTriangle } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -1858,6 +1858,54 @@ const SLIDE_GOLD = GOLD
 const SLIDE_GOLD_DIM = G_DIM
 const SLIDE_GOLD_BORDER = G_BORDER
 
+// First slide of the intro sequence — cost-of-inaction framing. Reuses the
+// red "warning" color already established in Slide2's "Without a plan" card
+// below, rather than inventing a new one. Kept two things out on purpose:
+// no line implying the user invites bullying by not looksmaxxing (that's a
+// threat, not a real cost, and cuts against Ascendus's whole "not toxic like
+// the competition" positioning), and no line about "height potential" (adult
+// height doesn't change, looksmaxxing or not, so that claim is just false).
+function SlideCostOfInaction() {
+  const warnings = [
+    'Your dating pool stays small. Looks are one of the first filters people swipe on, whether that’s fair or not.',
+    'The halo effect keeps working against you. Every interview, every first meeting, people read your face before you say a word.',
+    'Your bone structure keeps setting. Mewing and jaw work get harder to influence with every year that passes. The window doesn’t stay open forever.',
+    'The confidence spiral keeps spinning. Get overlooked, feel it, act smaller, get overlooked again.',
+    'People judge first and ask questions later. First impressions rarely get a second shot.',
+    'That negative headspace sticks around too. It’s hard to feel good about yourself when you’re not even trying to fix what you can.',
+    'Bad posture keeps costing you presence you could actually get back.',
+    'You stay average while the guys actually mogging keep pulling further ahead.',
+    'Five years from now, you’ll wish today was the day you started.',
+  ]
+  return (
+    <div className="flex-1 flex flex-col pt-20 pb-4 overflow-hidden">
+      <h1
+        className="font-heading font-bold text-center mb-6 px-6 flex-shrink-0"
+        style={{ fontSize: 26, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#F0EDE8' }}
+      >
+        What Happens If You<br />Never Looksmax
+      </h1>
+      <div className="flex-1 overflow-y-auto px-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col gap-3 pb-2">
+          {warnings.map((text, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 + i * 0.05, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-start gap-3 px-4 py-3.5 rounded-2xl"
+              style={{ background: 'rgba(224,60,60,0.06)', border: '0.5px solid rgba(224,60,60,0.22)' }}
+            >
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" style={{ color: '#E05555' }} />
+              <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Slide1() {
   const stats = [
     { num: '72%',  text: 'of people judge character based on appearance alone' },
@@ -2022,7 +2070,7 @@ function Slide3() {
   )
 }
 
-const SLIDE_COMPONENTS = [Slide1, Slide2, Slide3]
+const SLIDE_COMPONENTS = [SlideCostOfInaction, Slide1, Slide2, Slide3]
 
 function IntroSlides({ onDone }) {
   const [slide, setSlide] = useState(0)
@@ -2124,8 +2172,11 @@ export default function PremiumOnboarding() {
   // silently discard answers already entered.
   const draft = isAuthenticated ? null : loadDraft()
 
-  // Skip intro slides entirely — go straight to StepWelcome (or quiz if already signed in)
-  const [introDone, setIntroDone] = useState(true)
+  // Re-enabled — was previously skipped entirely (introDone defaulted to
+  // true, going straight to StepWelcome). Now shows the 4-slide intro
+  // (cost-of-inaction, then the 3 existing "why Ascendus" slides) before
+  // signup. Still skippable via the Skip button in IntroSlides.
+  const [introDone, setIntroDone] = useState(false)
   // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
   const [step, setStep] = useState(isAuthenticated ? 3 : (draft?.step ?? 0))
   const [dir, setDir] = useState(1)
