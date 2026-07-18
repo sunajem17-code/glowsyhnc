@@ -275,7 +275,7 @@ function Slider({ label, unit, value, displayValue, min, max, step = 1, onChange
 
 // ── STEP 0: Welcome ───────────────────────────────────────────────────────────
 const SOCIAL_STATS = [
-  { value: '10,000+', label: 'men looksmaxxing' },
+  { value: 'Countless', label: 'lives improved' },
   { value: '+1.2pts', label: 'avg score in 90 days' },
   { value: '78%', label: 'complete their plan' },
 ]
