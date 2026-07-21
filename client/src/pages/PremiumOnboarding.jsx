@@ -529,14 +529,12 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
 // ── STEP 1: Sign Up ───────────────────────────────────────────────────────────
 function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
   const [showPw, setShowPw] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const setAuth = useStore(s => s.setAuth)
   const setReferralCode = useStore(s => s.setReferralCode)
 
-  const valid = data.name?.trim() && data.email?.trim() && data.password?.length >= 8
-    && data.password === data.confirmPassword
+  const valid = data.email?.trim() && data.password?.length >= 8
 
   async function handleRegister() {
     if (!valid) return
@@ -548,7 +546,8 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
       const refCode = urlParams.get('ref')
       const deviceId = await getDeviceId().catch(() => null)
       const res = await api.auth.register({
-        name: data.name.trim(),
+        // name already collected by the earlier StepName step
+        name: data.name?.trim(),
         email: data.email.trim(),
         password: data.password,
         ...(refCode   ? { refCode }   : {}),
@@ -582,11 +581,6 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
 
         <div className="space-y-3">
           <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Full Name</label>
-            <input type="text" placeholder="Your name" value={data.name || ''}
-              onChange={e => onChange('name', e.target.value)} style={inputStyle} />
-          </div>
-          <div>
             <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Email</label>
             <input type="email" placeholder="you@example.com" value={data.email || ''}
               onChange={e => onChange('email', e.target.value)} style={inputStyle} />
@@ -603,24 +597,6 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-          </div>
-          <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Confirm Password</label>
-            <div className="relative">
-              <input type={showConfirm ? 'text' : 'password'} placeholder="Repeat password"
-                value={data.confirmPassword || ''} onChange={e => onChange('confirmPassword', e.target.value)}
-                style={{ ...inputStyle, paddingRight: 48,
-                  borderColor: data.confirmPassword && data.password !== data.confirmPassword ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.12)',
-                }} />
-              <button type="button" onClick={() => setShowConfirm(v => !v)}
-                aria-label={showConfirm ? 'Hide password' : 'Show password'} aria-pressed={showConfirm}
-                className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
-                {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-            {data.confirmPassword && data.password !== data.confirmPassword && (
-              <p className="text-[11px] mt-1 font-body" style={{ color: '#EF4444' }}>Passwords do not match</p>
-            )}
           </div>
 
           {error && (
@@ -712,6 +688,39 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
 
       <div className="pb-10 pt-2">
         <GoldBtn label="I Agree — Continue →" onClick={onNext} disabled={!allChecked} />
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Name ────────────────────────────────────────────────────────────────
+function StepName({ data, onChange, onNext, onBack }) {
+  const inputStyle = {
+    color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
+    borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
+    width: '100%', fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
+  }
+
+  return (
+    <div className="flex flex-col h-full px-6">
+      <BackBtn onBack={onBack} />
+      <div className="flex-1 flex flex-col justify-center pt-20">
+        <h1 className="font-heading font-bold text-[28px] mb-2 text-center" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+          What's your name?
+        </h1>
+        <p className="font-body text-[13px] mb-8 text-center" style={{ color: DIM }}>
+          We'll use this to personalize your results.
+        </p>
+        <input
+          type="text"
+          placeholder="Your name"
+          value={data.name || ''}
+          onChange={e => onChange('name', e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+      <div className="pb-10">
+        <GoldBtn label="Continue →" onClick={onNext} disabled={!data.name?.trim()} />
       </div>
     </div>
   )
@@ -2128,14 +2137,16 @@ export default function PremiumOnboarding() {
   // silently discard answers already entered.
   const draft = isAuthenticated ? null : loadDraft()
 
-  // Re-enabled — was previously skipped entirely (introDone defaulted to
-  // true, going straight to StepWelcome). Now shows the 3-slide "why
-  // Ascendus" intro before signup. Still skippable via the Skip button in
-  // IntroSlides. (The cost-of-inaction slide that used to lead this
-  // sequence now shows post-onboarding instead — see CostOfInaction.jsx.)
-  const [introDone, setIntroDone] = useState(false)
-  // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
-  const [step, setStep] = useState(isAuthenticated ? 3 : (draft?.step ?? 0))
+  // Dormant again — the Welcome screen (steps[1], "Brutally honest. Built
+  // to improve you.") must always be the literal first thing a never-signed-up
+  // user sees, no slides in front of it. IntroSlides (the 3-slide "why
+  // Ascendus" sequence) stays in the codebase in case it's wanted again
+  // later, but introDone defaults true so it never shows unprompted.
+  const [introDone, setIntroDone] = useState(true)
+  // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
+  // same reason — new unauthenticated sessions start straight at Welcome(1).
+  // If already authenticated, skip Intro(0), Welcome(1), Name(2), SignUp(3) — start at Consent(4)
+  const [step, setStep] = useState(isAuthenticated ? 4 : (draft?.step ?? 1))
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -2269,9 +2280,9 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Progress bar: only during data-collection steps (2–7); post-scan celebration screens (8–11) get no counter
-  const QUIZ_START = isAuthenticated ? 3 : 2
-  const QUIZ_END = 7
+  // Progress bar: only during data-collection steps (2–8); post-scan celebration screens (9–12) get no counter
+  const QUIZ_START = isAuthenticated ? 4 : 2
+  const QUIZ_END = 8
   const showProgress = step >= QUIZ_START && step <= QUIZ_END
   const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
   const stepCounter = step - QUIZ_START + 1
@@ -2324,22 +2335,25 @@ export default function PremiumOnboarding() {
       if (!res.ok) throw new Error(data.error || 'Authentication failed')
 
       setAuth(data.user, data.token)
-      // Skip signup steps — go straight to quiz
-      setStep(2)
+      // Apple already provides identity — skip Name(2) and SignUp(3), go straight to Consent(4)
+      setStep(4)
     } catch (err) {
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
       console.error('[APPLE AUTH] PremiumOnboarding error:', err)
     }
   }
 
-  // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=gender, 5=goal, 6=heightweight,
-  //       7=scan(face+side), 8=locked-reveal, 9=phase, 10=transformation, 11=rating → /unlock
+  // Flow: 0=intro, 1=welcome, 2=name, 3=signup, 4=consent, 5=gender, 6=goal, 7=heightweight,
+  //       8=scan(face+side), 9=locked-reveal, 10=phase, 11=transformation, 12=rating → /unlock
   const steps = [
     <StepIntro key="intro" onNext={goNext} />,
     <StepWelcome key="welcome"
       onCreateAccount={goNext}
       onSignIn={() => setSigningIn(true)}
       onAppleSignIn={handleAppleSignIn}
+    />,
+    <StepName key="name" data={formData} onChange={updateField}
+      onNext={goNext} onBack={goBack}
     />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}
@@ -2382,11 +2396,18 @@ export default function PremiumOnboarding() {
         </div>
       )}
 
+      {/* Logo — centered so it never collides with BackBtn (left-5) or the step counter (right-5) */}
+      {showProgress && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+          <img src={logo} alt="Ascendus" style={{ width: 20, height: 20, mixBlendMode: 'lighten', opacity: 0.65 }} />
+        </div>
+      )}
+
       {/* Step counter */}
       {showProgress && (
         <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
-            {stepCounter} / {stepTotal}
+            Step {stepCounter} of {stepTotal}
           </span>
         </div>
       )}
