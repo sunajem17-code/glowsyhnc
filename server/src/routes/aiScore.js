@@ -1,8 +1,6 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
-const path = require('path')
-const fs = require('fs')
 const { RekognitionClient, RecognizeCelebritiesCommand } = require('@aws-sdk/client-rekognition')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
@@ -472,20 +470,9 @@ async function rekognizeImage(faceBase64) {
 
 const NO_MATCH = { celebrity: 'No close match found', profession: null, similarity: 0, shared_traits: 'No celebrity match detected' }
 
-// ── Lookalike pool (loaded once at startup) ───────────────────────────────────
-let LOOKALIKE_POOL = null
-function getLookalikePool() {
-  if (LOOKALIKE_POOL) return LOOKALIKE_POOL
-  try {
-    const poolPath = path.join(__dirname, '../../data/lookalikePool.json')
-    LOOKALIKE_POOL = JSON.parse(fs.readFileSync(poolPath, 'utf8'))
-    const total = Object.values(LOOKALIKE_POOL).reduce((s, a) => s + a.length, 0)
-    console.log(`[CELEB] Lookalike pool loaded: ${total} candidates across ${Object.keys(LOOKALIKE_POOL).length} categories`)
-  } catch (err) {
-    console.error('[CELEB] Failed to load lookalikePool.json:', err.message)
-    LOOKALIKE_POOL = {}
-  }
-  return LOOKALIKE_POOL
+// Claude occasionally wraps "no markdown" JSON responses in a ```json fence anyway.
+function stripJsonFence(text) {
+  return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
 // ── Claude two-call celebrity fallback ───────────────────────────────────────
@@ -493,13 +480,6 @@ function getLookalikePool() {
 // Call B: text   — match descriptors against pool candidates
 async function getCelebrityMatchClaude(faceBase64) {
   const client = getClient()
-  const pool   = getLookalikePool()
-
-  // Flatten pool to a compact string for Call B prompt
-  const poolText = Object.entries(pool).map(([cat, entries]) => {
-    const lines = entries.map(e => `- ${e.name} (${cat}): ${e.notableFeatures.join(', ')}`).join('\n')
-    return `## ${cat}\n${lines}`
-  }).join('\n\n')
 
   // ── Call A: face descriptor extraction ──────────────────────────────────────
   const base64Data = faceBase64.replace(/^data:image\/\w+;base64,/, '')
@@ -520,37 +500,45 @@ async function getCelebrityMatchClaude(faceBase64) {
           },
           {
             type: 'text',
-            text: 'Describe this face\'s physical structure. Output ONLY a JSON object with these keys: faceShape, jawType, browType, noseType, eyeShape, lipFullness, cheekbones, skinTone, hairTexture. Use concise descriptive values (e.g. "square", "angular", "deep-set", "olive"). No celebrity names. No commentary.',
+            text: 'Describe this face\'s physical structure. Output ONLY a JSON object with these keys: faceShape, jawType, browType, noseType, eyeShape, lipFullness, cheekbones, skinTone, hairTexture, gender. Use concise descriptive values for the structural keys (e.g. "square", "angular", "deep-set", "olive"). For gender, output ONLY "male" or "female" based on the visible facial structure. No celebrity names. No commentary.',
           },
         ],
       }],
     }), 'claude-celeb-A')
 
-    faceDescriptors = JSON.parse(callA.content[0].text.trim())
+    faceDescriptors = JSON.parse(stripJsonFence(callA.content[0].text))
     console.log('[CELEB][tier=claude-fallback] Call A descriptors:', JSON.stringify(faceDescriptors))
   } catch (err) {
     console.error('[CELEB][tier=claude-fallback] Call A failed:', err.message)
     return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
   }
 
-  // ── Call B: match descriptors against pool ───────────────────────────────────
+  // ── Call B: name real public figures matching the descriptors (no candidate pool) ──
   try {
     const callB = await withRetry(() => client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
-      system: `You are a celebrity lookalike matcher. Match faces based ONLY on shared physical features (face shape, jaw, cheekbones, brow, nose, eyes, lips). NEVER use ethnicity, race, or fame as a matching shortcut. Output ONLY valid JSON — no markdown, no explanations.`,
+      system: `You are a celebrity lookalike matcher. Based on the facial descriptors provided, name 1 to 3 real, well-known public figures (mainstream celebrities, professional models, popular Twitch/YouTube streamers, or TikTok influencers with at least 500k followers) whose face shape and features most closely resemble the description. Only name real people you are confident actually exist and are genuinely publicly known — never invent a name or guess at an obscure/private individual. Match based ONLY on shared physical features (face shape, jaw, cheekbones, brow, nose, eyes, lips). NEVER use ethnicity, race, or fame level as a shortcut. For each match, include a confidence field: 'high' if you are certain this is a real, verifiable public figure, or 'low' if you are at all uncertain of the name or their public profile. Output ONLY valid JSON — no markdown, no explanations.`,
       messages: [{
         role: 'user',
-        content: `Face descriptors:\n${JSON.stringify(faceDescriptors, null, 2)}\n\nCandidate pool:\n${poolText}\n\nPick the single best matching candidate from the pool per category. Return 1 to 3 total matches (only include a match if it is genuinely similar). Output a JSON array of objects, each with: celebrity (string), category (string), matchStrength ("strong" or "moderate"), shared_traits (one sentence referencing specific physical features from the descriptors). Example: [{"celebrity":"Henry Cavill","category":"mainstream_celebrity","matchStrength":"strong","shared_traits":"Shares a square jaw, defined cheekbones, and deep-set eyes."}]`,
+        content: `Face descriptors:\n${JSON.stringify(faceDescriptors, null, 2)}\n\nName 1 to 3 real, well-known public figures whose face most closely matches these descriptors. Output ONLY a JSON array of objects, each with: celebrity (string, the person's real name), category (string — one of "mainstream_celebrity", "model", "streamer", "tiktok_influencer"), matchStrength ("strong" or "moderate"), confidence ("high" or "low"), shared_traits (one sentence referencing specific physical features from the descriptors). Example: [{"celebrity":"Henry Cavill","category":"mainstream_celebrity","matchStrength":"strong","confidence":"high","shared_traits":"Shares a square jaw, defined cheekbones, and deep-set eyes."}]`,
       }],
     }), 'claude-celeb-B')
 
-    let matches = JSON.parse(callB.content[0].text.trim())
+    let matches = JSON.parse(stripJsonFence(callB.content[0].text))
     if (!Array.isArray(matches)) matches = [matches]
     matches = matches.slice(0, 3)
-    console.log(`[CELEB][tier=claude-fallback] Call B matches: ${matches.map(m => m.celebrity).join(', ')}`)
+    console.log(`[CELEB][tier=claude-fallback] Call B matches: ${matches.map(m => `${m.celebrity} (${m.confidence})`).join(', ')}`)
 
-    const mapped = matches.map(m => ({
+    // Drop any match Claude itself flagged as low-confidence rather than surfacing
+    // an unverifiable/possibly-hallucinated name to the client.
+    const confident = matches.filter(m => m.confidence !== 'low')
+    const droppedCount = matches.length - confident.length
+    if (droppedCount > 0) {
+      console.log(`[CELEB][tier=claude-fallback] Dropped ${droppedCount} low-confidence match(es): ${matches.filter(m => m.confidence === 'low').map(m => m.celebrity).join(', ')}`)
+    }
+
+    const mapped = confident.map(m => ({
       celebrity:     m.celebrity,
       profession:    m.category === 'model' ? 'Model' : m.category === 'streamer' ? 'Streamer' : m.category === 'tiktok_influencer' ? 'TikTok Influencer' : 'Celebrity',
       similarity:    0,
