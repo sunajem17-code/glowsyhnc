@@ -20,6 +20,18 @@ import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { startFaceScan } from '../utils/faceScan'
 import { analyzeBodyPhoto, analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
+import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+
+// No-op on web — no native bridge, and no web Firebase app configured yet either.
+async function logAnalyticsEvent(name, params) {
+  if (!isNative()) return
+  try {
+    await FirebaseAnalytics.logEvent({ name, params })
+  } catch {
+    // analytics unavailable — not fatal, ignore
+  }
+}
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -210,12 +222,130 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   )
 }
 
+// ─── Face Scan Overlay (decorative) ──────────────────────────────────────────
+// Purely visual — no real face detection. Plays once, briefly, right after a
+// face photo (step 1 only) is captured or uploaded. Echoes the grid + sweep
+// "scanning" motif already used in the share-card Remotion video, so the two
+// moments read as one system instead of two unrelated effects.
+const FACE_SCAN_DOT_ROWS = [22, 38, 54, 70, 86]
+const FACE_SCAN_DOTS = FACE_SCAN_DOT_ROWS.flatMap((cy, row) => {
+  const edge = row === 0 || row === FACE_SCAN_DOT_ROWS.length - 1
+  const count = edge ? 3 : 5
+  const spread = edge ? 20 : 32
+  return Array.from({ length: count }, (_, i) => ({
+    cx: 50 + (i - (count - 1) / 2) * (spread / (count - 1 || 1)),
+    cy,
+  }))
+})
+
+function FaceScanOverlay() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.35, ease: EASE_STANDARD }}
+      className="absolute inset-0 pointer-events-none overflow-hidden"
+    >
+      {/* Grid */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `linear-gradient(${GOLD}33 1px, transparent 1px), linear-gradient(90deg, ${GOLD}33 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+        }}
+      />
+      {/* Dot mesh — loose face-outline arrangement, not real landmarks */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {FACE_SCAN_DOTS.map((d, i) => (
+          <motion.circle
+            key={i}
+            cx={d.cx} cy={d.cy} r={0.7}
+            fill={GOLD}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 1.7, ease: EASE_STANDARD, delay: i * 0.025 }}
+          />
+        ))}
+      </svg>
+      {/* Sweep line */}
+      <motion.div
+        className="absolute left-0 right-0"
+        style={{ height: 2, background: GOLD, boxShadow: `0 0 14px 3px ${GOLD}` }}
+        initial={{ top: '0%', opacity: 0 }}
+        animate={{ top: ['0%', '100%'], opacity: [0, 1, 1, 0] }}
+        transition={{ duration: 1.5, ease: EASE_STANDARD }}
+      />
+    </motion.div>
+  )
+}
+
+// ─── Photo Action Sheet (iOS-style) ──────────────────────────────────────────
+// Custom JS sheet, not a native action-sheet plugin — @capacitor/action-sheet
+// isn't a dependency here, and adding one is a bigger lift (new native
+// dependency + cap sync) than this redesign calls for. This matches the same
+// visual convention (grouped options card + separate Cancel button, sliding
+// up from the bottom) without it.
+function PhotoActionSheet({ options, onClose }) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: EASE_STANDARD }}
+        className="fixed inset-0 z-50 bg-black/50"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={SPRING_STANDARD}
+        className="fixed inset-x-0 bottom-0 z-50 px-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}
+      >
+        <div className="rounded-2xl overflow-hidden mb-2" style={{ background: '#1C1C1E' }}>
+          {options.map((opt, i) => (
+            <button
+              key={opt.label}
+              onClick={opt.onSelect}
+              className="w-full flex items-center justify-center gap-2 py-4 active:opacity-60 transition-opacity"
+              style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none', color: opt.highlight ? GOLD : 'white' }}
+            >
+              <opt.icon size={18} />
+              <span className="font-heading font-semibold text-[16px]">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full rounded-2xl py-4 font-heading font-bold text-[16px] active:opacity-60 transition-opacity"
+          style={{ background: '#1C1C1E', color: GOLD }}
+        >
+          Cancel
+        </button>
+      </motion.div>
+    </>
+  )
+}
+
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
 export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
+  const [showActionSheet, setShowActionSheet] = useState(false)
+  const [showScanOverlay, setShowScanOverlay] = useState(false)
+  const prevPhotoRef = useRef(photo)
+
+  // Decorative-only — plays once every time a new face photo (step 1) lands,
+  // including retakes. No real face detection involved.
+  useEffect(() => {
+    const justCaptured = stepNum === 1 && photo && photo !== prevPhotoRef.current
+    prevPhotoRef.current = photo
+    if (!justCaptured) return
+    setShowScanOverlay(true)
+    const t = setTimeout(() => setShowScanOverlay(false), 1800)
+    return () => clearTimeout(t)
+  }, [photo, stepNum])
 
   async function handleCameraClick() {
     if (isNative()) {
@@ -263,6 +393,11 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
                 <CheckCircle2 size={30} className="text-white" />
               </div>
             </div>
+            {stepNum === 1 && (
+              <AnimatePresence>
+                {showScanOverlay && <FaceScanOverlay />}
+              </AnimatePresence>
+            )}
           </>
         ) : (stepNum === 1 || stepNum === 2) && arScanDone ? (
           <div className="flex flex-col items-center gap-3 p-8">
@@ -353,51 +488,19 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           Profile step just invited people to turn 90° before tapping it,
           which broke tracking — so step 2 only ever needs a photo now, no
           separate scan action. */}
-      {stepNum === 1 && isNative() && onLiveScan ? (
+      {stepNum === 1 ? (
         <div className="mb-1">
-          <div className="grid grid-cols-2 gap-2.5">
           <button
-            onClick={handleCameraClick}
-            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-            style={{
-              background: 'rgba(201,168,76,0.06)',
-              border: '2px solid #C6A85C',
-              borderRadius: 12,
-              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
-            }}
+            onClick={() => setShowActionSheet(true)}
+            className="w-full flex items-center justify-center gap-2 py-3.5 active:scale-95 transition-transform"
+            style={{ background: 'rgba(198,168,92,0.08)', border: `1px solid ${GOLD}55`, borderRadius: 12 }}
           >
-            <Camera size={20} style={{ color: '#C6A85C' }} />
-            <span className="text-xs font-heading font-bold text-white">Take Photo</span>
-          </button>
-          <button
-            onClick={onLiveScan}
-            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-            style={{
-              background: arScanDone ? 'rgba(0,255,255,0.1)' : 'linear-gradient(135deg, rgba(0,255,255,0.14) 0%, rgba(198,168,92,0.10) 100%)',
-              border: `2px solid ${arScanDone ? 'cyan' : 'rgba(0,255,255,0.55)'}`,
-              borderRadius: 12,
-              boxShadow: '0 0 12px rgba(0,255,255,0.25)',
-            }}
-          >
-            <Star size={20} style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.85)' }} />
-            <span className="text-xs font-heading font-bold text-center" style={{ color: arScanDone ? 'cyan' : 'rgba(0,255,255,0.9)' }}>
-              {arScanDone ? '✓ Rescan' : 'Live Face Scan'}
+            <Camera size={18} style={{ color: GOLD }} />
+            <span className="text-sm font-heading font-bold text-white">
+              {photo || arScanDone ? 'Retake Photo' : 'Add Photo'}
             </span>
           </button>
-          </div>
-          <button
-            onClick={handleUploadClick}
-            className="w-full mt-2.5 flex items-center justify-center gap-2 active:scale-95 transition-transform"
-            style={{
-              background: 'rgba(201,168,76,0.06)',
-              border: '2px solid #C6A85C',
-              borderRadius: 12,
-              padding: '12px 14px',
-            }}
-          >
-            <Upload size={18} style={{ color: '#C6A85C' }} />
-            <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
-          </button>
+
           {photo && !arScanDone && !arScanSkipped && onSkipScan && (
             <button
               onClick={onSkipScan}
@@ -410,6 +513,24 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               </span>
             </button>
           )}
+
+          <AnimatePresence>
+            {showActionSheet && (
+              <PhotoActionSheet
+                onClose={() => setShowActionSheet(false)}
+                options={[
+                  ...(isNative() && onLiveScan ? [{
+                    label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
+                    icon: Star,
+                    highlight: true,
+                    onSelect: () => { setShowActionSheet(false); onLiveScan() },
+                  }] : []),
+                  { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                  { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+                ]}
+              />
+            )}
+          </AnimatePresence>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
@@ -922,6 +1043,7 @@ export default function Scan() {
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
+      logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
       // Premium users see full results immediately; free users hit the unlock gate
