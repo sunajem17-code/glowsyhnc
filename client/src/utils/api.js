@@ -1,5 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
-const BASE = `https://${API_URL.replace(/^https?:\/\//, '')}/api`
+const BASE = `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
 
 // Several server routes' generic catch-alls return machine-readable codes
 // (not sentences) as `error` — safe for logs, never safe to render as-is.

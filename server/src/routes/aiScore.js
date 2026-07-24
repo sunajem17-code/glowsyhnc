@@ -686,6 +686,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey || apiKey.trim() === '') {
+      console.error(`[aiScore] POST /score — ANTHROPIC_API_KEY not configured — ${new Date().toISOString()}`)
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 

@@ -158,10 +158,22 @@ function CardShell({ badge, icon: Icon, children }) {
 }
 
 function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
-  const blur = size === 'lg' ? 'blur(10px)' : size === 'sm' ? 'blur(4px)' : 'blur(7px)'
+  const blur = size === 'lg' ? 'blur(16px)' : size === 'sm' ? 'blur(11px)' : 'blur(13px)'
   return (
-    <span style={{ filter: blur, userSelect: 'none', ...extraStyle }}>
-      {children}
+    <span style={{ position: 'relative', display: 'inline-block', userSelect: 'none', ...extraStyle }}>
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: -6,
+          borderRadius: 10,
+          background: 'radial-gradient(circle, rgba(198,168,92,0.08) 0%, transparent 72%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <span style={{ position: 'relative', display: 'inline-block', filter: blur }}>
+        {children}
+      </span>
     </span>
   )
 }
@@ -186,9 +198,19 @@ function Card1Score({ scan }) {
   // pct drives each tile's progress bar. Tier itself is a string label, so it
   // borrows the same overall glowScore already shown as the hero number above;
   // potential reuses the value already computed for the tile itself.
+  const symmetry          = scan?.faceData?.symmetry          ?? null
+  const jawlineDefinition = scan?.faceData?.jawlineDefinition ?? null
+  const skinClarity       = scan?.faceData?.skinClarity       ?? null
+  const facialProportions = scan?.faceData?.facialProportions ?? null
+  const toScorePct = v => v != null ? Math.min(100, (v / 10) * 100) : 0
+
   const lockedMetrics = [
-    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '—',       unit: '',                          pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
-    { icon: Zap,  label: 'Potential', value: potential ?? '—',  unit: potential ? '/10' : '',       pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { label: 'PSL Tier',           value: tier ?? '—',                                              unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { label: 'Potential',          value: potential ?? '—',                                         unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : '—',                     unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : '—',   unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : '—',               unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : '—',   unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -216,34 +238,42 @@ function Card1Score({ scan }) {
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
             GLOW SCORE
           </p>
-          <div className="flex items-end gap-1.5 mb-3">
-            <span className="font-heading font-bold leading-none" style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
-              {glowScore != null ? glowScore.toFixed(1) : '—'}
-            </span>
-            <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
-          </div>
+          <BlurLock size="lg">
+            <div className="flex items-end gap-1.5 mb-3">
+              <span className="font-heading font-bold leading-none" style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {glowScore != null ? glowScore.toFixed(1) : '—'}
+              </span>
+              <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
+            </div>
+          </BlurLock>
           <div className="flex items-center gap-2.5 flex-wrap">
             {tier && (
               <div className="inline-flex items-center px-3 py-1.5 rounded-xl" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.30)' }}>
-                <span className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: G }}>{tier.toUpperCase()}</span>
+                <BlurLock size="sm">
+                  <span className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: G }}>{tier.toUpperCase()}</span>
+                </BlurLock>
               </div>
             )}
             {topPct && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
                 <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                <span className="font-heading font-bold text-[11px] tracking-[0.10em]" style={{ color: 'rgba(255,255,255,0.75)' }}>{topPct}</span>
+                <BlurLock size="sm">
+                  <span className="font-heading font-bold text-[11px] tracking-[0.10em]" style={{ color: 'rgba(255,255,255,0.75)' }}>{topPct}</span>
+                </BlurLock>
               </div>
             )}
           </div>
         </div>
 
-        {/* Top strength — one real unblurred personalized observation */}
+        {/* Top strength — label stays visible, the actual observation is locked */}
         {topStrength && (
           <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.18)' }}>
             <div className="flex-shrink-0 mt-0.5" style={{ color: G, fontSize: 13 }}>✦</div>
             <div className="min-w-0">
               <p className="font-body text-[10px] tracking-[0.14em] mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>YOUR TOP STRENGTH</p>
-              <p className="font-heading font-semibold text-[13px] leading-snug" style={{ color: TEXT }}>{topStrength}</p>
+              <BlurLock size="sm">
+                <p className="font-heading font-semibold text-[13px] leading-snug" style={{ color: TEXT }}>{topStrength}</p>
+              </BlurLock>
             </div>
           </div>
         )}
@@ -254,7 +284,9 @@ function Card1Score({ scan }) {
             <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
             <div className="min-w-0">
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Biggest growth area</p>
-              <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>{growthArea.label}</p>
+              <BlurLock size="sm">
+                <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>{growthArea.label}</p>
+              </BlurLock>
               <BlurLock size="sm">
                 <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   {growthArea.detail}
@@ -274,7 +306,7 @@ function Card1Score({ scan }) {
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
                 {celebMatch.source === 'rekognition' ? `Celebrity match · ${celebMatch.sim}% similarity` : 'Celebrity match · Shared facial features'}
               </p>
-              <BlurLock size="sm">
+              <BlurLock size="md">
                 <p className="font-heading font-bold text-[15px]" style={{ color: 'rgba(255,255,255,0.90)' }}>
                   {celebMatch.name}
                 </p>
@@ -285,21 +317,20 @@ function Card1Score({ scan }) {
         )}
 
         {/* Locked metric cards */}
-        <div className="grid grid-cols-2 gap-2.5 mb-4">
-          {lockedMetrics.map(({ icon: Icon, label, value, unit, pct }) => (
-            <div key={label} className="rounded-2xl p-3 flex flex-col" style={{ background: 'rgba(198,168,92,0.04)', border: '1px solid rgba(198,168,92,0.12)' }}>
-              <div className="flex items-center justify-between mb-2.5">
-                <Icon size={12} style={{ color: G }} />
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {lockedMetrics.map(({ label, value, unit, pct }) => (
+            <div key={label} className="rounded-2xl p-4 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
+              <span className="font-heading font-bold text-[19px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
+              <div className="flex items-center justify-between mb-2">
+                <BlurLock size="sm">
+                  <div className="flex items-end gap-0.5">
+                    <span className="font-heading font-bold text-[26px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+                  </div>
+                </BlurLock>
                 <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </div>
-              <span className="font-heading text-[9px] tracking-wide font-bold mb-1.5" style={{ color: 'rgba(198,168,92,0.6)' }}>{label}</span>
-              <BlurLock size="sm">
-                <div className="flex items-end gap-0.5 mb-2">
-                  <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
-                  {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                </div>
-              </BlurLock>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
@@ -349,11 +380,11 @@ function Card3FaceMetrics({ scan }) {
   return (
     <CardShell badge="FACE METRICS" icon={Smile}>
       {metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5 mb-3">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           {metrics.map(({ label, value, icon: Icon }) => (
             <div
               key={label}
-              className="rounded-2xl p-3.5 flex flex-col"
+              className="rounded-2xl p-4 flex flex-col"
               style={{ background: 'rgba(198,168,92,0.04)', border: '1px solid rgba(198,168,92,0.12)' }}
             >
               <div className="flex items-center justify-between mb-2.5">
@@ -361,7 +392,7 @@ function Card3FaceMetrics({ scan }) {
                 <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </div>
               <p
-                className="font-heading font-bold text-[9px] tracking-[0.12em] mb-2"
+                className="font-heading font-bold text-[9px] tracking-[0.12em] mb-3"
                 style={{ color: 'rgba(198,168,92,0.6)' }}
               >
                 {label}
@@ -380,11 +411,11 @@ function Card3FaceMetrics({ scan }) {
       )}
 
       {extras.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {extras.map(({ label, value }) => (
             <div
               key={label}
-              className="flex items-center justify-between rounded-xl px-3.5 py-3"
+              className="flex items-center justify-between rounded-xl p-4"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
             >
               <p className="font-body text-[11px] tracking-wide" style={{ color: DIM }}>{label}</p>

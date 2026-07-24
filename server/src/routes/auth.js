@@ -24,7 +24,7 @@ async function authLimiter(req, res, next) {
 // ── POST /api/auth/register ───────────────────────────────────────────────────
 router.post('/register', authLimiter, async (req, res) => {
   const { name, email, password, refCode } = req.body
-  if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' })
+  if (!email || !password) return res.status(400).json({ error: 'All fields required' })
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
 
   try {
@@ -42,7 +42,7 @@ router.post('/register', authLimiter, async (req, res) => {
       const user = await createUser({
         id,
         email,
-        name,
+        name: name || '',
         password_hash: hash,
         referral_code: ownCode,
         referral_count: 0,
@@ -76,7 +76,7 @@ router.post('/register', authLimiter, async (req, res) => {
       const id = uuid()
       const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
 
-      db.prepare('INSERT INTO users (id, email, name, password_hash, referral_code) VALUES (?, ?, ?, ?, ?)').run(id, email, name, hash, ownCode)
+      db.prepare('INSERT INTO users (id, email, name, password_hash, referral_code) VALUES (?, ?, ?, ?, ?)').run(id, email, name || '', hash, ownCode)
       db.prepare('INSERT INTO streaks (user_id) VALUES (?)').run(id)
 
       if (refCode && typeof refCode === 'string') {
@@ -86,7 +86,7 @@ router.post('/register', authLimiter, async (req, res) => {
         }
       }
 
-      const user = { id, name, email, subscriptionTier: 'free', createdAt: new Date().toISOString() }
+      const user = { id, name: name || '', email, subscriptionTier: 'free', createdAt: new Date().toISOString() }
       return res.json({ user, token: signToken(id, email) })
     }
   } catch (err) {

@@ -1626,7 +1626,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
         setRetryCountdown(err.retryAfter || 30)
         setPhase('retry_error')
       } else {
-        setError("We're experiencing high demand. Please try again in 30 seconds.")
+        setError(err.message || 'Something went wrong, please try again.')
         setPhase('retry_error')
       }
     }
