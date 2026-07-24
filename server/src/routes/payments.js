@@ -9,11 +9,13 @@ const { getUserById, updateUserById, getSupabase, isConfigured, isWebhookProcess
 // Do NOT call these endpoints from the iOS app — Apple will reject the app.
 const router = express.Router()
 
-if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY env var is required')
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  httpClient: Stripe.createFetchHttpClient(),
-  maxNetworkRetries: 1,
-})
+if (!process.env.STRIPE_SECRET_KEY) console.warn('[Stripe] STRIPE_SECRET_KEY env var is not set — Stripe payment endpoints will be unavailable.')
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      httpClient: Stripe.createFetchHttpClient(),
+      maxNetworkRetries: 1,
+    })
+  : null
 
 const PRICES = {
   monthly: process.env.STRIPE_PRICE_MONTHLY || 'price_monthly_placeholder',
