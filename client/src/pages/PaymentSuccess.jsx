@@ -4,9 +4,25 @@ import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
 const SESSION_KEY = 'asc_pro_splash_shown'
+
+// This page only ever runs in a plain web browser (Stripe redirects back here
+// after checkout) — never inside the native app shell, so unlike the other
+// analytics calls in this codebase, this one is NOT gated behind an
+// isNativePlatform() check; that would make it a permanent no-op. There's no
+// web Firebase app configured yet either, so this currently no-ops via the
+// catch below until that's set up — but it'll start working with zero further
+// code changes once it is.
+async function logAnalyticsEvent(name, params) {
+  try {
+    await FirebaseAnalytics.logEvent({ name, params })
+  } catch {
+    // analytics unavailable (no web Firebase config yet) — not fatal, ignore
+  }
+}
 
 export default function PaymentSuccess() {
   const navigate = useNavigate()
@@ -27,6 +43,7 @@ export default function PaymentSuccess() {
           const { isPremium } = await api.payments.status()
           if (isPremium) {
             setIsPremium(true)
+            logAnalyticsEvent('purchase_completed', { platform: 'web' })
             return
           }
         } catch (err) {

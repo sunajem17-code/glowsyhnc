@@ -13,19 +13,61 @@ import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
+import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { JUST_ONBOARDED_KEY } from '../utils/tourFlags'
+import MotionPage from '../components/MotionPage'
+
+// Light tap feedback on primary CTAs. No-op on web (no native bridge) and
+// swallows any native error so a haptics failure never blocks the tap itself.
+async function triggerHaptic() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await Haptics.impact({ style: ImpactStyle.Light })
+  } catch {
+    // haptics unavailable — not fatal, ignore
+  }
+}
+
+// Analytics collection ships disabled by default (see GoogleService-Info.plist's
+// IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
+// to it in StepConsent. No-op on web — no native bridge, and no web Firebase app
+// configured yet either.
+async function enableAnalytics() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await FirebaseAnalytics.setEnabled({ enabled: true })
+  } catch {
+    // analytics unavailable — not fatal, ignore
+  }
+}
+
+async function logAnalyticsEvent(name, params) {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await FirebaseAnalytics.logEvent({ name, params })
+  } catch {
+    // analytics unavailable — not fatal, ignore
+  }
+}
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
+// BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
+// custom properties (root wrapper below applies the "dark" scope so they resolve
+// correctly — .dark isn't otherwise activated anywhere in the app). --text-secondary
+// itself is overridden locally on that same wrapper: its shared .dark value
+// (#4A4642) is calibrated for light-card text, not for overlay text on this
+// near-black background, and doesn't meet the 4.5:1 contrast floor here.
 const G = GOLD
 const G_DIM = 'rgba(198,168,92,0.10)'
 const G_BORDER = 'rgba(198,168,92,0.28)'
-const BG = '#080808'
+const BG = 'var(--bg)'
 const SURFACE = '#111111'
 const BORDER = 'rgba(255,255,255,0.07)'
-const TEXT = '#F0EDE8'
-const DIM = 'rgba(255,255,255,0.5)'  // 5.3:1 against BG — 0.35 measured ~3.1:1, under the 4.5:1 body-text floor
+const TEXT = 'var(--text-primary)'
+const DIM = 'var(--text-secondary)'
 
 // Steps: 0=intro, 1=welcome, 2=signup, 3=consent, 4=gender, 5=goal, 6=heightweight, 7=scan
 //         8=locked-reveal, 9=phase, 10=transformation, 11=rating
@@ -65,7 +107,7 @@ const pageVariants = {
   center: { x: 0, opacity: 1 },
   exit:  (dir) => ({ x: dir > 0 ? -48 : 48, opacity: 0 }),
 }
-const pageTrans = { type: 'spring', stiffness: 380, damping: 36 }
+const pageTrans = SPRING_STANDARD
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 function BackBtn({ onBack }) {
@@ -82,25 +124,19 @@ function BackBtn({ onBack }) {
 }
 
 function GoldBtn({ label, onClick, disabled, loading }) {
+  function handleClick() {
+    triggerHaptic()
+    onClick?.()
+  }
   return (
-    <motion.button
-      whileTap={{ scale: disabled ? 1 : 0.97 }}
-      onClick={onClick}
+    <button
+      onClick={handleClick}
       disabled={disabled || loading}
-      className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-      style={{
-        background: disabled || loading
-          ? 'rgba(198,168,92,0.22)'
-          : GOLD_GRADIENT,
-        color: disabled || loading ? 'rgba(255,255,255,0.25)' : '#0A0A0A',
-        boxShadow: disabled || loading ? 'none' : `0 4px 20px rgba(198,168,92,0.25)`,
-        letterSpacing: '0.01em',
-        cursor: disabled || loading ? 'not-allowed' : 'pointer',
-      }}
+      className="btn-primary flex items-center justify-center gap-2"
     >
       {loading && <Loader2 size={16} className="animate-spin" />}
       {label}
-    </motion.button>
+    </button>
   )
 }
 
@@ -287,7 +323,7 @@ function StepIntro({ onNext }) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.55, ease: EASE_STANDARD }}
         >
           <p className="font-heading font-bold text-[28px] leading-tight mb-5" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
             First Impressions<br />Are Fast
@@ -332,7 +368,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.5, ease: EASE_STANDARD }}
           className="mb-4"
         >
           <img src={logo} alt="Ascendus" style={{ width: 200, mixBlendMode: 'lighten' }} />
@@ -534,7 +570,7 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
   const setAuth = useStore(s => s.setAuth)
   const setReferralCode = useStore(s => s.setReferralCode)
 
-  const valid = data.email?.trim() && data.password?.length >= 8
+  const valid = data.email?.trim() && data.password?.trim().length >= 8
 
   async function handleRegister() {
     if (!valid) return
@@ -546,10 +582,8 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
       const refCode = urlParams.get('ref')
       const deviceId = await getDeviceId().catch(() => null)
       const res = await api.auth.register({
-        // name already collected by the earlier StepName step
-        name: data.name?.trim(),
         email: data.email.trim(),
-        password: data.password,
+        password: data.password.trim(),
         ...(refCode   ? { refCode }   : {}),
         ...(deviceId  ? { deviceId }  : {}),
       })
@@ -621,6 +655,11 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
   const navigate = useNavigate()
   const allChecked = Object.values(checks).every(Boolean)
 
+  function handleAgree() {
+    enableAnalytics()
+    onNext()
+  }
+
   const items = [
     { key: 'legalAgeConsent', label: 'I confirm I am 17 years of age or older and agree to the Terms of Service and Privacy Policy.', sub: null, link: 'both' },
     {
@@ -687,7 +726,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
       </div>
 
       <div className="pb-10 pt-2">
-        <GoldBtn label="I Agree — Continue →" onClick={onNext} disabled={!allChecked} />
+        <GoldBtn label="I Agree — Continue →" onClick={handleAgree} disabled={!allChecked} />
       </div>
     </div>
   )
@@ -699,6 +738,18 @@ function StepName({ data, onChange, onNext, onBack }) {
     color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
     borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
     width: '100%', fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
+  }
+
+  // Best-effort — the name isn't critical-path, so a network hiccup here
+  // should never block onboarding. Advance regardless of outcome.
+  async function handleContinue() {
+    try {
+      await api.user.update({ name: data.name.trim() })
+    } catch (err) {
+      console.error('[StepName] Failed to save name:', err.message)
+    } finally {
+      onNext()
+    }
   }
 
   return (
@@ -720,7 +771,7 @@ function StepName({ data, onChange, onNext, onBack }) {
         />
       </div>
       <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} disabled={!data.name?.trim()} />
+        <GoldBtn label="Continue →" onClick={handleContinue} disabled={!data.name?.trim()} />
       </div>
     </div>
   )
@@ -1262,7 +1313,7 @@ function StepBMI({ data, onNext, onBack }) {
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.45, ease: EASE_STANDARD }}
           className="text-center mb-6"
         >
           <p className="font-body text-[11px] uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Your BMI</p>
@@ -1391,7 +1442,7 @@ function StepPhaseResult({ data, onFinish }) {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.5, ease: EASE_STANDARD }}
           className="text-center mb-6"
         >
           <div className="mb-4 flex justify-center"><info.PhaseIcon size={52} style={{ color: info.color }} /></div>
@@ -1787,7 +1838,7 @@ function StepLockedReveal({ onContinue }) {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.25, ease: EASE_STANDARD }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.15}
@@ -1892,7 +1943,7 @@ function Slide1() {
             key={i}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.08 + i * 0.12, duration: 0.4, ease: EASE_STANDARD }}
             className="flex items-center gap-4 px-5 py-4 rounded-2xl"
             style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
           >
@@ -1988,7 +2039,7 @@ function Slide3() {
       <motion.div
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.5, ease: EASE_STANDARD }}
         className="rounded-2xl px-6 py-5 mb-6 flex flex-col items-center"
         style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
       >
@@ -2018,7 +2069,7 @@ function Slide3() {
             key={i}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.15 + i * 0.1, duration: 0.4, ease: EASE_STANDARD }}
             className="flex-1 rounded-xl px-2 py-3 flex flex-col items-center gap-1"
             style={{ background: '#0A0A0A', border: `0.5px solid rgba(198,168,92,0.25)` }}
           >
@@ -2145,8 +2196,8 @@ export default function PremiumOnboarding() {
   const [introDone, setIntroDone] = useState(true)
   // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
   // same reason — new unauthenticated sessions start straight at Welcome(1).
-  // If already authenticated, skip Intro(0), Welcome(1), Name(2), SignUp(3) — start at Consent(4)
-  const [step, setStep] = useState(isAuthenticated ? 4 : (draft?.step ?? 1))
+  // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
+  const [step, setStep] = useState(isAuthenticated ? 3 : (draft?.step ?? 1))
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -2249,6 +2300,7 @@ export default function PremiumOnboarding() {
       setAssignedPhase(phase)
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
+      logAnalyticsEvent('scan_completed', { tier: scanRecord?.tier, score: scanRecord?.umaxScore, source: 'onboarding' })
 
       // Persist to Supabase non-blocking — same fields as regular Scan flow
       api.supabase.saveScan({
@@ -2281,7 +2333,7 @@ export default function PremiumOnboarding() {
   }
 
   // Progress bar: only during data-collection steps (2–8); post-scan celebration screens (9–12) get no counter
-  const QUIZ_START = isAuthenticated ? 4 : 2
+  const QUIZ_START = isAuthenticated ? 3 : 2
   const QUIZ_END = 8
   const showProgress = step >= QUIZ_START && step <= QUIZ_END
   const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
@@ -2335,15 +2387,15 @@ export default function PremiumOnboarding() {
       if (!res.ok) throw new Error(data.error || 'Authentication failed')
 
       setAuth(data.user, data.token)
-      // Apple already provides identity — skip Name(2) and SignUp(3), go straight to Consent(4)
-      setStep(4)
+      // Apple already provides identity — skip SignUp(2), go straight to Consent(3)
+      setStep(3)
     } catch (err) {
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
       console.error('[APPLE AUTH] PremiumOnboarding error:', err)
     }
   }
 
-  // Flow: 0=intro, 1=welcome, 2=name, 3=signup, 4=consent, 5=gender, 6=goal, 7=heightweight,
+  // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=name, 5=gender, 6=goal, 7=heightweight,
   //       8=scan(face+side), 9=locked-reveal, 10=phase, 11=transformation, 12=rating → /unlock
   const steps = [
     <StepIntro key="intro" onNext={goNext} />,
@@ -2352,13 +2404,13 @@ export default function PremiumOnboarding() {
       onSignIn={() => setSigningIn(true)}
       onAppleSignIn={handleAppleSignIn}
     />,
-    <StepName key="name" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack}
-    />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}
     />,
     <StepConsent key="consent" checks={checks} onToggle={toggleCheck}
+      onNext={goNext} onBack={goBack}
+    />,
+    <StepName key="name" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack}
     />,
     <StepGender key="gender" data={formData} onChange={updateField}
@@ -2382,7 +2434,11 @@ export default function PremiumOnboarding() {
   ]
 
   return (
-    <div className="relative flex flex-col h-full overflow-hidden" style={{ background: BG }}>
+    <MotionPage
+      baseClassName=""
+      className="relative flex flex-col h-full overflow-hidden dark"
+      style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
+    >
       {/* Progress bar (steps 1-9) */}
       {showProgress && (
         <div className="absolute top-0 left-0 right-0 h-0.5 z-20" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -2426,6 +2482,6 @@ export default function PremiumOnboarding() {
           {steps[step]}
         </motion.div>
       </AnimatePresence>
-    </div>
+    </MotionPage>
   )
 }

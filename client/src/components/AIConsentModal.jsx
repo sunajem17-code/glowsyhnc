@@ -7,7 +7,7 @@ import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 const SURFACE = '#111111'
 const BORDER = 'rgba(255,255,255,0.08)'
 const TEXT = '#F0EDE8'
-const DIM = 'rgba(255,255,255,0.45)'
+const DIM = 'rgba(255,255,255,0.5)'
 
 async function openPrivacy() {
   const url = 'https://ascendus.store/privacy'

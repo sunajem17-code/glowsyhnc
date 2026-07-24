@@ -17,7 +17,7 @@ function tierMeta(label) {
 
 function barColor(val) {
   if (val >= 7) return { from: '#1a7a3a', to: '#2ecc71' }
-  if (val >= 5) return { from: '#7a5a1a', to: '#C9A84C' }
+  if (val >= 5) return { from: '#7a5a1a', to: GOLD }
   return { from: '#7a2a1a', to: '#E07A5F' }
 }
 

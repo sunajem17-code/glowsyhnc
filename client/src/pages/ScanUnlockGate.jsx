@@ -10,13 +10,44 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import logo from '../assets/ascendus-icon.png'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
+import MotionPage from '../components/MotionPage'
+
+// Light tap feedback on the primary CTA. No-op on web (no native bridge) and
+// swallows any native error so a haptics failure never blocks the tap itself.
+async function triggerHaptic() {
+  if (!isNative()) return
+  try {
+    await Haptics.impact({ style: ImpactStyle.Light })
+  } catch {
+    // haptics unavailable — not fatal, ignore
+  }
+}
+
+// Native purchase path only — the web/Stripe checkout path doesn't actually
+// complete here (see handleAscend), so this is deliberately not called for it.
+async function logAnalyticsEvent(name, params) {
+  if (!isNative()) return
+  try {
+    await FirebaseAnalytics.logEvent({ name, params })
+  } catch {
+    // analytics unavailable — not fatal, ignore
+  }
+}
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
-const BG   = '#080808'
-const TEXT = '#F0EDE8'
-const DIM  = 'rgba(255,255,255,0.5)'  // 5.3:1 against BG — 0.38 measured ~3.5:1, under the 4.5:1 body-text floor
+// BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
+// custom properties (root wrapper below applies the "dark" scope so they resolve
+// correctly — .dark isn't otherwise activated anywhere in the app). --text-secondary
+// itself is overridden locally on that same wrapper: its shared .dark value
+// (#4A4642) is calibrated for light-card text, not for overlay text on this
+// near-black background, and doesn't meet the 4.5:1 contrast floor here.
+const BG   = 'var(--bg)'
+const TEXT = 'var(--text-primary)'
+const DIM  = 'var(--text-secondary)'
 const SURF = 'rgba(255,255,255,0.04)'
 
 // ── Helpers (copied from OnboardingFinalSteps) ────────────────────────────────
@@ -152,9 +183,12 @@ function Card1Score({ scan }) {
     ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
     : null
 
+  // pct drives each tile's progress bar. Tier itself is a string label, so it
+  // borrows the same overall glowScore already shown as the hero number above;
+  // potential reuses the value already computed for the tile itself.
   const lockedMetrics = [
-    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '—',       unit: '' },
-    { icon: Zap,  label: 'Potential', value: potential ?? '—',  unit: potential ? '/10' : '' },
+    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '—',       unit: '',                          pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { icon: Zap,  label: 'Potential', value: potential ?? '—',  unit: potential ? '/10' : '',       pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
   ]
 
   return (
@@ -221,9 +255,11 @@ function Card1Score({ scan }) {
             <div className="min-w-0">
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Biggest growth area</p>
               <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>{growthArea.label}</p>
-              <p className="font-body text-[12px] leading-snug select-none" style={{ color: 'rgba(255,255,255,0.55)', filter: 'blur(5px)', userSelect: 'none' }}>
-                {growthArea.detail}
-              </p>
+              <BlurLock size="sm">
+                <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  {growthArea.detail}
+                </p>
+              </BlurLock>
             </div>
           </div>
         )}
@@ -238,9 +274,11 @@ function Card1Score({ scan }) {
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
                 {celebMatch.source === 'rekognition' ? `Celebrity match · ${celebMatch.sim}% similarity` : 'Celebrity match · Shared facial features'}
               </p>
-              <p className="font-heading font-bold text-[15px] select-none" style={{ color: 'rgba(255,255,255,0.90)', filter: 'blur(6px)', userSelect: 'none' }}>
-                {celebMatch.name}
-              </p>
+              <BlurLock size="sm">
+                <p className="font-heading font-bold text-[15px]" style={{ color: 'rgba(255,255,255,0.90)' }}>
+                  {celebMatch.name}
+                </p>
+              </BlurLock>
             </div>
             <Lock size={13} style={{ color: G, flexShrink: 0 }} />
           </div>
@@ -248,16 +286,27 @@ function Card1Score({ scan }) {
 
         {/* Locked metric cards */}
         <div className="grid grid-cols-2 gap-2.5 mb-4">
-          {lockedMetrics.map(({ icon: Icon, label, value, unit }, i) => (
+          {lockedMetrics.map(({ icon: Icon, label, value, unit, pct }) => (
             <div key={label} className="rounded-2xl p-3 flex flex-col" style={{ background: 'rgba(198,168,92,0.04)', border: '1px solid rgba(198,168,92,0.12)' }}>
               <div className="flex items-center justify-between mb-2.5">
                 <Icon size={12} style={{ color: G }} />
                 <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </div>
               <span className="font-heading text-[9px] tracking-wide font-bold mb-1.5" style={{ color: 'rgba(198,168,92,0.6)' }}>{label}</span>
-              <div className="flex items-end gap-0.5">
-                <span className="font-heading font-bold text-[22px] leading-none select-none" style={{ color: TEXT, filter: 'blur(7px)', userSelect: 'none' }}>{value}</span>
-                {unit && <span className="font-heading font-bold text-[11px] mb-0.5 select-none" style={{ color: DIM, filter: 'blur(5px)' }}>{unit}</span>}
+              <BlurLock size="sm">
+                <div className="flex items-end gap-0.5 mb-2">
+                  <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                  {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+                </div>
+              </BlurLock>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                />
               </div>
             </div>
           ))}
@@ -479,21 +528,11 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
         </AnimatePresence>
       </div>
 
-      {/* Dot pagination */}
-      <div className="flex items-center justify-center gap-2 py-3 flex-shrink-0">
-        {cards.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            <motion.div
-              animate={{ width: i === cardIdx ? 22 : 6, background: i === cardIdx ? G : 'rgba(255,255,255,0.18)' }}
-              transition={{ duration: 0.2 }}
-              style={{ height: 6, borderRadius: 3 }}
-            />
-          </button>
-        ))}
+      {/* Step counter */}
+      <div className="flex items-center justify-center py-3 flex-shrink-0">
+        <span className="font-heading font-bold text-[11px] tracking-[0.1em]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          {cardIdx + 1} OF {cards.length}
+        </span>
       </div>
 
       {/* Fixed CTA */}
@@ -507,7 +546,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
             <>
               <motion.button
                 whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-                onClick={onAscend}
+                onClick={() => { triggerHaptic(); onAscend() }}
                 disabled={isPurchasing}
                 className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
                 style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
@@ -518,7 +557,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ duration: 0.15, ease: EASE_STANDARD }}
                     className="flex items-center justify-center gap-2"
                   >
                     {isPurchasing
@@ -597,7 +636,7 @@ function UnlockReveal({ score, onContinue }) {
           <motion.div
             initial={{ scale: 0.2, opacity: 0.9 }}
             animate={{ scale: revealed ? 3.5 : 0.2, opacity: revealed ? 0 : 0.9 }}
-            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 1.2, ease: EASE_STANDARD }}
             style={{ position: 'absolute', width: 240, height: 240, borderRadius: '50%', border: `2px solid ${G}`, pointerEvents: 'none' }}
           />
           {PARTICLES.map((p, i) => (
@@ -605,7 +644,7 @@ function UnlockReveal({ score, onContinue }) {
               key={i}
               initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
               animate={revealed ? { x: Math.cos((p.angle * Math.PI) / 180) * p.radius, y: Math.sin((p.angle * Math.PI) / 180) * p.radius, opacity: 0, scale: 0 } : {}}
-              transition={{ duration: 0.85, delay: p.delay, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.85, delay: p.delay, ease: EASE_STANDARD }}
               style={{ position: 'absolute', width: p.size, height: p.size, borderRadius: '50%', background: G, pointerEvents: 'none' }}
             />
           ))}
@@ -633,7 +672,7 @@ function UnlockReveal({ score, onContinue }) {
             : { filter: revealed ? 'blur(0px)' : 'blur(28px)', scale: revealed ? 1 : 0.8, opacity: 1 }}
           transition={reducedMotion
             ? { duration: 0.2, ease: 'easeOut' }
-            : { duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+            : { duration: 1.1, ease: EASE_STANDARD, delay: 0.15 }}
         >
           <span className="font-heading font-bold" style={{ fontSize: 100, color: TEXT, letterSpacing: '-0.04em', lineHeight: 1, display: 'block' }}>
             {score.toFixed(1)}
@@ -843,6 +882,7 @@ export default function ScanUnlockGate() {
           api.payments.syncRc(rcUserId).catch(() => {})
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
+          logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
           navigate('/results', { replace: true })
           return
         }
@@ -872,7 +912,11 @@ export default function ScanUnlockGate() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden" style={{ background: BG }}>
+    <MotionPage
+      baseClassName=""
+      className="fixed inset-0 z-50 overflow-hidden dark"
+      style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
+    >
       <SwipeableResultCards
         scan={currentScan}
         onAscend={handleAscend}
@@ -916,6 +960,6 @@ export default function ScanUnlockGate() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </MotionPage>
   )
 }
