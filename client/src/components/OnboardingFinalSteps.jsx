@@ -204,11 +204,15 @@ function OverallCard({ scan }) {
 
       <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
 
-        {/* Header */}
+        {/* Header — centered as a unit (logo badge, heading, date pill), distinct
+            from the OVERALL section/cards below which stay left-aligned. Centering
+            just the heading+pill and leaving the badge left would zigzag
+            left/center/center/left; grouping the whole hero block reads as one
+            intentional centered moment instead. */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-5"
+          className="flex items-center justify-center gap-3 mb-5"
         >
           <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
           <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
@@ -220,7 +224,7 @@ function OverallCard({ scan }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.04 }}
-          className="font-heading font-bold text-[22px] leading-tight mb-3"
+          className="font-heading font-bold text-[22px] leading-tight mb-3 text-center"
           style={{ color: TEXT, letterSpacing: '-0.01em' }}
         >
           You will ascend by
@@ -231,7 +235,7 @@ function OverallCard({ scan }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="mb-6"
+          className="mb-6 flex justify-center"
         >
           <div
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full"
@@ -387,8 +391,8 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
           onClick={onAscend}
           disabled={isPurchasing}
-          className="btn-primary flex items-center justify-center gap-2 disabled:opacity-70"
-          style={{ background: GOLD_GRAD, fontSize: 16, letterSpacing: '0.02em' }}
+          className="btn-primary flex items-center justify-center gap-2.5 disabled:opacity-70"
+          style={{ background: GOLD_GRAD, fontSize: 19, letterSpacing: '0.02em', color: 'white', paddingTop: 19, paddingBottom: 19 }}
         >
           {/* isPurchasing/error were accepted as props but never rendered —
               handleAscend genuinely ran and genuinely failed (no Stripe keys
@@ -397,14 +401,20 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
               as ScanUnlockGate's own button, so behavior doesn't drift between
               the two screens.
 
-              Text color stays #0A0A0A from .btn-primary (shared by every gold
-              CTA app-wide, not touched here) — checked WCAG contrast for
-              white against this exact gradient (#D4AF6A/#C6A85C/#A8893A) and
-              it fails badly at the lighter stop (~1.9:1, below even the 3:1
-              floor for bold/large text), while black holds ~5.7–9.9:1 across
-              the whole range. Confirmed with the user: bump size/weight
-              instead of trading away contrast for a color that reads worse
-              at one end of the gradient. */}
+              color: 'white' here overrides .btn-primary's own color: #0A0A0A
+              (inline style beats a class selector, so this only affects this
+              one button, not the other gold CTAs sharing that class). Per the
+              user's explicit call despite the earlier contrast finding (white
+              against this exact gradient measures ~1.9:1 at the lighter stop,
+              below the 3:1 floor for bold/large text — worse than the black
+              it replaces). Sparkles below gets the same explicit white so it
+              doesn't end up mismatched against the now-white label.
+
+              paddingTop/Bottom + fontSize here bump this one CTA above the
+              app-wide py-4/text-[15px] convention baked into .btn-primary
+              itself (index.css) — there's no separate "large button" variant
+              anywhere else to reuse; this is the app's one CTA size, made
+              deliberately bigger just for this button per explicit request. */}
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={isPurchasing ? 'processing' : 'ready'}
@@ -412,11 +422,11 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15, ease: EASE_STANDARD }}
-              className="flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2.5"
             >
               {isPurchasing
-                ? <Loader2 size={16} className="animate-spin" />
-                : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+                ? <Loader2 size={20} className="animate-spin" />
+                : <Sparkles size={20} style={{ color: 'white' }} />
               }
               {isPurchasing ? 'Processing…' : 'Unlock Results Now'}
             </motion.span>

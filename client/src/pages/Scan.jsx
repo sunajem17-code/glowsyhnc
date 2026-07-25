@@ -532,7 +532,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           separate scan action. */}
       {stepNum === 1 ? (
         canAutoLiveScan ? (
-          <div className="mb-1 mt-auto">
+          <div className="mb-1">
             {/* Hidden entirely while the "Now scanning…" transition/overlay is up —
                 that state has its own inline skip link, so nothing duplicates it here. */}
             {!showScanOverlay && (
@@ -595,7 +595,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             </AnimatePresence>
           </div>
         ) : (
-        <div className="mb-1 mt-auto">
+        <div className="mb-1">
           <button
             onClick={() => setShowActionSheet(true)}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
