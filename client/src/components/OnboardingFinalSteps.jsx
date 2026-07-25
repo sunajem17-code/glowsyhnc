@@ -179,7 +179,7 @@ function OverallCard({ scan }) {
   }
 
   const ascendByLabel = new Date(Date.now() + 12 * 7 * 24 * 60 * 60 * 1000)
-    .toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+    .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   // Six real fields — same as Card1Score, not fabricated categories.
   const lockedMetrics = [
@@ -388,14 +388,23 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
           onClick={onAscend}
           disabled={isPurchasing}
           className="btn-primary flex items-center justify-center gap-2 disabled:opacity-70"
-          style={{ background: GOLD_GRAD }}
+          style={{ background: GOLD_GRAD, fontSize: 16, letterSpacing: '0.02em' }}
         >
           {/* isPurchasing/error were accepted as props but never rendered —
               handleAscend genuinely ran and genuinely failed (no Stripe keys
               configured in this env, or an early demo-token redirect), it
               just had nowhere to show it. Same spinner/disabled/error pattern
               as ScanUnlockGate's own button, so behavior doesn't drift between
-              the two screens. */}
+              the two screens.
+
+              Text color stays #0A0A0A from .btn-primary (shared by every gold
+              CTA app-wide, not touched here) — checked WCAG contrast for
+              white against this exact gradient (#D4AF6A/#C6A85C/#A8893A) and
+              it fails badly at the lighter stop (~1.9:1, below even the 3:1
+              floor for bold/large text), while black holds ~5.7–9.9:1 across
+              the whole range. Confirmed with the user: bump size/weight
+              instead of trading away contrast for a color that reads worse
+              at one end of the gradient. */}
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={isPurchasing ? 'processing' : 'ready'}
@@ -414,7 +423,7 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
           </AnimatePresence>
         </motion.button>
         {error && (
-          <p className="text-center text-[11px] font-body mt-2" style={{ color: '#EF4444' }}>{error}</p>
+          <p className="text-center text-[12px] font-body font-semibold mt-2" style={{ color: TEXT }}>{error}</p>
         )}
       </div>
     </div>
