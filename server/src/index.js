@@ -151,6 +151,10 @@ app.use('/api/tindermaxx', express.json({ limit: '15mb' }), require('./routes/ti
 // Community posts can contain base64 photos — allow up to 15mb
 app.use('/api/community',   express.json({ limit: '15mb' }), require('./routes/community'))
 app.use('/webhooks',        require('./routes/email-webhooks'))
+// RevenueCat's auth is a plain shared-secret header (checked inside the
+// route itself), not a body-dependent signature like Stripe's — no raw-body
+// handling needed here, the global express.json() above already parses it.
+app.use('/api/webhooks',    require('./routes/revenuecatWebhook'))
 
 // Health checks
 app.get('/',           (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))

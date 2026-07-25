@@ -7,7 +7,8 @@ import useStore from '../store/useStore'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const RESCAN_DAYS = 14
 
@@ -21,7 +22,7 @@ function greeting() {
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
-  transition: { delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  transition: { delay, duration: 0.4, ease: EASE_STANDARD },
 })
 
 export default function Dashboard() {
@@ -80,11 +81,11 @@ export default function Dashboard() {
           </h1>
         </div>
         <button
-          onClick={() => navigate('/profile')}
+          onClick={() => { triggerHaptic(); navigate('/profile') }}
           className="w-10 h-10 rounded-2xl flex items-center justify-center"
-          style={{ background: '#1C1C1C', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
         >
-          <span className="font-bold text-sm font-heading" style={{ color: 'rgba(255,255,255,0.85)' }}>
+          <span className="font-bold text-sm font-heading text-primary">
             {(user?.name?.[0] ?? 'G').toUpperCase()}
           </span>
         </button>
@@ -97,7 +98,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: -8, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -8, height: 0 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.35, ease: EASE_STANDARD }}
             className="mb-4 overflow-hidden"
           >
             <div
@@ -111,10 +112,10 @@ export default function Dashboard() {
                 className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: 'rgba(198,168,92,0.12)' }}
               >
-                <Gift size={17} style={{ color: '#C6A85C' }} />
+                <Gift size={17} style={{ color: GOLD }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>
+                <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
                   Get 3 days Pro free
                 </p>
                 <p className="font-body text-[11px] text-secondary leading-snug">
@@ -122,9 +123,9 @@ export default function Dashboard() {
                 </p>
               </div>
               <button
-                onClick={() => navigate('/referral')}
+                onClick={() => { triggerHaptic(); navigate('/referral') }}
                 className="font-heading font-bold text-xs px-3 py-1.5 rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}
+                style={{ background: 'rgba(198,168,92,0.18)', color: GOLD }}
               >
                 Share
               </button>
@@ -180,7 +181,7 @@ export default function Dashboard() {
                     </p>
                   )}
                   <button
-                    onClick={() => navigate('/results')}
+                    onClick={() => { triggerHaptic(); navigate('/results') }}
                     className="mt-3 inline-flex items-center gap-1 text-xs font-heading font-bold rounded-xl px-3 py-1.5"
                     style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', backdropFilter: 'blur(8px)' }}
                   >
@@ -194,9 +195,9 @@ export default function Dashboard() {
                     Take your first scan to unlock your Glow Score
                   </p>
                   <button
-                    onClick={() => navigate('/scan')}
+                    onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
                     className="px-4 py-2 rounded-xl font-heading font-bold text-xs"
-                    style={{ background: 'linear-gradient(135deg, #D4B96A, #C6A85C)', color: '#0A0A0A' }}
+                    style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
                   >
                     Start Scan
                   </button>
@@ -212,18 +213,18 @@ export default function Dashboard() {
         <motion.div {...fadeUp(0.08)} className="mb-4">
           {rescanReady ? (
             <button
-              onClick={() => navigate('/scan')}
+              onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
               className="w-full rounded-2xl px-4 py-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform"
               style={{ background: 'linear-gradient(135deg, rgba(198,168,92,0.12) 0%, rgba(168,137,58,0.06) 100%)', border: '1px solid rgba(198,168,92,0.35)' }}
             >
               <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(198,168,92,0.15)' }}>
-                <Camera size={17} style={{ color: '#C6A85C' }} />
+                <Camera size={17} style={{ color: GOLD }} />
               </div>
               <div className="flex-1 text-left">
-                <p className="font-heading font-bold text-[13px]" style={{ color: '#C6A85C' }}>New scan ready</p>
+                <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>New scan ready</p>
                 <p className="font-body text-[11px] text-secondary">It's been {daysSinceScan} days — track your progress</p>
               </div>
-              <ChevronRight size={14} style={{ color: '#C6A85C' }} />
+              <ChevronRight size={14} style={{ color: GOLD }} />
             </button>
           ) : (
             <div
@@ -238,12 +239,12 @@ export default function Dashboard() {
                 <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${((RESCAN_DAYS - daysUntilRescan) / RESCAN_DAYS) * 100}%`, background: 'linear-gradient(90deg, #A8893A, #C6A85C)' }}
+                    style={{ width: `${((RESCAN_DAYS - daysUntilRescan) / RESCAN_DAYS) * 100}%`, background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
                   />
                 </div>
               </div>
               <button
-                onClick={() => navigate('/compare')}
+                onClick={() => { triggerHaptic(); navigate('/compare') }}
                 className="flex items-center gap-1 text-[10px] font-heading font-bold px-2.5 py-1.5 rounded-lg flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}
               >
@@ -268,7 +269,7 @@ export default function Dashboard() {
             label: 'Face',
             value: latestScan?.faceData?.aestheticScore != null ? latestScan.faceData.aestheticScore.toFixed(1) : '—',
             icon: Activity,
-            color: '#C6A85C',
+            color: GOLD,
             bg: 'rgba(198,168,92,0.08)',
           },
           {
@@ -337,9 +338,9 @@ export default function Dashboard() {
                 </p>
               </div>
               <button
-                onClick={() => navigate('/plan')}
+                onClick={() => { triggerHaptic(); navigate('/plan') }}
                 className="text-[11px] font-heading font-bold"
-                style={{ color: '#C6A85C' }}
+                style={{ color: GOLD }}
               >
                 See all
               </button>
@@ -351,10 +352,10 @@ export default function Dashboard() {
             >
               <motion.div
                 className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, #A8893A, #C6A85C, #D4B96A)' }}
+                style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD}, #D4B96A)` }}
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPct}%` }}
-                transition={{ duration: 1.2, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 1.2, delay: 0.5, ease: EASE_STANDARD }}
               />
             </div>
             <div className="space-y-1.5">
@@ -407,9 +408,9 @@ export default function Dashboard() {
               <p className="text-[11px] text-secondary font-body">Glow Score over time</p>
             </div>
             <button
-              onClick={() => navigate('/progress')}
+              onClick={() => { triggerHaptic(); navigate('/progress') }}
               className="inline-flex items-center gap-1 text-[11px] font-heading font-bold"
-              style={{ color: '#C6A85C' }}
+              style={{ color: GOLD }}
             >
               <TrendingUp size={12} /> Full view
             </button>
@@ -436,9 +437,9 @@ export default function Dashboard() {
               <Line
                 type="monotone"
                 dataKey="score"
-                stroke="#C6A85C"
+                stroke={GOLD}
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: '#C6A85C', strokeWidth: 0 }}
+                dot={{ r: 3, fill: GOLD, strokeWidth: 0 }}
                 activeDot={{ r: 5, fill: '#E8A000', strokeWidth: 0 }}
               />
               <Tooltip
@@ -462,12 +463,12 @@ export default function Dashboard() {
       {/* HairMaxx */}
       <motion.button
         {...fadeUp(0.24)}
-        onClick={() => navigate('/hairmaxx')}
+        onClick={() => { triggerHaptic(); navigate('/hairmaxx') }}
         className="w-full mb-4 rounded-2xl flex items-center gap-4 px-4 py-4 active:scale-[0.98] transition-transform"
         style={{
-          background: '#0D0D0D',
-          border: '1px solid #1E1E1E',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <div
@@ -477,10 +478,10 @@ export default function Dashboard() {
           <Scissors size={19} style={{ color: GOLD }} />
         </div>
         <div className="text-left flex-1">
-          <p className="font-heading font-bold text-sm" style={{ color: '#F0EDE8' }}>
+          <p className="font-heading font-bold text-sm text-primary">
             HairMaxx
           </p>
-          <p className="text-[11px] font-body mt-0.5" style={{ color: '#4A4642' }}>
+          <p className="text-[11px] font-body mt-0.5 text-secondary">
             Face analysis · Barber scripts · Cut rankings
           </p>
         </div>
@@ -490,12 +491,12 @@ export default function Dashboard() {
       {/* SwipeMaxx */}
       <motion.button
         {...fadeUp(0.26)}
-        onClick={() => navigate('/swipemaxx')}
+        onClick={() => { triggerHaptic(); navigate('/swipemaxx') }}
         className="w-full mb-4 rounded-2xl flex items-center gap-4 px-4 py-4 active:scale-[0.98] transition-transform"
         style={{
-          background: '#0D0D0D',
-          border: '1px solid #1E1E1E',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <div
@@ -505,10 +506,10 @@ export default function Dashboard() {
           <Sparkles size={19} style={{ color: GOLD }} />
         </div>
         <div className="text-left flex-1">
-          <p className="font-heading font-bold text-sm" style={{ color: '#F0EDE8' }}>
+          <p className="font-heading font-bold text-sm text-primary">
             SwipeMaxx
           </p>
-          <p className="text-[11px] font-body mt-0.5" style={{ color: '#4A4642' }}>
+          <p className="text-[11px] font-body mt-0.5 text-secondary">
             AI picks your best dating photo
           </p>
         </div>
@@ -518,7 +519,7 @@ export default function Dashboard() {
       {/* CTA Buttons */}
       <motion.div {...fadeUp(0.27)} className="grid grid-cols-2 gap-3 mb-8">
         <button
-          onClick={() => navigate('/checkin')}
+          onClick={() => { triggerHaptic(); navigate('/checkin') }}
           className="py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
           style={{
             background: 'var(--card)',
@@ -531,7 +532,7 @@ export default function Dashboard() {
           Check-In
         </button>
         <button
-          onClick={() => navigate('/scan')}
+          onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
           className="btn-primary py-3.5 flex items-center justify-center gap-2"
           style={{ color: '#0A0A0A' }}
         >

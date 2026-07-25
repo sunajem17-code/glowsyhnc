@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Star, Sparkles, UserPlus, Check, Loader2, ChevronRight, Zap, Trophy, Eye, BarChart2, Lock } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Star, Sparkles, Check, Loader2, ChevronRight, ChevronDown, Zap, Trophy, Eye, BarChart2, Lock } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { EXTENDED_CATEGORIES, CategoryCard } from './CategoryCard'
 
 const G = GOLD
 const GOLD_GRAD = GOLD_GRADIENT
@@ -126,55 +127,38 @@ export function StepRating({ onNext }) {
   )
 }
 
-// ── Derive biggest growth area from scan sub-scores ───────────────────────────
-function getBiggestGrowthArea(scan) {
-  if (!scan) return null
-
-  const candidates = []
-
-  const fd = scan.faceData
-  if (fd) {
-    if (fd.jawlineDefinition != null) candidates.push({ label: 'Jawline & Structure',  score: fd.jawlineDefinition, detail: 'How much definition and angularity your jawline currently has versus its structural ceiling' })
-    if (fd.skinClarity       != null) candidates.push({ label: 'Skin Clarity',          score: fd.skinClarity,       detail: 'Texture, tone evenness, and clarity — the single highest-ROI area to address first' })
-    if (fd.eyeArea           != null) candidates.push({ label: 'Eye Area',              score: fd.eyeArea,           detail: 'Periorbital definition, under-eye quality, and how your eye shape reads on camera' })
-    if (fd.facialHarmony     != null) candidates.push({ label: 'Facial Harmony',        score: fd.facialHarmony,     detail: 'How well your facial thirds and feature proportions balance against each other' })
-    if (fd.facialProportions != null) candidates.push({ label: 'Facial Proportions',    score: fd.facialProportions, detail: 'Upper to lower face ratio and the width-to-length balance relative to ideal benchmarks' })
-  }
-
-  if (scan.physiqueScore?.overall != null) {
-    candidates.push({ label: 'Body & Physique', score: scan.physiqueScore.overall, detail: 'Muscle-to-fat ratio, shoulder-to-waist taper, and the visual impact of your current physique' })
-  }
-
-  if (!candidates.length) return null
-  return candidates.reduce((low, c) => c.score < low.score ? c : low)
+// Same blur-lock treatment as ScanUnlockGate's Card1Score — kept as a local
+// copy rather than a shared import since the two files already duplicate the
+// growth-area/celeb-match helpers above for the same reason (no shared
+// "onboarding result card" module exists yet).
+function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
+  const blur = size === 'lg' ? 'blur(16px)' : size === 'sm' ? 'blur(11px)' : 'blur(13px)'
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', userSelect: 'none', ...extraStyle }}>
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: -6,
+          borderRadius: 10,
+          background: 'radial-gradient(circle, rgba(198,168,92,0.08) 0%, transparent 72%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <span style={{ position: 'relative', display: 'inline-block', filter: blur }}>
+        {children}
+      </span>
+    </span>
+  )
 }
 
-// ── Pick one celebrity match from scan data (deterministic by scan id) ───────────
-const CELEB_QUICK = {
-  strong:  [{ name: 'Henry Cavill', sim: 79 }, { name: 'Chris Hemsworth', sim: 76 }, { name: 'Jacob Elordi', sim: 75 }, { name: 'Cristiano Ronaldo', sim: 73 }],
-  defined: [{ name: 'Zac Efron',    sim: 73 }, { name: 'Austin Butler',   sim: 71 }, { name: 'Tom Holland',  sim: 68 }, { name: 'Timothée Chalamet', sim: 70 }],
-  average: [{ name: 'Pedro Pascal', sim: 67 }, { name: 'Ryan Reynolds',   sim: 65 }, { name: 'Paul Mescal',  sim: 66 }, { name: 'Andrew Garfield',  sim: 64 }],
-  soft:    [{ name: 'Harry Styles', sim: 64 }, { name: 'Justin Bieber',   sim: 62 }, { name: 'Niall Horan',  sim: 61 }, { name: 'Jack Harlow',      sim: 63 }],
-}
-
-function getCelebMatch(scan) {
-  if (!scan) return null
-  const jaw  = scan.faceData?.jawlineDefinition ?? 5
-  const harm = scan.faceData?.facialHarmony     ?? 5
-  const avg  = (jaw + harm) / 2
-  const key  = avg >= 7 ? 'strong' : avg >= 6 ? 'defined' : avg >= 4.5 ? 'average' : 'soft'
-  const pool = CELEB_QUICK[key]
-  const seed = (scan.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return pool[Math.abs(seed) % pool.length]
-}
-
-// ── STEP: Scores Waiting ──────────────────────────────────────────────────────────
-// Free-user gate shown after scan completes.
-// VISIBLE:  Glow Score number + tier label — the hook that drives unlock curiosity.
-// BLURRED:  PSL Tier, Top %, Potential, and all sub-score details.
-// TEASER:   Biggest growth area category name visible; detail blurred — proves
-//           there's real analysis behind the paywall.
-export function StepScoresWaiting({ onAscend, onInvite, scan }) {
+// ── Card 1: Overall — the original StepScoresWaiting content, now the first
+// card of the carousel below. Self-contained (computes everything off `scan`
+// alone) to match Card1Score/CategoryCard's own pattern in ScanUnlockGate.jsx.
+// BLURRED: PSL Tier, Potential, Symmetry, Jawline, Skin Clarity, Facial Proportions.
+// No visible hero number/tier and no growth-area/celebrity-match teasers — this
+// card goes straight from the ascend-date badge to the locked tile grid.
+function OverallCard({ scan }) {
   const glowScore = scan?.glowScore ?? null
   const tier      = scan?.tier      ?? null
 
@@ -185,25 +169,26 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
     ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
     : null
 
-  function toTopPct(score) {
-    if (score == null) return null
-    if (score >= 9.0) return 'Top 1%'
-    if (score >= 8.0) return 'Top 5%'
-    if (score >= 7.0) return 'Top 15%'
-    if (score >= 6.0) return 'Top 30%'
-    if (score >= 5.0) return 'Top 50%'
-    return 'Bot 40%'
+  const symmetry          = scan?.faceData?.symmetry          ?? null
+  const jawlineDefinition = scan?.faceData?.jawlineDefinition ?? null
+  const skinClarity       = scan?.faceData?.skinClarity       ?? null
+  const facialProportions = scan?.faceData?.facialProportions ?? null
+
+  function toScorePct(v) {
+    return v != null ? Math.min(100, (v / 10) * 100) : 0
   }
 
-  const growthArea  = getBiggestGrowthArea(scan)
-  const celebMatch  = getCelebMatch(scan)
+  const ascendByLabel = new Date(Date.now() + 12 * 7 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 
-  const topPct = toTopPct(glowScore)
-
-  // Three locked cards — PSL Tier, Potential (Top % is now visible in hero)
+  // Six real fields — same as Card1Score, not fabricated categories.
   const lockedMetrics = [
-    { icon: Eye,  label: 'PSL Tier',  value: tier ?? '8.1',  unit: '' },
-    { icon: Zap,  label: 'Potential', value: potential ?? '8.4', unit: '/10' },
+    { label: 'PSL Tier',           value: tier ?? '—',                                                    unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { label: 'Potential',          value: potential ?? '—',                                                unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : '—',                    unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : '—',  unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : '—',               unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : '—',   unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -223,7 +208,7 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-7"
+          className="flex items-center gap-3 mb-5"
         >
           <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
           <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
@@ -231,206 +216,206 @@ export function StepScoresWaiting({ onAscend, onInvite, scan }) {
           </span>
         </motion.div>
 
-        {/* ── Hero: visible Glow Score + tier ─────────────────────────────── */}
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.04 }}
+          className="font-heading font-bold text-[22px] leading-tight mb-3"
+          style={{ color: TEXT, letterSpacing: '-0.01em' }}
+        >
+          You will ascend by
+        </motion.h1>
+
+        {/* ── Ascend-date pill ──────────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="mb-5"
+          className="mb-6"
         >
-          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
-            GLOW SCORE
-          </p>
-
-          {/* Big number — fully visible, no blur */}
-          <div className="flex items-end gap-1.5 mb-3">
-            <span
-              className="font-heading font-bold leading-none"
-              style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}
-            >
-              {glowScore != null ? glowScore.toFixed(1) : '—'}
+          <div
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full"
+            style={{
+              background: 'rgba(198,168,92,0.12)',
+              border: '1px solid rgba(198,168,92,0.35)',
+            }}
+          >
+            <span className="font-heading font-bold text-[19px]" style={{ color: G }}>
+              {ascendByLabel}
             </span>
-            <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              /10
-            </span>
-          </div>
-
-          {/* Tier badge + Top % — fully visible */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {tier && (
-              <div
-                className="inline-flex items-center px-3 py-1.5 rounded-xl"
-                style={{
-                  background: 'rgba(198,168,92,0.12)',
-                  border: '1px solid rgba(198,168,92,0.30)',
-                }}
-              >
-                <span
-                  className="font-heading font-bold text-[11px] tracking-[0.14em]"
-                  style={{ color: G }}
-                >
-                  {tier.toUpperCase()}
-                </span>
-              </div>
-            )}
-            {topPct && (
-              <div
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                }}
-              >
-                <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                <span
-                  className="font-heading font-bold text-[11px] tracking-[0.10em]"
-                  style={{ color: 'rgba(255,255,255,0.75)' }}
-                >
-                  {topPct}
-                </span>
-              </div>
-            )}
+            <ChevronDown size={16} style={{ color: G }} />
           </div>
         </motion.div>
 
-        {/* ── Teaser: biggest growth area ──────────────────────────────────── */}
-        {growthArea && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5"
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.07)',
-            }}
-          >
-            <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
-            <div className="min-w-0">
-              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                Biggest growth area
-              </p>
-              <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>
-                {growthArea.label}
-              </p>
-              {/* Detail is blurred — category name above is the visible hook */}
-              <p
-                className="font-body text-[12px] leading-snug select-none"
-                style={{ color: 'rgba(255,255,255,0.55)', filter: 'blur(5px)', userSelect: 'none' }}
-              >
-                {growthArea.detail}
-              </p>
-            </div>
-          </motion.div>
-        )}
+        {/* ── Overall label ─────────────────────────────────────────────────── */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14 }}
+          className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2 uppercase"
+          style={{ color: G }}
+        >
+          Overall
+        </motion.p>
 
-        {/* ── Celebrity match teaser ───────────────────────────────────────── */}
-        {celebMatch && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.26 }}
-            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 mb-5"
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.07)',
-            }}
-          >
-            {/* Avatar placeholder */}
-            <div
-              className="flex-shrink-0 flex items-center justify-center rounded-full"
-              style={{
-                width: 38, height: 38,
-                background: 'rgba(198,168,92,0.10)',
-                border: '1px solid rgba(198,168,92,0.22)',
-              }}
-            >
-              <span style={{ fontSize: 17 }}>⭐</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                Celebrity match · {celebMatch.sim}% similarity
-              </p>
-              {/* Name is blurred — the mystery drives the unlock */}
-              <p
-                className="font-heading font-bold text-[15px] select-none"
-                style={{ color: 'rgba(255,255,255,0.90)', filter: 'blur(6px)', userSelect: 'none' }}
-              >
-                {celebMatch.name}
-              </p>
-            </div>
-            <Lock size={13} style={{ color: G, flexShrink: 0 }} />
-          </motion.div>
-        )}
-
-        {/* ── Three locked metric cards ─────────────────────────────────────── */}
+        {/* ── Six locked metric cards — 2×3 grid, matching Card1Score ───────── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="grid grid-cols-2 gap-2.5 mb-5"
         >
-          {lockedMetrics.map(({ icon: Icon, label, value, unit }, i) => (
+          {lockedMetrics.map(({ label, value, unit, pct }, i) => (
             <motion.div
               key={label}
               initial={{ opacity: 0, scale: 0.93 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.35 + i * 0.06 }}
-              className="rounded-2xl p-3 flex flex-col"
+              transition={{ delay: 0.35 + i * 0.05 }}
+              className="rounded-2xl p-3.5 flex flex-col"
               style={{
-                background: 'rgba(198,168,92,0.04)',
-                border: '1px solid rgba(198,168,92,0.12)',
+                background: 'rgba(198,168,92,0.03)',
+                border: '1px solid rgba(198,168,92,0.15)',
               }}
             >
-              <div className="flex items-center justify-between mb-2.5">
-                <Icon size={12} style={{ color: G }} />
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
-              </div>
-              <span className="font-heading text-[9px] tracking-wide font-bold mb-1.5" style={{ color: 'rgba(198,168,92,0.6)' }}>
+              <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>
                 {label}
               </span>
-              <div className="flex items-end gap-0.5">
-                <span
-                  className="font-heading font-bold text-[22px] leading-none select-none"
-                  style={{ color: TEXT, filter: 'blur(7px)', userSelect: 'none' }}
-                >
-                  {value}
-                </span>
-                {unit && (
-                  <span className="font-heading font-bold text-[11px] mb-0.5 select-none" style={{ color: DIM, filter: 'blur(5px)' }}>
-                    {unit}
-                  </span>
-                )}
+              <div className="flex items-center justify-between mb-2">
+                <BlurLock size="sm">
+                  <div className="flex items-end gap-0.5">
+                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+                  </div>
+                </BlurLock>
+                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                />
               </div>
             </motion.div>
           ))}
         </motion.div>
 
       </div>
+    </div>
+  )
+}
 
-      <div className="px-6 pb-10 pt-2 flex flex-col gap-3 flex-shrink-0">
+// ── STEP: Scores Waiting ──────────────────────────────────────────────────────────
+// Onboarding's own "here's your real score" moment — now a 6-card swipeable
+// carousel: OverallCard (mirrors ScanUnlockGate's Card1Score) followed by the
+// same 5 EXTENDED_CATEGORIES cards ScanUnlockGate shows post-purchase, so the
+// paywall on /unlock isn't the first time the user sees any of this. Swipe/drag
+// mechanics (index state, velocity-aware drag commit, spring transition, "X OF
+// Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
+// "Unlock Results Now" CTA below is untouched, still a flat call to onAscend.
+const CAROUSEL_SLIDE_VARIANTS = {
+  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
+}
+
+export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error = '' }) {
+  const [cardIdx, setCardIdx] = useState(0)
+  const [direction, setDirection] = useState(1)
+
+  const cards = [
+    { id: 'overall', el: <OverallCard scan={scan} /> },
+    ...EXTENDED_CATEGORIES.map(cat => ({
+      id: cat.key,
+      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} />,
+    })),
+  ]
+
+  function goTo(idx) {
+    if (idx === cardIdx) return
+    setDirection(idx > cardIdx ? 1 : -1)
+    setCardIdx(idx)
+  }
+
+  function handleDragEnd(_, info) {
+    const DISTANCE = 60
+    const VELOCITY = 400
+    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
+      goTo(cardIdx + 1)
+    } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
+      goTo(cardIdx - 1)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full" style={{ background: BG }}>
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.div
+            key={cardIdx}
+            custom={direction}
+            variants={CAROUSEL_SLIDE_VARIANTS}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
+            className="absolute inset-0"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
+            onDragEnd={handleDragEnd}
+          >
+            {cards[cardIdx].el}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Step counter */}
+      <div className="flex items-center justify-center py-3 flex-shrink-0">
+        <span className="font-heading font-bold text-[11px] tracking-[0.1em]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          {cardIdx + 1} OF {cards.length}
+        </span>
+      </div>
+
+      <div className="px-6 pb-10 pt-2 flex-shrink-0">
         <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
-          whileTap={{ scale: 0.97 }}
+          whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
           onClick={onAscend}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          disabled={isPurchasing}
+          className="btn-primary flex items-center justify-center gap-2 disabled:opacity-70"
+          style={{ background: GOLD_GRAD }}
         >
-          <Sparkles size={16} style={{ color: '#0A0A0A' }} /> Unlock Full Results
+          {/* isPurchasing/error were accepted as props but never rendered —
+              handleAscend genuinely ran and genuinely failed (no Stripe keys
+              configured in this env, or an early demo-token redirect), it
+              just had nowhere to show it. Same spinner/disabled/error pattern
+              as ScanUnlockGate's own button, so behavior doesn't drift between
+              the two screens. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={isPurchasing ? 'processing' : 'ready'}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: EASE_STANDARD }}
+              className="flex items-center justify-center gap-2"
+            >
+              {isPurchasing
+                ? <Loader2 size={16} className="animate-spin" />
+                : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+              }
+              {isPurchasing ? 'Processing…' : 'Unlock Results Now'}
+            </motion.span>
+          </AnimatePresence>
         </motion.button>
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.65 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={onInvite}
-          className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[14px] flex items-center justify-center gap-2"
-          style={{ background: SURFACE, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
-        >
-          <UserPlus size={15} /> Invite 3 Friends — Get Free Access
-        </motion.button>
+        {error && (
+          <p className="text-center text-[11px] font-body mt-2" style={{ color: '#EF4444' }}>{error}</p>
+        )}
       </div>
     </div>
   )

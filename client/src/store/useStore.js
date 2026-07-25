@@ -40,8 +40,6 @@ const useStore = create(
         gender: null,
         userProfile: null,
         legalConsented: false,
-        hasSeenFeatureTour: false,
-        hasSeenCostOfInaction: false,
         // age gate is device-level, intentionally NOT reset on logout
       }),
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
@@ -116,17 +114,6 @@ const useStore = create(
       setHasOnboarded: () => set({ hasOnboarded: true }),
       resetOnboarding: () => set({ hasOnboarded: false }),
 
-      // Post-onboarding feature tour — shown once, right after a user's first
-      // scan. Gated in App.jsx alongside a session flag so pre-existing users
-      // (onboarded before this shipped) never see it retroactively.
-      hasSeenFeatureTour: false,
-      setHasSeenFeatureTour: () => set({ hasSeenFeatureTour: true }),
-
-      // "Cost of inaction" screen — shown once, right after the Feature Tour
-      // finishes (same JUST_ONBOARDED_KEY session gate, see App.jsx Gate 4).
-      hasSeenCostOfInaction: false,
-      setHasSeenCostOfInaction: () => set({ hasSeenCostOfInaction: true }),
-
       // Legal consent (age gate + AI/biometric consent)
       legalConsented: false,
       setLegalConsented: () => set({ legalConsented: true }),
@@ -197,12 +184,21 @@ const useStore = create(
         if (Date.now() - _lastProRefresh < 60_000) return
         set({ _lastProRefresh: Date.now() })
         try {
-          // 0. On iOS check RevenueCat entitlements first (source of truth for IAP)
+          // 0. On iOS check RevenueCat entitlements first (source of truth for IAP).
+          // isPro is a clean boolean once this resolves successfully — set it
+          // either way, not just when true. Previously this only ever
+          // promoted (if (isPro) set({isPremium:true})) and silently did
+          // nothing when isPro was false, meaning any isPremium:true that got
+          // set incorrectly elsewhere (a bug, a stale value, anything) could
+          // never self-correct even when RevenueCat clearly says otherwise.
+          // A thrown/rejected check (network failure, RC not synced yet) is
+          // NOT the same as an explicit false — that's genuinely unknown, so
+          // the catch below still does nothing, on purpose.
           try {
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              if (isPro) set({ isPremium: true })
+              set({ isPremium: isPro })
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
@@ -216,11 +212,22 @@ const useStore = create(
             fetch(`${base}/user/profile`,    { headers }),
           ])
 
+          // Same reasoning as the RevenueCat check above — /payments/status is
+          // a dedicated, authoritative status endpoint that always returns a
+          // real boolean when the request succeeds, so an explicit false is
+          // just as trustworthy as an explicit true and should actually apply.
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
-            if (isPremium) set({ isPremium: true })
+            set({ isPremium })
           }
 
+          // /user/profile is different — it's a general profile hydration
+          // endpoint, not a status oracle, and its subscription fields may
+          // simply be absent rather than a deliberate "not premium" signal.
+          // So this one stays additive-only (falls back to the current
+          // state.isPremium, which the two authoritative checks above may
+          // have already corrected to false) rather than treating missing
+          // fields as proof of anything.
           if (profileRes.ok) {
             const profile = await profileRes.json()
             const fresh = profile.user || profile
@@ -322,8 +329,6 @@ const useStore = create(
         streak: state.streak,
         theme: state.theme,
         hasOnboarded: state.hasOnboarded,
-        hasSeenFeatureTour: state.hasSeenFeatureTour,
-        hasSeenCostOfInaction: state.hasSeenCostOfInaction,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,
         ageConfirmedAt: state.ageConfirmedAt,

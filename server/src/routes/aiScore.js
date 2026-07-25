@@ -210,7 +210,10 @@ Include a "profile" object in your JSON response.` : ''
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: hasSide ? 1100 : 950,
+    // Bumped from 950/1100 — the extended_metrics block alone adds 30 more
+    // {score, descriptor} pairs on top of the original response, and the old
+    // budget would truncate the JSON mid-object before this addition.
+    max_tokens: hasSide ? 2400 : 2200,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
@@ -311,6 +314,50 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
+
+EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Same format as FACE METRICS: each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Scoring direction is consistent with every other metric in this prompt: 10.0 = the most aesthetically favorable outcome, 1.0 = the least, for every metric below (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
+
+eyes:
+- orbital_depth: depth-set vs. protruding position of the eye socket relative to the brow and cheekbone plane
+- canthal_tilt: upward or downward angle of the outer eye corner relative to the inner corner
+- eyebrow_density: thickness, fullness, and coverage of the eyebrow hair
+- eyelash_density: thickness and fullness of visible eyelashes
+- eyelid_exposure: amount of visible eyelid skin between the lash line and brow (hooded vs. open)
+- under_eye_health: presence or absence of dark circles, puffiness, or hollowing beneath the eyes
+
+lower_third:
+- lips: fullness, definition, and proportion of upper to lower lip
+- mandible: overall lower jawbone width, definition, and forward projection
+- gonial_angle: sharpness of the jaw angle where the ramus meets the body of the mandible
+- ramus: vertical height and width of the jawbone segment connecting the jaw to the skull
+- hyoid_skin_tightness: tightness and definition of the skin and muscle under the chin and upper neck (submental area)
+- jaw_width: width of the jaw relative to the rest of the face
+
+midface:
+- cheekbones: height, prominence, and forward projection of the malar bones
+- maxilla: forward projection and width of the upper jawbone/midface support structure
+- nose: proportion, straightness, and refinement of the nose relative to the face
+- ipd: inter-pupillary distance — spacing between the eyes relative to face width
+- fwhr: facial width-to-height ratio — bizygomatic width relative to upper-face height
+- compactness: how tightly the midface features sit together versus how spread out the midface reads
+
+upper_third:
+- norwood_stage: stage of hairline recession/male-pattern hair loss progression, if any is visible
+- forehead_proportion: height and width of the forehead relative to the rest of the face
+- hairline_recession: degree of hairline recession at the temples and frontal hairline
+- hair_thinning: visible thinning or reduced density across the scalp
+- hairline_density: density and evenness of hair along the hairline itself
+- forehead_slope: degree of forward or backward slope of the forehead in profile
+
+miscellaneous:
+- skin: overall skin quality, tone evenness, and texture
+- harmony: how cohesively all facial features and proportions work together as a whole
+- symmetry: left-right balance across the whole face
+- neck_width: thickness and proportion of the neck relative to the head and shoulders
+- bloat: visible facial or under-skin puffiness/water retention affecting definition
+- bone_mass: overall robustness and density of visible facial bone structure
+
+CONFIDENCE ON HARD-TO-ASSESS METRICS: ramus and forehead_slope describe structures that are genuinely difficult to judge accurately from a single front-facing photo without a side profile — a front view mostly hides the jaw's vertical ramus segment and the forehead's true slope. Still provide your best visual estimate and a real score for both, but naturally flag the lower confidence in the descriptor text itself (e.g. "Likely average ramus height, hard to confirm without a side view" or "Forehead appears near-vertical from this angle, slope uncertain") rather than presenting either with the same false precision as metrics that are clearly visible head-on.
 ${profileSection}
 KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
@@ -347,6 +394,48 @@ Return ONLY this JSON — no markdown, nothing else:
     "skin_quality":           { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
     "masculinity_femininity": { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
     "facial_thirds":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+  },
+  "extended_metrics": {
+    "eyes": {
+      "orbital_depth":     { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "canthal_tilt":      { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "eyebrow_density":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "eyelash_density":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "eyelid_exposure":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "under_eye_health":  { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+    },
+    "lower_third": {
+      "lips":                  { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "mandible":              { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "gonial_angle":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "ramus":                 { "score": <number 1.0–10.0>, "descriptor": "<max 10 words, flag low confidence>" },
+      "hyoid_skin_tightness":  { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "jaw_width":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+    },
+    "midface": {
+      "cheekbones":    { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "maxilla":       { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "nose":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "ipd":           { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "fwhr":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "compactness":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+    },
+    "upper_third": {
+      "norwood_stage":         { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "forehead_proportion":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "hairline_recession":    { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "hair_thinning":         { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "hairline_density":      { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "forehead_slope":        { "score": <number 1.0–10.0>, "descriptor": "<max 10 words, flag low confidence>" }
+    },
+    "miscellaneous": {
+      "skin":        { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "harmony":     { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "symmetry":    { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "neck_width":  { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "bloat":       { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+      "bone_mass":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+    }
   }${profileSchema}
 }`,
     messages: [{
@@ -850,6 +939,62 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
           skinQuality:           metric('skin_quality'),
           masculinityFemininity: metric('masculinity_femininity'),
           facialThirds:          metric('facial_thirds'),
+        }
+      })(),
+      extendedMetrics: (() => {
+        const em = faceResult.extended_metrics
+        if (!em) return null
+        const metric = (cat, key) => cat?.[key]?.score != null
+          ? { score: r(cat[key].score), descriptor: cat[key].descriptor ?? null }
+          : null
+        const category = (catKey, keyMap) => {
+          const cat = em[catKey]
+          if (!cat) return null
+          const out = {}
+          for (const [camel, snake] of Object.entries(keyMap)) out[camel] = metric(cat, snake)
+          return out
+        }
+        return {
+          eyes: category('eyes', {
+            orbitalDepth:    'orbital_depth',
+            canthalTilt:     'canthal_tilt',
+            eyebrowDensity:  'eyebrow_density',
+            eyelashDensity:  'eyelash_density',
+            eyelidExposure:  'eyelid_exposure',
+            underEyeHealth:  'under_eye_health',
+          }),
+          lowerThird: category('lower_third', {
+            lips:               'lips',
+            mandible:           'mandible',
+            gonialAngle:        'gonial_angle',
+            ramus:              'ramus',
+            hyoidSkinTightness: 'hyoid_skin_tightness',
+            jawWidth:           'jaw_width',
+          }),
+          midface: category('midface', {
+            cheekbones:  'cheekbones',
+            maxilla:     'maxilla',
+            nose:        'nose',
+            ipd:         'ipd',
+            fwhr:        'fwhr',
+            compactness: 'compactness',
+          }),
+          upperThird: category('upper_third', {
+            norwoodStage:        'norwood_stage',
+            foreheadProportion:  'forehead_proportion',
+            hairlineRecession:   'hairline_recession',
+            hairThinning:        'hair_thinning',
+            hairlineDensity:     'hairline_density',
+            foreheadSlope:       'forehead_slope',
+          }),
+          miscellaneous: category('miscellaneous', {
+            skin:      'skin',
+            harmony:   'harmony',
+            symmetry:  'symmetry',
+            neckWidth: 'neck_width',
+            bloat:     'bloat',
+            boneMass:  'bone_mass',
+          }),
         }
       })(),
       // Celebrity match is resolved by a separate, later request — see

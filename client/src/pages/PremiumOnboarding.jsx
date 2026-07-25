@@ -1,35 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Target, Shield, Check, X, Trophy, User, UserRound, Lock } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import TransformationScreen from '../components/TransformationScreen'
-import { StepRating } from '../components/OnboardingFinalSteps'
+import { StepRating, StepScoresWaiting } from '../components/OnboardingFinalSteps'
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
+import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
-import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
-import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
-import { JUST_ONBOARDED_KEY } from '../utils/tourFlags'
+import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
-
-// Light tap feedback on primary CTAs. No-op on web (no native bridge) and
-// swallows any native error so a haptics failure never blocks the tap itself.
-async function triggerHaptic() {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    await Haptics.impact({ style: ImpactStyle.Light })
-  } catch {
-    // haptics unavailable — not fatal, ignore
-  }
-}
 
 // Analytics collection ships disabled by default (see GoogleService-Info.plist's
 // IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
@@ -1180,68 +1168,6 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
   )
 }
 
-// ── STEP 5: Height + Weight (combined) ───────────────────────────────────────
-function StepHeightWeight({ data, onChange, onNext, onBack, units }) {
-  const cm  = data.height || 175
-  const kg  = data.weight || 75
-  let feet  = Math.floor(cm / 30.48)
-  let inches = Math.round((cm / 30.48 - feet) * 12)
-  if (inches === 12) { feet += 1; inches = 0 }
-  const lbs = Math.round(kg * 2.205)
-
-  return (
-    <div className="flex flex-col h-full px-6">
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20 gap-8">
-        <div>
-          <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-            Your body stats
-          </h1>
-          <p className="font-body text-[13px]" style={{ color: DIM }}>Used to calculate your BMI, training phase, and nutrition plan.</p>
-        </div>
-
-        <div className="space-y-6">
-          <Slider
-            label="Height"
-            unit={units === 'imperial' ? `${feet}'${inches}"` : 'cm'}
-            value={cm}
-            min={140}
-            max={220}
-            onChange={v => onChange('height', v)}
-          />
-          <Slider
-            label="Weight"
-            unit={units === 'imperial' ? 'lbs' : 'kg'}
-            value={kg}
-            displayValue={units === 'imperial' ? lbs : kg}
-            min={40}
-            max={180}
-            onChange={v => onChange('weight', v)}
-          />
-        </div>
-
-        <div className="flex gap-2">
-          {['metric', 'imperial'].map(u => (
-            <button key={u} onClick={() => onChange('_units', u)}
-              className="flex-1 py-2.5 rounded-xl font-heading font-bold text-[12px] capitalize"
-              style={{
-                background: units === u ? G_DIM : SURFACE,
-                border: `1px solid ${units === u ? G_BORDER : BORDER}`,
-                color: units === u ? G : DIM,
-              }}
-            >
-              {u}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} />
-      </div>
-    </div>
-  )
-}
-
 // ── STEP 8 (kept for reference, no longer used) ───────────────────────────────
 function calcBMI(heightCm, weightKg) {
   return weightKg / Math.pow(heightCm / 100, 2)
@@ -1379,128 +1305,6 @@ function StepBMI({ data, onNext, onBack }) {
   )
 }
 
-// ── STEP 10: Phase Assignment ─────────────────────────────────────────────────
-function calculatePhase(goal, heightCm, weightKg) {
-  const bmi = weightKg / Math.pow(heightCm / 100, 2)
-  if (goal === 'Maintain') return 'MAINTENANCE'
-  if (goal === 'Lose Fat' || bmi > 27) return 'CUT'
-  if (goal === 'Build Muscle' && bmi < 22) return 'BULK'
-  return 'RECOMP'
-}
-
-const PHASE_INFO = {
-  CUT: {
-    PhaseIcon: Flame,
-    label: 'CUT',
-    color: '#EF4444',
-    bg: 'rgba(239,68,68,0.08)',
-    border: 'rgba(239,68,68,0.25)',
-    headline: 'Your Phase: Cut',
-    why: 'Based on your goal and body stats, losing body fat is your highest-leverage move. Reducing body fat will reveal your jawline, V-taper, and muscle definition — directly boosting your score.',
-    actions: ['500 cal/day deficit', '0.8–1g protein per lb', 'Cardio 3× per week', 'Strength training 4× per week'],
-  },
-  BULK: {
-    PhaseIcon: Dumbbell,
-    label: 'BULK',
-    color: '#3B82F6',
-    bg: 'rgba(59,130,246,0.08)',
-    border: 'rgba(59,130,246,0.25)',
-    headline: 'Your Phase: Bulk',
-    why: 'Your stats show you have room to build mass. Adding muscle to your frame will improve your V-taper, broaden your shoulders, and elevate your overall physique score significantly.',
-    actions: ['250–300 cal/day surplus', '0.8–1g protein per lb', 'Compound lifts 4–5× per week', 'Focus on progressive overload'],
-  },
-  RECOMP: {
-    PhaseIcon: Zap,
-    label: 'RECOMP',
-    color: '#C6A85C',
-    bg: 'rgba(198,168,92,0.08)',
-    border: 'rgba(198,168,92,0.25)',
-    headline: 'Your Phase: Recomp',
-    why: "You're in the ideal zone to recompose — lose fat and build muscle simultaneously. This is the most effective phase for improving your overall appearance rating.",
-    actions: ['Maintenance calories (±100)', '1g protein per lb bodyweight', 'Strength training 4× per week', 'Track weekly photos for progress'],
-  },
-  MAINTENANCE: {
-    PhaseIcon: Target,
-    label: 'MAINTENANCE',
-    color: '#34C759',
-    bg: 'rgba(52,199,89,0.08)',
-    border: 'rgba(52,199,89,0.25)',
-    headline: 'Your Phase: Maintenance',
-    why: "You're happy with your current physique. Your plan focuses on consistency, optimizing grooming, skincare, and posture — the highest ROI improvements at your level.",
-    actions: ['Maintenance calories', 'Strength training 3–4× per week', 'Focus on grooming & skincare', 'Posture correction protocol'],
-  },
-}
-
-function StepPhaseResult({ data, onFinish }) {
-  const phase = calculatePhase(data.goal, data.height || 175, data.weight || 75)
-  const info = PHASE_INFO[phase]
-
-  return (
-    <div className="flex flex-col h-full px-6">
-      <div className="flex-1 flex flex-col justify-center">
-        {/* Phase badge */}
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, ease: EASE_STANDARD }}
-          className="text-center mb-6"
-        >
-          <div className="mb-4 flex justify-center"><info.PhaseIcon size={52} style={{ color: info.color }} /></div>
-          <div
-            className="inline-block px-6 py-2.5 rounded-full font-heading font-bold text-[13px] uppercase tracking-widest mb-5"
-            style={{ background: info.bg, border: `1.5px solid ${info.border}`, color: info.color }}
-          >
-            {info.label}
-          </div>
-          <h1 className="font-heading font-bold text-[28px] mb-3" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-            Your personalized<br />plan is ready.
-          </h1>
-          <p className="font-body text-[14px] leading-relaxed" style={{ color: DIM }}>
-            {info.why}
-          </p>
-        </motion.div>
-
-        {/* Action items */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="rounded-2xl p-4 mb-4"
-          style={{ background: info.bg, border: `1px solid ${info.border}` }}
-        >
-          <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-3" style={{ color: info.color }}>
-            Your Protocol
-          </p>
-          <div className="space-y-2">
-            {info.actions.map((a, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: info.color }} />
-                <p className="font-body text-[13px]" style={{ color: TEXT }}>{a}</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}` }}
-        >
-          <p className="font-body text-[11px] text-center" style={{ color: DIM }}>
-            Your AI scan is complete. This phase and your 12-week plan have been personalized to your results.
-          </p>
-        </motion.div>
-      </div>
-
-      <div className="pb-10 pt-4">
-        <GoldBtn label="Continue →" onClick={onFinish} />
-      </div>
-    </div>
-  )
-}
-
 // ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack }) {
   const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing' | 'retry_error'
@@ -1606,6 +1410,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
           facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
         },
         pillars:          aiResult.pillars          ?? null,
+        extendedMetrics:  aiResult.extendedMetrics  ?? null,
         celebrityMatches: aiResult.celebrityMatches ?? null,
         physiqueScore:    null,
         bodyFatLevel:     null,
@@ -1775,133 +1580,19 @@ function StepScanCapture({ gender, onDone, onBack }) {
         />
       </div>
 
-      <div className="pb-10 pt-2">
-        <GoldBtn
-          label={facePhoto ? 'Continue →' : 'Upload or Take a Photo First'}
-          onClick={() => { if (facePhoto) { setPhase('side'); setError('') } }}
-          disabled={!facePhoto}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── STEP 8: Locked Reveal — swipeable metric cards, all blurred ───────────────
-function StepLockedReveal({ onContinue }) {
-  const navigate    = useNavigate()
-  const currentScan = useStore(s => s.currentScan)
-  const [cardIdx, setCardIdx] = useState(0)
-
-  const scan      = currentScan
-  const glowScore = scan?.glowScore ?? scan?.umaxScore
-  const pillars   = scan?.pillars ?? {}
-  const potential = glowScore != null ? Math.min(10, glowScore + 1.4).toFixed(1) : null
-
-  const cards = [
-    { label: 'Overall Score', value: glowScore?.toFixed(1) ?? '—', unit: '/10', sub: 'Your AI-computed attractiveness rating' },
-    { label: 'Potential',     value: potential ?? '—',              unit: '/10', sub: 'Your achievable peak with the right protocol' },
-    { label: 'Harmony',       value: pillars.harmony?.toFixed(1)    ?? '—', unit: '/10', sub: 'How well your features work together as a unit' },
-    { label: 'Angularity',    value: pillars.angularity?.toFixed(1) ?? '—', unit: '/10', sub: 'Bone structure definition and facial sharpness' },
-    { label: 'Features',      value: pillars.features?.toFixed(1)   ?? '—', unit: '/10', sub: 'Quality of your individual facial features' },
-    { label: 'Dimorphism',    value: pillars.dimorphism?.toFixed(1) ?? '—', unit: '/10', sub: 'Strength of sex-specific facial characteristics' },
-  ]
-  if (scan?.physiqueScore?.overall != null) {
-    cards.push({ label: 'Physique', value: scan.physiqueScore.overall.toFixed(1), unit: '/10', sub: 'Body composition and visual impact score' })
-  }
-
-  return (
-    <div className="flex flex-col h-full" style={{ background: BG }}>
-      <div style={{
-        position: 'absolute', top: '8%', left: '50%', transform: 'translateX(-50%)',
-        width: 320, height: 320, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(198,168,92,0.13) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 text-center"
-        >
-          <p className="font-heading font-bold text-[11px] tracking-[0.2em] mb-2" style={{ color: G }}>
-            YOUR RESULTS ARE READY
-          </p>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-            {cards.length} metrics analyzed.<br />Unlock to see them all.
-          </h1>
-        </motion.div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={cardIdx}
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.25, ease: EASE_STANDARD }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.15}
-            onDragEnd={(_, info) => {
-              if (info.offset.x < -60 && cardIdx < cards.length - 1) setCardIdx(i => i + 1)
-              if (info.offset.x > 60 && cardIdx > 0) setCardIdx(i => i - 1)
-            }}
-            className="rounded-2xl p-8 flex flex-col items-center text-center mb-6 cursor-grab active:cursor-grabbing select-none"
-            style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.22)', minHeight: 220 }}
-          >
-            <div className="mb-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.28)' }}>
-              <Lock size={18} style={{ color: G }} />
-            </div>
-            <p className="font-heading font-bold text-[11px] tracking-[0.16em] mb-4" style={{ color: 'rgba(198,168,92,0.7)' }}>
-              {cards[cardIdx].label.toUpperCase()}
-            </p>
-            <div className="flex items-end gap-1 mb-3">
-              <span className="font-heading font-bold select-none" style={{ fontSize: 68, color: TEXT, filter: 'blur(10px)', userSelect: 'none', lineHeight: 1, letterSpacing: '-0.03em' }}>
-                {cards[cardIdx].value}
-              </span>
-              <span className="font-heading font-bold text-[22px] mb-2 select-none" style={{ color: 'rgba(255,255,255,0.4)', filter: 'blur(5px)' }}>
-                {cards[cardIdx].unit}
-              </span>
-            </div>
-            <p className="font-body text-[13px]" style={{ color: DIM }}>
-              {cards[cardIdx].sub}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {cards.map((_, i) => (
-            <motion.button
-              key={i}
-              onClick={() => setCardIdx(i)}
-              animate={{ width: i === cardIdx ? 20 : 6, opacity: i === cardIdx ? 1 : 0.3 }}
-              transition={{ duration: 0.25 }}
-              style={{ height: 6, borderRadius: 99, background: G, flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' }}
-            />
-          ))}
+      {/* Only rendered once a photo exists — PhotoUploadStep's own "Upload or
+          Take a Selfie" pill already prompts for the photo itself, so a
+          second disabled prompt here was a redundant duplicate. This button's
+          real job is advancing to the side-profile phase, which nothing else
+          on this screen does. */}
+      {facePhoto && (
+        <div className="pb-10 pt-2">
+          <GoldBtn
+            label="Continue →"
+            onClick={() => { setPhase('side'); setError('') }}
+          />
         </div>
-      </div>
-
-      <div className="px-6 pb-10 pt-2 flex flex-col gap-3 flex-shrink-0">
-        <motion.button
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/unlock')}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2"
-          style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-        >
-          <Lock size={16} style={{ color: '#0A0A0A' }} /> Unlock Results Now
-        </motion.button>
-        <button
-          onClick={onContinue}
-          className="w-full py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70"
-          style={{ color: 'rgba(255,255,255,0.25)' }}
-        >
-          Continue
-        </button>
-      </div>
+      )}
     </div>
   )
 }
@@ -1916,11 +1607,6 @@ function StepLockedReveal({ onContinue }) {
 const SLIDE_GOLD = GOLD
 const SLIDE_GOLD_DIM = G_DIM
 const SLIDE_GOLD_BORDER = G_BORDER
-
-// Note: the cost-of-inaction slide that used to open this sequence now lives
-// at client/src/pages/CostOfInaction.jsx, shown post-onboarding (after
-// signup, consent, gender/goal, scan, and the Feature Tour) instead of here.
-// See App.jsx Gate 4.
 
 function Slide1() {
   const stats = [
@@ -2177,11 +1863,27 @@ export default function PremiumOnboarding() {
   const setUnits           = useStore(s => s.setUnits)
   const setAuth            = useStore(s => s.setAuth)
   const addScan            = useStore(s => s.addScan)
+  const currentScan        = useStore(s => s.currentScan)
   const setCurrentScan     = useStore(s => s.setCurrentScan)
   const setCurrentPlan     = useStore(s => s.setCurrentPlan)
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
   const setLastScanDate    = useStore(s => s.setLastScanDate)
   const incrementScanCount = useStore(s => s.incrementScanCount)
+  const setIsPremium       = useStore(s => s.setIsPremium)
+
+  // Purchase state for StepScoresWaiting's "Unlock Results Now" button — moved
+  // here from ScanUnlockGate.jsx's handleAscend (Step 1 of retiring that
+  // screen; ScanUnlockGate itself is untouched and still routable at /unlock,
+  // just no longer reachable from this button).
+  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState('')
+
+  useEffect(() => {
+    checkTrialEligibility()
+      .then(result => setTrialEligibility(result))
+      .catch(() => {})
+  }, [])
 
   // Restore an in-progress draft (unauthenticated only — an authenticated user
   // always starts fresh at Consent) so a refresh/backgrounding mid-quiz doesn't
@@ -2207,7 +1909,6 @@ export default function PremiumOnboarding() {
     ageConfirmed: null,
     gender: '', goal: '',
     improvementFocus: [],
-    height: 175, weight: 75,
     ...draft?.formData,
   })
 
@@ -2243,52 +1944,23 @@ export default function PremiumOnboarding() {
     setStep(s => s - 1)
   }
 
-  function finish(destination = '/') {
-    clearDraft()
-    // Defensive — handleScanDone() above is the normal completion path and
-    // already sets this, but this covers finish() too in case it's ever
-    // reached directly.
-    try { sessionStorage.setItem(JUST_ONBOARDED_KEY, '1') } catch {}
-    const phase = calculatePhase(formData.goal, formData.height, formData.weight)
-    setUserProfile({
-      height: formData.height,
-      weight: formData.weight,
-      goal: formData.goal,
-    })
-    setGender(formData.gender || null)
-    setAssignedPhase(phase)
-    setLegalConsented()
-    setAgeConfirmed()
-    setHasOnboarded()
-
-    if (authData) {
-      api.user.update({
-        gender: formData.gender,
-        height_cm: formData.height,
-        weight_kg: formData.weight,
-      }).catch(() => {})
-
-      // Save goal_type, improvement_focus, and legal consent to Supabase (fire-and-forget)
-      const profilePatch = {}
-      if (formData.goal) profilePatch.goal_type = formData.goal
-      // Persist consent audit trail server-side
-      profilePatch.ai_consent = !!checks.aiConsent
-      profilePatch.consent_at = new Date().toISOString()
-      api.supabase.updateUser(profilePatch).catch(() => {})
-    }
-
-    navigate(typeof destination === 'string' ? destination : '/')
-  }
-
-  // Called by StepScanCapture when analysis completes — saves scan record to
-  // store then immediately shows the unlock gate (the hook screen with score +
-  // tier + growth area + celeb match). PhaseResult/Transformation/Rating follow
-  // after the user has seen and interacted with the unlock screen.
+  // Called by StepScanCapture when analysis completes — saves the scan record
+  // to the store, then continues the normal step sequence (Transformation →
+  // Rating → ScoresWaiting) instead of jumping straight to the /unlock route.
+  // hasOnboarded only flips at the very end, in handleAscend — flipping it
+  // here would swap App.jsx out of the !hasOnboarded routing branch mid-flow
+  // and unmount this component.
+  //
+  // Phase is computed with the same assignPhase(faceScore, goal) call
+  // Scan.jsx's own (post-onboarding) scan flow uses — this is the actual
+  // vocabulary ActionPlan.jsx and generatePlanTasks() read (LEAN/SCULPT/
+  // TRANSFORM/REFINE), not the separate BMI-based CUT/BULK/RECOMP/MAINTENANCE
+  // result WorkoutPlan.jsx's body-stats screen shows.
   function handleScanDone(scanRecord) {
     console.log('[SCAN DONE] handleScanDone fired', JSON.stringify({ id: scanRecord?.id, score: scanRecord?.umaxScore, tier: scanRecord?.tier }))
     try {
       const g = formData.gender || 'male'
-      const phase = calculatePhase(formData.goal, formData.height, formData.weight)
+      const phase = assignPhase(scanRecord.faceData?.aestheticScore, formData.goal)
       console.log('[SCAN DONE] calling generatePlanTasks')
       const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, phase, g)
       console.log('[SCAN DONE] generatePlanTasks done, tasks count:', tasks?.length)
@@ -2316,25 +1988,99 @@ export default function PremiumOnboarding() {
         tasks,
       }).catch(() => {})
 
-      // flushSync ensures hasOnboarded=true is committed to the React tree before
-      // navigate fires — otherwise /unlock is caught by the * wildcard (PremiumOnboarding)
-      // because the route only exists in the hasOnboarded=true branch of App.jsx.
-      // This is the one reliable "onboarding just completed" moment for a normal
-      // first-time user, so it's also where the Feature Tour gate gets armed.
-      try { sessionStorage.setItem(JUST_ONBOARDED_KEY, '1') } catch {}
-      console.log('[SCAN DONE] calling flushSync + setHasOnboarded')
-      flushSync(() => { setHasOnboarded() })
-      console.log('[SCAN DONE] flushSync done, calling navigate /unlock')
-      navigate('/unlock', { replace: true }) // show unlock gate immediately — the hook
-      console.log('[SCAN DONE] navigate called')
+      console.log('[SCAN DONE] calling goNext')
+      goNext()
+      console.log('[SCAN DONE] goNext called')
     } catch (err) {
       console.error('[SCAN DONE] ERROR in handleScanDone:', err?.message, err?.stack)
     }
   }
 
-  // Progress bar: only during data-collection steps (2–8); post-scan celebration screens (9–12) get no counter
+  // NOT a verbatim port of ScanUnlockGate.jsx's handleAscend — it couldn't be.
+  // In the original flow, finish('/unlock') already ran (setHasOnboarded,
+  // setLegalConsented, setAgeConfirmed, setUserProfile, the Supabase profile
+  // patch) before ScanUnlockGate ever mounted, so its handleAscend never had
+  // to worry about onboarding-completion state. Here, this button IS what
+  // used to trigger finish() — but unlike finish()'s other side effects (none
+  // of which gate any route — see below), setHasOnboarded() is NOT run
+  // unconditionally up front anymore. It's the one flag App.jsx's routing
+  // actually checks (!hasOnboarded ? <PremiumOnboarding/> : ...), so setting
+  // it before the purchase even starts meant closing the app mid-purchase
+  // (during the StoreKit sheet, on a cancel, on a network drop) left the user
+  // permanently marked "onboarded" with isPremium still false and no route
+  // back to any paywall — a real bypass, not hypothetical. It now only flips
+  // on the native success path below, and — since the web/Stripe redirect
+  // tears down this whole function's execution context — on confirmed
+  // payment in PaymentSuccess.jsx instead. An interrupted attempt now
+  // correctly leaves hasOnboarded false, sending the user back through
+  // onboarding (from Consent — the step array always resets there for an
+  // already-authenticated user) rather than skipping it. The other fields
+  // below (userProfile/gender/legalConsented/ageConfirmed, the Supabase
+  // patch) are harmless to set unconditionally — nothing gates access on
+  // them, only hasOnboarded does, and re-onboarding just re-sets them anyway.
+  async function handleAscend() {
+    clearDraft()
+    setUserProfile({ goal: formData.goal })
+    setGender(formData.gender || null)
+    setLegalConsented()
+    setAgeConfirmed()
+    if (authData) {
+      api.user.update({ gender: formData.gender }).catch(() => {})
+      const profilePatch = {}
+      if (formData.goal) profilePatch.goal_type = formData.goal
+      profilePatch.ai_consent = !!checks.aiConsent
+      profilePatch.consent_at = new Date().toISOString()
+      api.supabase.updateUser(profilePatch).catch(() => {})
+    }
+
+    setIsPurchasing(true)
+    setPurchaseError('')
+    try {
+      if (isNative()) {
+        // Prefer whichever plan the "3-Day Free Trial" copy is actually
+        // promising — monthly by default, but fall back to yearly if only
+        // that one is trial-eligible.
+        const plan = trialEligibility.monthly === 'eligible' ? 'monthly'
+          : trialEligibility.yearly === 'eligible' ? 'yearly' : 'monthly'
+        const result = await purchasePro(plan)
+        if (result?.success) {
+          const rcUserId = result.customerInfo?.originalAppUserId
+          api.payments.syncRc(rcUserId).catch(() => {})
+          sessionStorage.setItem('asc_pro_splash_shown', '1')
+          setIsPremium(true)
+          setHasOnboarded()
+          logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
+          navigate('/results', { replace: true })
+          return
+        }
+        // Resolved without granting the entitlement — either the user
+        // cancelled or something else went wrong without throwing. Reset so
+        // the button never gets stuck spinning either way.
+        if (result?.reason !== 'cancelled') {
+          setPurchaseError('Unable to complete purchase. Please try again.')
+        }
+        setIsPurchasing(false)
+        return
+      }
+      // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
+      const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+      const token  = stored?.state?.token
+      if (!token || token === 'demo-token') { setIsPurchasing(false); navigate('/auth'); return }
+      const { url } = await api.payments.createCheckout('monthly', false)
+      window.location.href = url
+      // Leave isPurchasing=true — the page is about to navigate away.
+    } catch (err) {
+      const msg = (err?.message || '').toLowerCase()
+      if (!msg.includes('cancel')) {
+        setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
+      }
+      setIsPurchasing(false)
+    }
+  }
+
+  // Progress bar: only during data-collection steps (2–7); post-scan celebration screens (8–10) get no counter
   const QUIZ_START = isAuthenticated ? 3 : 2
-  const QUIZ_END = 8
+  const QUIZ_END = 7
   const showProgress = step >= QUIZ_START && step <= QUIZ_END
   const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
   const stepCounter = step - QUIZ_START + 1
@@ -2395,8 +2141,14 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=name, 5=gender, 6=goal, 7=heightweight,
-  //       8=scan(face+side), 9=locked-reveal, 10=phase, 11=transformation, 12=rating → /unlock
+  // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=name, 5=gender, 6=goal,
+  //       7=scan(face+side), 8=transformation, 9=rating,
+  //       10=scores-waiting (real score + tier + growth area + celeb match + locked
+  //       tile grid — the single score-reveal moment in onboarding, previewing
+  //       what /unlock shows) → /unlock
+  // Body stats (height/weight) and the BMI-based phase result are no longer
+  // collected here — moved to WorkoutPlan.jsx (see BodyStatsStep.jsx), so
+  // they're gathered when actually needed instead of upfront for everyone.
   const steps = [
     <StepIntro key="intro" onNext={goNext} />,
     <StepWelcome key="welcome"
@@ -2419,18 +2171,14 @@ export default function PremiumOnboarding() {
     <StepGoal key="goal" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack}
     />,
-    <StepHeightWeight key="heightweight" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack} units={units}
-    />,
     <StepScanCapture key="scan"
       gender={formData.gender}
       onDone={handleScanDone}
       onBack={goBack}
     />,
-    <StepLockedReveal key="locked-reveal" onContinue={goNext} />,
-    <StepPhaseResult key="phase" data={formData} onFinish={goNext} />,
     <TransformationScreen key="transformation" onNext={goNext} />,
-    <StepRating key="rating" onNext={() => finish('/unlock')} />,
+    <StepRating key="rating" onNext={goNext} />,
+    <StepScoresWaiting key="scores-waiting" scan={currentScan} onAscend={handleAscend} isPurchasing={isPurchasing} error={purchaseError} />,
   ]
 
   return (

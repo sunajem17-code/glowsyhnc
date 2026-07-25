@@ -6,20 +6,23 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import { scheduleStreakReminder } from '../utils/notifications'
+import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const WATER_GOAL = 8
 
 function ToggleButton({ checked, onToggle, label, icon: Icon, color }) {
   return (
     <button
-      onClick={onToggle}
+      onClick={() => { triggerHaptic(); onToggle() }}
       className={`flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 transition-all duration-200 ${
-        checked ? 'border-[#C6A85C] bg-[#C6A85C]/8' : 'border-gray-200 dark:border-gray-700 bg-card'
+        checked ? '' : 'border-gray-200 dark:border-gray-700 bg-card'
       }`}
+      style={checked ? { borderColor: GOLD, background: `${GOLD}14` } : undefined}
     >
-      <Icon size={22} className={checked ? 'text-[#C6A85C]' : 'text-secondary'} />
-      <span className={`text-xs font-heading font-bold ${checked ? 'text-[#C6A85C]' : 'text-secondary'}`}>{label}</span>
-      {checked && <CheckCircle2 size={14} className="text-[#C6A85C]" />}
+      <Icon size={22} className={checked ? '' : 'text-secondary'} style={checked ? { color: GOLD } : undefined} />
+      <span className={`text-xs font-heading font-bold ${checked ? '' : 'text-secondary'}`} style={checked ? { color: GOLD } : undefined}>{label}</span>
+      {checked && <CheckCircle2 size={14} style={{ color: GOLD }} />}
     </button>
   )
 }
@@ -106,6 +109,7 @@ export default function DailyCheckin() {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
+          transition={{ ease: EASE_STANDARD }}
           className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6"
         >
           <motion.div
@@ -113,7 +117,7 @@ export default function DailyCheckin() {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="mb-6 flex justify-center"
           >
-            {completionScore >= 4 ? <Flame size={56} style={{ color: '#FF6B35' }} /> : completionScore >= 3 ? <Dumbbell size={56} style={{ color: '#C6A85C' }} /> : <CheckCircle2 size={56} style={{ color: '#34C759' }} />}
+            {completionScore >= 4 ? <Flame size={56} style={{ color: '#FF6B35' }} /> : completionScore >= 3 ? <Dumbbell size={56} style={{ color: GOLD }} /> : <CheckCircle2 size={56} style={{ color: '#34C759' }} />}
           </motion.div>
           <h2 className="font-heading font-bold text-2xl text-primary mb-2">
             {completionScore >= 4 ? 'On fire!' : completionScore >= 3 ? 'Solid day!' : 'Check-in logged!'}
@@ -136,7 +140,7 @@ export default function DailyCheckin() {
             ].map(({ label, value, done }) => (
               <div key={label} className="flex items-center justify-between py-2.5 border-b border-default last:border-0">
                 <span className="text-sm font-body text-secondary">{label}</span>
-                <span className={`text-sm font-heading font-bold ${done ? 'text-[#C6A85C]' : 'text-secondary'}`}>{value}</span>
+                <span className={`text-sm font-heading font-bold ${done ? '' : 'text-secondary'}`} style={done ? { color: GOLD } : undefined}>{value}</span>
               </div>
             ))}
           </div>
@@ -159,13 +163,13 @@ export default function DailyCheckin() {
             <div className="flex items-center gap-2 mb-3">
               <Droplets size={18} className="text-blue-400" />
               <h3 className="font-heading font-bold text-sm text-primary">Hydration</h3>
-              <span className="ml-auto font-mono font-bold text-[#C6A85C]">{water}/{WATER_GOAL}</span>
+              <span className="ml-auto font-mono font-bold" style={{ color: GOLD }}>{water}/{WATER_GOAL}</span>
             </div>
             <div className="grid grid-cols-8 gap-1.5 mb-2">
               {Array.from({ length: WATER_GOAL }, (_, i) => (
                 <button
                   key={i}
-                  onClick={() => setWater(i < water ? i : i + 1)}
+                  onClick={() => { triggerHaptic(); setWater(i < water ? i : i + 1) }}
                   className="flex flex-col items-center"
                 >
                   <motion.div
@@ -185,7 +189,7 @@ export default function DailyCheckin() {
               <motion.div
                 className="h-full bg-blue-400 rounded-full"
                 animate={{ width: `${(water / WATER_GOAL) * 100}%` }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                transition={SPRING_STANDARD}
               />
             </div>
           </div>
@@ -193,7 +197,7 @@ export default function DailyCheckin() {
           {/* Skincare */}
           <div className="card mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <Sparkles size={18} style={{ color: '#C6A85C' }} />
+              <Sparkles size={18} style={{ color: GOLD }} />
               <h3 className="font-heading font-bold text-sm text-primary">Skincare</h3>
             </div>
             <div className="flex gap-3">
@@ -217,22 +221,23 @@ export default function DailyCheckin() {
           {/* Exercise */}
           <div className="card mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <Dumbbell size={18} className="text-[#C6A85C]" />
+              <Dumbbell size={18} style={{ color: GOLD }} />
               <h3 className="font-heading font-bold text-sm text-primary">Exercise</h3>
             </div>
             <button
-              onClick={() => setExerciseDone(v => !v)}
+              onClick={() => { triggerHaptic(); setExerciseDone(v => !v) }}
               className={`w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 transition-all ${
-                exerciseDone ? 'border-[#C6A85C] bg-[#C6A85C]/8' : 'border-gray-200 dark:border-gray-700'
+                exerciseDone ? '' : 'border-gray-200 dark:border-gray-700'
               }`}
+              style={exerciseDone ? { borderColor: GOLD, background: `${GOLD}14` } : undefined}
             >
               {exerciseDone ? (
-                <CheckCircle2 size={20} className="text-[#C6A85C]" />
+                <CheckCircle2 size={20} style={{ color: GOLD }} />
               ) : (
                 <Circle size={20} className="text-gray-300" />
               )}
-              <span className={`font-heading font-semibold text-sm ${exerciseDone ? 'text-[#C6A85C]' : 'text-secondary'}`}>
-                {exerciseDone ? <span className="flex items-center gap-1">Today's exercises done! <Dumbbell size={14} style={{ color: '#C6A85C' }} /></span> : "Mark today's exercises complete"}
+              <span className={`font-heading font-semibold text-sm ${exerciseDone ? '' : 'text-secondary'}`} style={exerciseDone ? { color: GOLD } : undefined}>
+                {exerciseDone ? <span className="flex items-center gap-1">Today's exercises done! <Dumbbell size={14} style={{ color: GOLD }} /></span> : "Mark today's exercises complete"}
               </span>
             </button>
           </div>
@@ -249,16 +254,16 @@ export default function DailyCheckin() {
                 { val: 2, Icon: Meh,      label: 'Meh',   color: '#F97316' },
                 { val: 3, Icon: SmilePlus, label: 'OK',   color: '#F5A623' },
                 { val: 4, Icon: Smile,    label: 'Good',  color: '#34C759' },
-                { val: 5, Icon: Laugh,    label: 'Great', color: '#C6A85C' },
+                { val: 5, Icon: Laugh,    label: 'Great', color: GOLD },
               ].map(({ val, Icon, label, color }) => (
                 <button
                   key={val}
-                  onClick={() => setMood(val)}
+                  onClick={() => { triggerHaptic(); setMood(val) }}
                   className="flex flex-col items-center gap-1"
                 >
                   <motion.div
                     animate={{ scale: mood === val ? 1.3 : 1 }}
-                    transition={{ type: 'spring', stiffness: 400 }}
+                    transition={SPRING_STANDARD}
                     className={`${mood === val ? '' : 'opacity-40'}`}
                   >
                     <Icon size={24} style={{ color }} />
@@ -273,14 +278,18 @@ export default function DailyCheckin() {
           <div className="flex items-center gap-3 mb-4">
             <div className="flex gap-1.5">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i < completionScore ? 'bg-[#C6A85C]' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                <div
+                  key={i}
+                  className={`w-2 h-2 rounded-full transition-colors ${i < completionScore ? '' : 'bg-gray-200 dark:bg-gray-700'}`}
+                  style={i < completionScore ? { background: GOLD } : undefined}
+                />
               ))}
             </div>
             <p className="text-xs text-secondary font-body">{completionScore}/5 habits logged</p>
           </div>
 
           <button
-            onClick={handleSubmit}
+            onClick={() => { triggerHaptic(); handleSubmit() }}
             disabled={completionScore === 0}
             className={`btn-primary mb-8 ${completionScore === 0 ? 'opacity-50' : ''}`}
           >

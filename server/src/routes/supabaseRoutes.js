@@ -59,6 +59,7 @@ router.post('/scans', auth, async (req, res) => {
       celebrityMatches, faceImageUrl,
       hairstyleRec1, hairstyleRec2, hairstyleRec3,
       hairTypeDetected, faceShape,
+      extendedMetrics,
     } = req.body
 
     // Insert scan
@@ -87,6 +88,7 @@ router.post('/scans', auth, async (req, res) => {
         hairstyle_recommendation_3:  hairstyleRec3 ?? null,
         hair_type_detected:          hairTypeDetected ?? null,
         face_shape:                  faceShape     ?? null,
+        extended_metrics:            extendedMetrics ?? null,
       })
       .select('id')
       .single()

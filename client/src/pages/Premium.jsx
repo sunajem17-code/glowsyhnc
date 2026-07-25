@@ -7,7 +7,9 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import { isNative, purchasePro, restorePurchases, initRevenueCat, checkTrialEligibility } from '../utils/iap'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
+import MotionPage from '../components/MotionPage'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
 const GOLD_LIGHT = '#D4B96A'
@@ -204,11 +206,12 @@ export default function Premium() {
 
   if (isPremium) {
     return (
-      <div
-        className="page-scroll-full flex flex-col items-center justify-center px-8 text-center"
+      <MotionPage
+        baseClassName="page-scroll-full"
+        className="flex flex-col items-center justify-center px-8 text-center"
         style={{ background: SURFACE }}
       >
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }}>
           <div
             className="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center"
             style={{ background: `${GOLD}18`, border: `1px solid ${GOLD_BORDER}` }}
@@ -224,16 +227,16 @@ export default function Premium() {
           <p className="font-body text-sm mb-8" style={{ color: TEXT_DIM }}>
             All features unlocked. Go make it happen.
           </p>
-          <button onClick={() => navigate(-1)} className="btn-primary max-w-xs">
+          <button onClick={() => { triggerHaptic(); navigate(-1) }} className="btn-primary max-w-xs">
             Back to Dashboard
           </button>
         </motion.div>
-      </div>
+      </MotionPage>
     )
   }
 
   return (
-    <div className="page-scroll-full" style={{ background: SURFACE }}>
+    <MotionPage baseClassName="page-scroll-full" style={{ background: SURFACE }}>
       <Helmet>
         <title>Ascendus Pro — Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
         <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, celebrity lookalikes, body composition scores, and a personalized looksmax plan. Start your glow up today." />
@@ -248,7 +251,7 @@ export default function Premium() {
           style={{ background: `radial-gradient(ellipse at 50% -20%, ${GOLD}12 0%, transparent 70%)` }}
         />
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => { triggerHaptic(); navigate(-1) }}
           className="absolute left-4 top-14 w-9 h-9 rounded-xl flex items-center justify-center z-20"
           style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
         >
@@ -292,7 +295,7 @@ export default function Premium() {
           ].map(({ key, label, price, badge }) => (
             <button
               key={key}
-              onClick={() => setPlan(key)}
+              onClick={() => { triggerHaptic(); setPlan(key) }}
               className="flex-1 py-3 rounded-xl flex flex-col items-center transition-all duration-200"
               style={{
                 background: plan === key ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD_DARK})` : 'transparent',
@@ -311,11 +314,11 @@ export default function Premium() {
         {/* ── Subscribe CTA ─────────────────────────────────────────────── */}
         <motion.button
           whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
-          onClick={handleSubscribe}
+          onClick={() => { triggerHaptic(); handleSubscribe() }}
           disabled={subscribingNow}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60"
           style={{
-            background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
+            background: GOLD_GRADIENT,
             color: '#0A0A0A',
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
@@ -367,7 +370,7 @@ export default function Premium() {
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: referralCount >= n ? '100%' : '0%' }}
-                  transition={{ duration: 0.6, delay: n * 0.1 }}
+                  transition={{ duration: 0.6, delay: n * 0.1, ease: EASE_STANDARD }}
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
                 />
@@ -381,7 +384,7 @@ export default function Premium() {
           {/* Share button */}
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={handleCopyReferral}
+            onClick={() => { triggerHaptic(); handleCopyReferral() }}
             className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 mb-2.5"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
           >
@@ -406,7 +409,7 @@ export default function Premium() {
           {/* Claim button */}
           <motion.button
             whileTap={{ scale: referralCount >= 3 ? 0.97 : 1 }}
-            onClick={handleUnlockPro}
+            onClick={() => { triggerHaptic(); handleUnlockPro() }}
             disabled={unlocking || referralCount < 3}
             className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 disabled:opacity-40"
             style={{
@@ -513,7 +516,7 @@ export default function Premium() {
             key={t.handle}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
+            transition={{ delay: i * 0.08, ease: EASE_STANDARD }}
             className="rounded-2xl p-4 mb-3"
             style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
           >
@@ -546,11 +549,11 @@ export default function Premium() {
         {/* ── Final CTA ───────────────────────────────────────────────── */}
         <motion.button
           whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
-          onClick={handleSubscribe}
+          onClick={() => { triggerHaptic(); handleSubscribe() }}
           disabled={subscribingNow || restoring}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-1 transition-all duration-200 disabled:opacity-60"
           style={{
-            background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, ${GOLD} 45%, ${GOLD_DARK} 100%)`,
+            background: GOLD_GRADIENT,
             color: '#0A0A0A',
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
@@ -588,7 +591,7 @@ export default function Premium() {
         {/* Restore Purchases — required by Apple */}
         {isNative() && (
           <button
-            onClick={handleRestore}
+            onClick={() => { triggerHaptic(); handleRestore() }}
             disabled={restoring || subscribingNow}
             className="w-full mb-3 font-body text-[12px] text-center transition-opacity hover:opacity-70 disabled:opacity-40"
             style={{ color: 'rgba(198,168,92,0.6)' }}
@@ -617,6 +620,6 @@ export default function Premium() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </MotionPage>
   )
 }

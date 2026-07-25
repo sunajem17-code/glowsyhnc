@@ -8,7 +8,8 @@ import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
 import { isNative as checkNative } from '../utils/iap'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const SURFACE = '#141414'
 const BORDER  = 'rgba(255,255,255,0.07)'
@@ -119,9 +120,9 @@ export default function TinderMaxx() {
           </p>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => navigate('/premium?from=tindermaxx')}
+            onClick={() => { triggerHaptic(); navigate('/premium?from=tindermaxx') }}
             className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm"
-            style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
           >
             Unlock TinderMaxx
           </motion.button>
@@ -161,7 +162,7 @@ export default function TinderMaxx() {
               )}
               {!loading && !result && (
                 <button
-                  onClick={() => removePhoto(i)}
+                  onClick={() => { triggerHaptic(); removePhoto(i) }}
                   className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center"
                   style={{ background: 'rgba(0,0,0,0.6)' }}
                 >
@@ -176,7 +177,7 @@ export default function TinderMaxx() {
         {photos.length < maxPhotos && !result && (
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={() => isNative() ? handleNativePhoto() : fileRef.current?.click()}
+            onClick={() => { triggerHaptic(); isNative() ? handleNativePhoto() : fileRef.current?.click() }}
             className="aspect-[3/4] rounded-2xl flex flex-col items-center justify-center gap-2"
             style={{ background: '#1C1C1C', border: `1.5px dashed rgba(198,168,92,0.3)` }}
           >
@@ -217,11 +218,11 @@ export default function TinderMaxx() {
       {!result && (
         <motion.button
           whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={handleAnalyze}
+          onClick={() => { triggerHaptic(); handleAnalyze() }}
           disabled={loading || photos.length < 2}
           className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 mb-4 disabled:opacity-40"
           style={{
-            background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`,
+            background: GOLD_GRADIENT,
             color: '#0A0A0A',
           }}
         >
@@ -245,7 +246,7 @@ export default function TinderMaxx() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.5, ease: EASE_STANDARD }}
           >
             {/* Winner reveal */}
             <div
@@ -321,7 +322,7 @@ export default function TinderMaxx() {
 
             {/* Retry */}
             <button
-              onClick={() => { setResult(null); setPhotos([]) }}
+              onClick={() => { triggerHaptic(); setResult(null); setPhotos([]) }}
               className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
               style={{ background: '#1C1C1C', border: BORDER, color: 'rgba(255,255,255,0.6)' }}
             >

@@ -7,6 +7,8 @@ import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import ProLock from '../components/ProLock'
 import { PHASE_META } from '../utils/phase'
+import { GOLD, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,7 +53,7 @@ function TaskCard({ task, onToggle, detailLocked, onUpgrade }) {
   return (
     <motion.div layout className={`card mb-2.5 transition-all duration-300 ${task.completed ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-3">
-        <button onClick={() => onToggle(task.id)} className="mt-0.5 flex-shrink-0">
+        <button onClick={() => { triggerHaptic(); onToggle(task.id) }} className="mt-0.5 flex-shrink-0">
           {task.completed
             ? <CheckCircle2 size={22} className="text-[#1A6B5C]" />
             : <Circle size={22} className="text-gray-300 dark:text-gray-600" />}
@@ -75,7 +77,7 @@ function TaskCard({ task, onToggle, detailLocked, onUpgrade }) {
                 {task.title}
               </p>
             </div>
-            <button onClick={() => setExpanded(e => !e)} className="flex-shrink-0 mt-1">
+            <button onClick={() => { triggerHaptic(); setExpanded(e => !e) }} className="flex-shrink-0 mt-1">
               {expanded
                 ? <ChevronUp size={14} className="text-secondary" />
                 : <ChevronDown size={14} className="text-secondary" />}
@@ -107,7 +109,7 @@ function TaskCard({ task, onToggle, detailLocked, onUpgrade }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.2, ease: EASE_STANDARD }}
             className="overflow-hidden"
           >
             <div className="mt-3 pt-3 border-t border-default">
@@ -121,9 +123,9 @@ function TaskCard({ task, onToggle, detailLocked, onUpgrade }) {
                     <Lock size={14} className="text-amber-accent" />
                     <p className="text-[11px] font-heading font-bold text-primary text-center">Pro Protocol</p>
                     <button
-                      onClick={onUpgrade}
+                      onClick={() => { triggerHaptic(); onUpgrade() }}
                       className="px-3 py-1 rounded-lg text-[10px] font-heading font-bold text-black"
-                      style={{ background: 'linear-gradient(135deg, #F5A623, #C6A85C)' }}
+                      style={{ background: `linear-gradient(135deg, #F5A623, ${GOLD})` }}
                     >
                       Unlock Details
                     </button>
@@ -165,7 +167,7 @@ function WeekSelector({ selectedWeek, onSelect, tasksByWeek, isPremium }) {
         return (
           <button
             key={w}
-            onClick={() => onSelect(w)}
+            onClick={() => { triggerHaptic(); onSelect(w) }}
             className={`flex-shrink-0 flex flex-col items-center gap-0.5 w-10 py-2 rounded-xl border transition-all duration-200 relative ${
               isSelected
                 ? 'border-transparent text-white'
@@ -210,12 +212,12 @@ export default function ActionPlan() {
 
   if (!currentPlan) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-        <ClipboardList size={40} className="mb-4" style={{ color: '#C6A85C' }} />
+      <MotionPage baseClassName="" className="flex flex-col items-center justify-center h-full px-8 text-center">
+        <ClipboardList size={40} className="mb-4" style={{ color: GOLD }} />
         <h2 className="font-heading font-bold text-xl text-primary mb-2">No plan yet</h2>
         <p className="text-secondary text-sm font-body mb-6">Complete a full scan to generate your personalized 12-week plan.</p>
-        <button onClick={() => navigate('/scan')} className="btn-primary max-w-xs">Start Your First Scan</button>
-      </div>
+        <button onClick={() => { triggerHaptic(); navigate('/scan/capture') }} className="btn-primary max-w-xs">Start Your First Scan</button>
+      </MotionPage>
     )
   }
 
@@ -277,14 +279,14 @@ export default function ActionPlan() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={prevWeek}
+              onClick={() => { triggerHaptic(); prevWeek() }}
               disabled={selectedWeek === 1}
               className="w-8 h-8 rounded-full bg-white/10 dark:bg-black/10 flex items-center justify-center disabled:opacity-30"
             >
               <ChevronLeft size={16} className="text-primary" />
             </button>
             <button
-              onClick={nextWeek}
+              onClick={() => { triggerHaptic(); nextWeek() }}
               disabled={selectedWeek === 12}
               className="w-8 h-8 rounded-full flex items-center justify-center disabled:opacity-30"
               style={{ background: phaseStyle.color }}
@@ -301,12 +303,12 @@ export default function ActionPlan() {
             style={{ background: phaseStyle.color }}
             initial={{ width: 0 }}
             animate={{ width: `${weekPct}%` }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.8, ease: EASE_STANDARD }}
           />
         </div>
 
         {weekPct === 100 && totalThisWeek > 0 && (
-          <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+          <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }}
             className="text-xs font-heading font-bold mt-2" style={{ color: phaseStyle.color }}>
             ✓ Week {selectedWeek} complete
             {selectedWeek < 12 ? ' — advance to next week' : ' — time to rescan!'}
@@ -327,13 +329,13 @@ export default function ActionPlan() {
         {TABS.map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => { triggerHaptic(); setActiveTab(tab) }}
             className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-heading font-bold transition-all duration-200 ${
               activeTab === tab
-                ? 'text-black border border-[#C6A85C]'
+                ? 'text-black border'
                 : 'bg-card border border-default text-secondary'
             }`}
-            style={activeTab === tab ? { background: 'linear-gradient(135deg, #FFD700, #C6A85C)' } : {}}
+            style={activeTab === tab ? { borderColor: GOLD, background: `linear-gradient(135deg, #FFD700, ${GOLD})` } : {}}
           >
             {tab}
           </button>
@@ -344,7 +346,7 @@ export default function ActionPlan() {
         {/* ── Weeks 2-12 gated for free users ────────────────────── */}
         {weekContentLocked ? (
           <ProLock
-            onUpgrade={() => navigate('/premium')}
+            onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
             label="Your plan continues here — unlock weeks 2–12"
             blurAmount="7px"
             className="mb-3"
@@ -379,10 +381,10 @@ export default function ActionPlan() {
               <div className="text-center py-12">
                 <div className="flex justify-center mb-2">
                   {(() => {
-                    if (activeTab === 'All') return <Gift size={24} style={{ color: '#C6A85C' }} />
+                    if (activeTab === 'All') return <Gift size={24} style={{ color: GOLD }} />
                     const cfg = CATEGORY_CONFIG[activeTab.toLowerCase() === 'appeal' ? 'grooming' : activeTab.toLowerCase()]
                     if (cfg) return <cfg.Icon size={24} style={{ color: cfg.color }} />
-                    return <ClipboardList size={24} style={{ color: '#C6A85C' }} />
+                    return <ClipboardList size={24} style={{ color: GOLD }} />
                   })()}
                 </div>
                 <p className="text-secondary text-sm font-body">
@@ -433,6 +435,7 @@ export default function ActionPlan() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ ease: EASE_STANDARD }}
             className="mt-4 card border-2 bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800"
             style={{ borderColor: '#FFD700' }}
           >
@@ -450,7 +453,7 @@ export default function ActionPlan() {
               12 weeks of compounding habits will show a measurably higher score.
             </p>
             <button
-              onClick={() => navigate('/scan')}
+              onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
               className="w-full py-3 rounded-2xl font-heading font-bold text-sm text-charcoal"
               style={{ background: 'linear-gradient(135deg, #FFD700, #F5A623)' }}
             >
@@ -464,6 +467,7 @@ export default function ActionPlan() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ ease: EASE_STANDARD }}
             className="card mt-3 border-dashed border-2 border-amber-accent/40 bg-amber-50/50 dark:bg-amber-900/10"
           >
             <div className="flex items-center gap-3">
@@ -474,7 +478,7 @@ export default function ActionPlan() {
                 <p className="font-heading font-bold text-sm text-primary">Unlock full protocols</p>
                 <p className="text-xs text-secondary font-body">Step-by-step instructions for every task, all 12 weeks.</p>
               </div>
-              <button onClick={() => navigate('/premium')} className="px-3 py-1.5 rounded-xl text-xs font-heading font-bold text-charcoal flex-shrink-0" style={{ background: '#F5A623' }}>
+              <button onClick={() => { triggerHaptic(); navigate('/premium') }} className="px-3 py-1.5 rounded-xl text-xs font-heading font-bold text-charcoal flex-shrink-0" style={{ background: '#F5A623' }}>
                 Pro
               </button>
             </div>

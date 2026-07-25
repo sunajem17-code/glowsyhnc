@@ -11,20 +11,10 @@ import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
-import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
+import { triggerHaptic } from '../utils/haptics'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import MotionPage from '../components/MotionPage'
-
-// Light tap feedback on the primary CTA. No-op on web (no native bridge) and
-// swallows any native error so a haptics failure never blocks the tap itself.
-async function triggerHaptic() {
-  if (!isNative()) return
-  try {
-    await Haptics.impact({ style: ImpactStyle.Light })
-  } catch {
-    // haptics unavailable — not fatal, ignore
-  }
-}
 
 // Native purchase path only — the web/Stripe checkout path doesn't actually
 // complete here (see handleAscend), so this is deliberately not called for it.
@@ -119,65 +109,6 @@ function toTopPct(score) {
   return 'Bot 40%'
 }
 
-// ── Card shell ────────────────────────────────────────────────────────────────
-
-function CardShell({ badge, icon: Icon, children }) {
-  return (
-    // Outer: full height, clips overflow for scroll, applies safe-area at top
-    <div className="h-full flex flex-col overflow-y-auto"
-         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0px)' }}>
-      {/* Single centered block — branding + badge + content all centered together */}
-      <div className="flex-1 flex flex-col justify-center px-6 pb-2">
-        {/* Branding — in the middle of the card, not pinned to top */}
-        <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
-          <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
-          <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
-            ASCENDUS
-          </span>
-        </div>
-        {/* Badge row */}
-        <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
-          >
-            <Icon size={16} style={{ color: G }} />
-          </div>
-          <span
-            className="font-heading font-bold text-[10px] tracking-[0.22em]"
-            style={{ color: 'rgba(198,168,92,0.75)' }}
-          >
-            {badge}
-          </span>
-        </div>
-        {/* Card content */}
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
-  const blur = size === 'lg' ? 'blur(16px)' : size === 'sm' ? 'blur(11px)' : 'blur(13px)'
-  return (
-    <span style={{ position: 'relative', display: 'inline-block', userSelect: 'none', ...extraStyle }}>
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: -6,
-          borderRadius: 10,
-          background: 'radial-gradient(circle, rgba(198,168,92,0.08) 0%, transparent 72%)',
-          pointerEvents: 'none',
-        }}
-      />
-      <span style={{ position: 'relative', display: 'inline-block', filter: blur }}>
-        {children}
-      </span>
-    </span>
-  )
-}
-
 // ── Card 1: Original StepScoresWaiting layout ────────────────────────────────
 
 function Card1Score({ scan }) {
@@ -240,10 +171,10 @@ function Card1Score({ scan }) {
           </p>
           <BlurLock size="lg">
             <div className="flex items-end gap-1.5 mb-3">
-              <span className="font-heading font-bold leading-none" style={{ fontSize: 72, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
+              <span className="font-heading font-bold leading-none" style={{ fontSize: 62, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {glowScore != null ? glowScore.toFixed(1) : '—'}
               </span>
-              <span className="font-heading font-bold text-[22px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
+              <span className="font-heading font-bold text-[19px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
             </div>
           </BlurLock>
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -267,7 +198,7 @@ function Card1Score({ scan }) {
 
         {/* Top strength — label stays visible, the actual observation is locked */}
         {topStrength && (
-          <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.18)' }}>
+          <div className="flex items-start gap-3 rounded-2xl px-3.5 py-3 mb-5" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.18)' }}>
             <div className="flex-shrink-0 mt-0.5" style={{ color: G, fontSize: 13 }}>✦</div>
             <div className="min-w-0">
               <p className="font-body text-[10px] tracking-[0.14em] mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>YOUR TOP STRENGTH</p>
@@ -280,7 +211,7 @@ function Card1Score({ scan }) {
 
         {/* Biggest growth area teaser */}
         {growthArea && (
-          <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-start gap-3 rounded-2xl px-3.5 py-3 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
             <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
             <div className="min-w-0">
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Biggest growth area</p>
@@ -317,14 +248,14 @@ function Card1Score({ scan }) {
         )}
 
         {/* Locked metric cards */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-2.5 mb-4">
           {lockedMetrics.map(({ label, value, unit, pct }) => (
-            <div key={label} className="rounded-2xl p-4 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
-              <span className="font-heading font-bold text-[19px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
+            <div key={label} className="rounded-2xl p-3.5 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
+              <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
               <div className="flex items-center justify-between mb-2">
                 <BlurLock size="sm">
                   <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[26px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </BlurLock>
@@ -504,8 +435,12 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
   // them as separate near-identical locked cards was pure padding.
   const cards = [
     { id: 'score', el: <Card1Score scan={scan} /> },
-    { id: 'face',  el: <Card3FaceMetrics scan={scan} /> },
-    { id: 'ai',    el: <Card6AIAnalysis scan={scan} /> },
+    ...EXTENDED_CATEGORIES.map(cat => ({
+      id: cat.key,
+      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} />,
+    })),
+    { id: 'face', el: <Card3FaceMetrics scan={scan} /> },
+    { id: 'ai',   el: <Card6AIAnalysis scan={scan} /> },
   ]
 
   function goTo(idx) {

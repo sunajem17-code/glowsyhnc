@@ -26,7 +26,7 @@ async function logAnalyticsEvent(name, params) {
 
 export default function PaymentSuccess() {
   const navigate = useNavigate()
-  const { setIsPremium, isAuthenticated, refreshProStatus } = useStore()
+  const { setIsPremium, setHasOnboarded, isAuthenticated, refreshProStatus } = useStore()
   const navigatedRef = useRef(false)
 
   useEffect(() => {
@@ -43,6 +43,13 @@ export default function PaymentSuccess() {
           const { isPremium } = await api.payments.status()
           if (isPremium) {
             setIsPremium(true)
+            // Onboarding's "Unlock Results Now" web path redirects here via a
+            // hard page load (window.location.href), which tears down
+            // PremiumOnboarding's own handleAscend before it can react to a
+            // successful purchase — this confirmed-payment branch is the only
+            // place that can still mark onboarding complete for that flow. A
+            // no-op for users who were already onboarded before upgrading here.
+            setHasOnboarded()
             logAnalyticsEvent('purchase_completed', { platform: 'web' })
             return
           }

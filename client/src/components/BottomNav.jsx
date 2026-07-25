@@ -1,7 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Camera, ClipboardList, TrendingUp, Users } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { GOLD } from '../utils/theme'
+import { GOLD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -10,6 +11,13 @@ const navItems = [
   { to: '/progress', icon: TrendingUp, label: 'Progress' },
   { to: '/community', icon: Users, label: 'Community' },
 ]
+
+// Single source of truth for which routes are tab roots (lateral destinations
+// reached by tapping the bar) vs. pushed detail screens reached by tapping
+// into content — Layout uses this to gate the edge-swipe-back gesture, since
+// "back" from a tab root isn't a meaningful concept the way it is from a
+// pushed screen.
+export const TAB_ROOT_PATHS = navItems.map(item => item.to)
 
 export default function BottomNav() {
   const location = useLocation()
@@ -31,6 +39,7 @@ export default function BottomNav() {
             <NavLink
               key={to}
               to={to}
+              onClick={triggerHaptic}
               className="relative flex flex-col items-center gap-1 px-4 py-2"
             >
               <div className="relative">
@@ -47,7 +56,7 @@ export default function BottomNav() {
                     layoutId="navGoldDot"
                     className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
                     style={{ background: GOLD, boxShadow: `0 0 6px ${GOLD}` }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    transition={SPRING_STANDARD}
                   />
                 )}
               </div>

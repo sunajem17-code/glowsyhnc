@@ -1,0 +1,218 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Camera, ChevronRight, Dumbbell, Sparkles } from 'lucide-react'
+import useStore from '../store/useStore'
+import MotionPage from '../components/MotionPage'
+import FaceScanOverlay from '../components/FaceScanOverlay'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
+
+// Same slide/drag gesture pattern as ScanUnlockGate's SwipeableResultCards
+// (direction-aware enter/exit, velocity-aware drag commit) — reused here for
+// consistency, but with SPRING_STANDARD/EASE_STANDARD instead of that
+// component's own hand-tuned spring, per the app's established motion tokens.
+const SLIDE_VARIANTS = {
+  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
+}
+
+function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual }) {
+  return (
+    <div
+      className="flex flex-col h-full px-6 pb-4"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+    >
+      <div className="relative flex-1 rounded-2xl overflow-hidden mb-5" style={{ background: '#000' }}>
+        {visual}
+      </div>
+      <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1.5" style={{ color: GOLD }}>
+        {eyebrow}
+      </p>
+      <h2 className="font-heading font-bold text-[24px] text-primary mb-2" style={{ letterSpacing: '-0.02em' }}>
+        {title}
+      </h2>
+      <p className="font-body text-[14px] text-secondary mb-6 leading-relaxed">
+        {body}
+      </p>
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={() => { triggerHaptic(); onAction() }}
+        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+        style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+      >
+        <Icon size={17} /> {cta}
+      </motion.button>
+    </div>
+  )
+}
+
+function BeginScanCard({ onBegin }) {
+  return (
+    <CardShell
+      eyebrow="NEW SCAN"
+      title="Begin Scan"
+      body="Get your AI-powered Glow Score, tier, and personalized action plan in under 60 seconds."
+      cta="Start Your Scan"
+      icon={Sparkles}
+      onAction={onBegin}
+      visual={
+        <>
+          {/* Icon renders first so FaceScanOverlay (rendered after, below)
+              paints on top of it, matching Scan.jsx's own stacking — there,
+              FaceScanOverlay is always the last-rendered element in its
+              branch, with nothing painted after/above it. */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Camera size={48} style={{ color: `${GOLD}66` }} />
+          </div>
+          <FaceScanOverlay loop />
+        </>
+      }
+    />
+  )
+}
+
+function PastResultCard({ scan, onView }) {
+  const photo = scan.facePhotoUrl ?? scan.photos?.face ?? null
+  const dateLabel = scan.analyzedAt
+    ? new Date(scan.analyzedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+    : null
+
+  return (
+    <CardShell
+      eyebrow="LAST SCAN"
+      title="Past Result"
+      body={dateLabel ? `Your last scan — ${dateLabel}.` : 'Your most recent scan.'}
+      cta="Results"
+      icon={ChevronRight}
+      onAction={onView}
+      visual={
+        <>
+          {photo ? (
+            <img src={photo} alt="Last scan" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Camera size={48} style={{ color: 'rgba(255,255,255,0.15)' }} />
+            </div>
+          )}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 45%)' }}
+          />
+          {scan.glowScore != null && (
+            <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
+              <div>
+                <p className="font-body text-[11px] text-white/60 uppercase tracking-wide mb-0.5">Glow Score</p>
+                <p className="font-heading font-bold text-[28px] text-white leading-none">{scan.glowScore.toFixed(1)}</p>
+              </div>
+              {scan.tier && (
+                <span
+                  className="font-heading font-bold text-[11px] px-2.5 py-1 rounded-full"
+                  style={{ background: 'rgba(198,168,92,0.2)', color: GOLD, border: `1px solid ${GOLD}55` }}
+                >
+                  {scan.tier.toUpperCase()}
+                </span>
+              )}
+            </div>
+          )}
+        </>
+      }
+    />
+  )
+}
+
+function BodyCard({ onBody }) {
+  return (
+    <CardShell
+      eyebrow="PHYSIQUE"
+      title="Body"
+      body="Track your physique score and get a training plan built around your weak points."
+      cta="View Training Plan"
+      icon={Dumbbell}
+      onAction={onBody}
+      visual={
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0f22' }}>
+          <Dumbbell size={56} style={{ color: `${GOLD}66` }} />
+        </div>
+      }
+    />
+  )
+}
+
+export default function ScanHome() {
+  const navigate = useNavigate()
+  const scans = useStore(s => s.scans)
+  const setCurrentScan = useStore(s => s.setCurrentScan)
+  const [cardIdx, setCardIdx] = useState(0)
+  const [direction, setDirection] = useState(1)
+
+  const latestScan = scans?.[0] ?? null
+
+  // "Past Result" only appears once a scan actually exists — a first-time
+  // user never sees a card built from placeholder/fake data.
+  const cards = [
+    { id: 'begin', el: <BeginScanCard onBegin={() => navigate('/scan/capture')} /> },
+    ...(latestScan ? [{
+      id: 'past',
+      el: <PastResultCard scan={latestScan} onView={() => { setCurrentScan(latestScan); navigate('/results') }} />,
+    }] : []),
+    { id: 'body', el: <BodyCard onBody={() => navigate('/workout-plan')} /> },
+  ]
+
+  function goTo(idx) {
+    if (idx === cardIdx) return
+    setDirection(idx > cardIdx ? 1 : -1)
+    setCardIdx(idx)
+  }
+
+  // Velocity-aware, not just distance-aware — matches SwipeableResultCards'
+  // own drag-commit thresholds.
+  function handleDragEnd(_, info) {
+    const DISTANCE = 60
+    const VELOCITY = 400
+    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
+      goTo(cardIdx + 1)
+    } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
+      goTo(cardIdx - 1)
+    }
+  }
+
+  return (
+    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.div
+            key={cardIdx}
+            custom={direction}
+            variants={SLIDE_VARIANTS}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={SPRING_STANDARD}
+            className="absolute inset-0"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
+            onDragEnd={handleDragEnd}
+          >
+            {cards[cardIdx].el}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Page-dot indicator — same animated width/opacity pattern used for the
+          intro-slides carousel elsewhere in the app. */}
+      <div className="flex items-center justify-center gap-2 py-4 flex-shrink-0">
+        {cards.map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{ width: i === cardIdx ? 20 : 6, opacity: i === cardIdx ? 1 : 0.35 }}
+            transition={{ duration: 0.3, ease: EASE_STANDARD }}
+            style={{ height: 6, borderRadius: 99, background: GOLD }}
+          />
+        ))}
+      </div>
+    </MotionPage>
+  )
+}

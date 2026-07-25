@@ -119,7 +119,7 @@ export default function FaceMetricsExplorer() {
 
       {isDemo && (
         <button
-          onClick={() => navigate('/scan')}
+          onClick={() => navigate('/scan/capture')}
           className="w-full flex items-center justify-between gap-2 px-3 py-2.5 mb-3 rounded-xl active:scale-95 transition-transform text-left"
           style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.3)' }}
         >

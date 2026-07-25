@@ -2,13 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api } from '../utils/api'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
+import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/side-profile-guide.png'
 import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
 import bodyGuideMale from '../assets/body-guide-male.jpg'
@@ -21,7 +22,8 @@ import { startFaceScan } from '../utils/faceScan'
 import { analyzeBodyPhoto, analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
-import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // No-op on web — no native bridge, and no web Firebase app configured yet either.
 async function logAnalyticsEvent(name, params) {
@@ -222,64 +224,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   )
 }
 
-// ─── Face Scan Overlay (decorative) ──────────────────────────────────────────
-// Purely visual — no real face detection. Plays once, briefly, right after a
-// face photo (step 1 only) is captured or uploaded. Echoes the grid + sweep
-// "scanning" motif already used in the share-card Remotion video, so the two
-// moments read as one system instead of two unrelated effects.
-const FACE_SCAN_DOT_ROWS = [22, 38, 54, 70, 86]
-const FACE_SCAN_DOTS = FACE_SCAN_DOT_ROWS.flatMap((cy, row) => {
-  const edge = row === 0 || row === FACE_SCAN_DOT_ROWS.length - 1
-  const count = edge ? 3 : 5
-  const spread = edge ? 20 : 32
-  return Array.from({ length: count }, (_, i) => ({
-    cx: 50 + (i - (count - 1) / 2) * (spread / (count - 1 || 1)),
-    cy,
-  }))
-})
-
-function FaceScanOverlay() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.35, ease: EASE_STANDARD }}
-      className="absolute inset-0 pointer-events-none overflow-hidden"
-    >
-      {/* Grid */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `linear-gradient(${GOLD}33 1px, transparent 1px), linear-gradient(90deg, ${GOLD}33 1px, transparent 1px)`,
-          backgroundSize: '24px 24px',
-        }}
-      />
-      {/* Dot mesh — loose face-outline arrangement, not real landmarks */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {FACE_SCAN_DOTS.map((d, i) => (
-          <motion.circle
-            key={i}
-            cx={d.cx} cy={d.cy} r={0.7}
-            fill={GOLD}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 1, 1, 0] }}
-            transition={{ duration: 1.7, ease: EASE_STANDARD, delay: i * 0.025 }}
-          />
-        ))}
-      </svg>
-      {/* Sweep line */}
-      <motion.div
-        className="absolute left-0 right-0"
-        style={{ height: 2, background: GOLD, boxShadow: `0 0 14px 3px ${GOLD}` }}
-        initial={{ top: '0%', opacity: 0 }}
-        animate={{ top: ['0%', '100%'], opacity: [0, 1, 1, 0] }}
-        transition={{ duration: 1.5, ease: EASE_STANDARD }}
-      />
-    </motion.div>
-  )
-}
-
 // ─── Photo Action Sheet (iOS-style) ──────────────────────────────────────────
 // Custom JS sheet, not a native action-sheet plugin — @capacitor/action-sheet
 // isn't a dependency here, and adding one is a bigger lift (new native
@@ -328,24 +272,64 @@ function PhotoActionSheet({ options, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null, onScanningChange = null }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
   const [showActionSheet, setShowActionSheet] = useState(false)
   const [showScanOverlay, setShowScanOverlay] = useState(false)
   const prevPhotoRef = useRef(photo)
+  const skipRequestedRef = useRef(false)
 
-  // Decorative-only — plays once every time a new face photo (step 1) lands,
-  // including retakes. No real face detection involved.
+  // TrueDepth-capable devices chain straight into the live scan after capture
+  // instead of requiring a separate manual "Live Face Scan" tap. Web and
+  // non-TrueDepth devices are untouched — onLiveScan is only ever passed
+  // truthy where the native scan can actually run, and isNative() gates out
+  // the web build regardless.
+  const canAutoLiveScan = stepNum === 1 && isNative() && !!onLiveScan
+
+  // Decorative-only on non-auto-scan devices — plays once every time a new
+  // face photo (step 1) lands, including retakes. No real face detection
+  // involved. On TrueDepth-capable devices, this same overlay/state now also
+  // carries the "Now scanning…" transition into the actual live scan below.
   useEffect(() => {
     const justCaptured = stepNum === 1 && photo && photo !== prevPhotoRef.current
     prevPhotoRef.current = photo
     if (!justCaptured) return
+
     setShowScanOverlay(true)
-    const t = setTimeout(() => setShowScanOverlay(false), 1800)
-    return () => clearTimeout(t)
+
+    if (!canAutoLiveScan) {
+      const t = setTimeout(() => setShowScanOverlay(false), 1800)
+      return () => clearTimeout(t)
+    }
+
+    // Short lead-in so "Now scanning your facial structure…" is actually
+    // readable before the native fullscreen modal takes over — the modal
+    // itself covers the whole screen, so nothing web-rendered needs to keep
+    // pace with it once it's open. onScanningChange tells the parent a scan
+    // is genuinely in flight — arScanDone alone can't be used for this,
+    // since a retake leaves the *previous* scan's arScanDone=true stale
+    // until this new one resolves (retaking a photo intentionally doesn't
+    // clear an already-completed scan).
+    skipRequestedRef.current = false
+    onScanningChange?.(true)
+    ;(async () => {
+      await new Promise(r => setTimeout(r, 700))
+      if (skipRequestedRef.current) return
+      await onLiveScan()
+      setShowScanOverlay(false)
+      onScanningChange?.(false)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photo, stepNum])
+
+  function handleSkipDuringScan() {
+    skipRequestedRef.current = true
+    setShowScanOverlay(false)
+    onScanningChange?.(false)
+    onSkipScan?.()
+  }
 
   async function handleCameraClick() {
     if (isNative()) {
@@ -378,16 +362,45 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
   }
 
   return (
-    <div className="flex flex-col h-full px-4">
+    <div className={stepNum === 1 ? 'flex flex-col h-full px-3' : 'flex flex-col h-full px-4'}>
       {cameraOpen && (
         <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
       )}
 
-      {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below */}
-      <div className="relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none" style={{ background: stepNum === 3 ? '#0a0f22' : (stepNum === 1 || stepNum === 2) ? '#000000' : '#111827' }}>
+      {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below.
+          Step 1 (face photo) uses a near-full-width, aspect-ratio-driven frame instead of the
+          shared flex-1/max-h-80 box, so it dominates the screen instead of sitting in a smaller
+          centered box. */}
+      <div
+        className={stepNum === 1
+          ? 'relative w-full aspect-[4/5] rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none'
+          : 'relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none'}
+        style={{
+          background: stepNum === 3 ? '#0a0f22' : (stepNum === 1 || stepNum === 2) ? '#000000' : '#111827',
+          // Gold frame — step 1 only, same weight/opacity idiom as the rest of
+          // the app's gold accents (solid GOLD for the border itself, the
+          // equivalent rgba(198,168,92,X) for the soft outer glow, since
+          // there's no alpha-variant helper for the hex token elsewhere in
+          // this codebase either — see Premium.jsx's GOLD_BORDER/${GOLD}NN
+          // pattern, ScanUnlockGate's badge borders).
+          ...(stepNum === 1 ? { border: `1.5px solid ${GOLD}`, boxShadow: '0 0 16px rgba(198,168,92,0.25)' } : {}),
+        }}
+      >
         {photo ? (
           <>
-            <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-cover" />
+            {/* object-contain (not cover) on step 1 specifically — cover inside
+                this aspect-[4/5] box was cropping real uploaded/captured
+                photos (whatever aspect ratio the camera/library photo came
+                in at) down to a smaller center region, cutting off the chin
+                or forehead depending on the source photo's proportions.
+                Matches the same fix already applied to this step's guide
+                placeholder image below. Steps 2/3 keep cover — out of scope
+                here, not reported as cropping. */}
+            <img
+              src={photo}
+              alt="uploaded"
+              className={stepNum === 1 ? 'absolute inset-0 w-full h-full object-contain' : 'absolute inset-0 w-full h-full object-cover'}
+            />
             <div className="absolute inset-0 flex items-center justify-center bg-black/25">
               <div className="w-14 h-14 rounded-full bg-[#C6A85C] flex items-center justify-center">
                 <CheckCircle2 size={30} className="text-white" />
@@ -395,7 +408,34 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             </div>
             {stepNum === 1 && (
               <AnimatePresence>
-                {showScanOverlay && <FaceScanOverlay />}
+                {showScanOverlay && (
+                  <>
+                    <FaceScanOverlay />
+                    {canAutoLiveScan && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3, ease: EASE_STANDARD }}
+                        className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-6 pointer-events-auto"
+                      >
+                        <p
+                          className="font-heading font-bold text-[13px] text-center"
+                          style={{ color: 'white', textShadow: '0 1px 6px rgba(0,0,0,0.85)' }}
+                        >
+                          Now scanning your facial structure…
+                        </p>
+                        <button
+                          onClick={handleSkipDuringScan}
+                          className="text-[11px] font-body underline active:opacity-60 transition-opacity"
+                          style={{ color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}
+                        >
+                          Skip — use photo only
+                        </button>
+                      </motion.div>
+                    )}
+                  </>
+                )}
               </AnimatePresence>
             )}
           </>
@@ -452,8 +492,10 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
         )}
-        {/* Corner guides — decorative only */}
-        {!photo && (
+        {/* Corner guides — decorative only. Dropped for step 1's redesigned
+            frame, which is meant to be just the photo/reference image with
+            nothing else cluttering it. */}
+        {!photo && stepNum !== 1 && (
           <>
             {[['top-3 left-3', true, false, true, false], ['top-3 right-3', true, false, false, true],
               ['bottom-3 left-3', false, true, true, false], ['bottom-3 right-3', false, true, false, true]].map(([pos, t, b, l, r], i) => (
@@ -489,15 +531,79 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           which broke tracking — so step 2 only ever needs a photo now, no
           separate scan action. */}
       {stepNum === 1 ? (
-        <div className="mb-1">
+        canAutoLiveScan ? (
+          <div className="mb-1 mt-auto">
+            {/* Hidden entirely while the "Now scanning…" transition/overlay is up —
+                that state has its own inline skip link, so nothing duplicates it here. */}
+            {!showScanOverlay && (
+              !photo && !arScanDone ? (
+                <button
+                  onClick={() => setShowActionSheet(true)}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+                >
+                  <Camera size={18} style={{ color: '#0A0A0A' }} />
+                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+                    Upload or Take a Selfie
+                  </span>
+                </button>
+              ) : (
+                // Settled (scan succeeded, was skipped, or the native modal was
+                // cancelled) — a lightweight retake control, not a full pill.
+                // Reopening the action sheet still offers "Live Face Scan" as a
+                // manual option, so this doubles as the recovery path if the
+                // native modal was dismissed without using the skip link above.
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    onClick={() => setShowActionSheet(true)}
+                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
+                  >
+                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      Retake Photo
+                    </span>
+                  </button>
+                  {!arScanDone && !arScanSkipped && onSkipScan && (
+                    <button
+                      onClick={onSkipScan}
+                      className="text-[11px] font-body underline active:opacity-60 transition-opacity"
+                      style={{ color: 'rgba(255,255,255,0.35)' }}
+                    >
+                      Skip Live Face Scan — use photo only
+                    </button>
+                  )}
+                </div>
+              )
+            )}
+
+            <AnimatePresence>
+              {showActionSheet && (
+                <PhotoActionSheet
+                  onClose={() => setShowActionSheet(false)}
+                  options={[
+                    ...(isNative() && onLiveScan ? [{
+                      label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
+                      icon: Star,
+                      highlight: true,
+                      onSelect: () => { setShowActionSheet(false); onLiveScan() },
+                    }] : []),
+                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+                  ]}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        ) : (
+        <div className="mb-1 mt-auto">
           <button
             onClick={() => setShowActionSheet(true)}
-            className="w-full flex items-center justify-center gap-2 py-3.5 active:scale-95 transition-transform"
-            style={{ background: 'rgba(198,168,92,0.08)', border: `1px solid ${GOLD}55`, borderRadius: 12 }}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+            style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
           >
-            <Camera size={18} style={{ color: GOLD }} />
-            <span className="text-sm font-heading font-bold text-white">
-              {photo || arScanDone ? 'Retake Photo' : 'Add Photo'}
+            <Camera size={18} style={{ color: '#0A0A0A' }} />
+            <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+              {photo || arScanDone ? 'Retake Selfie' : 'Upload or Take a Selfie'}
             </span>
           </button>
 
@@ -532,6 +638,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             )}
           </AnimatePresence>
         </div>
+        )
       ) : (
         <div className="grid grid-cols-2 gap-3 mb-1">
           {/* Take Photo — solid gold border */}
@@ -670,6 +777,7 @@ export default function Scan() {
   const [faceMetrics, setFaceMetrics]     = useState(null)   // ARKit geometry results
   const [arScanDone, setArScanDone]       = useState(false)  // true when ARKit replaced photo
   const [arScanSkipped, setArScanSkipped] = useState(false)  // user opted out of Live Face Scan after uploading/taking a static photo
+  const [faceScanBusy, setFaceScanBusy]   = useState(false)  // PhotoUploadStep's auto-live-scan chain is genuinely in flight
   const geometrySatisfied = arScanDone || arScanSkipped
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
@@ -774,6 +882,20 @@ export default function Scan() {
       setLastFaceScanCapture(capturedImage, landmarks2D)
     }
   }
+
+  // Step 1 has no separate "Continue" button anymore — PhotoUploadStep's own
+  // capture + auto-live-scan chain already gets facePhoto/geometrySatisfied
+  // to true on its own, so this just advances once both are set. Gated on
+  // !faceScanBusy specifically because arScanDone is deliberately NOT reset
+  // on a retake (an already-completed scan stays valid until a fresh one
+  // actually resolves) — so geometrySatisfied can read stale-true for the
+  // whole span of a retake's own auto-triggered rescan. Without this gate,
+  // that staleness would auto-advance to step 2 mid-rescan.
+  useEffect(() => {
+    if (step !== 1 || !facePhoto || !geometrySatisfied || faceScanBusy) return
+    const t = setTimeout(() => { setStep(2); setError('') }, 900)
+    return () => clearTimeout(t)
+  }, [step, facePhoto, geometrySatisfied, faceScanBusy])
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false, skipBodyOverride = false) {
@@ -942,6 +1064,7 @@ export default function Scan() {
           facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
         },
         pillars:          aiResult.pillars         ?? null,
+        extendedMetrics:  aiResult.extendedMetrics ?? null,
         celebrityMatches: aiResult.celebrityMatches ?? null,
         // Demo scans set celebrityMatches directly with no status field — treat
         // those as already resolved. Real scans come back 'pending' from /score
@@ -1111,13 +1234,37 @@ export default function Scan() {
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
       </Helmet>
 
-      {/* Header */}
+      {/* Header — step 1 (Face Photo) gets a plain back-arrow + title header,
+          no subtitle/progress-bar, so the photo frame below can dominate the
+          screen instead of competing with a caption row. Other steps keep
+          the existing PageHeader + progress-bar treatment. */}
       {!isAnalyzing && (
-        <PageHeader title={STEP_META[step]?.title ?? ''} subtitle={STEP_META[step]?.subtitle ?? ''} back={step > 0} />
+        step === 1 ? (
+          <div
+            className="flex items-center gap-3 px-4 pb-4 flex-shrink-0"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+          >
+            <button
+              onClick={() => { triggerHaptic(); navigate(-1) }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+            >
+              <ChevronLeft size={20} className="text-primary" />
+            </button>
+            <h1 className="font-heading font-bold text-[18px] text-primary">Take Your Front Photo</h1>
+          </div>
+        ) : (
+          <PageHeader
+            title={STEP_META[step]?.title ?? ''}
+            subtitle={STEP_META[step]?.subtitle ?? ''}
+            back
+            onBack={step === 0 ? () => navigate('/scan') : undefined}
+          />
+        )
       )}
 
-      {/* Progress bar (photo steps 1–3) */}
-      {step >= 1 && step <= 3 && (
+      {/* Progress bar (photo steps 2–3 only — step 1 uses its own plain header above) */}
+      {step >= 2 && step <= 3 && (
         <div className="px-4 pb-3">
           <div className="flex gap-2">
             {[1, 2, 3].map(i => (
@@ -1126,9 +1273,7 @@ export default function Scan() {
             ))}
           </div>
           <p className="text-xs text-secondary font-body mt-1.5">
-            {step === 1
-              ? 'Neutral expression · Face centered · Good lighting · No harsh shadows'
-              : step === 2
+            {step === 2
               ? 'Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera'
               : 'Full body visible · Stand straight · Good lighting · Fitted clothing'}
           </p>
@@ -1148,7 +1293,7 @@ export default function Scan() {
               {/* Photo and Live Face Scan are now both required, so taking a
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} onScanningChange={setFaceScanBusy} />
             </motion.div>
           )}
           {step === 3 && (
@@ -1309,22 +1454,12 @@ export default function Scan() {
             </button>
           )}
 
-          {/* Step 1: face — a regular photo is always required; the Live Face
-              Scan requirement can be satisfied either by actually running it
-              or by explicitly skipping it (arScanSkipped) after uploading/
-              taking a static photo. */}
-          {step === 1 && (
-            <button onClick={() => (facePhoto && geometrySatisfied) && (setStep(2), setError(''))} disabled={!facePhoto || !geometrySatisfied}
-              className={`btn-primary ${!facePhoto || !geometrySatisfied ? 'opacity-50' : ''}`}>
-              {facePhoto && geometrySatisfied
-                ? 'Continue →'
-                : !facePhoto && !geometrySatisfied
-                ? 'Take a photo and run Live Face Scan first'
-                : !facePhoto
-                ? 'Take a photo too to continue'
-                : 'Run a Live Face Scan too to continue'}
-            </button>
-          )}
+          {/* Step 1 (face) has no CTA here anymore — PhotoUploadStep's own
+              button handles capture/scan, and the useEffect above advances
+              to step 2 automatically once facePhoto + geometrySatisfied are
+              both true. See that effect for why it isn't just this button
+              turned into an auto-fire — retakes need the faceScanBusy gate
+              too. */}
 
           {/* Step 2: side profile → advance to body step. geometrySatisfied
               is already guaranteed true by the time anyone reaches this step

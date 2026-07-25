@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame } from 'lucide-react'
+import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
+import BodyStatsFlow from '../components/BodyStatsStep'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // Resize + JPEG-compress a raw File before sending to the server, same
 // approach used in Scan.jsx's toBase64 — keeps payloads small and fast.
@@ -233,7 +236,7 @@ function DayCard({ day, index }) {
       style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
     >
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { triggerHaptic(); setOpen(o => !o) }}
         className="w-full flex items-center justify-between px-5 py-4 text-left"
       >
         <div>
@@ -260,13 +263,13 @@ function DayCard({ day, index }) {
                 <div key={i} className="flex gap-3">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)' }}>
-                    <span className="font-heading font-bold text-[10px]" style={{ color: '#C6A85C' }}>{i + 1}</span>
+                    <span className="font-heading font-bold text-[10px]" style={{ color: GOLD }}>{i + 1}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="font-heading font-bold text-[13px] text-primary">{ex.name}</p>
                       <span className="font-mono text-[11px] font-bold flex-shrink-0"
-                        style={{ color: '#C6A85C' }}>
+                        style={{ color: GOLD }}>
                         {ex.sets}×{ex.reps}
                       </span>
                     </div>
@@ -325,8 +328,28 @@ export default function WorkoutPlan() {
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const gender         = useStore(s => s.gender) ?? currentScan?.gender ?? 'male'
   const isPremium      = useStore(s => s.isPremium)
+  const userProfile    = useStore(s => s.userProfile)
+  const setUserProfile = useStore(s => s.setUserProfile)
 
   const physiqueScores = currentScan?.physiqueScore
+
+  // ── Body stats (height/weight) — collected here instead of onboarding, so
+  // they're gathered when actually needed (training-phase calculation) rather
+  // than upfront for every user regardless of whether they ever open this
+  // screen. Auto-opens once, the first time this screen loads with no stats
+  // saved yet; also reachable any time via the settings row below.
+  const [showBodyStats, setShowBodyStats] = useState(false)
+  const hasBodyStats = userProfile?.height != null && userProfile?.weight != null
+
+  useEffect(() => {
+    if (!hasBodyStats) setShowBodyStats(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function handleBodyStatsSave(height, weight) {
+    setUserProfile({ ...userProfile, height, weight })
+    api.user.update({ height_cm: height, weight_kg: weight }).catch(() => {})
+  }
 
   // ── Body-only quick scan (no face required) ──────────────────────────────────
   const bodyFileInputRef = useRef(null)
@@ -409,6 +432,7 @@ export default function WorkoutPlan() {
   // ── Gate: no body photo uploaded yet ─────────────────────────────────────────
   if (!physiqueScores) {
     return (
+      <>
       <MotionPage>
         <PageHeader title="Training Plan" onBack={() => navigate(-1)} />
         <div className="flex-1 flex flex-col items-center justify-center px-8 pb-24 text-center gap-5">
@@ -416,7 +440,7 @@ export default function WorkoutPlan() {
             className="w-20 h-20 rounded-3xl flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
           >
-            <Dumbbell size={36} style={{ color: '#C6A85C' }} />
+            <Dumbbell size={36} style={{ color: GOLD }} />
           </div>
           <div className="space-y-2">
             <p className="font-heading font-bold text-[20px] text-primary leading-tight">
@@ -446,10 +470,10 @@ export default function WorkoutPlan() {
           <motion.button
             whileTap={{ scale: bodyScanLoading ? 1 : 0.97 }}
             disabled={bodyScanLoading}
-            onClick={() => bodyFileInputRef.current?.click()}
+            onClick={() => { triggerHaptic(); bodyFileInputRef.current?.click() }}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
             style={{
-              background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)',
+              background: GOLD_GRADIENT,
               color: '#0A0A0A',
               boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
               opacity: bodyScanLoading ? 0.6 : 1,
@@ -469,6 +493,18 @@ export default function WorkoutPlan() {
           </motion.button>
         </div>
       </MotionPage>
+      <AnimatePresence>
+        {showBodyStats && (
+          <BodyStatsFlow
+            initialHeight={userProfile?.height}
+            initialWeight={userProfile?.weight}
+            goal={userProfile?.goal}
+            onSave={handleBodyStatsSave}
+            onClose={() => setShowBodyStats(false)}
+          />
+        )}
+      </AnimatePresence>
+      </>
     )
   }
 
@@ -476,6 +512,7 @@ export default function WorkoutPlan() {
   const splitLabel = plan?.split ?? `${inferredLevel === 'beginner' ? '3-day Full Body' : inferredLevel === 'intermediate' ? '4-day Upper/Lower' : '6-day PPL'}`
 
   return (
+    <>
     <MotionPage>
       <PageHeader title="Training Plan" onBack={() => navigate(-1)} />
 
@@ -490,13 +527,13 @@ export default function WorkoutPlan() {
         >
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="font-heading font-bold text-[10px] uppercase tracking-widest mb-1" style={{ color: '#C6A85C' }}>
+              <p className="font-heading font-bold text-[10px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>
                 AI-Generated Plan
               </p>
               <h1 className="font-heading font-bold text-[20px] text-primary leading-tight">{splitLabel}</h1>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full capitalize"
-              style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)', color: '#C6A85C' }}>
+              style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}>
               {SPLIT_ICONS[levelLabel]}
               <span className="font-heading font-bold text-[11px]">{levelLabel}</span>
             </div>
@@ -505,6 +542,23 @@ export default function WorkoutPlan() {
           <p className="font-body text-[11px] text-secondary mb-2">Built around your weak areas:</p>
           <WeakAreaChips physiqueScores={physiqueScores} />
         </motion.div>
+
+        {/* Body stats — settings-style row, reopens the same flow shown automatically above */}
+        <motion.button
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => { triggerHaptic(); setShowBodyStats(true) }}
+          className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <Ruler size={16} style={{ color: GOLD }} />
+            <span className="font-body text-[13px] text-primary">
+              {hasBodyStats ? `${userProfile.height} cm · ${userProfile.weight} kg` : 'Add your body stats'}
+            </span>
+          </div>
+          <ChevronRight size={16} className="text-secondary" />
+        </motion.button>
 
         {/* Fallback notice */}
         {isFallback && !loading && (
@@ -518,7 +572,7 @@ export default function WorkoutPlan() {
             <p className="font-body text-[11px] leading-relaxed" style={{ color: '#F5A623' }}>
               Showing a template plan based on your physique score. Personalized AI plan failed to load.
             </p>
-            <button onClick={loadPlan} className="flex-shrink-0">
+            <button onClick={() => { triggerHaptic(); loadPlan() }} className="flex-shrink-0">
               <RefreshCw size={13} style={{ color: '#F5A623' }} />
             </button>
           </motion.div>
@@ -531,7 +585,7 @@ export default function WorkoutPlan() {
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             >
-              <Dumbbell size={28} style={{ color: '#C6A85C' }} />
+              <Dumbbell size={28} style={{ color: GOLD }} />
             </motion.div>
             <div className="text-center">
               <p className="font-heading font-bold text-[14px] text-primary">Building Your Plan</p>
@@ -557,5 +611,17 @@ export default function WorkoutPlan() {
         )}
       </div>
     </MotionPage>
+    <AnimatePresence>
+      {showBodyStats && (
+        <BodyStatsFlow
+          initialHeight={userProfile?.height}
+          initialWeight={userProfile?.weight}
+          goal={userProfile?.goal}
+          onSave={handleBodyStatsSave}
+          onClose={() => setShowBodyStats(false)}
+        />
+      )}
+    </AnimatePresence>
+    </>
   )
 }

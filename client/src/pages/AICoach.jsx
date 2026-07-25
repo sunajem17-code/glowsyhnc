@@ -5,7 +5,8 @@ import { Send, Sparkles, Lock, ChevronRight, RotateCcw, Check } from 'lucide-rea
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -85,7 +86,7 @@ function MessageBubble({ msg, isNew }) {
     <motion.div
       initial={isNew ? { opacity: 0, y: 10 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.25, ease: EASE_STANDARD }}
       className={`flex items-end gap-2 mb-4 ${isUser ? 'flex-row-reverse' : ''}`}
     >
       {!isUser && (
@@ -216,7 +217,7 @@ export default function AICoach() {
 
   // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -253,6 +254,7 @@ export default function AICoach() {
         {messages.length > 1 && !freeCoachLocked && (
           <button
             onClick={() => {
+              triggerHaptic()
               if (latestScan) {
                 const greeting = isPremium
                   ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
@@ -280,14 +282,14 @@ export default function AICoach() {
           className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-4"
           style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.22)' }}
         >
-          <span className="text-[12px] flex-shrink-0 mt-0.5" style={{ color: '#C6A85C' }}>ℹ</span>
+          <span className="text-[12px] flex-shrink-0 mt-0.5" style={{ color: GOLD }}>ℹ</span>
           <p className="font-body text-[10px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
             For informational purposes only — not medical advice. Sources:{' '}
-            <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>Healthline</a>
+            <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>Healthline</a>
             ,{' '}
-            <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>NIH</a>
+            <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>NIH</a>
             ,{' '}
-            <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>AAD</a>
+            <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>AAD</a>
             . Consult a qualified professional before making any health decisions.
           </p>
         </motion.div>
@@ -313,7 +315,7 @@ export default function AICoach() {
               {freeMessagesLeft} of {FREE_COACH_LIMIT} free questions left
             </p>
             <button
-              onClick={() => navigate('/premium')}
+              onClick={() => { triggerHaptic(); navigate('/premium') }}
               className="text-[10px] font-heading font-bold px-2 py-1 rounded-lg"
               style={{ background: GOLD, color: '#0A0A0A' }}
             >
@@ -339,7 +341,7 @@ export default function AICoach() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 + i * 0.06 }}
-                  onClick={() => sendMessage(prompt)}
+                  onClick={() => { triggerHaptic(); sendMessage(prompt) }}
                   className="text-left px-3 py-3 rounded-xl"
                   style={{
                     background: 'rgba(255,255,255,0.04)',
@@ -407,9 +409,9 @@ export default function AICoach() {
               ))}
             </ul>
             <button
-              onClick={() => navigate('/premium')}
+              onClick={() => { triggerHaptic(); navigate('/premium') }}
               className="w-full py-3 rounded-xl font-heading font-bold text-[13px] flex items-center justify-center gap-2"
-              style={{ background: `linear-gradient(135deg, ${GOLD} 0%, #A8893A 100%)`, color: '#0A0A0A' }}
+              style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
             >
               Upgrade to Pro
               <ChevronRight size={14} />
@@ -444,7 +446,7 @@ export default function AICoach() {
               }}
             />
             <button
-              onClick={() => sendMessage()}
+              onClick={() => { if (input.trim() && !loading) triggerHaptic(); sendMessage() }}
               disabled={!input.trim() || loading}
               className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
               style={{
@@ -458,6 +460,6 @@ export default function AICoach() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPage>
   )
 }

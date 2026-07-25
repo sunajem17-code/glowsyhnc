@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowLeftRight, Share2, Download, TrendingUp, Loader2, X, Ch
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
+import { GOLD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -96,7 +98,7 @@ export function CompareSlider({ before, after }) {
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-white shadow-xl flex items-center justify-center"
         >
-          <ArrowLeftRight size={14} className="text-[#C6A85C]" />
+          <ArrowLeftRight size={14} style={{ color: GOLD }} />
         </div>
       </div>
 
@@ -207,7 +209,7 @@ async function drawCompareCard({ canvas, beforeScan, afterScan, beforePhoto, aft
   ctx.fillText('Ascendus', W / 2, 72)
   ctx.beginPath()
   ctx.arc(W / 2 + 116, 57, 7, 0, Math.PI * 2)
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.fill()
   ctx.restore()
 
@@ -349,7 +351,7 @@ async function drawCompareCard({ canvas, beforeScan, afterScan, beforePhoto, aft
 
     ctx.textAlign  = 'center'
     ctx.font       = '600 30px "Plus Jakarta Sans", Arial'
-    ctx.fillStyle  = '#C6A85C'
+    ctx.fillStyle  = GOLD
     ctx.fillText(`⏱  ${elapsed} of looksmaxxing`, W / 2, eY + 44)
   }
 
@@ -411,7 +413,7 @@ async function drawCompareCard({ canvas, beforeScan, afterScan, beforePhoto, aft
   ctx.fillText('ascendus.store', W / 2, H - 48)
   ctx.beginPath()
   ctx.arc(W / 2 + 216, H - 63, 5, 0, Math.PI * 2)
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.fill()
 }
 
@@ -444,6 +446,7 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
 
   async function handleShare() {
     if (!preview) return
+    triggerHaptic()
     setSharing(true)
     try {
       const res = await fetch(preview)
@@ -464,6 +467,7 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
 
   function handleSave() {
     if (!preview) return
+    triggerHaptic()
     const a = document.createElement('a')
     a.href = preview; a.download = 'ascendus-glow-up.jpg'; a.click()
   }
@@ -485,7 +489,7 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
           <p className="text-[11px] text-white/40 font-body mt-0.5">9:16 · Instagram / TikTok Stories</p>
         </div>
         <button
-          onClick={onClose}
+          onClick={() => { triggerHaptic(); onClose() }}
           className="w-9 h-9 rounded-full flex items-center justify-center"
           style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}
         >
@@ -498,13 +502,13 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
       <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden px-4">
         {generating ? (
           <div className="flex flex-col items-center gap-3">
-            <Loader2 size={28} className="text-[#C6A85C] animate-spin" />
+            <Loader2 size={28} style={{ color: GOLD }} className="animate-spin" />
             <p className="text-white/55 text-sm font-body">Building your card...</p>
           </div>
         ) : error ? (
           <div className="text-center">
             <p className="text-white/55 text-sm mb-3">{error}</p>
-            <button onClick={generate} className="px-4 py-2 rounded-xl text-white text-sm bg-white/10">Retry</button>
+            <button onClick={() => { triggerHaptic(); generate() }} className="px-4 py-2 rounded-xl text-white text-sm bg-white/10">Retry</button>
           </div>
         ) : preview ? (
           <div style={{
@@ -570,14 +574,14 @@ export default function Compare() {
               className="w-16 h-16 rounded-2xl flex items-center justify-center mb-2"
               style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.20)' }}
             >
-              <TrendingUp size={28} className="text-[#C6A85C]" />
+              <TrendingUp size={28} style={{ color: GOLD }} />
             </div>
             <p className="font-heading font-bold text-lg text-white">You need 2+ scans</p>
             <p className="font-body text-sm text-white/50 leading-relaxed">
               Complete your first scan, then rescan after a few weeks to unlock before/after comparison.
             </p>
             <button
-              onClick={() => navigate('/scan')}
+              onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
               className="mt-2 px-6 py-3 rounded-2xl font-heading font-bold text-sm text-black"
               style={{ background: 'linear-gradient(135deg, #FFE066 0%, #FFD700 45%, #B8922A 100%)' }}
             >
@@ -612,7 +616,7 @@ export default function Compare() {
           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
         >
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => { triggerHaptic(); navigate(-1) }}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
@@ -620,17 +624,17 @@ export default function Compare() {
           </button>
           <h1 className="font-heading font-bold text-[17px] text-white">Before &amp; After</h1>
           <button
-            onClick={() => setShowShare(true)}
+            onClick={() => { triggerHaptic(); setShowShare(true) }}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)' }}
           >
-            <Share2 size={16} className="text-[#C6A85C]" />
+            <Share2 size={16} style={{ color: GOLD }} />
           </button>
         </div>
 
         <div className="px-4 pb-28 flex flex-col gap-5">
           {/* Photo Comparison */}
-          <CompareSlider before={afterPhoto} after={beforePhoto} />
+          <CompareSlider before={beforePhoto} after={afterPhoto} />
 
           {/* Score Hero */}
           <motion.div
@@ -678,7 +682,7 @@ export default function Compare() {
               <p className="font-body text-[11px] text-white/40 uppercase tracking-wide mb-1">After</p>
               <p
                 className="font-heading font-bold text-3xl"
-                style={{ color: '#C6A85C' }}
+                style={{ color: GOLD }}
               >
                 {(latestScan.glowScore ?? 0).toFixed(1)}
               </p>
@@ -698,7 +702,7 @@ export default function Compare() {
                 border: '1px solid rgba(198,168,92,0.20)',
               }}
             >
-              <TrendingUp size={18} className="text-[#C6A85C] flex-shrink-0" />
+              <TrendingUp size={18} style={{ color: GOLD }} className="flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-body text-[12px] text-white/50">Tier Change</p>
                 <p className="font-heading font-bold text-sm text-white truncate">
@@ -744,7 +748,7 @@ export default function Compare() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            onClick={() => setShowShare(true)}
+            onClick={() => { triggerHaptic(); setShowShare(true) }}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] text-black flex items-center justify-center gap-2"
             style={{ background: 'linear-gradient(135deg, #FFE066 0%, #FFD700 45%, #B8922A 100%)' }}
           >

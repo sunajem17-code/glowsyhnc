@@ -11,9 +11,11 @@ import PageHeader from '../components/PageHeader'
 import ProLock from '../components/ProLock'
 import FaceMetricsExplorer from '../components/FaceMetricsExplorer'
 import { api } from '../utils/api'
+import { GOLD, EASE_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const METRIC_TABS = [
-  { key: 'glowScore',     label: 'Overall',  color: '#C6A85C' },
+  { key: 'glowScore',     label: 'Overall',  color: GOLD },
   { key: 'faceScore',     label: 'Face',     color: '#F5A623' },
   { key: 'groomingScore', label: 'Grooming', color: '#E07A5F' },
 ]
@@ -48,7 +50,7 @@ function drawShareCard(canvas, firstScan, latestScan) {
   ctx.fillRect(0, 0, W, H)
 
   // Gold top bar
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.fillRect(0, 0, W, 5)
 
   // ── Left card (first scan) ────────────────────────────────────────────────
@@ -61,7 +63,7 @@ function drawShareCard(canvas, firstScan, latestScan) {
   ctx.font = '600 11px Inter, system-ui, sans-serif'
   ctx.fillText('FIRST SCAN', 128, 52)
 
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.font = 'bold 54px Inter, system-ui, sans-serif'
   ctx.fillText(firstScan.overall_score.toFixed(1), 128, 118)
 
@@ -77,17 +79,17 @@ function drawShareCard(canvas, firstScan, latestScan) {
   ctx.textAlign = 'center'
 
   // Arrow circle
-  ctx.strokeStyle = '#C6A85C'
+  ctx.strokeStyle = GOLD
   ctx.lineWidth   = 2
   ctx.beginPath()
   ctx.arc(300, 100, 30, 0, Math.PI * 2)
   ctx.stroke()
 
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.font = 'bold 28px Inter, system-ui, sans-serif'
   ctx.fillText('↑', 300, 112)
 
-  ctx.fillStyle = diff >= 0 ? '#C6A85C' : '#E07A5F'
+  ctx.fillStyle = diff >= 0 ? GOLD : '#E07A5F'
   ctx.font = 'bold 20px Inter, system-ui, sans-serif'
   ctx.fillText(diffStr, 300, 156)
 
@@ -101,11 +103,11 @@ function drawShareCard(canvas, firstScan, latestScan) {
   ctx.fill()
 
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.font = '600 11px Inter, system-ui, sans-serif'
   ctx.fillText('NOW', 472, 52)
 
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.font = 'bold 54px Inter, system-ui, sans-serif'
   ctx.fillText(latestScan.overall_score.toFixed(1), 472, 118)
 
@@ -118,7 +120,7 @@ function drawShareCard(canvas, firstScan, latestScan) {
   ctx.fillText(fmtDate(latestScan.created_at), 472, 168)
 
   // ── Bottom branding bar ───────────────────────────────────────────────────
-  ctx.fillStyle = '#C6A85C'
+  ctx.fillStyle = GOLD
   ctx.fillRect(0, H - 34, W, 34)
 
   ctx.fillStyle = '#121212'
@@ -157,7 +159,7 @@ function ComparisonSlider({ before, after }) {
       <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
         style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
-          <ArrowLeftRight size={14} className="text-[#C6A85C]" />
+          <ArrowLeftRight size={14} style={{ color: GOLD }} />
         </div>
       </div>
       <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/50 rounded-lg">
@@ -275,8 +277,8 @@ export default function Progress() {
       {/* ── Overview cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Total Scans', value: history.length || scans.length || '—', icon: <Camera size={20} style={{ color: '#C6A85C' }} /> },
-          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: <Trophy size={20} style={{ color: '#C6A85C' }} /> },
+          { label: 'Total Scans', value: history.length || scans.length || '—', icon: <Camera size={20} style={{ color: GOLD }} /> },
+          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: <Trophy size={20} style={{ color: GOLD }} /> },
           { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : '—', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
         ].map(({ label, value, icon }) => (
           <div key={label} className="card text-center py-3">
@@ -290,15 +292,16 @@ export default function Progress() {
       {/* ── Chart / Empty state ───────────────────────────────────────────── */}
       {loading ? (
         <div className="card mb-4 flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-[#C6A85C] border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: GOLD, borderTopColor: 'transparent' }} />
         </div>
       ) : !hasEnoughData ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ ease: EASE_STANDARD }}
           className="card mb-4 flex flex-col items-center gap-3 py-10 text-center"
         >
-          <TrendingUp size={40} style={{ color: '#C6A85C' }} />
+          <TrendingUp size={40} style={{ color: GOLD }} />
           <p className="font-heading font-bold text-base text-primary">
             {history.length === 0
               ? 'Complete your first scan to start tracking your glow up'
@@ -308,8 +311,9 @@ export default function Progress() {
             Your score history will appear here after two scans
           </p>
           <button
-            onClick={() => navigate('/scan')}
-            className="mt-1 px-5 py-2 bg-[#C6A85C] rounded-xl text-sm font-heading font-bold text-white"
+            onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
+            className="mt-1 px-5 py-2 rounded-xl text-sm font-heading font-bold text-white"
+            style={{ background: GOLD }}
           >
             Start a Scan
           </button>
@@ -322,17 +326,18 @@ export default function Progress() {
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
                   { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
-                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: <Star size={20} style={{ color: '#C6A85C', fill: '#C6A85C' }} /> },
+                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} /> },
                   {
                     label: 'Improvement',
                     value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
-                    icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: '#C6A85C' }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
-                    color: improvementNum >= 0 ? 'text-[#C6A85C]' : 'text-warning',
+                    icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: GOLD }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
+                    colorClass: improvementNum >= 0 ? '' : 'text-warning',
+                    colorStyle: improvementNum >= 0 ? { color: GOLD } : undefined,
                   },
-                ].map(({ label, value, icon, color }) => (
+                ].map(({ label, value, icon, colorClass, colorStyle }) => (
                   <div key={label} className="card text-center py-3">
                     <div className="flex justify-center mb-0.5">{icon}</div>
-                    <p className={`font-mono font-bold text-lg ${color || 'text-primary'}`}>{value}</p>
+                    <p className={`font-mono font-bold text-lg ${colorClass || 'text-primary'}`} style={colorStyle}>{value}</p>
                     <p className="text-[10px] text-secondary font-body">{label}</p>
                   </div>
                 ))}
@@ -342,11 +347,10 @@ export default function Progress() {
               <div className="card mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
-                  <span className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${
-                    improvementNum >= 0
-                      ? 'bg-[#C6A85C]/10 text-[#C6A85C]'
-                      : 'bg-red-50 text-warning dark:bg-red-900/20'
-                  }`}>
+                  <span
+                    className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${improvementNum >= 0 ? '' : 'bg-red-50 text-warning dark:bg-red-900/20'}`}
+                    style={improvementNum >= 0 ? { background: `${GOLD}1A`, color: GOLD } : undefined}
+                  >
                     {improvementNum >= 0 ? '+' : ''}{improvement} pts
                   </span>
                 </div>
@@ -354,7 +358,7 @@ export default function Progress() {
                   {METRIC_TABS.map((m, i) => (
                     <button
                       key={m.key}
-                      onClick={() => setMetricTab(i)}
+                      onClick={() => { triggerHaptic(); setMetricTab(i) }}
                       className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
                         metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
                       }`}
@@ -382,11 +386,11 @@ export default function Progress() {
               </div>
 
               {/* Share My Glow Up — Pro */}
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card mb-4 overflow-hidden">
-                <div className="h-1 -mx-4 -mt-4 mb-4 bg-gradient-to-r from-[#C6A85C] to-[#F5D98E]" />
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }} className="card mb-4 overflow-hidden">
+                <div className="h-1 -mx-4 -mt-4 mb-4" style={{ background: `linear-gradient(90deg, ${GOLD}, #F5D98E)` }} />
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#C6A85C]/10 flex items-center justify-center flex-shrink-0">
-                    <Share2 size={20} className="text-[#C6A85C]" />
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${GOLD}1A` }}>
+                    <Share2 size={20} style={{ color: GOLD }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
@@ -394,7 +398,7 @@ export default function Progress() {
                       {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
                     </p>
                   </div>
-                  <button onClick={handleShare} disabled={sharing} className="flex items-center gap-1.5 px-3 py-2 bg-[#C6A85C] rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0">
+                  <button onClick={() => { triggerHaptic(); handleShare() }} disabled={sharing} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0" style={{ background: GOLD }}>
                     {sharing ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Download size={13} />Share</>}
                   </button>
                 </div>
@@ -404,7 +408,7 @@ export default function Progress() {
             /* Free users: locked progress graph + share card */
             <ProLock
               solid
-              onUpgrade={() => navigate('/premium')}
+              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
               label="Progress Graph & Share Card"
               description="Track your score over time and share your glow-up with Pro."
               className="mb-4"
@@ -449,7 +453,7 @@ export default function Progress() {
           ) : (
             <ProLock
               solid
-              onUpgrade={() => navigate('/premium')}
+              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
               label="Scan History"
               description="All your scan photos and score history, in one place."
             />
@@ -472,7 +476,7 @@ export default function Progress() {
           ) : (
             <ProLock
               solid
-              onUpgrade={() => navigate('/premium')}
+              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
               label="Before & After Comparison"
               description="Drag-slider photo comparison of your first scan vs. your latest."
             />
@@ -483,10 +487,10 @@ export default function Progress() {
       {/* ── Milestones ────────────────────────────────────────────────────── */}
       {hasEnoughData && (
         <div className="mb-6">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2"><Trophy size={16} style={{ color: '#C6A85C' }} /> Milestones</h2>
+          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2"><Trophy size={16} style={{ color: GOLD }} /> Milestones</h2>
           {[
             {
-              icon: <Target size={20} style={{ color: '#C6A85C' }} />,
+              icon: <Target size={20} style={{ color: GOLD }} />,
               text: 'First scan completed',
               date: new Date(firstScan.created_at).toLocaleDateString(),
             },
@@ -495,7 +499,7 @@ export default function Progress() {
               text: `Score improved by ${improvement} points`,
             },
             bestScore >= 7.5 && {
-              icon: <Star size={20} style={{ color: '#C6A85C', fill: '#C6A85C' }} />,
+              icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} />,
               text: `Reached ${bestScore.toFixed(1)} — ${latestScan.tier || 'elite tier'}`,
             },
           ].filter(Boolean).map((m, i) => (

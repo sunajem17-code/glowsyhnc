@@ -1360,7 +1360,7 @@ export default function Results() {
         <Camera size={48} className="mb-4" style={{ color: '#C6A85C' }} />
         <h2 className="font-heading font-bold text-xl text-primary mb-2">No scan yet</h2>
         <p className="text-secondary text-sm font-body mb-6">Take your first scan to see your results here.</p>
-        <button onClick={() => navigate('/scan')} className="btn-primary max-w-xs">Start Scan</button>
+        <button onClick={() => navigate('/scan/capture')} className="btn-primary max-w-xs">Start Scan</button>
       </div>
     )
   }
@@ -2892,7 +2892,7 @@ export default function Results() {
             <button onClick={() => navigate('/workout-plan')} className="btn-primary flex items-center justify-center gap-2">
               See My Training Plan <ArrowRight size={15} />
             </button>
-            <button onClick={() => navigate('/scan')} className="btn-ghost border border-default">
+            <button onClick={() => navigate('/scan/capture')} className="btn-ghost border border-default">
               Take Another Scan
             </button>
           </>

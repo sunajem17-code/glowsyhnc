@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { triggerHaptic } from '../utils/haptics'
 
-export default function PageHeader({ title, subtitle, back, action }) {
+export default function PageHeader({ title, subtitle, back, onBack, action }) {
   const navigate = useNavigate()
 
   return (
     <div className="flex items-center gap-3 px-4 pb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       {back && (
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => { triggerHaptic(); onBack ? onBack() : navigate(-1) }}
           className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
           style={{
             background: 'var(--card)',

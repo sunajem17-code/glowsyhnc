@@ -6,7 +6,8 @@ import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import { pickPhoto, isNative } from '../utils/camera'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 const BORDER = 'rgba(255,255,255,0.07)'
 
@@ -90,7 +91,7 @@ function PhotoPicker({ label, value, onChange }) {
       </p>
       <button
         type="button"
-        onClick={handlePick}
+        onClick={() => { triggerHaptic(); handlePick() }}
         className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center"
         style={{
           aspectRatio: '3/4',
@@ -174,7 +175,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
       initial={{ y: '100%' }}
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+      transition={SPRING_STANDARD}
       className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
       style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '75vh' }}
     >
@@ -183,7 +184,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
       </div>
       <div className="flex items-center justify-between px-4 pb-3 border-b flex-shrink-0" style={{ borderColor: BORDER }}>
         <p className="font-heading font-bold text-sm text-primary">Comments</p>
-        <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+        <button onClick={() => { triggerHaptic(); onClose() }}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -202,7 +203,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
               <p className="font-body text-[13px] text-primary leading-snug">{c.content}</p>
             </div>
             {c.is_mine && (
-              <button onClick={() => deleteComment(c.id)}>
+              <button onClick={() => { triggerHaptic(); deleteComment(c.id) }}>
                 <Trash2 size={12} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </button>
             )}
@@ -223,7 +224,7 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
           className="flex-1 bg-transparent font-body text-primary outline-none placeholder:text-secondary"
           style={{ fontSize: 16 }}
         />
-        <button onClick={send} disabled={!text.trim() || sending}>
+        <button onClick={() => { triggerHaptic(); send() }} disabled={!text.trim() || sending}>
           <Send size={18} style={{ color: text.trim() ? GOLD : 'rgba(255,255,255,0.2)' }} />
         </button>
       </div>
@@ -303,7 +304,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
         initial={{ y: 60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        transition={SPRING_STANDARD}
         className="w-full rounded-t-2xl flex flex-col"
         style={{
           background: '#1A1A1A',
@@ -314,7 +315,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
         {/* Fixed header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
           <p className="font-heading font-bold text-base text-primary">Share to Community</p>
-          <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+          <button onClick={() => { triggerHaptic(); onClose() }}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
         </div>
 
         {/* Post type selector */}
@@ -323,7 +324,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
             {[{ id: 'glow-up', icon: <TrendingUp size={13} />, label: 'Glow-Up' }, { id: 'rate-me', icon: <Star size={13} />, label: 'Rate Me' }].map(t => (
               <button
                 key={t.id}
-                onClick={() => setPostType(t.id)}
+                onClick={() => { triggerHaptic(); setPostType(t.id) }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-heading font-bold text-[12px] transition-all"
                 style={postType === t.id
                   ? { background: GOLD, color: '#0A0A0A' }
@@ -426,10 +427,10 @@ function ShareModal({ onClose, onPosted, user, scans }) {
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={submit}
+            onClick={() => { triggerHaptic(); submit() }}
             disabled={posting}
             className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
           >
             {posting
               ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
@@ -480,7 +481,7 @@ async function renderPostCard(post) {
   rrCtx(ctx, 36, 36, W - 72, H - 72, 48); ctx.stroke()
 
   // topbar
-  ctx.font = '800 38px Inter, Arial'; ctx.fillStyle = '#C6A85C'
+  ctx.font = '800 38px Inter, Arial'; ctx.fillStyle = GOLD
   ctx.textAlign = 'right'
   ctx.fillText('ASCENDUS', W - 80, 110)
 
@@ -531,9 +532,9 @@ async function renderPostCard(post) {
   if (bothPhotos) {
     const hw = (W - 72 - 20 - photoGap) / 2
     await drawPhoto(post.before_photo_url, 56, photoTop, hw, photoH, 'BEFORE', '#ffffff')
-    await drawPhoto(post.photo_url,        56 + hw + photoGap, photoTop, hw, photoH, 'AFTER', '#C6A85C')
+    await drawPhoto(post.photo_url,        56 + hw + photoGap, photoTop, hw, photoH, 'AFTER', GOLD)
   } else if (hasAfter) {
-    await drawPhoto(post.photo_url, 56, photoTop, W - 112, photoH, 'AFTER', '#C6A85C')
+    await drawPhoto(post.photo_url, 56, photoTop, W - 112, photoH, 'AFTER', GOLD)
   } else if (hasBefore) {
     await drawPhoto(post.before_photo_url, 56, photoTop, W - 112, photoH, 'BEFORE', '#ffffff')
   }
@@ -555,7 +556,7 @@ async function renderPostCard(post) {
   }
 
   // footer
-  ctx.font = '600 28px Inter, Arial'; ctx.fillStyle = '#C6A85C'
+  ctx.font = '600 28px Inter, Arial'; ctx.fillStyle = GOLD
   ctx.textAlign = 'center'; ctx.letterSpacing = '2px'
   ctx.fillText('ascendus.store', W / 2, H - 58)
   ctx.letterSpacing = '0px'
@@ -600,7 +601,7 @@ function PostShareSheet({ post, onClose }) {
         onClick={onClose} />
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        transition={SPRING_STANDARD}
         className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl pb-safe"
         style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
       >
@@ -610,7 +611,7 @@ function PostShareSheet({ post, onClose }) {
         <p className="px-5 pb-4 font-heading font-bold text-sm text-primary">Share Post</p>
         <div className="px-4 flex flex-col gap-2">
           <button
-            onClick={shareAsImage}
+            onClick={() => { triggerHaptic(); shareAsImage() }}
             disabled={generating}
             className="flex items-center gap-3 px-4 py-3.5 rounded-2xl w-full text-left"
             style={{ background: '#242424', border: `1px solid ${BORDER}` }}
@@ -624,7 +625,7 @@ function PostShareSheet({ post, onClose }) {
             </div>
           </button>
           <button
-            onClick={copyText}
+            onClick={() => { triggerHaptic(); copyText() }}
             className="flex items-center gap-3 px-4 py-3.5 rounded-2xl w-full text-left"
             style={{ background: '#242424', border: `1px solid ${BORDER}` }}
           >
@@ -637,7 +638,7 @@ function PostShareSheet({ post, onClose }) {
             </div>
           </button>
           <button
-            onClick={onClose}
+            onClick={() => { triggerHaptic(); onClose() }}
             className="w-full py-3 rounded-2xl font-heading font-bold text-sm mt-1"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}
           >
@@ -700,7 +701,7 @@ const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate })
                   whileTap={{ scale: 0.9 }}
                   onPointerEnter={() => setHoveredScore(n)}
                   onPointerLeave={() => setHoveredScore(null)}
-                  onClick={() => handleScore(n)}
+                  onClick={() => { triggerHaptic(); handleScore(n) }}
                   disabled={submitting}
                   className="aspect-square rounded-lg flex items-center justify-center font-heading font-bold text-[11px] transition-colors"
                   style={{
@@ -755,7 +756,7 @@ function ReportSheet({ postId, onClose }) {
       />
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        transition={SPRING_STANDARD}
         className="fixed bottom-0 inset-x-0 z-50 rounded-t-2xl px-5 pt-5 pb-10"
         style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}
       >
@@ -770,14 +771,14 @@ function ReportSheet({ postId, onClose }) {
           <>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-heading font-bold text-base text-primary">Report post</h3>
-              <button onClick={onClose}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+              <button onClick={() => { triggerHaptic(); onClose() }}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
             </div>
             <p className="font-body text-sm text-secondary mb-4">Why are you reporting this post?</p>
             <div className="flex flex-col gap-2 mb-6">
               {REPORT_REASONS.map(r => (
                 <button
                   key={r.value}
-                  onClick={() => setSelected(r.value)}
+                  onClick={() => { triggerHaptic(); setSelected(r.value) }}
                   className="flex items-center justify-between px-4 py-3 rounded-xl text-left"
                   style={{
                     background: selected === r.value ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
@@ -790,7 +791,7 @@ function ReportSheet({ postId, onClose }) {
               ))}
             </div>
             <button
-              onClick={submit}
+              onClick={() => { triggerHaptic(); submit() }}
               disabled={submitting}
               className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2"
               style={{ background: submitting ? 'rgba(255,255,255,0.06)' : 'rgba(239,68,68,0.15)', color: submitting ? 'rgba(255,255,255,0.3)' : '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
@@ -832,14 +833,14 @@ function EditSheet({ post, onClose, onSaved }) {
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0,  opacity: 1 }}
         exit={{    y: 80, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        transition={SPRING_STANDARD}
         className="w-full rounded-t-2xl p-6"
         style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-heading font-bold text-base text-primary">Edit Post</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <button onClick={() => { triggerHaptic(); onClose() }} className="p-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <X size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
           </button>
         </div>
@@ -872,7 +873,7 @@ function EditSheet({ post, onClose, onSaved }) {
         {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
 
         <button
-          onClick={handleSave}
+          onClick={() => { triggerHaptic(); handleSave() }}
           disabled={saving || !displayName.trim()}
           className="w-full py-3.5 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2"
           style={{ background: GOLD, color: '#0A0A0A', opacity: (saving || !displayName.trim()) ? 0.5 : 1 }}
@@ -899,14 +900,14 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
         <p className="font-body text-sm text-primary mb-5 text-center leading-relaxed">{message}</p>
         <div className="flex gap-3">
           <button
-            onClick={onCancel}
+            onClick={() => { triggerHaptic(); onCancel() }}
             className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
             style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}
           >
             Cancel
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => { triggerHaptic(); onConfirm() }}
             className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
             style={{ background: '#c0392b', color: '#fff' }}
           >
@@ -970,7 +971,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
         {!!post.is_mine && (
           <div className="relative">
             <button
-              onClick={() => setShowMenu(v => !v)}
+              onClick={() => { triggerHaptic(); setShowMenu(v => !v) }}
               className="p-1.5 rounded-lg"
               style={{ color: 'rgba(255,255,255,0.3)' }}
             >
@@ -987,14 +988,14 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
                   style={{ background: '#222', border: '1px solid rgba(255,255,255,0.12)', minWidth: 140 }}
                 >
                   <button
-                    onClick={() => { setShowMenu(false); setShowEdit(true) }}
+                    onClick={() => { triggerHaptic(); setShowMenu(false); setShowEdit(true) }}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body text-primary"
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     <Pencil size={13} style={{ color: GOLD }} /> Edit
                   </button>
                   <button
-                    onClick={() => { setShowMenu(false); onDelete(post.id) }}
+                    onClick={() => { triggerHaptic(); setShowMenu(false); onDelete(post.id) }}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body"
                     style={{ color: '#ef4444' }}
                   >
@@ -1024,7 +1025,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${(post.score_after / 10) * 100}%` }}
-              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 1, ease: EASE_STANDARD }}
               className="h-full rounded-full"
               style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
             />
@@ -1079,7 +1080,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
       {/* Actions */}
       <div className="flex items-center gap-1 px-3 py-3 border-t" style={{ borderColor: BORDER }}>
         <button
-          onClick={() => onLike(post.id)}
+          onClick={() => { triggerHaptic(); onLike(post.id) }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
           style={{ color: post.user_liked ? '#EF4444' : 'rgba(255,255,255,0.4)' }}
         >
@@ -1087,7 +1088,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           <span className="font-body text-[12px]">{post.likes_count ?? 0}</span>
         </button>
         <button
-          onClick={() => onOpenComments(post)}
+          onClick={() => { triggerHaptic(); onOpenComments(post) }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
           style={{ color: 'rgba(255,255,255,0.4)' }}
         >
@@ -1097,7 +1098,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
         <div className="flex items-center gap-1 ml-auto">
           {!post.is_mine && (
             <button
-              onClick={() => setShowReport(true)}
+              onClick={() => { triggerHaptic(); setShowReport(true) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
               style={{ color: 'rgba(255,255,255,0.2)' }}
               aria-label="Report post"
@@ -1107,7 +1108,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           )}
           {!isRateMe && (
             <button
-              onClick={() => setShowShareSheet(true)}
+              onClick={() => { triggerHaptic(); setShowShareSheet(true) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
               style={{ color: 'rgba(255,255,255,0.4)' }}
             >
@@ -1210,7 +1211,7 @@ export default function Community() {
         </div>
         <motion.button
           whileTap={{ scale: 0.95 }}
-          onClick={() => setShowShare(true)}
+          onClick={() => { triggerHaptic(); setShowShare(true) }}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
           style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
         >
@@ -1238,9 +1239,9 @@ export default function Community() {
           </p>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setShowShare(true)}
+            onClick={() => { triggerHaptic(); setShowShare(true) }}
             className="px-6 py-3 rounded-2xl font-heading font-bold text-sm"
-            style={{ background: `linear-gradient(135deg, #D4B96A, ${GOLD}, #A8893A)`, color: '#0A0A0A' }}
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
           >
             Share My Glow-Up
           </motion.button>

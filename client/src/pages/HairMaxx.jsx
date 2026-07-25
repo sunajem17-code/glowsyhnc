@@ -8,6 +8,7 @@ import {
   Sparkles, RotateCcw, Lightbulb,
 } from 'lucide-react'
 import useStore from '../store/useStore'
+import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import {
@@ -19,7 +20,8 @@ import {
   MAINTENANCE_COLORS,
   MAINTENANCE_LABELS,
 } from '../utils/haircuts'
-import { GOLD } from '../utils/theme'
+import { GOLD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD_DIM  = '#8A7140'
@@ -97,7 +99,7 @@ function ModeSelector({ onAI, onManual }) {
       {/* AI Scan option */}
       <motion.button
         whileTap={{ scale: 0.97 }}
-        onClick={onAI}
+        onClick={() => { triggerHaptic(); onAI() }}
         className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
         style={{ background: `${GOLD}12`, border: `1.5px solid ${GOLD}50` }}
       >
@@ -127,7 +129,7 @@ function ModeSelector({ onAI, onManual }) {
       {/* Manual option */}
       <motion.button
         whileTap={{ scale: 0.97 }}
-        onClick={onManual}
+        onClick={() => { triggerHaptic(); onManual() }}
         className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
         style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
       >
@@ -194,7 +196,7 @@ function PhotoCapture({ onPhoto, onBack }) {
         <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1/1' }}>
           <img src={preview} alt="Preview" className="w-full h-full object-cover" />
           <button
-            onClick={() => { setPreview(null); setFile(null) }}
+            onClick={() => { triggerHaptic(); setPreview(null); setFile(null) }}
             className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(0,0,0,0.7)' }}
           >
@@ -214,7 +216,7 @@ function PhotoCapture({ onPhoto, onBack }) {
       {/* Buttons */}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={handleCamera}
+          onClick={() => { triggerHaptic(); handleCamera() }}
           className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
           style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
         >
@@ -222,7 +224,7 @@ function PhotoCapture({ onPhoto, onBack }) {
           Camera
         </button>
         <button
-          onClick={handleUpload}
+          onClick={() => { triggerHaptic(); handleUpload() }}
           className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
           style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
         >
@@ -243,7 +245,7 @@ function PhotoCapture({ onPhoto, onBack }) {
       {/* Analyze CTA */}
       <motion.button
         whileTap={{ scale: 0.97 }}
-        onClick={() => onPhoto(file)}
+        onClick={() => { if (file) triggerHaptic(); onPhoto(file) }}
         disabled={!file}
         className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2"
         style={{
@@ -281,6 +283,7 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
   const [copiedIdx, setCopiedIdx] = useState(null)
 
   function copyScript(text, idx) {
+    triggerHaptic()
     navigator.clipboard.writeText(text).catch(() => {})
     setCopiedIdx(idx)
     setTimeout(() => setCopiedIdx(null), 2000)
@@ -407,7 +410,7 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
                 See all 3 haircuts with barber scripts
               </p>
               <button
-                onClick={onUpgrade}
+                onClick={() => { triggerHaptic(); onUpgrade() }}
                 className="px-6 py-2.5 rounded-xl font-heading font-bold text-sm"
                 style={{ background: GOLD, color: '#0A0A0A' }}
               >
@@ -436,7 +439,7 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
 
       {/* Rescan */}
       <button
-        onClick={onRescan}
+        onClick={() => { triggerHaptic(); onRescan() }}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-heading font-semibold text-sm"
         style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}
       >
@@ -461,7 +464,7 @@ export function FaceShapeSelector({ selected, onSelect }) {
             <motion.button
               key={shape.id}
               whileTap={{ scale: 0.96 }}
-              onClick={() => onSelect(shape.id)}
+              onClick={() => { triggerHaptic(); onSelect(shape.id) }}
               className="flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-200"
               style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
             >
@@ -507,7 +510,7 @@ function HairDetailsSelector({ density, hairline, onDensity, onHairline }) {
           {HAIR_DENSITIES.map(d => {
             const isActive = density === d.id
             return (
-              <button key={d.id} onClick={() => onDensity(d.id)}
+              <button key={d.id} onClick={() => { triggerHaptic(); onDensity(d.id) }}
                 className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
                 style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
               >
@@ -524,7 +527,7 @@ function HairDetailsSelector({ density, hairline, onDensity, onHairline }) {
           {HAIRLINES.map(h => {
             const isActive = hairline === h.id
             return (
-              <button key={h.id} onClick={() => onHairline(h.id)}
+              <button key={h.id} onClick={() => { triggerHaptic(); onHairline(h.id) }}
                 className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
                 style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
               >
@@ -542,6 +545,7 @@ function HairDetailsSelector({ density, hairline, onDensity, onHairline }) {
 function BarberScriptModal({ cut, onClose }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = () => {
+    triggerHaptic()
     navigator.clipboard.writeText(cut.barberScript.say.replace(/"/g, ''))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -555,7 +559,7 @@ function BarberScriptModal({ cut, onClose }) {
     >
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        transition={SPRING_STANDARD}
         className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl p-6"
         style={{ background: SURFACE_2 }}
         onClick={e => e.stopPropagation()}
@@ -566,7 +570,7 @@ function BarberScriptModal({ cut, onClose }) {
             <p className="text-[10px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Barber Script</p>
             <h3 className="font-heading font-bold text-lg" style={{ color: TEXT_PRI }}>{cut.name}</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: SURFACE_3 }}>
+          <button onClick={() => { triggerHaptic(); onClose() }} className="p-1.5 rounded-lg" style={{ background: SURFACE_3 }}>
             <X size={16} style={{ color: TEXT_SEC }} />
           </button>
         </div>
@@ -629,7 +633,7 @@ function CutCard({ cut, rank, saved, onSave, onScript, delay = 0 }) {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono font-bold" style={{ color: GOLD }}>{cut.matchScore}% match</span>
-          <button onClick={() => onSave(cut.id)} className="p-1.5 rounded-lg transition-colors"
+          <button onClick={() => { triggerHaptic(); onSave(cut.id) }} className="p-1.5 rounded-lg transition-colors"
             style={{ background: saved ? `${GOLD}20` : SURFACE_2 }}>
             {saved ? <Star size={13} style={{ color: GOLD }} fill={GOLD} /> : <StarOff size={13} style={{ color: TEXT_SEC }} />}
           </button>
@@ -653,7 +657,7 @@ function CutCard({ cut, rank, saved, onSave, onScript, delay = 0 }) {
             <p className="text-xs font-body leading-relaxed" style={{ color: RED }}>{cut.hairlineNote || cut.densityNote}</p>
           </div>
         )}
-        <button onClick={() => onScript(cut)}
+        <button onClick={() => { triggerHaptic(); onScript(cut) }}
           className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-heading font-semibold text-sm transition-all active:scale-98"
           style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}>
           <Scissors size={14} />
@@ -676,7 +680,7 @@ export function ManualResultsView({ faceShape, density, hairline, savedCuts, onS
           <p className="text-[10px] font-body uppercase tracking-widest mb-0.5" style={{ color: GOLD_DIM }}>{faceLabel} Face</p>
           <h2 className="font-heading font-bold text-xl" style={{ color: TEXT_PRI }}>Your Cuts</h2>
         </div>
-        <button onClick={onReset} className="text-xs font-heading font-semibold px-3 py-1.5 rounded-xl"
+        <button onClick={() => { triggerHaptic(); onReset() }} className="text-xs font-heading font-semibold px-3 py-1.5 rounded-xl"
           style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>Start over</button>
       </div>
       <div className="rounded-xl px-4 py-3 mb-5" style={{ background: SURFACE_2, borderLeft: `3px solid ${GOLD}` }}>
@@ -798,7 +802,8 @@ export default function HairMaxx() {
   }
 
   return (
-    <div className="page-scroll" style={{ background: SURFACE }}>
+    <>
+    <MotionPage style={{ background: SURFACE }}>
       <Helmet>
         <title>AI Hair Analysis &amp; Hairmaxx Guide — Ascendus</title>
         <meta name="description" content="Scan your hair type with AI and get a personalized hairmaxx routine. Identify your curl pattern, porosity, and the exact products to maximize your hair's potential." />
@@ -807,7 +812,7 @@ export default function HairMaxx() {
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center justify-between px-4 pb-4"
         style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-        <button onClick={handleBack} className="p-2 -ml-2 rounded-xl" style={{ color: TEXT_SEC }}>
+        <button onClick={() => { triggerHaptic(); handleBack() }} className="p-2 -ml-2 rounded-xl" style={{ color: TEXT_SEC }}>
           <ChevronLeft size={22} />
         </button>
         <div className="text-center">
@@ -889,28 +894,32 @@ export default function HairMaxx() {
 
         </AnimatePresence>
       </div>
+    </MotionPage>
 
-      {/* Manual flow next button */}
-      {mode === 'manual' && manualStep < 2 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pt-4"
+    {/* Manual flow next button — kept outside MotionPage: framer-motion's
+        transform on the animated container would turn this fixed-position
+        button into one positioned relative to that container instead of
+        the viewport. */}
+    {mode === 'manual' && manualStep < 2 && (
+      <div className="fixed bottom-0 left-0 right-0 px-4 pt-4"
+        style={{
+          background: `linear-gradient(to top, ${SURFACE} 60%, transparent)`,
+          paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))',
+        }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); handleManualNext() }}
+          disabled={manualStep === 0 ? !canNext0 : !canNext1}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition-all"
           style={{
-            background: `linear-gradient(to top, ${SURFACE} 60%, transparent)`,
-            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))',
-          }}>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleManualNext}
-            disabled={manualStep === 0 ? !canNext0 : !canNext1}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition-all"
-            style={{
-              background: (manualStep === 0 ? canNext0 : canNext1) ? GOLD : SURFACE_3,
-              color: (manualStep === 0 ? canNext0 : canNext1) ? '#0A0A0A' : TEXT_SEC,
-            }}
-          >
-            {manualStep === 1 ? <><Scissors size={16} />Get My Cuts</> : <>Next<ChevronRight size={16} /></>}
-          </motion.button>
-        </div>
-      )}
-    </div>
+            background: (manualStep === 0 ? canNext0 : canNext1) ? GOLD : SURFACE_3,
+            color: (manualStep === 0 ? canNext0 : canNext1) ? '#0A0A0A' : TEXT_SEC,
+          }}
+        >
+          {manualStep === 1 ? <><Scissors size={16} />Get My Cuts</> : <>Next<ChevronRight size={16} /></>}
+        </motion.button>
+      </div>
+    )}
+    </>
   )
 }

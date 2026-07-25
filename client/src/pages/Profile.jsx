@@ -17,7 +17,8 @@ import PageHeader from '../components/PageHeader'
 import GlowScoreRing from '../components/GlowScoreRing'
 import { ACHIEVEMENTS } from '../utils/achievements'
 import { api } from '../utils/api'
-import { GOLD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { triggerHaptic } from '../utils/haptics'
 
 // ─── Cancel Subscription Modal ────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ function CancelModal({ onClose }) {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+        transition={SPRING_STANDARD}
         className="w-full rounded-t-2xl overflow-y-auto"
         style={{ background: '#0D0D0D', maxHeight: '90vh', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}
       >
@@ -117,16 +118,16 @@ function CancelModal({ onClose }) {
                 50% off your next month — one-time offer to keep your progress alive.
               </p>
               <button
-                onClick={onClose}
+                onClick={() => { triggerHaptic(); onClose() }}
                 className="w-full py-3 rounded-xl font-heading font-bold text-[13px] text-black"
-                style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}
+                style={{ background: GOLD_GRADIENT }}
               >
                 Keep Premium at 50% Off →
               </button>
             </div>
 
             <button
-              onClick={() => setStep(2)}
+              onClick={() => { triggerHaptic(); setStep(2) }}
               className="w-full py-2.5 font-body text-[13px] text-center"
               style={{ color: 'rgba(255,255,255,0.28)' }}
             >
@@ -176,7 +177,7 @@ function CancelModal({ onClose }) {
                         onClick={() => { setReason(r); setReasonOpen(false) }}
                         className="w-full text-left px-4 py-3 font-body text-sm border-b last:border-0"
                         style={{
-                          color: reason === r ? '#C6A85C' : 'rgba(255,255,255,0.75)',
+                          color: reason === r ? GOLD : 'rgba(255,255,255,0.75)',
                           borderColor: 'rgba(255,255,255,0.06)',
                           background: reason === r ? 'rgba(198,168,92,0.06)' : 'transparent',
                         }}
@@ -190,7 +191,7 @@ function CancelModal({ onClose }) {
             </div>
 
             <button
-              onClick={confirmCancel}
+              onClick={() => { triggerHaptic(); confirmCancel() }}
               disabled={!reason || cancelling}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[14px] mb-3 flex items-center justify-center gap-2 disabled:opacity-40"
               style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.30)', color: '#EF4444' }}
@@ -209,7 +210,7 @@ function CancelModal({ onClose }) {
         {/* Step 3 — Done */}
         {step === 3 && (
           <div className="px-5 pt-3 pb-10 text-center">
-            <div className="mb-4 mt-6"><User size={40} style={{ color: '#C6A85C' }} /></div>
+            <div className="mb-4 mt-6"><User size={40} style={{ color: GOLD }} /></div>
             <h3 className="font-heading font-bold text-[18px] text-white mb-2">Subscription Cancelled</h3>
             <p className="font-body text-sm text-white/50 mb-6 leading-relaxed">
               You'll have access until the end of your current period.<br />
@@ -239,7 +240,7 @@ const TEXT_DIM = '#5A5652'
 function SettingsRow({ icon: Icon, label, value, onClick, danger, toggle, checked }) {
   return (
     <button
-      onClick={onClick}
+      onClick={() => { triggerHaptic(); onClick?.() }}
       className="w-full flex items-center gap-3.5 py-4 px-4 transition-colors"
       style={{ background: 'transparent' }}
     >
@@ -419,7 +420,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.35, ease: EASE_STANDARD }}
         className="mb-5 rounded-2xl p-5"
         style={{ background: SURFACE, border: `1px solid ${BORDER}` }}
       >
@@ -504,7 +505,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.06, duration: 0.35, ease: EASE_STANDARD }}
         className="grid grid-cols-3 gap-2.5 mb-5"
       >
         {[
@@ -536,7 +537,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.08, duration: 0.35, ease: EASE_STANDARD }}
         className="mb-5 rounded-2xl p-4"
         style={{ background: SURFACE, border: `1px solid ${BORDER}` }}
       >
@@ -574,7 +575,7 @@ export default function Profile() {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ delay: 0.1, duration: 0.35, ease: EASE_STANDARD }}
           className="mb-5 rounded-2xl overflow-hidden"
           style={{
             background: '#111',
@@ -608,10 +609,10 @@ export default function Profile() {
             </p>
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={() => navigate('/premium')}
+              onClick={() => { triggerHaptic(); navigate('/premium') }}
               className="w-full py-3.5 rounded-xl font-heading font-bold text-[14px]"
               style={{
-                background: `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 45%, #A8893A 100%)`,
+                background: GOLD_GRADIENT,
                 color: '#0A0A0A',
                 boxShadow: `0 4px 20px rgba(198,168,92,0.3)`,
                 letterSpacing: '0.01em',
@@ -630,7 +631,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.14, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.14, duration: 0.35, ease: EASE_STANDARD }}
         className="mb-3"
         style={sectionStyle}
       >
@@ -707,7 +708,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.17, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.17, duration: 0.35, ease: EASE_STANDARD }}
         className="mb-3"
         style={sectionStyle}
       >
@@ -728,7 +729,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.2, duration: 0.35, ease: EASE_STANDARD }}
         className="flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-3"
         style={{
           background: 'rgba(255,255,255,0.03)',
@@ -746,7 +747,7 @@ export default function Profile() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.22, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.22, duration: 0.35, ease: EASE_STANDARD }}
         className="mb-5"
         style={sectionStyle}
       >
@@ -785,7 +786,7 @@ export default function Profile() {
               initial={{ y: 300 }}
               animate={{ y: 0 }}
               exit={{ y: 300 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              transition={SPRING_STANDARD}
               className="w-full rounded-t-2xl p-6"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none' }}
               onClick={e => e.stopPropagation()}
@@ -840,7 +841,7 @@ export default function Profile() {
                 ].map(({ label, Icon, iconColor, emoji, bg, border, action }) => (
                   <button
                     key={label}
-                    onClick={action}
+                    onClick={() => { triggerHaptic(); action() }}
                     className="flex flex-col items-center gap-2 py-4 rounded-2xl active:scale-95 transition-transform"
                     style={{ background: bg, border: `1px solid ${border}` }}
                   >
@@ -856,7 +857,7 @@ export default function Profile() {
               </div>
 
               <button
-                onClick={copyLink}
+                onClick={() => { triggerHaptic(); copyLink() }}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-colors"
                 style={{
                   border: `1.5px dashed ${copied ? GOLD : 'rgba(255,255,255,0.12)'}`,
@@ -894,7 +895,7 @@ export default function Profile() {
               initial={{ y: 400 }}
               animate={{ y: 0 }}
               exit={{ y: 400 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              transition={SPRING_STANDARD}
               className="w-full rounded-t-2xl p-6"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none', maxHeight: '85vh', overflowY: 'auto' }}
               onClick={e => e.stopPropagation()}
@@ -974,7 +975,7 @@ export default function Profile() {
                       <motion.div
                         className="absolute top-1 w-4 h-4 rounded-full bg-white"
                         animate={{ x: privacySettings?.[key] ? 20 : 4 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        transition={SPRING_STANDARD}
                       />
                     </button>
                   </div>
@@ -1016,7 +1017,7 @@ export default function Profile() {
                         Cancel
                       </button>
                       <button
-                        onClick={() => { clearAllScanData(); setDataDeleted(true); setDeleteConfirm(false) }}
+                        onClick={() => { triggerHaptic(); clearAllScanData(); setDataDeleted(true); setDeleteConfirm(false) }}
                         className="flex-1 py-2.5 rounded-xl font-heading font-bold text-[12px]"
                         style={{ background: '#EF4444', color: 'white' }}
                       >
@@ -1025,7 +1026,7 @@ export default function Profile() {
                     </motion.div>
                   ) : (
                     <button
-                      onClick={() => setDeleteConfirm(true)}
+                      onClick={() => { triggerHaptic(); setDeleteConfirm(true) }}
                       className="w-full mt-3 py-2.5 rounded-xl font-heading font-bold text-[12px] transition-all"
                       style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
                     >
@@ -1058,7 +1059,7 @@ export default function Profile() {
               initial={{ y: 300 }}
               animate={{ y: 0 }}
               exit={{ y: 300 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              transition={SPRING_STANDARD}
               className="relative w-full rounded-t-2xl p-6 text-center"
               style={{ background: '#161616', border: `1px solid ${BORDER}`, borderBottom: 'none' }}
               onClick={e => e.stopPropagation()}
@@ -1073,7 +1074,7 @@ export default function Profile() {
 
               {rated ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                  <Heart size={48} className="mb-3" style={{ color: '#C6A85C' }} />
+                  <Heart size={48} className="mb-3" style={{ color: GOLD }} />
                   <h3
                     className="font-heading font-bold text-xl mb-1"
                     style={{ color: TEXT, letterSpacing: '-0.01em' }}
@@ -1108,7 +1109,7 @@ export default function Profile() {
                         key={star}
                         whileTap={{ scale: 0.85 }}
                         animate={{ scale: rating >= star ? 1.15 : 1 }}
-                        onClick={() => setRating(star)}
+                        onClick={() => { triggerHaptic(); setRating(star) }}
                       >
                         <Star
                           size={34}
@@ -1120,12 +1121,12 @@ export default function Profile() {
                   </div>
 
                   <button
-                    onClick={() => rating > 0 && submitRating(rating)}
+                    onClick={() => { if (rating > 0) { triggerHaptic(); submitRating(rating) } }}
                     disabled={rating === 0}
                     className="w-full py-3.5 rounded-xl font-heading font-bold text-[14px] transition-all"
                     style={{
                       background: rating > 0
-                        ? `linear-gradient(135deg, #D4B96A 0%, ${GOLD} 45%, #A8893A 100%)`
+                        ? GOLD_GRADIENT
                         : 'rgba(255,255,255,0.06)',
                       color: rating > 0 ? '#0A0A0A' : TEXT_DIM,
                       opacity: rating === 0 ? 0.5 : 1,
@@ -1180,7 +1181,7 @@ export default function Profile() {
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+                transition={SPRING_STANDARD}
                 style={{
                   width: '100%',
                   background: '#0D0D0D',
@@ -1242,7 +1243,7 @@ export default function Profile() {
 
                   {/* Buttons */}
                   <button
-                    onClick={handleDeleteAccount}
+                    onClick={() => { triggerHaptic(); handleDeleteAccount() }}
                     disabled={deletingAccount}
                     className="font-heading font-bold text-[14px]"
                     style={{ width: '100%', padding: '16px', borderRadius: 16, background: '#EF4444', color: 'white', border: 'none', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: deletingAccount ? 0.5 : 1, cursor: deletingAccount ? 'not-allowed' : 'pointer' }}
