@@ -1411,6 +1411,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
         },
         pillars:          aiResult.pillars          ?? null,
         extendedMetrics:  aiResult.extendedMetrics  ?? null,
+        extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
         physiqueScore:    null,
         bodyFatLevel:     null,
       }
@@ -1492,7 +1493,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} />
       </div>
     )
   }
@@ -1864,6 +1865,7 @@ export default function PremiumOnboarding() {
   const addScan            = useStore(s => s.addScan)
   const currentScan        = useStore(s => s.currentScan)
   const setCurrentScan     = useStore(s => s.setCurrentScan)
+  const patchScanExtendedMetrics = useStore(s => s.patchScanExtendedMetrics)
   const setCurrentPlan     = useStore(s => s.setCurrentPlan)
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
   const setLastScanDate    = useStore(s => s.setLastScanDate)
@@ -1972,6 +1974,22 @@ export default function PremiumOnboarding() {
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
       logAnalyticsEvent('scan_completed', { tier: scanRecord?.tier, score: scanRecord?.umaxScore, source: 'onboarding' })
+
+      // Extended metrics (30-metric breakdown) were split into a separate,
+      // slower follow-up call for latency — fire it now, non-blocking, so
+      // StepScoresWaiting's CategoryCard teasers hot-update once it resolves
+      // instead of blocking the onboarding scan result on it. Same pattern
+      // as the regular Scan.jsx flow.
+      if (scanRecord.facePhotoUrl && scanRecord.extendedMetricsStatus === 'pending') {
+        api.ai.scoreExtendedMetrics({ faceImage: scanRecord.facePhotoUrl, gender: g })
+          .then(({ extendedMetrics }) => {
+            patchScanExtendedMetrics(scanRecord.id, extendedMetrics, 'ready')
+          })
+          .catch(err => {
+            console.warn('[SCAN DONE] Extended metrics follow-up failed (non-fatal):', err?.message)
+            patchScanExtendedMetrics(scanRecord.id, null, 'failed')
+          })
+      }
 
       // Persist to Supabase non-blocking — same fields as regular Scan flow
       api.supabase.saveScan({

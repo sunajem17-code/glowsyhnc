@@ -54,6 +54,17 @@ const useStore = create(
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
 
+      // Extended metrics (30-metric breakdown) now arrive via a separate,
+      // slower follow-up call after the core score — this patches them into
+      // both currentScan and the matching scans[] entry once that call
+      // resolves, so CategoryCard's teasers hot-update without a re-scan.
+      patchScanExtendedMetrics: (scanId, extendedMetrics, status) => set(state => ({
+        currentScan: state.currentScan?.id === scanId
+          ? { ...state.currentScan, extendedMetrics, extendedMetricsStatus: status }
+          : state.currentScan,
+        scans: state.scans.map(s => s.id === scanId ? { ...s, extendedMetrics, extendedMetricsStatus: status } : s),
+      })),
+
       // Live Face Scan photo + 2D landmark positions, for the "tap a stat, see
       // it pointed out on your face" UI. Deliberately session-only — NOT in
       // partialize below, so this never gets written to localStorage. It's a

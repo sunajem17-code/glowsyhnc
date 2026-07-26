@@ -147,11 +147,17 @@ function stripPrefix(dataUrl) {
   return dataUrl.replace(/^data:image\/\w+;base64,/, '')
 }
 
-// ── CALL 1: Face + Grooming + 4 Pillars (+ optional side profile) ────────────
-// Focused on facial structure, grooming, and the 4 aesthetic pillars.
+// ── CALL 1: Core score — Face + Grooming + 4 Pillars (+ optional side profile) ──
+// Focused on facial structure, grooming, and the 4 aesthetic pillars. This is
+// deliberately the SMALL/FAST call — the 30-metric extended breakdown lives in
+// its own call (getExtendedMetrics, below) so the user's core result doesn't
+// wait on generating 30 extra {score, descriptor} pairs. Splitting cut the
+// time-to-first-result roughly in half in real testing (~35s combined ->
+// ~18s core alone), since output-token generation dominates latency here,
+// not image/input processing.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
-async function getFaceScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null) {
+async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null) {
   const client = getClient()
   const isFemale = gender === 'female'
   const hasSide = !!sideBase64
@@ -185,16 +191,16 @@ Include a "profile" object in your JSON response.` : ''
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    // Bumped from 950/1100 — the extended_metrics block alone adds 30 more
-    // {score, descriptor} pairs on top of the original response, and the old
-    // budget would truncate the JSON mid-object before this addition.
-    max_tokens: hasSide ? 2400 : 2200,
+    // extended_metrics (30 more {score, descriptor} pairs) moved to its own
+    // call (getExtendedMetrics) — this budget only needs to cover the core
+    // fields + optional profile block now.
+    max_tokens: hasSide ? 1300 : 1100,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 Score face and grooming on a 1.0–10.0 scale.
 
-SCORE DISTRIBUTION — READ FIRST, applies to every 1.0–10.0 score in this prompt (face_score, pillars, sub_scores, face_metrics, extended_metrics):
+SCORE DISTRIBUTION — READ FIRST, applies to every 1.0–10.0 score in this prompt (face_score, pillars, sub_scores, face_metrics):
 Think of scores as a bell curve across the general population, not a curve of dating-app profile photos or influencers:
 - 5.0 is the TRUE MIDDLE — an average person you'd pass on the street, nothing notably attractive or unattractive about them. This is where MOST people land, not a "bad" score.
 - 3.0 — below-average on a given metric: e.g. weak/undefined jawline hidden by fat, visibly asymmetric features, noticeable acne. Common, not rare.
@@ -319,8 +325,81 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
+${profileSection}
+KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
-EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Same format as FACE METRICS: each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Scoring direction is consistent with every other metric in this prompt: 10.0 = the most aesthetically favorable outcome, 1.0 = the least, for every metric below (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
+TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
+
+Return ONLY this JSON — no markdown, nothing else:
+{
+  "face_score": <number 1.0–10.0>,
+  "grooming_score": <number 1.0–10.0>,
+  "facial_structure": "<soft/round|average|defined|strong>",
+  "hair_type": "<straight|wavy|curly|coily|locs|bald|unknown>",
+  "perceived_ethnicity": "<white|black|east_asian|south_asian|latino|middle_eastern|mixed>",
+  "pillars": {
+    "harmony": <number 1.0–10.0>,
+    "angularity": <number 1.0–10.0>,
+    "features": <number 1.0–10.0>,
+    "dimorphism": <number 1.0–10.0>
+  },
+  "sub_scores": {
+    "symmetry": <number 1.0–10.0>,
+    "jawline_definition": <number 1.0–10.0>,
+    "skin_clarity": <number 1.0–10.0>,
+    "facial_proportions": <number 1.0–10.0>,
+    "eye_area": <number 1.0–10.0>,
+    "facial_harmony": <number 1.0–10.0>
+  },
+  "key_strengths": ["<strength 1>", "<strength 2>"],
+  "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
+  "top_improvement": "<single most impactful improvement>",
+  "face_metrics": {
+    "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "symmetry":               { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "skin_quality":           { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "masculinity_femininity": { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
+    "facial_thirds":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
+  }${profileSchema}
+}`,
+    messages: [{
+      role: 'user',
+      content: hasSide ? [
+        { type: 'text',  text: 'Image 1 — front-facing photo:' },
+        { type: 'image', source: { type: 'base64', media_type: faceMediaType,  data: faceBase64  } },
+        { type: 'text',  text: 'Image 2 — side profile (right side):' },
+        { type: 'image', source: { type: 'base64', media_type: sideMediaType,  data: sideBase64  } },
+        { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face, grooming, and side profile. Return ONLY the JSON.` },
+      ] : [
+        { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
+        { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face and grooming. Return ONLY the JSON.` },
+      ],
+    }],
+  })
+
+  return parseJSON(response.content[0]?.text?.trim() || '', 'Core scorer')
+}
+
+// ── CALL: Extended Metrics — 30-metric breakdown, split out of the core call ──
+// Split off from getCoreScore purely for latency: this is the slow, deep
+// breakdown (Eyes/Lower Third/Midface/Upper Third/Miscellaneous) that isn't
+// needed for the user's headline score, so it runs as its own call the client
+// fires in parallel with (or right after) the core call and patches in once
+// it resolves — see /score/extended-metrics route below.
+async function getExtendedMetrics(faceBase64, faceMediaType, gender) {
+  const client = getClient()
+  const isFemale = gender === 'female'
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1400,
+    temperature: 0,
+    system: `You are a facial structure analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
+
+SCORE DISTRIBUTION — every score is 1.0–10.0, a bell curve across the general population: 5.0 = true average (most people), 3.0 = below average (common, not rare), 7.0 = above average (a real, achievable good score), 9.0 = genuinely exceptional (rare, top few percent). Use the full range — do not compress everyone into 6–8.
+
+EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
 
 eyes:
 - orbital_depth: depth-set vs. protruding position of the eye socket relative to the brow and cheekbone plane
@@ -363,43 +442,11 @@ miscellaneous:
 - bone_mass: overall robustness and density of visible facial bone structure
 
 CONFIDENCE ON HARD-TO-ASSESS METRICS: ramus and forehead_slope describe structures that are genuinely difficult to judge accurately from a single front-facing photo without a side profile — a front view mostly hides the jaw's vertical ramus segment and the forehead's true slope. Still provide your best visual estimate and a real score for both, but naturally flag the lower confidence in the descriptor text itself (e.g. "Likely average ramus height, hard to confirm without a side view" or "Forehead appears near-vertical from this angle, slope uncertain") rather than presenting either with the same false precision as metrics that are clearly visible head-on.
-${profileSection}
-KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
-TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
+This face is ${isFemale ? "a woman's" : "a man's"} — use ${isFemale ? 'feminine' : 'masculine'} framing where relevant (e.g. norwood_stage / hairline metrics still apply to both).
 
 Return ONLY this JSON — no markdown, nothing else:
 {
-  "face_score": <number 1.0–10.0>,
-  "grooming_score": <number 1.0–10.0>,
-  "facial_structure": "<soft/round|average|defined|strong>",
-  "hair_type": "<straight|wavy|curly|coily|locs|bald|unknown>",
-  "perceived_ethnicity": "<white|black|east_asian|south_asian|latino|middle_eastern|mixed>",
-  "pillars": {
-    "harmony": <number 1.0–10.0>,
-    "angularity": <number 1.0–10.0>,
-    "features": <number 1.0–10.0>,
-    "dimorphism": <number 1.0–10.0>
-  },
-  "sub_scores": {
-    "symmetry": <number 1.0–10.0>,
-    "jawline_definition": <number 1.0–10.0>,
-    "skin_clarity": <number 1.0–10.0>,
-    "facial_proportions": <number 1.0–10.0>,
-    "eye_area": <number 1.0–10.0>,
-    "facial_harmony": <number 1.0–10.0>
-  },
-  "key_strengths": ["<strength 1>", "<strength 2>"],
-  "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
-  "top_improvement": "<single most impactful improvement>",
-  "face_metrics": {
-    "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
-    "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
-    "symmetry":               { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
-    "skin_quality":           { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
-    "masculinity_femininity": { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
-    "facial_thirds":          { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
-  },
   "extended_metrics": {
     "eyes": {
       "orbital_depth":     { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
@@ -441,24 +488,79 @@ Return ONLY this JSON — no markdown, nothing else:
       "bloat":       { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
       "bone_mass":   { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" }
     }
-  }${profileSchema}
+  }
 }`,
     messages: [{
       role: 'user',
-      content: hasSide ? [
-        { type: 'text',  text: 'Image 1 — front-facing photo:' },
-        { type: 'image', source: { type: 'base64', media_type: faceMediaType,  data: faceBase64  } },
-        { type: 'text',  text: 'Image 2 — side profile (right side):' },
-        { type: 'image', source: { type: 'base64', media_type: sideMediaType,  data: sideBase64  } },
-        { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face, grooming, and side profile. Return ONLY the JSON.` },
-      ] : [
+      content: [
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
-        { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face and grooming. Return ONLY the JSON.` },
+        { type: 'text',  text: `Give the 30-metric extended breakdown for this ${gender === 'female' ? 'woman' : 'man'}'s face. Return ONLY the JSON.` },
       ],
     }],
   })
 
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Face scorer')
+  return parseJSON(response.content[0]?.text?.trim() || '', 'Extended metrics scorer')
+}
+
+// Shapes a raw extended_metrics object (snake_case keys, as returned by
+// getExtendedMetrics) into the camelCase shape the client expects. Shared by
+// the /score route (in case a cached combined result predates the split) and
+// the /score/extended-metrics route below, so the two never drift apart.
+function shapeExtendedMetrics(em) {
+  if (!em) return null
+  const r = (v) => v != null ? Math.round(Number(v) * 10) / 10 : null
+  const metric = (cat, key) => cat?.[key]?.score != null
+    ? { score: r(cat[key].score), descriptor: cat[key].descriptor ?? null }
+    : null
+  const category = (catKey, keyMap) => {
+    const cat = em[catKey]
+    if (!cat) return null
+    const out = {}
+    for (const [camel, snake] of Object.entries(keyMap)) out[camel] = metric(cat, snake)
+    return out
+  }
+  return {
+    eyes: category('eyes', {
+      orbitalDepth:    'orbital_depth',
+      canthalTilt:     'canthal_tilt',
+      eyebrowDensity:  'eyebrow_density',
+      eyelashDensity:  'eyelash_density',
+      eyelidExposure:  'eyelid_exposure',
+      underEyeHealth:  'under_eye_health',
+    }),
+    lowerThird: category('lower_third', {
+      lips:               'lips',
+      mandible:           'mandible',
+      gonialAngle:        'gonial_angle',
+      ramus:              'ramus',
+      hyoidSkinTightness: 'hyoid_skin_tightness',
+      jawWidth:           'jaw_width',
+    }),
+    midface: category('midface', {
+      cheekbones:  'cheekbones',
+      maxilla:     'maxilla',
+      nose:        'nose',
+      ipd:         'ipd',
+      fwhr:        'fwhr',
+      compactness: 'compactness',
+    }),
+    upperThird: category('upper_third', {
+      norwoodStage:        'norwood_stage',
+      foreheadProportion:  'forehead_proportion',
+      hairlineRecession:   'hairline_recession',
+      hairThinning:        'hair_thinning',
+      hairlineDensity:     'hairline_density',
+      foreheadSlope:       'forehead_slope',
+    }),
+    miscellaneous: category('miscellaneous', {
+      skin:      'skin',
+      harmony:   'harmony',
+      symmetry:  'symmetry',
+      neckWidth: 'neck_width',
+      bloat:     'bloat',
+      boneMass:  'bone_mass',
+    }),
+  }
 }
 
 // ── CALL 2: Physique Scoring (optional — only when bodyImage provided) ────────
@@ -655,7 +757,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
     const fullHash = computeFullHash(faceBase64, null, sideBase64)
+    const tL2Start = Date.now()
     const sbCached = await getScanCache(fullHash)
+    console.log(`[aiScore:TIMING] L2 Supabase cache lookup took ${Date.now() - tL2Start}ms`)
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
       if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
@@ -666,45 +770,62 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
     console.log('[aiScore] Inputs — gender:', gender, '| side:', sideBase64 ? 'YES' : 'NO', '| body:', bodyBase64 ? 'YES' : 'NO')
 
+    const tRouteStart = Date.now()
+
     // Acquire concurrency slot only now — cache hits above never need it
+    const tSlotWaitStart = Date.now()
     await acquireSlot()
+    console.log(`[aiScore:TIMING] slot acquire wait: ${Date.now() - tSlotWaitStart}ms`)
     let faceResult, physiqueResult = null, computedScores
 
     try {
-      // ── STEP 1: Face scoring (REQUIRED) ──────────────────────────────────────
-      // This is the only step that can produce a hard failure. If it throws,
-      // we re-throw so the outer catch returns a 500 to the client.
+      // ── STEP 1 + STEP 3 in parallel — Face (REQUIRED) + Physique (OPTIONAL) ──
+      // Physique has zero data dependency on the face result, so both calls
+      // fire at once instead of face-then-physique. Face failure must still
+      // hard-fail the whole request; physique failure must stay non-fatal
+      // (fall back to face-only) — so physique's promise is caught internally
+      // and resolves to null rather than rejecting, while face's promise is
+      // left to reject naturally into the outer catch below.
       console.log('[aiScore] STEP 1 — Face scoring...')
-      try {
-        faceResult = await withRetry(
-          () => getFaceScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry),
-          'face'
-        )
-        console.log('[aiScore] STEP 1 OK — face_score:', faceResult.face_score, '| structure:', faceResult.facial_structure, '| grooming:', faceResult.grooming_score)
-      } catch (faceErr) {
+      const tFaceStart = Date.now()
+      const facePromise = withRetry(
+        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry),
+        'face'
+      ).then(result => {
+        console.log(`[aiScore:TIMING] STEP 1 (face) took ${Date.now() - tFaceStart}ms`)
+        console.log('[aiScore] STEP 1 OK — face_score:', result.face_score, '| structure:', result.facial_structure, '| grooming:', result.grooming_score)
+        return result
+      }).catch(faceErr => {
+        console.log(`[aiScore:TIMING] STEP 1 (face) FAILED after ${Date.now() - tFaceStart}ms`)
         console.error(`[aiScore] STEP 1 FAILED — face scoring threw: "${faceErr.message}" | userId=${req.userId} gender=${gender} hasSide=${!!sideBase64}`)
         throw faceErr  // only face failure escalates to a full error response
-      }
+      })
 
-      // ── STEP 3: Physique scoring (OPTIONAL) ───────────────────────────────────
       console.log('[aiScore] STEP 3 — Physique scoring...')
-      if (bodyBase64) {
-        try {
-          physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique')
-          console.log('[aiScore] STEP 3 OK — physique overall:', physiqueResult.overall)
-        } catch (physiqueErr) {
-          console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueErr.message}" | userId=${req.userId} gender=${gender}`)
-          physiqueResult = null
-        }
-      } else {
-        console.log('[aiScore] STEP 3 — no body photo, skipped')
-      }
+      const tPhysiqueStart = Date.now()
+      const physiquePromise = bodyBase64
+        ? withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique')
+            .then(result => {
+              console.log(`[aiScore:TIMING] STEP 3 (physique) took ${Date.now() - tPhysiqueStart}ms`)
+              console.log('[aiScore] STEP 3 OK — physique overall:', result.overall)
+              return result
+            })
+            .catch(physiqueErr => {
+              console.log(`[aiScore:TIMING] STEP 3 (physique) FAILED after ${Date.now() - tPhysiqueStart}ms`)
+              console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueErr.message}" | userId=${req.userId} gender=${gender}`)
+              return null
+            })
+        : (console.log('[aiScore] STEP 3 — no body photo, skipped'), Promise.resolve(null))
+
+      ;[faceResult, physiqueResult] = await Promise.all([facePromise, physiquePromise])
 
       // ── STEP 4: Overall score calculation ─────────────────────────────────────
       // If calculation throws with physique data, retry without it before failing.
       console.log('[aiScore] STEP 4 — Calculating final score...')
+      const tCalcStart = Date.now()
       try {
         computedScores = calculateFinalScore(faceResult, gender, physiqueResult)
+        console.log(`[aiScore:TIMING] STEP 4 (calc) took ${Date.now() - tCalcStart}ms`)
       } catch (calcErr) {
         console.error(`[aiScore] STEP 4 FAILED with physique — retrying face-only: "${calcErr.message}" | physiqueResult=${JSON.stringify(physiqueResult)}`)
         computedScores = calculateFinalScore(faceResult, gender, null)
@@ -713,6 +834,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       }
     } finally {
       releaseSlot()
+      console.log(`[aiScore:TIMING] TOTAL pipeline (post-cache-check) took ${Date.now() - tRouteStart}ms`)
     }
 
     // Final score: pure code — no AI involvement (computedScores already calculated above)
@@ -786,62 +908,12 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
           facialThirds:          metric('facial_thirds'),
         }
       })(),
-      extendedMetrics: (() => {
-        const em = faceResult.extended_metrics
-        if (!em) return null
-        const metric = (cat, key) => cat?.[key]?.score != null
-          ? { score: r(cat[key].score), descriptor: cat[key].descriptor ?? null }
-          : null
-        const category = (catKey, keyMap) => {
-          const cat = em[catKey]
-          if (!cat) return null
-          const out = {}
-          for (const [camel, snake] of Object.entries(keyMap)) out[camel] = metric(cat, snake)
-          return out
-        }
-        return {
-          eyes: category('eyes', {
-            orbitalDepth:    'orbital_depth',
-            canthalTilt:     'canthal_tilt',
-            eyebrowDensity:  'eyebrow_density',
-            eyelashDensity:  'eyelash_density',
-            eyelidExposure:  'eyelid_exposure',
-            underEyeHealth:  'under_eye_health',
-          }),
-          lowerThird: category('lower_third', {
-            lips:               'lips',
-            mandible:           'mandible',
-            gonialAngle:        'gonial_angle',
-            ramus:              'ramus',
-            hyoidSkinTightness: 'hyoid_skin_tightness',
-            jawWidth:           'jaw_width',
-          }),
-          midface: category('midface', {
-            cheekbones:  'cheekbones',
-            maxilla:     'maxilla',
-            nose:        'nose',
-            ipd:         'ipd',
-            fwhr:        'fwhr',
-            compactness: 'compactness',
-          }),
-          upperThird: category('upper_third', {
-            norwoodStage:        'norwood_stage',
-            foreheadProportion:  'forehead_proportion',
-            hairlineRecession:   'hairline_recession',
-            hairThinning:        'hair_thinning',
-            hairlineDensity:     'hairline_density',
-            foreheadSlope:       'forehead_slope',
-          }),
-          miscellaneous: category('miscellaneous', {
-            skin:      'skin',
-            harmony:   'harmony',
-            symmetry:  'symmetry',
-            neckWidth: 'neck_width',
-            bloat:     'bloat',
-            boneMass:  'bone_mass',
-          }),
-        }
-      })(),
+      // extended_metrics no longer comes from the core call — it's fetched
+      // separately via POST /score/extended-metrics so the core result isn't
+      // held up waiting on it. 'pending' tells the client to fire that
+      // follow-up call and patch the result in once it resolves.
+      extendedMetrics: null,
+      extendedMetricsStatus: 'pending',
       // Side profile — null when no side photo was provided
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,
@@ -951,6 +1023,90 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       lower.includes('too many')
 
     console.error(`[aiScore:physique-only] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
+
+    if (isRateLimit) {
+      return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
+    }
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+// ── POST /api/ai/score/extended-metrics ───────────────────────────────────────
+// The 30-metric breakdown, split out of the core /score call purely for
+// latency (see getExtendedMetrics above) — the client fires this in parallel
+// with (or right after) /score and patches the result in once it resolves.
+// Not gated by scanLimit (that's for full scans) — only claudeLimit, same as
+// /score/physique, since this is a single follow-up Claude call, not a scan.
+router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey || apiKey.trim() === '') {
+      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+    }
+
+    const { faceImage, gender = 'male' } = req.body
+    if (!faceImage) {
+      return res.status(400).json({ error: 'Face image is required' })
+    }
+
+    const faceMediaType = getMediaType(faceImage)
+    const faceBase64    = stripPrefix(faceImage)
+
+    // Same two-tier cache as /score, namespaced with an 'EXTENDED' marker so
+    // these keys never collide with the core-score cache for the same photo.
+    const cacheKey = hashImages(faceBase64, 'EXTENDED_METRICS_v1', null)
+    if (scoreCache.has(cacheKey)) {
+      console.log('[aiScore:extended] L1 cache hit:', cacheKey)
+      return res.json(scoreCache.get(cacheKey))
+    }
+    const fullHash = computeFullHash(faceBase64, 'EXTENDED_METRICS_v1', null)
+    const sbCached = await getScanCache(fullHash)
+    if (sbCached) {
+      console.log('[aiScore:extended] L2 Supabase cache hit:', fullHash.slice(0, 16))
+      if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
+      scoreCache.set(cacheKey, sbCached)
+      return res.json(sbCached)
+    }
+
+    console.log('[aiScore:extended] Inputs — gender:', gender)
+
+    await acquireSlot()
+    let extendedRaw
+    const tStart = Date.now()
+    try {
+      extendedRaw = await withRetry(() => getExtendedMetrics(faceBase64, faceMediaType, gender), 'extended-metrics')
+      console.log(`[aiScore:TIMING] extended-metrics call took ${Date.now() - tStart}ms`)
+    } finally {
+      releaseSlot()
+    }
+
+    const result = { extendedMetrics: shapeExtendedMetrics(extendedRaw.extended_metrics) }
+
+    if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
+    scoreCache.set(cacheKey, result)
+    try {
+      setScanCache(fullHash, result).then(() => {
+        console.log('[aiScore:extended] L2 Supabase cache written:', fullHash.slice(0, 16))
+      }).catch(err => {
+        console.warn('[aiScore:extended] L2 Supabase cache write failed (non-fatal):', err.message)
+      })
+    } catch (e) {
+      console.warn('[aiScore:extended] L2 cache call error (non-fatal):', e.message)
+    }
+
+    res.json(result)
+  } catch (err) {
+    const status = err.status ?? err.statusCode ?? 0
+    const msg    = err.message || ''
+    const lower  = msg.toLowerCase()
+    const isRateLimit =
+      status === 429 || status === 529 || err.retryExhausted ||
+      lower.includes('quota') || lower.includes('rate limit') ||
+      lower.includes('rate_limit') || lower.includes('exceeded') ||
+      lower.includes('overloaded') || lower.includes('capacity') ||
+      lower.includes('too many')
+
+    console.error(`[aiScore:extended] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
 
     if (isRateLimit) {
       return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })

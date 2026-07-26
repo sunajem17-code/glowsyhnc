@@ -18,13 +18,23 @@ const SLIDE_VARIANTS = {
   exit: (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual }) {
+// visualClassName lets a specific card opt out of the default flex-1
+// fill (which stretches the box to eat all leftover vertical space in the
+// h-full column) in favor of a fixed aspect ratio instead — only
+// BeginScanCard's grid/camera visual currently does this; PastResultCard's
+// photo and BodyCard's visual still want to fill the available height, so
+// they're untouched by leaving this prop at its default. justify-center on
+// the outer column is inert for those two (their flex-1 box already
+// consumes all the space, leaving nothing to redistribute) but centers
+// BeginScanCard's now-shorter box+text+button group in the freed-up space
+// instead of leaving it pinned to the top with a dead gap at the bottom.
+function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, visualClassName = 'flex-1' }) {
   return (
     <div
-      className="flex flex-col h-full px-6 pb-4"
+      className="flex flex-col justify-center h-full px-6 pb-4"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
     >
-      <div className="relative flex-1 rounded-2xl overflow-hidden mb-5" style={{ background: '#000' }}>
+      <div className={`relative rounded-2xl overflow-hidden mb-5 ${visualClassName}`} style={{ background: '#000' }}>
         {visual}
       </div>
       <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1.5" style={{ color: GOLD }}>
@@ -57,6 +67,7 @@ function BeginScanCard({ onBegin }) {
       cta="Start Your Scan"
       icon={Sparkles}
       onAction={onBegin}
+      visualClassName="aspect-[4/5] flex-shrink-0"
       visual={
         <>
           {/* Icon renders first so FaceScanOverlay (rendered after, below)

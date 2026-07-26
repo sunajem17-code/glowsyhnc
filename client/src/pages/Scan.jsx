@@ -676,54 +676,272 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
 
 // ─── Analyzing Screen ─────────────────────────────────────────────────────────
 
-export function AnalyzingScreen({ currentStep, slow }) {
+// Rotates through a few distinct-sounding status lines instead of one frozen
+// line. Purely presentational — timer-driven, NOT tied to real backend
+// progress (the core-score call gives no granular progress events, so this
+// deliberately never claims a percentage). Loops continuously so it still
+// feels alive if the real result takes longer than one full cycle.
+const ANALYZING_MESSAGES = [
+  'Analyzing facial features...',
+  'Measuring symmetry...',
+  'Reading skin texture...',
+  'Mapping bone structure...',
+  'Evaluating proportions...',
+  'Cross-referencing your profile...',
+]
+
+function useRotatingIndex(length, intervalMs) {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setIndex(i => (i + 1) % length), intervalMs)
+    return () => clearInterval(id)
+  }, [length, intervalMs])
+  return index
+}
+
+// Same 5 real facial regions/vertical positions established in the prior
+// label work (cy% top to bottom on the photo) — now used as lookup bands for
+// a horizontal sweep line's position instead of driving a separate timer.
+const SWEEP_FEATURE_ROWS = [22, 38, 54, 70, 86]
+const SWEEP_FEATURE_LABELS = ['Scanning forehead', 'Scanning eye symmetry', 'Scanning nose bridge', 'Scanning jawline', 'Scanning chin']
+// Midpoints between adjacent rows above — the band boundaries the sweep
+// line's live percentage position is tested against.
+const SWEEP_BAND_THRESHOLDS = [30, 46, 62, 78]
+// One-way top-to-bottom pass; the line bounces (reverses), so a full cycle
+// is 2x this. ~3 bounce cycles fit inside the real ~17s core-score wait.
+const SWEEP_ONE_WAY_MS = 2800
+
+function bandForSweepPct(pct) {
+  for (let i = 0; i < SWEEP_BAND_THRESHOLDS.length; i++) {
+    if (pct < SWEEP_BAND_THRESHOLDS[i]) return i
+  }
+  return SWEEP_FEATURE_ROWS.length - 1
+}
+
+// Derives which feature band the sweep line currently occupies from the same
+// elapsed-time/duration math driving the line's own animation below (not an
+// independent guess at timing) — polled at a coarse interval since the label
+// only needs to update on a band change, not every frame.
+function useSweepBand() {
+  const [band, setBand] = useState(0)
+  const bandRef = useRef(0)
+  useEffect(() => {
+    const start = performance.now()
+    const id = setInterval(() => {
+      const elapsed = performance.now() - start
+      const cycle = SWEEP_ONE_WAY_MS * 2
+      const t = elapsed % cycle
+      const pct = t < SWEEP_ONE_WAY_MS
+        ? (t / SWEEP_ONE_WAY_MS) * 100
+        : 100 - ((t - SWEEP_ONE_WAY_MS) / SWEEP_ONE_WAY_MS) * 100
+      const next = bandForSweepPct(pct)
+      if (next !== bandRef.current) {
+        bandRef.current = next
+        setBand(next)
+      }
+    }, 120)
+    return () => clearInterval(id)
+  }, [])
+  return band
+}
+
+// Dot positions computed once at module scope, each tagged with its row
+// index so it can reference that row's keyframe (below) by name.
+const SWEEP_DOTS = SWEEP_FEATURE_ROWS.flatMap((cy, row) => [35, 50, 65].map(cx => ({ cx, cy, row })))
+const SWEEP_FULL_CYCLE_S = (SWEEP_ONE_WAY_MS * 2) / 1000
+
+// Plain CSS @keyframes for the line + one per dot row, injected once via a
+// <style> tag — deliberately NOT driven by Framer Motion's `animate` prop.
+// Framer Motion's JS-level animation engine defers to the OS
+// prefers-reduced-motion setting (same as this app's existing FaceScanOverlay,
+// which freezes identically under it despite its own reducedMotion="never"
+// override), which would leave this whole effect static for anyone with
+// Reduce Motion on. A plain CSS animation isn't gated by that check unless a
+// `@media (prefers-reduced-motion: reduce)` rule explicitly disables it here
+// — which this deliberately does not do, since the effect is purely
+// decorative and conveys no information the label text doesn't already say.
+const SWEEP_KEYFRAMES_CSS = `
+@keyframes ascendus-sweep-line {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+${SWEEP_FEATURE_ROWS.map((cy, row) => {
+  const downPct = (cy / 200) * 100
+  const upPct = (1 - cy / 200) * 100
+  const eps = 2.5
+  const d0 = Math.max(0, downPct - eps).toFixed(2)
+  const d1 = downPct.toFixed(2)
+  const d2 = Math.min(100, downPct + eps).toFixed(2)
+  const u0 = Math.max(0, upPct - eps).toFixed(2)
+  const u1 = upPct.toFixed(2)
+  const u2 = Math.min(100, upPct + eps).toFixed(2)
+  return `
+@keyframes ascendus-sweep-dot-${row} {
+  0% { opacity: 0.2; }
+  ${d0}% { opacity: 0.2; }
+  ${d1}% { opacity: 1; }
+  ${d2}% { opacity: 0.2; }
+  ${u0}% { opacity: 0.2; }
+  ${u1}% { opacity: 1; }
+  ${u2}% { opacity: 0.2; }
+  100% { opacity: 0.2; }
+}`
+}).join('\n')}
+`
+
+// A dim landmark dot that briefly brightens as the sweep line's position
+// crosses it — on both the downward AND the return upward pass, via its
+// row's CSS keyframe. Extra feedback only — the sweep line is the main effect.
+function SweepFeatureDot({ cx, cy, row }) {
+  return (
+    <circle
+      cx={cx} cy={cy} r={0.6}
+      fill={GOLD}
+      style={{ animation: `ascendus-sweep-dot-${row} ${SWEEP_FULL_CYCLE_S}s ease-in-out infinite` }}
+    />
+  )
+}
+
+function SweepLine() {
+  return (
+    <div
+      className="absolute left-0 right-0"
+      style={{
+        height: 2,
+        background: GOLD,
+        boxShadow: `0 0 16px 3px ${GOLD}, 0 0 4px 1px ${GOLD}`,
+        animation: `ascendus-sweep-line ${SWEEP_FULL_CYCLE_S}s ease-in-out infinite`,
+      }}
+    />
+  )
+}
+
+// The user's real captured photo with a glowing horizontal line sweeping
+// top<->bottom (document-scanner style) — replaces the dot-mesh/on-photo-
+// label and checklist-thumbnail versions entirely. Purely timer/animation
+// driven, not tied to real backend progress; the label crossfades in a fixed
+// spot at the bottom of the photo as the line's position crosses each
+// feature's band, derived from the same duration as the line itself.
+function AnalyzingSweepOverlay({ photo }) {
+  const band = useSweepBand()
+
+  return (
+    <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ aspectRatio: '4/5', background: '#0a0a0a' }}>
+      <style>{SWEEP_KEYFRAMES_CSS}</style>
+      {photo && (
+        <img
+          src={photo}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ filter: 'brightness(0.5) saturate(0.85)' }}
+        />
+      )}
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
+      />
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {SWEEP_DOTS.map((d, i) => <SweepFeatureDot key={i} cx={d.cx} cy={d.cy} row={d.row} />)}
+      </svg>
+      <SweepLine />
+      <div className="absolute left-0 right-0 bottom-3 flex justify-center px-3">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={band}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25 }}
+            className="font-heading font-bold text-[11px] tracking-wide px-2.5 py-1 rounded-md"
+            style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${GOLD}55`, color: GOLD }}
+          >
+            {SWEEP_FEATURE_LABELS[band]}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+export function AnalyzingScreen({ currentStep, slow, photo }) {
+  const msgIndex = useRotatingIndex(ANALYZING_MESSAGES.length, 2800)
+
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <div className="relative w-28 h-28 mb-8">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
-          className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#C6A85C] border-r-[#C6A85C]/40" />
-        <motion.div animate={{ rotate: -360 }} transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
-          className="absolute inset-3 rounded-full border-transparent" style={{ borderWidth: 3, borderStyle: 'solid', borderTopColor: 'rgba(245,166,35,0.7)' }} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <motion.span key={currentStep} initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center justify-center">
-            {(() => { const S = ANALYSIS_STEPS[currentStep]?.Icon ?? Zap; return <S size={24} style={{ color: '#C6A85C' }} />; })()}
-          </motion.span>
-        </div>
-      </div>
+      <AnalyzingSweepOverlay photo={photo} />
 
       <AnimatePresence mode="wait">
         {slow ? (
-          <motion.div key="slow" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="mb-6 text-center">
-            <h2 className="font-heading font-bold text-xl text-primary mb-1">Almost there…</h2>
-            <p className="text-xs font-body" style={{ color: '#C6A85C' }}>Finalizing your full analysis</p>
-          </motion.div>
+          <motion.h2 key="slow" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="font-heading font-bold text-xl text-primary mb-1">
+            Almost there…
+          </motion.h2>
         ) : (
-          <motion.div key="normal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="mb-6 text-center">
-            <h2 className="font-heading font-bold text-xl text-primary mb-1">Analyzing…</h2>
-            <p className="text-xs text-secondary font-body">Calculating your Overall Rating</p>
-          </motion.div>
+          <motion.h2 key="normal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="font-heading font-bold text-xl text-primary mb-1">
+            Analyzing…
+          </motion.h2>
         )}
       </AnimatePresence>
 
+      <div className="h-5 mb-6 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          <motion.p key={msgIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.3 }}
+            className="text-xs font-body"
+            style={{ color: slow ? GOLD : 'var(--text-secondary)' }}
+          >
+            {ANALYZING_MESSAGES[msgIndex]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
       <div className="w-full space-y-2.5">
         {ANALYSIS_STEPS.map((s, i) => (
-          <motion.div key={i} initial={{ opacity: 0, x: -16 }} animate={{ opacity: i <= currentStep ? 1 : 0.3, x: 0 }} transition={{ delay: i * 0.08 }} className="flex items-center gap-3">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-              i < currentStep ? 'bg-[#C6A85C]' : i === currentStep ? 'bg-[#F5A623]' : 'bg-gray-200 dark:bg-gray-700'
-            }`}>
-              {i < currentStep ? <CheckCircle2 size={11} className="text-white" /> :
-               i === currentStep ? <Loader2 size={10} className="text-white animate-spin" /> :
-               <div className="w-1.5 h-1.5 rounded-full bg-white/40" />}
-            </div>
-            <span className={`text-sm font-body ${i <= currentStep ? 'text-primary' : 'text-secondary'}`}>
-              {s.label}{i < currentStep ? ' ✓' : ''}
-            </span>
-          </motion.div>
+          <ChecklistRow key={i} step={s} i={i} currentStep={currentStep} />
         ))}
       </div>
     </div>
+  )
+}
+
+function ChecklistRow({ step: s, i, currentStep }) {
+  const isDone = i < currentStep
+  const isActive = i === currentStep
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: i <= currentStep ? 1 : 0.3, x: 0 }}
+      transition={{ delay: i * 0.08 }}
+      className="flex items-center gap-3"
+    >
+      <motion.div
+        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+        animate={isDone ? { rotate: [0, 360], scale: [0.6, 1] } : {}}
+        transition={{ duration: 0.5, ease: 'backOut' }}
+        style={{ background: isDone ? GOLD : isActive ? '#F5A623' : 'rgba(255,255,255,0.08)' }}
+      >
+        {isDone ? <CheckCircle2 size={11} className="text-white" /> :
+         isActive ? <div className="w-1.5 h-1.5 rounded-full bg-white/70" /> :
+         <div className="w-1.5 h-1.5 rounded-full bg-white/25" />}
+      </motion.div>
+      {isActive ? (
+        <span className="text-sm font-body relative overflow-hidden text-primary">
+          {s.label}
+          <motion.span
+            className="absolute inset-0"
+            animate={{ x: ['-100%', '200%'] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(198,168,92,0.9), transparent)', mixBlendMode: 'overlay', width: '50%' }}
+          />
+        </span>
+      ) : (
+        <span className={`text-sm font-body ${isDone ? 'text-primary' : 'text-secondary'}`}>
+          {s.label}
+        </span>
+      )}
+    </motion.div>
   )
 }
 
@@ -749,6 +967,7 @@ export default function Scan() {
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
   const addScan           = useStore(s => s.addScan)
   const setCurrentScan    = useStore(s => s.setCurrentScan)
+  const patchScanExtendedMetrics = useStore(s => s.patchScanExtendedMetrics)
   const setCurrentPlan    = useStore(s => s.setCurrentPlan)
   const setGender         = useStore(s => s.setGender)
   const incrementScanCount = useStore(s => s.incrementScanCount)
@@ -1060,6 +1279,10 @@ export default function Scan() {
         },
         pillars:          aiResult.pillars         ?? null,
         extendedMetrics:  aiResult.extendedMetrics ?? null,
+        // 'pending' when the core call split extended metrics into their own
+        // follow-up request (see below); absent/undefined for demo/ARKit
+        // scans, which never produce extended metrics at all.
+        extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
         physiqueScore:    aiResult.physiqueScore    ?? null,
         bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
         // ARKit live scan geometry — present when user used TrueDepth face scan
@@ -1079,6 +1302,23 @@ export default function Scan() {
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
+
+      // Extended metrics (30-metric breakdown) fill in a few seconds after
+      // the core result — split out server-side purely for latency (core
+      // call ~18s vs ~35s combined). Fire the follow-up now, non-blocking;
+      // CategoryCard reads scan.extendedMetrics/.extendedMetricsStatus
+      // directly from the store, so this patch alone is enough to update it
+      // wherever it's rendered (ScanUnlockGate, StepScoresWaiting) once it lands.
+      if (faceB64 && scanRecord.extendedMetricsStatus === 'pending') {
+        api.ai.scoreExtendedMetrics({ faceImage: faceB64, gender: g })
+          .then(({ extendedMetrics }) => {
+            patchScanExtendedMetrics(scanRecord.id, extendedMetrics, 'ready')
+          })
+          .catch(err => {
+            console.warn('[Scan] Extended metrics follow-up failed (non-fatal):', err?.message)
+            patchScanExtendedMetrics(scanRecord.id, null, 'failed')
+          })
+      }
 
       // Persist to Supabase (non-blocking). Upload the real scan photo to
       // Supabase Storage first (private 'scan-images' bucket, already wired
@@ -1284,8 +1524,8 @@ export default function Scan() {
             </motion.div>
           )}
           {isAnalyzing && (
-            <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} />
+            <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto || lastFaceScanImage} />
             </motion.div>
           )}
         </AnimatePresence>

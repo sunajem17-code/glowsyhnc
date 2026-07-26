@@ -141,6 +141,11 @@ export const EXTENDED_CATEGORIES = [
 
 export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
   const data = scan?.extendedMetrics?.[categoryKey] ?? {}
+  // Extended metrics now arrive a few seconds after the core score via a
+  // separate follow-up call (see Scan.jsx/PremiumOnboarding.jsx) — while it's
+  // in flight, tiles show a pulsing placeholder instead of a bare "—", so
+  // this reads as "still loading" rather than "no data available".
+  const isPending = scan?.extendedMetricsStatus === 'pending'
 
   const tiles = metrics.map(({ key, label }) => {
     const score = data[key]?.score ?? null
@@ -165,22 +170,40 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
               {label}
             </span>
             <div className="flex items-center justify-between mb-2">
-              <BlurLock size="sm">
-                <div className="flex items-end gap-0.5">
-                  <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
-                  {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                </div>
-              </BlurLock>
+              {isPending && value === '—' ? (
+                <motion.div
+                  className="h-[22px] w-12 rounded-md"
+                  style={{ background: 'rgba(198,168,92,0.15)' }}
+                  animate={{ opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+              ) : (
+                <BlurLock size="sm">
+                  <div className="flex items-end gap-0.5">
+                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+                  </div>
+                </BlurLock>
+              )}
               <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
             </div>
             <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                initial={{ width: 0 }}
-                animate={{ width: `${pct}%` }}
-                transition={{ duration: 0.9, ease: EASE_STANDARD }}
-              />
+              {isPending && pct === 0 ? (
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+              ) : (
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                />
+              )}
             </div>
           </div>
         ))}
