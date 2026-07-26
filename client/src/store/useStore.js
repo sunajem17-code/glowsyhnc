@@ -67,17 +67,6 @@ const useStore = create(
         lastFaceScanLandmarks2D: landmarks2D,
       }),
 
-      // Patches celebrity-match data onto an already-saved scan once
-      // POST /score/enrich resolves — updates both currentScan and the
-      // matching entry in scans[] so it's correct whether the user is still
-      // on the results screen or navigates away and back later.
-      patchScanEnrichment: (scanId, patch) => set(state => ({
-        currentScan: state.currentScan?.id === scanId
-          ? { ...state.currentScan, ...patch }
-          : state.currentScan,
-        scans: state.scans.map(s => s.id === scanId ? { ...s, ...patch } : s),
-      })),
-
       // Action Plan
       currentPlan: null,
       setCurrentPlan: (plan) => set({ currentPlan: plan }),

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Check, Loader2, ChevronRight, ChevronDown, Zap, Trophy, Eye, BarChart2, Lock } from 'lucide-react'
+import { Star, Sparkles, Check, Loader2, ChevronRight, ChevronDown, Zap, Trophy, BarChart2, Lock } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
@@ -476,7 +476,6 @@ export function StepPaywall({ onUnlocked, onSkip }) {
 
   const benefits = [
     { icon: Trophy, text: 'Full AI Glow Score + face breakdown' },
-    { icon: Eye, text: 'Celebrity lookalike matches' },
     { icon: Zap, text: 'Personalized 12-week glow-up plan' },
     { icon: BarChart2, text: 'AI improvement coach & weekly check-ins' },
   ]

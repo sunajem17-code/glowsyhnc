@@ -28,7 +28,7 @@ export default function Referral() {
   const [copied, setCopied] = useState(false)
   const [trialStarted, setTrialStarted] = useState(proTrialActive)
 
-  const shareText = `I've been using Ascendus to level up my looks — it gives you an AI Glow Score, custom plan & celebrity matches. Try it free 👇\n${link}`
+  const shareText = `I've been using Ascendus to level up my looks — it gives you an AI Glow Score and a custom plan. Try it free 👇\n${link}`
 
   function copyLink() {
     navigator.clipboard.writeText(link).then(() => {

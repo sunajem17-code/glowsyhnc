@@ -379,7 +379,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
           className="font-body text-[15px] leading-relaxed mb-5"
           style={{ color: DIM }}
         >
-          Brutally accurate AI scoring, celebrity matches,<br />and a 12-week plan built for you.
+          Brutally accurate AI scoring<br />and a 12-week plan built for you.
         </motion.p>
 
         {/* Urgency badge */}
@@ -1411,7 +1411,6 @@ function StepScanCapture({ gender, onDone, onBack }) {
         },
         pillars:          aiResult.pillars          ?? null,
         extendedMetrics:  aiResult.extendedMetrics  ?? null,
-        celebrityMatches: aiResult.celebrityMatches ?? null,
         physiqueScore:    null,
         bodyFatLevel:     null,
       }

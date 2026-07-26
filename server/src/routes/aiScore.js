@@ -1,21 +1,9 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
-const { RekognitionClient, RecognizeCelebritiesCommand } = require('@aws-sdk/client-rekognition')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
 const { getTier } = require('../lib/tier')
-
-// ── AWS Rekognition client ────────────────────────────────────────────────────
-function getRekognitionClient() {
-  return new RekognitionClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-  })
-}
 
 const router = express.Router()
 
@@ -28,19 +16,6 @@ const scoreCache = new Map()
 // Force-clear cache on every deploy so stale bad-key entries can't persist
 // (cache is in-memory only anyway — this is a no-op on fresh process starts)
 scoreCache.clear()
-
-// ── Celebrity cache: hash(face+gender) → celebrity match result ────────────────
-// Separate from scoreCache since celebrity match is now resolved by a later,
-// independent request (POST /score/enrich) — see that route below.
-const celebCache = new Map()
-celebCache.clear()
-
-function hashFaceForCeleb(faceB64, gender) {
-  return crypto.createHash('sha256')
-    .update(sampleB64(faceB64) + '||gender=' + gender)
-    .digest('hex')
-    .slice(0, 24)
-}
 
 function sampleB64(s) {
   if (!s) return 'null'
@@ -580,169 +555,6 @@ Return ONLY this JSON — no markdown, nothing else:
   }
 }
 
-// ── Rekognition: call RecognizeCelebrities, return raw CelebrityFaces array ──
-async function rekognizeImage(faceBase64) {
-  const client  = getRekognitionClient()
-  const bytes   = Buffer.from(faceBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-  const cmd     = new RecognizeCelebritiesCommand({ Image: { Bytes: bytes } })
-
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Rekognition timed out after 10s')), 10_000)
-  )
-  const resp = await Promise.race([client.send(cmd), timeout])
-  return resp.CelebrityFaces ?? []
-}
-
-const NO_MATCH = { celebrity: 'No close match found', profession: null, similarity: 0, shared_traits: 'No celebrity match detected' }
-
-// Claude occasionally wraps "no markdown" JSON responses in a ```json fence anyway.
-function stripJsonFence(text) {
-  return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
-}
-
-// ── Claude two-call celebrity fallback ───────────────────────────────────────
-// Call A: vision — extract physical face descriptors (no celebrity names)
-// Call B: text   — match descriptors against pool candidates
-async function getCelebrityMatchClaude(faceBase64) {
-  const client = getClient()
-
-  // ── Call A: face descriptor extraction ──────────────────────────────────────
-  const base64Data = faceBase64.replace(/^data:image\/\w+;base64,/, '')
-  const mediaType  = faceBase64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg'
-
-  let faceDescriptors
-  try {
-    const callA = await withRetry(() => client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      system: 'You are a facial structure analyst. Output ONLY valid JSON with no markdown, no explanations, no celebrity names. Describe the physical structure of the face shown using objective anatomical terms.',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64Data },
-          },
-          {
-            type: 'text',
-            text: 'Describe this face\'s physical structure. Output ONLY a JSON object with these keys: faceShape, jawType, browType, noseType, eyeShape, lipFullness, cheekbones, skinTone, hairTexture, gender. Use concise descriptive values for the structural keys (e.g. "square", "angular", "deep-set", "olive"). For gender, output ONLY "male" or "female" based on the visible facial structure. No celebrity names. No commentary.',
-          },
-        ],
-      }],
-    }), 'claude-celeb-A')
-
-    faceDescriptors = JSON.parse(stripJsonFence(callA.content[0].text))
-    console.log('[CELEB][tier=claude-fallback] Call A descriptors:', JSON.stringify(faceDescriptors))
-  } catch (err) {
-    console.error('[CELEB][tier=claude-fallback] Call A failed:', err.message)
-    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
-  }
-
-  // ── Call B: name real public figures matching the descriptors (no candidate pool) ──
-  try {
-    const callB = await withRetry(() => client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: `You are a celebrity lookalike matcher. Based on the facial descriptors provided, name 1 to 3 real, well-known public figures (mainstream celebrities, professional models, popular Twitch/YouTube streamers, or TikTok influencers with at least 500k followers) whose face shape and features most closely resemble the description. Only name real people you are confident actually exist and are genuinely publicly known — never invent a name or guess at an obscure/private individual. Match based ONLY on shared physical features (face shape, jaw, cheekbones, brow, nose, eyes, lips). NEVER use ethnicity, race, or fame level as a shortcut. For each match, include a confidence field: 'high' if you are certain this is a real, verifiable public figure, or 'low' if you are at all uncertain of the name or their public profile. Output ONLY valid JSON — no markdown, no explanations.`,
-      messages: [{
-        role: 'user',
-        content: `Face descriptors:\n${JSON.stringify(faceDescriptors, null, 2)}\n\nName 1 to 3 real, well-known public figures whose face most closely matches these descriptors. Output ONLY a JSON array of objects, each with: celebrity (string, the person's real name), category (string — one of "mainstream_celebrity", "model", "streamer", "tiktok_influencer"), matchStrength ("strong" or "moderate"), confidence ("high" or "low"), shared_traits (one sentence referencing specific physical features from the descriptors). Example: [{"celebrity":"Henry Cavill","category":"mainstream_celebrity","matchStrength":"strong","confidence":"high","shared_traits":"Shares a square jaw, defined cheekbones, and deep-set eyes."}]`,
-      }],
-    }), 'claude-celeb-B')
-
-    let matches = JSON.parse(stripJsonFence(callB.content[0].text))
-    if (!Array.isArray(matches)) matches = [matches]
-    matches = matches.slice(0, 3)
-    console.log(`[CELEB][tier=claude-fallback] Call B matches: ${matches.map(m => `${m.celebrity} (${m.confidence})`).join(', ')}`)
-
-    // Drop any match Claude itself flagged as low-confidence rather than surfacing
-    // an unverifiable/possibly-hallucinated name to the client.
-    const confident = matches.filter(m => m.confidence !== 'low')
-    const droppedCount = matches.length - confident.length
-    if (droppedCount > 0) {
-      console.log(`[CELEB][tier=claude-fallback] Dropped ${droppedCount} low-confidence match(es): ${matches.filter(m => m.confidence === 'low').map(m => m.celebrity).join(', ')}`)
-    }
-
-    const mapped = confident.map(m => ({
-      celebrity:     m.celebrity,
-      profession:    m.category === 'model' ? 'Model' : m.category === 'streamer' ? 'Streamer' : m.category === 'tiktok_influencer' ? 'TikTok Influencer' : 'Celebrity',
-      similarity:    0,
-      shared_traits: m.shared_traits || 'Shared facial features',
-      matchStrength: m.matchStrength || 'moderate',
-      source:        'claude',
-      category:      m.category,
-    }))
-
-    while (mapped.length < 3) mapped.push(NO_MATCH)
-    return { match1: mapped[0], match2: mapped[1], match3: mapped[2] }
-  } catch (err) {
-    console.error('[CELEB][tier=claude-fallback] Call B failed:', err.message)
-    return { match1: NO_MATCH, match2: NO_MATCH, match3: NO_MATCH }
-  }
-}
-
-// Known-female celebrity names drawn from our own CELEB_POOLS female list.
-// Used to filter cross-gender Rekognition results without an external lookup.
-const KNOWN_FEMALE_CELEBS = new Set([
-  'Angelina Jolie','Megan Fox','Charlize Theron','Cate Blanchett','Eva Green',
-  'Monica Bellucci','Bella Hadid','Naomi Campbell','Kendall Jenner','Hailey Bieber',
-  'Gigi Hadid','Adriana Lima','Joan Smalls','Winnie Harlow','Rihanna','Beyoncé',
-  'Rosalía','Sommer Ray','Ana Cheri','Natalie Portman','Emma Watson','Zendaya',
-  'Florence Pugh','Anya Taylor-Joy','Daisy Ridley','Lupita Nyongo','Letitia Wright',
-  'Olivia Rodrigo','Sabrina Carpenter','Billie Eilish','Gracie Abrams','Halle Bailey',
-  'SZA','Gemma Chan','Jennifer Aniston','Anne Hathaway','Sandra Bullock',
-  'Reese Witherspoon','Blake Lively','Scarlett Johansson','Millie Bobby Brown',
-  'Sydney Sweeney','Selena Gomez','Camila Cabello','Dua Lipa','Ariana Grande',
-  'Jennifer Lopez','Normani','Tyla','Doja Cat','Ari Lennox','Jorja Smith',
-  'Megan Thee Stallion','Adele','Lizzo','Meghan Trainor','Kelly Clarkson',
-  'Rebel Wilson','Chrissy Metz','Ashley Graham','Tess Holliday','Alix Earle',
-  'Emma Chamberlain','Addison Rae','Charli DAmelio','Dixie DAmelio','Pokimane',
-  'Valkyrae','Liza Koshy','Lilly Singh','Rachel Zegler','Haifa Wehbe',
-])
-
-// ── CALL 3 (parallel): Celebrity Lookalike via AWS Rekognition → Claude fallback
-async function getCelebrityMatch(faceBase64, gender = 'male') {
-  const isFemale = gender === 'female'
-  let rekogFaces = []
-  try {
-    rekogFaces = await withRetry(() => rekognizeImage(faceBase64), 'rekognition')
-    console.log(`[CELEB][tier=rekognition] Rekognition returned ${rekogFaces.length} matches`)
-  } catch (err) {
-    console.warn(`[CELEB][tier=rekognition] Rekognition failed: ${err.message} — falling back to Claude`)
-    return getCelebrityMatchClaude(faceBase64)
-  }
-
-  if (rekogFaces.length === 0) {
-    console.log('[CELEB][tier=rekognition] Rekognition returned 0 matches — falling back to Claude')
-    return getCelebrityMatchClaude(faceBase64)
-  }
-
-  // Filter cross-gender matches. For male users, exclude names we know are female.
-  // For female users we have no exhaustive male exclusion list, so pass all through —
-  // Rekognition rarely matches female faces to male celebrities anyway.
-  const genderFiltered = isFemale
-    ? rekogFaces
-    : rekogFaces.filter(r => !KNOWN_FEMALE_CELEBS.has(r.Name))
-  // If filtering wiped everything, fall back to unfiltered to avoid returning 3x NO_MATCH
-  const faces = genderFiltered.length > 0 ? genderFiltered : rekogFaces
-  if (genderFiltered.length === 0) {
-    console.warn(`[CELEB] Gender filter removed all ${rekogFaces.length} matches — using unfiltered`)
-  }
-
-  const mapped = faces.slice(0, 3).map(r => ({
-    celebrity:    r.Name,
-    profession:   'Celebrity',
-    similarity:   Math.round(r.MatchConfidence),
-    shared_traits: 'Matched by AWS Rekognition facial recognition',
-    source:       'rekognition',
-  }))
-
-  while (mapped.length < 3) mapped.push(NO_MATCH)
-
-  console.log(`[CELEB][tier=rekognition] Final matches: ${mapped.map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')}`)
-  return { match1: mapped[0], match2: mapped[1], match3: mapped[2] }
-}
-
 // ── Blend weights — tune here, not scattered through code ─────────────────────
 const FACE_WEIGHT     = 0.70  // face pillars contribute 70% of overall when physique present
 const PHYSIQUE_WEIGHT = 0.30  // physique overall contributes 30% when body photo provided
@@ -875,9 +687,6 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       }
 
       // ── STEP 3: Physique scoring (OPTIONAL) ───────────────────────────────────
-      // Celebrity matching used to run here too, in parallel — it's now resolved
-      // by a separate, later request (POST /score/enrich) so it's off the critical
-      // path entirely. See that route below for why.
       console.log('[aiScore] STEP 3 — Physique scoring...')
       if (bodyBase64) {
         try {
@@ -1033,12 +842,6 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
           }),
         }
       })(),
-      // Celebrity match is resolved by a separate, later request — see
-      // POST /score/enrich below. The client shows a skeleton for this section
-      // until that call lands and patches the scan record in place.
-      celebrityMatches: null,
-      celebrityStatus:  'pending',
-      faceTraits: null,
       // Side profile — null when no side photo was provided
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,
@@ -1072,7 +875,6 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
           faceScore:       result.faceScore,
           groomingScore:   result.groomingScore,
           tier:            result.tier,
-          celebrityMatch:  result.celebrityMatches?.[0]?.celebrity ?? null,
         }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
       } catch (e) {
         console.warn('[aiScore] scan_history call error (non-fatal):', e.message)
@@ -1101,97 +903,6 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     // Generic server error — client shows fallback message
     res.status(500).json({ error: 'server_error' })
-  }
-})
-
-// ── POST /api/ai/score/enrich ─────────────────────────────────────────────────
-// Celebrity match, resolved separately from the main /score response so it's
-// off the critical path — that endpoint returns the moment face scoring (and
-// physique, if present) is done. Stateless: the client resends the face image
-// rather than the server caching it keyed by a request id, so this works the
-// same whether or not the app ever runs more than one server instance.
-// No scanLimit here — this is the second half of a scan already counted
-// against quota by /score, not a new scan.
-router.post('/score/enrich', verifyToken, resolvePro, claudeLimit, async (req, res) => {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey || apiKey.trim() === '') {
-      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
-    }
-
-    const { faceImage, gender = 'male' } = req.body
-    if (!faceImage) {
-      return res.status(400).json({ error: 'Face image is required' })
-    }
-    const faceBase64 = stripPrefix(faceImage)
-
-    const cacheKey = hashFaceForCeleb(faceBase64, gender)
-    if (celebCache.has(cacheKey)) {
-      console.log('[aiScore:enrich] L1 cache hit:', cacheKey)
-      return res.json(celebCache.get(cacheKey))
-    }
-
-    const fullHash = 'celeb-' + computeFullHash(faceBase64, null, null)
-    const sbCached = await getScanCache(fullHash)
-    if (sbCached) {
-      console.log('[aiScore:enrich] L2 Supabase cache hit:', fullHash.slice(0, 16))
-      if (celebCache.size >= 500) celebCache.delete(celebCache.keys().next().value)
-      celebCache.set(cacheKey, sbCached)
-      return res.json(sbCached)
-    }
-
-    await acquireSlot()
-    let celebResult
-    try {
-      celebResult = await getCelebrityMatch(faceBase64, gender)
-      console.log('[aiScore:enrich] celeb matches:',
-        celebResult
-          ? [celebResult.match1, celebResult.match2, celebResult.match3]
-              .filter(Boolean).map(m => `${m.celebrity} ${m.similarity}%`).join(' | ')
-          : 'none')
-    } catch (celebErr) {
-      console.warn(`[aiScore:enrich] celeb match failed non-fatal: "${celebErr.message}" | userId=${req.userId}`)
-      celebResult = null
-    } finally {
-      releaseSlot()
-    }
-
-    const result = {
-      celebrityMatches: celebResult
-        ? [celebResult.match1, celebResult.match2, celebResult.match3]
-            .filter(Boolean)
-            .map(m => ({
-              celebrity:     m.celebrity,
-              profession:    m.profession ?? null,
-              similarity:    m.similarity,
-              reason:        m.shared_traits ?? m.reason ?? '',
-              shared_traits: m.shared_traits ?? m.reason ?? '',
-            }))
-        : null,
-      faceTraits: celebResult?.face_traits ?? null,
-      celebrityStatus: 'resolved',
-    }
-
-    if (celebCache.size >= 500) celebCache.delete(celebCache.keys().next().value)
-    celebCache.set(cacheKey, result)
-    try {
-      setScanCache(fullHash, result).then(() => {
-        console.log('[aiScore:enrich] L2 Supabase cache written:', fullHash.slice(0, 16))
-      }).catch(err => {
-        console.warn('[aiScore:enrich] L2 Supabase cache write failed (non-fatal):', err.message)
-      })
-    } catch (e) {
-      console.warn('[aiScore:enrich] L2 cache call error (non-fatal):', e.message)
-    }
-
-    res.json(result)
-  } catch (err) {
-    const status = err.status ?? err.statusCode ?? 0
-    const msg    = err.message || ''
-    console.error(`[aiScore:enrich] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
-    // Non-fatal from the client's perspective — it already has the real score.
-    // Client treats this as "celebrity match unavailable" rather than a hard error.
-    res.status(500).json({ celebrityMatches: null, celebrityStatus: 'failed' })
   }
 })
 

@@ -37,7 +37,6 @@ async function logAnalyticsEvent(name, params) {
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
-  { label: 'Matching celebrity lookalikes...', Icon: Star },
   { label: 'Calculating your score...', Icon: Zap },
   { label: 'Building your roadmap...', Icon: Map },
 ]
@@ -750,7 +749,6 @@ export default function Scan() {
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
   const addScan           = useStore(s => s.addScan)
   const setCurrentScan    = useStore(s => s.setCurrentScan)
-  const patchScanEnrichment = useStore(s => s.patchScanEnrichment)
   const setCurrentPlan    = useStore(s => s.setCurrentPlan)
   const setGender         = useStore(s => s.setGender)
   const incrementScanCount = useStore(s => s.incrementScanCount)
@@ -936,7 +934,7 @@ export default function Scan() {
 
       setAnalysisStep(1)
       setSlowAnalysis(false)
-      const stageTimer = setInterval(() => setAnalysisStep(prev => prev < 3 ? prev + 1 : prev), 1800)
+      const stageTimer = setInterval(() => setAnalysisStep(prev => prev < 2 ? prev + 1 : prev), 1800)
       const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       let aiResult
@@ -957,8 +955,6 @@ export default function Scan() {
           hasSideProfile:  false,
           faceSubScores:   { symmetry: score, jawlineDefinition: null, skinClarity: null, facialProportions: null, eyeArea: null, facialHarmony: null },
           pillars:         null,
-          celebrityMatches: [],
-          celebrityStatus: 'resolved',
           physiqueScore:   null,
           bodyFatLevel:    null,
           insights:        ['Score derived from live TrueDepth face geometry. Take a photo scan for full AI analysis.'],
@@ -997,7 +993,6 @@ export default function Scan() {
           },
           facialStructure:  'Oval',
           hairType:         null,
-          celebrityMatches: [{ name: 'Demo Match', score: 72, similarity: 0.72 }],
           physiqueScore: bodyB64 ? {
             overall:        Math.round((6.5 + Math.random()) * 10) / 10,
             body_fat_level: 'Athletic',
@@ -1037,9 +1032,9 @@ export default function Scan() {
         }
       }
 
-      setAnalysisStep(3)
+      setAnalysisStep(2)
       await new Promise(r => setTimeout(r, 350))
-      setAnalysisStep(4)
+      setAnalysisStep(3)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -1065,11 +1060,6 @@ export default function Scan() {
         },
         pillars:          aiResult.pillars         ?? null,
         extendedMetrics:  aiResult.extendedMetrics ?? null,
-        celebrityMatches: aiResult.celebrityMatches ?? null,
-        // Demo scans set celebrityMatches directly with no status field — treat
-        // those as already resolved. Real scans come back 'pending' from /score
-        // and get patched in place once /score/enrich resolves, below.
-        celebrityStatus:  aiResult.celebrityStatus ?? 'resolved',
         physiqueScore:    aiResult.physiqueScore    ?? null,
         bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
         // ARKit live scan geometry — present when user used TrueDepth face scan
@@ -1089,28 +1079,6 @@ export default function Scan() {
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
-
-      // Celebrity match — resolved separately, off the critical path. Fired
-      // here (not awaited) so it never delays navigation to results; when it
-      // resolves it patches the scan record in place, wherever the user is.
-      if (scanRecord.celebrityStatus === 'pending') {
-        api.ai.scoreEnrich({ faceImage: faceB64, gender: g })
-          .then(enrichResult => {
-            patchScanEnrichment(scanRecord.id, {
-              celebrityMatches: enrichResult.celebrityMatches,
-              celebrityStatus:  enrichResult.celebrityStatus,
-              aiScore: {
-                ...scanRecord.aiScore,
-                celebrityMatches: enrichResult.celebrityMatches,
-                faceTraits:       enrichResult.faceTraits,
-                celebrityStatus:  enrichResult.celebrityStatus,
-              },
-            })
-          })
-          .catch(() => {
-            patchScanEnrichment(scanRecord.id, { celebrityStatus: 'failed' })
-          })
-      }
 
       // Persist to Supabase (non-blocking). Upload the real scan photo to
       // Supabase Storage first (private 'scan-images' bucket, already wired
@@ -1154,7 +1122,6 @@ export default function Scan() {
               : 0
             return Math.min(10, (aiResult.overallScore ?? 5) + 1.4 + physiqueUpside)
           })(),
-          celebrityMatches: aiResult.celebrityMatches,
           hairTypeDetected: aiResult.hairType,
           faceShape:        aiResult.facialStructure,
           faceImageUrl,

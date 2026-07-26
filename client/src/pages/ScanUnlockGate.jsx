@@ -81,24 +81,6 @@ function getBiggestGrowthArea(scan) {
   return candidates.reduce((low, c) => c.score < low.score ? c : low)
 }
 
-const CELEB_QUICK = {
-  strong:  [{ name: 'Henry Cavill', sim: 79 }, { name: 'Chris Hemsworth', sim: 76 }, { name: 'Jacob Elordi', sim: 75 }, { name: 'Cristiano Ronaldo', sim: 73 }],
-  defined: [{ name: 'Zac Efron',    sim: 73 }, { name: 'Austin Butler',   sim: 71 }, { name: 'Tom Holland',  sim: 68 }, { name: 'Timothée Chalamet', sim: 70 }],
-  average: [{ name: 'Pedro Pascal', sim: 67 }, { name: 'Ryan Reynolds',   sim: 65 }, { name: 'Paul Mescal',  sim: 66 }, { name: 'Andrew Garfield',  sim: 64 }],
-  soft:    [{ name: 'Harry Styles', sim: 64 }, { name: 'Justin Bieber',   sim: 62 }, { name: 'Niall Horan',  sim: 61 }, { name: 'Jack Harlow',      sim: 63 }],
-}
-
-function getCelebMatch(scan) {
-  if (!scan) return null
-  const jaw  = scan.faceData?.jawlineDefinition ?? 5
-  const harm = scan.faceData?.facialHarmony     ?? 5
-  const avg  = (jaw + harm) / 2
-  const key  = avg >= 7 ? 'strong' : avg >= 6 ? 'defined' : avg >= 4.5 ? 'average' : 'soft'
-  const pool = CELEB_QUICK[key]
-  const seed = (scan.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return { ...pool[Math.abs(seed) % pool.length], source: 'ai_estimate' }
-}
-
 function toTopPct(score) {
   if (score == null) return null
   if (score >= 9.0) return 'Top 1%'
@@ -116,7 +98,6 @@ function Card1Score({ scan }) {
   const tier           = scan?.tier ?? null
   const topPct         = toTopPct(glowScore)
   const growthArea     = getBiggestGrowthArea(scan)
-  const celebMatch     = getCelebMatch(scan)
   const topStrength    = getStrongestFeature(scan)
 
   const physiqueUpside = scan?.physiqueScore
@@ -224,26 +205,6 @@ function Card1Score({ scan }) {
                 </p>
               </BlurLock>
             </div>
-          </div>
-        )}
-
-        {/* Celebrity match teaser */}
-        {celebMatch && (
-          <div className="flex items-center gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}>
-              <span style={{ fontSize: 17 }}>⭐</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                {celebMatch.source === 'rekognition' ? `Celebrity match · ${celebMatch.sim}% similarity` : 'Celebrity match · Shared facial features'}
-              </p>
-              <BlurLock size="md">
-                <p className="font-heading font-bold text-[15px]" style={{ color: 'rgba(255,255,255,0.90)' }}>
-                  {celebMatch.name}
-                </p>
-              </BlurLock>
-            </div>
-            <Lock size={13} style={{ color: G, flexShrink: 0 }} />
           </div>
         )}
 
@@ -430,9 +391,9 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
   const [cardIdx, setCardIdx]   = useState(0)
   const [direction, setDirection] = useState(1)
 
-  // Three high-value cards, not seven. Growth area, celebrity match, and PSL
-  // tier/potential are already teased inside Card1Score itself — repeating
-  // them as separate near-identical locked cards was pure padding.
+  // Three high-value cards, not seven. Growth area and PSL tier/potential
+  // are already teased inside Card1Score itself — repeating them as
+  // separate near-identical locked cards was pure padding.
   const cards = [
     { id: 'score', el: <Card1Score scan={scan} /> },
     ...EXTENDED_CATEGORIES.map(cat => ({
@@ -679,7 +640,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
   const navigate                    = useNavigate()
 
   const link      = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
-  const shareText = `I'm using Ascendus to track my glow-up — it gives you an AI Glow Score, custom plan & celebrity lookalike matches. Try it free 👇 ${link}`
+  const shareText = `I'm using Ascendus to track my glow-up — it gives you an AI Glow Score and a custom plan. Try it free 👇 ${link}`
 
   async function pollCount() {
     try { const { count: fresh } = await api.referral.count(); setCount(fresh ?? 0); return fresh ?? 0 }
