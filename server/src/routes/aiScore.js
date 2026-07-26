@@ -219,6 +219,14 @@ Include a "profile" object in your JSON response.` : ''
 
 Score face and grooming on a 1.0–10.0 scale.
 
+SCORE DISTRIBUTION — READ FIRST, applies to every 1.0–10.0 score in this prompt (face_score, pillars, sub_scores, face_metrics, extended_metrics):
+Think of scores as a bell curve across the general population, not a curve of dating-app profile photos or influencers:
+- 5.0 is the TRUE MIDDLE — an average person you'd pass on the street, nothing notably attractive or unattractive about them. This is where MOST people land, not a "bad" score.
+- 3.0 — below-average on a given metric: e.g. weak/undefined jawline hidden by fat, visibly asymmetric features, noticeable acne. Common, not rare.
+- 7.0 — clearly above-average: e.g. a visibly defined jawline, above-average symmetry, healthy even skin. This is a genuinely "good" score — do not reserve 7+ for only exceptional cases.
+- 9.0 — genuinely exceptional, model/celebrity-tier on that specific metric. This should be rare — most photos, even good-looking ones, should NOT get a 9 across the board.
+Do not compress everyone into 6–8 out of a desire to be polite or avoid a "harsh" number — an accurate 3 or 4 is exactly as valid an output as an accurate 8 or 9 when the photo supports it. A realistic population sample run through this prompt should produce scores spread across the full 1–10 range, roughly centered on 5, not clustered at 7–8.
+
 FACE SCORING — assess these features:
 - ${isFemale ? 'Facial softness, high cheekbones, feminine bone structure, large eyes, full lips' : 'Jawline definition and sharpness, cheekbone prominence, brow ridge, masculine structure'}
 - Facial symmetry
@@ -226,14 +234,20 @@ FACE SCORING — assess these features:
 - Facial thirds ratio (forehead : midface : lower face)
 - Skin quality and texture
 
-SKIN CLARITY SCORING (skin_clarity sub-score) — MANDATORY RULES:
-- Clear skin (no visible acne, scarring, blemishes, or hyperpigmentation) → MINIMUM 7.5/10
-- Mostly clear with minor texture or slight unevenness → 6.5–7.5/10
-- Some visible acne, active blemishes, or uneven skin tone → 5.0–6.5/10
-- Significant acne, acne scarring, or hyperpigmentation → below 5.0/10
-- CRITICAL: Clear smooth skin with no visible problems MUST score 7.5 or higher. Do NOT penalize healthy clear skin.
-- Only score below 7.5 if you can visibly see blemishes, acne, scarring, or skin texture problems in the photo.
-- If the skin appears smooth and even in tone, assume it is clear unless there is visible evidence otherwise.
+SKIN CLARITY SCORING (skin_clarity sub-score) — use the full range, calibrated to the general population, not just "acne vs no acne":
+- 9.0–10.0 → Exceptional: poreless, even tone, visible glow/luminosity, zero texture irregularities. Rare — top few percent.
+- 7.0–8.9  → Clear and healthy: no active blemishes, good tone evenness. Some normal minor texture (visible pores, faint lines) is fine and does not disqualify this tier.
+- 5.0–6.9  → Average: generally acceptable skin with visible texture, minor unevenness, occasional blemish, mild redness, or dullness — this is the most common real-world outcome, not a penalty tier.
+- 3.0–4.9  → Below average: noticeable acne, uneven tone, visible scarring, or dullness a viewer would register at a glance.
+- 1.0–2.9  → Poor: significant active acne, heavy scarring, or pronounced hyperpigmentation.
+Do not default to 7.5+ just because no acne is visible — "no visible problems" describes most people's skin and belongs in the 5.0–6.9 average band, not the 7+ tier. Reserve 7+ for skin that reads as genuinely healthy/even, not merely "not broken out."
+
+SYMMETRY SCORING (symmetry sub-score) — use these anchors:
+- 9.0–10.0 → Near-perfect left-right mirror symmetry, no visible asymmetry in eyes, brows, or jaw.
+- 7.0–8.9  → Good symmetry with only minor, hard-to-notice asymmetry.
+- 5.0–6.9  → Average — most people have some visible asymmetry (one eye slightly higher, jaw slightly off-center) at this level; this is normal, not a flaw.
+- 3.0–4.9  → Noticeable asymmetry visible without close inspection.
+- 1.0–2.9  → Pronounced, immediately obvious facial asymmetry.
 ${isFemale ? '- FEMALE: Skin and grooming are weighted MORE heavily. Clear glowing skin, neat brows, healthy hair are major scoring factors.' : ''}
 
 ${isFemale ? `FEMALE FACIAL STRUCTURE TIERS (strict):
@@ -264,28 +278,44 @@ THE 4 PILLARS — rate each independently on 1.0–10.0:
 - Harmony: How well all features work together as a cohesive unit. Consider facial symmetry, facial thirds balance, and overall visual balance.
 - Angularity: ${isFemale ?
   `For females — assess FEMININE facial refinement, NOT masculine sharpness.
-  FEMALE ANGULARITY SCORING RUBRIC:
-  9.0–10.0 → Elite feminine structure: high prominent cheekbones, clean facial lines, defined but soft jawline, model-tier bone structure.
-  7.5–8.9  → Strong feminine definition: visible cheekbones, clean jaw, refined facial structure above average.
-  6.0–7.4  → Moderate definition: some cheekbone visibility, average feminine structure, slight softness.
-  4.0–5.9  → Below-average structure: full face with minimal bone definition.
-  1.0–3.9  → Poor structure: heavy or round face, no visible bone structure.
-  CRITICAL: A female face with high cheekbones and refined structure MUST score 8.0+. Do NOT apply male standards.` :
+  FEMALE ANGULARITY SCORING RUBRIC — use the full range, narrow tiers below, calibrated to the general population:
+  9.0–10.0 → Elite/distinctive feminine structure: high prominent cheekbones, clean facial lines, refined jaw, model-tier bone structure. Rare — top few percent, not just "pretty."
+  7.0–8.9  → Strong feminine definition: visible cheekbones, clean jawline, refined structure that reads as distinctive, not merely pleasant. A real above-average score — but reserve 8+ specifically for structure that stands out, not decent structure that's simply fine.
+  5.0–6.9  → Average: some cheekbone presence, typical feminine structure, some softness. This is where MOST women land — average bone structure is the common case, not a deficiency.
+  3.0–4.9  → Below-average structure: cheekbones sit flat with no forward projection or visible height, the jawline is full and rounds directly into the neck with no distinct edge or corner, and the face reads as soft throughout with no bone landmarks breaking the surface. This is a common, honest read when structural definition is genuinely absent — not a harsher judgment than the evidence supports.
+  1.0–2.9  → Poor structure: heavy or round face, no visible bone structure.
+  CRITICAL: reserve 8.0+ for structure that is genuinely distinctive — high prominent cheekbones AND clean refined jaw together, the kind of face that stands out for its structure specifically. A face with decent-but-ordinary definition (some cheekbone presence, nothing that jumps out) belongs in the 5.0–6.9 average band, not 7+. Most faces — including conventionally attractive ones — have average bone structure; distinctive structure is uncommon by definition.
+  Equally, a full face with minimal bone definition must land in the 3.0–4.9 band, not be rounded up to 5+ out of politeness.` :
   `Sharpness and definition of physical structure. This is the PRIMARY structural pillar.
-  ANGULARITY SCORING RUBRIC — MANDATORY. Use the full range. Do not compress into 6–8.
-  9.0–10.0 → Elite bone structure: razor-sharp jawline with defined gonial angle, highly prominent cheekbones, strong visible brow ridge, forward chin projection, zero visible facial fat obscuring bone. This tier is real — use it when the evidence is present.
-  7.5–8.9  → Strong, clearly defined structure: sharp jawline, visible prominent cheekbones, good brow definition, lean facial structure. An 8 is NOT flattery — it is an accurate description of above-average bone structure.
-  6.0–7.4  → Moderate definition: jawline visible but not sharp, cheekbones present but not prominent, average to slightly above-average structure with some softness.
-  4.0–5.9  → Below-average structure: soft or undefined jaw, facial fat obscuring bone, cheekbones not visible, lacks skeletal definition.
-  1.0–3.9  → Poor angularity: round or heavy face, no visible bone structure at all.
-  CRITICAL: A face with a visibly sharp jaw, prominent cheekbones, and defined brow ridge MUST score 8.5 or higher. Giving 7.0 to a face with clearly strong bone structure is an inaccurate deflation — do not do it. Use the full 1–10 range.`}
+  ANGULARITY SCORING RUBRIC — MANDATORY. Use the full range, narrow tiers below, calibrated to the general population — do not let genuinely average structure drift into the 6-7+ range.
+  9.0–10.0 → Elite/distinctive bone structure: razor-sharp jawline with defined gonial angle, highly prominent cheekbones, strong visible brow ridge, forward chin projection, zero visible facial fat obscuring bone. Genuinely rare — top few percent, not just "solidly good."
+  7.0–8.9  → Strong, clearly defined structure: sharp jawline, visible prominent cheekbones, good brow definition, lean facial structure. A real above-average score — but reserve 8+ specifically for structure that's distinctive at a glance, not merely competent.
+  5.0–6.9  → Average: jawline visible but soft, cheekbones present but not prominent, typical bone structure with some softness or minor fat coverage. This is where MOST people land — average bone structure is not a deficiency, it's the common case.
+  3.0–4.9  → Below-average structure: jawline is soft and undefined with no visible gonial angle — the lower face curves smoothly into the neck with no distinct corner where jaw meets ear. Cheekbones sit flat against the face with no forward projection or shadow beneath them. Brow ridge is minimal or flat, adding no visible ledge above the eyes. Facial fat softens or fully obscures whatever bone structure is underneath. This is a common, honest read when jaw and cheekbone definition are genuinely absent from the photo — not a harsher judgment than the evidence supports.
+  1.0–2.9  → Poor angularity: round or heavy face, no visible bone structure at all.
+  CRITICAL: reserve 8.5+ for bone structure that is genuinely distinctive — visibly sharp jaw AND prominent cheekbones AND strong brow ridge together, the kind of face that stands out in a crowd for its structure specifically. A face with decent-but-ordinary definition (jawline visible, some cheekbone presence, nothing that jumps out) belongs in the 5.0–6.9 average band, not 7+. Most faces — including conventionally fine-looking ones — have average bone structure; distinctive structure is uncommon by definition.
+  Equally, a face with a soft or undefined jaw and minimal cheekbone visibility must land in the 3.0–4.9 band, not be rounded up to 5+ out of politeness.`}
 
 - Features: Quality of individual facial features. ${isFemale ? 'Consider eye size and shape (large almond eyes score highest), nose refinement, lip fullness, brow shape, and skin clarity. Skin clarity is weighted 1.5× for females.' : 'Consider eye shape and size, nose shape and proportion, lip fullness, skin clarity, and overall feature quality.'}
 - Dimorphism: ${isFemale ?
-  'Rate FEMININITY — how strongly this face expresses feminine sex characteristics. High score: large eyes, high soft cheekbones, smooth skin, delicate features, soft jaw. Low score: masculine jaw, heavy brow ridge, wide nose, angular masculine structure on a female face.' :
-  'Rate masculinity: strong jaw, hunter eyes, brow ridge, defined bone structure.'}
+  `Rate FEMININITY — how strongly this face expresses feminine sex characteristics.
+  FEMININITY SCORING RUBRIC — use the full range, calibrated to the general population:
+  9.0–10.0 → Extremely high feminine dimorphism: large eyes, high soft cheekbones, delicate jaw, smooth features — unmistakably, strikingly feminine at a glance. Rare.
+  7.0–8.9  → Clearly feminine: soft jaw, notable cheekbone softness, refined features — above-average feminine expression, distinctive rather than merely typical.
+  5.0–6.9  → Average femininity: typical female features, nothing that stands out as especially delicate or masculine-leaning. Most women land here.
+  3.0–4.9  → Below-average feminine expression: the jaw is heavier or squarer and does not taper toward the chin, the brow ridge is flatter or more prominent than the soft arch typical of feminine brows, and the overall bone structure reads as more neutral or masculine-leaning rather than distinctly feminine.
+  1.0–2.9  → Notably masculine-leaning features for a female face.
+  Reserve 8+ for femininity that is genuinely striking, not just present — an ordinary, unremarkable-but-clearly-female face belongs in the 5.0–6.9 average band.` :
+  `Rate masculinity: strong jaw, hunter eyes, brow ridge, defined bone structure.
+  MASCULINITY SCORING RUBRIC — use the full range, calibrated to the general population:
+  9.0–10.0 → Extremely high masculine dimorphism: heavy brow ridge, deep-set "hunter" eyes, wide strong jaw, thick neck — reads as unmistakably, powerfully masculine at a glance. Rare.
+  7.0–8.9  → Clearly masculine: visible brow ridge, defined jaw, masculine proportions — above-average masculine expression, distinctive rather than merely typical.
+  5.0–6.9  → Average masculinity: typical male features, some brow/jaw presence, nothing that stands out as especially masculine or soft. Most men land here.
+  3.0–4.9  → Below-average masculine expression: brow ridge is flat with no shadow or protrusion over the eyes, the jaw is narrow or tapered rather than wide, the face shape reads as round or soft rather than angular, and the neck is slender without visible thickness. The face reads as mild or gender-neutral rather than distinctly masculine — this is common, not a flaw.
+  1.0–2.9  → Very low masculine expression: notably soft/rounded features for a male face.
+  Reserve 8+ for masculinity that is genuinely striking, not just present — an ordinary, unremarkable-but-clearly-male face belongs in the 5.0–6.9 average band.`}
 
-Be honest and accurate. High scores (9+) for elite bone structure ARE the honest score — accuracy means using the full range, not clustering in the middle.
+Be honest and accurate — this cuts both ways. High scores (9+) for elite bone structure ARE the honest score when the evidence supports it, and low scores (3–4) for below-average structure are equally honest and should be used just as readily. Accuracy means using the full range in both directions, not clustering in the middle OR only being willing to go high.
 
 HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "straight"   → hair lies flat, no curl pattern
@@ -498,8 +528,14 @@ ${isFemale ? `FEMALE PHYSIQUE SCORING:
 - posture: Spine alignment, shoulder position, chest position. Rounded forward posture = low score. Upright, chest out = high score.
 - overall_presentation: Grooming, clothing fit, how well the body is presented. Clean presentation = high score.`}${measuredGeometryNote}
 
+SCORE DISTRIBUTION — think of these as a bell curve across the general population, not a fitness-influencer feed:
+- 5.0 is the TRUE MIDDLE — an average build, nothing notably impressive or lacking. Most people land here, and that is not a bad score.
+- 3.0 — below average: poor proportions, minimal muscle definition, or a noticeably underdeveloped frame for that category.
+- 7.0 — clearly above average: visible muscle definition or good proportions. This is a genuinely good score — do not reserve 7+ for exceptional cases only.
+- 9.0 — exceptional, physique-competitor or fitness-model tier. Rare — most photos, even good ones, should not get a 9 across the board.
+
 SCORING RULES:
-- Use the FULL 1–10 range. Do not cluster around 5–6.
+- Use the FULL 1–10 range in both directions — do not compress everyone into 5–7 out of politeness, but also don't treat a 5–6 as a punishment; it is the honest, common result for an average physique.
 - Score based only on what is VISIBLE in the photo. If the body is partially hidden by clothing, score what you can see and note it.
 - Never penalize for natural body type — score relative to ideal proportions for that body type.
 - Body fat levels: very_lean / lean / average / above_average / heavy

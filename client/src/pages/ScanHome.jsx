@@ -66,7 +66,7 @@ function BeginScanCard({ onBegin }) {
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera size={48} style={{ color: `${GOLD}66` }} />
           </div>
-          <FaceScanOverlay loop />
+          <FaceScanOverlay loop showDots={false} />
         </>
       }
     />

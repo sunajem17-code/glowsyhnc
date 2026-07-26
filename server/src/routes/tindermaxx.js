@@ -60,6 +60,13 @@ router.post('/rank', verifyToken, resolvePro, limitMiddleware, async (req, res) 
 
 Criteria: lighting, expression, background, angle, energy, attractiveness conveyed.
 
+SCORING CALIBRATION: these scores describe how effective each photo is as a dating-profile photo, not raw physical attractiveness — use the full 1–10 range realistically:
+- 8.5–10  → excellent: flattering lighting, natural expression, good angle, genuine energy. Reserve this for a photo that is actually strong, not by default for the best of a weak set.
+- 6.5–8.4 → solid: usable profile photo with a few things that could improve (lighting, angle, background, expression).
+- 4.5–6.4 → average: noticeable issues (harsh lighting, awkward angle, distracting background, stiff expression) that limit its effectiveness. This is a common, honest score — not a punishment.
+- Below 4.5 → weak: multiple significant problems (bad lighting, unflattering angle, cluttered background) that make this a poor profile choice.
+Do not give every photo in the set a "good" score just because they're all from the same person — real photo sets have real quality variation between shots; reflect it instead of clustering everything at 7–9.
+
 Respond ONLY in this exact JSON (no markdown, no extra text):
 {
   "winner_index": 0,
