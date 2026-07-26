@@ -2,7 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { triggerHaptic } from '../utils/haptics'
 
-export default function PageHeader({ title, subtitle, back, onBack, action }) {
+// icon defaults to ArrowLeft (the "go back one step" affordance used
+// everywhere else this header appears); pass icon={X} for screens where
+// tapping this button exits the whole flow rather than stepping back —
+// same button container/position, just a different icon + onBack target.
+export default function PageHeader({ title, subtitle, back, onBack, action, icon: Icon = ArrowLeft }) {
   const navigate = useNavigate()
 
   return (
@@ -17,7 +21,7 @@ export default function PageHeader({ title, subtitle, back, onBack, action }) {
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          <ArrowLeft size={17} className="text-primary" />
+          <Icon size={17} className="text-primary" />
         </button>
       )}
       <div className="flex-1">

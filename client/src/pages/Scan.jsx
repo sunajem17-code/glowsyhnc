@@ -1465,7 +1465,13 @@ export default function Scan() {
             title={STEP_META[step]?.title ?? ''}
             subtitle={STEP_META[step]?.subtitle ?? ''}
             back
-            onBack={step === 0 ? () => navigate('/scan') : undefined}
+            // Body Photo (step 3) is a close (X), not a back-arrow — tapping
+            // it exits the scan flow entirely (same convention as X buttons
+            // elsewhere in onboarding, e.g. TrainingPlanIntro's BodyStatsFlow
+            // close), rather than relying on navigate(-1)'s browser-history
+            // default, which can land somewhere unrelated to this flow.
+            icon={step === 3 ? X : undefined}
+            onBack={step === 0 || step === 3 ? () => navigate('/scan') : undefined}
           />
         )
       )}
