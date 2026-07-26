@@ -2078,6 +2078,18 @@ export default function PremiumOnboarding() {
     }
   }
 
+  // PromoModal already flips isPremium/updates the user in the store itself
+  // on redemption — this only handles the piece that's specific to still
+  // being mid-onboarding: completing it (so App.jsx's !hasOnboarded gate
+  // stops routing back here) and moving on to results, same as a successful
+  // purchase above.
+  function handlePromoSuccess() {
+    sessionStorage.setItem('asc_pro_splash_shown', '1')
+    setHasOnboarded()
+    logAnalyticsEvent('promo_redeemed', { source: 'onboarding' })
+    navigate('/results', { replace: true })
+  }
+
   // Progress bar: only during data-collection steps (2–7); post-scan celebration screens (8–10) get no counter
   const QUIZ_START = isAuthenticated ? 3 : 2
   const QUIZ_END = 7
@@ -2178,7 +2190,7 @@ export default function PremiumOnboarding() {
     />,
     <TransformationScreen key="transformation" onNext={goNext} />,
     <StepRating key="rating" onNext={goNext} />,
-    <StepScoresWaiting key="scores-waiting" scan={currentScan} onAscend={handleAscend} isPurchasing={isPurchasing} error={purchaseError} />,
+    <StepScoresWaiting key="scores-waiting" scan={currentScan} onAscend={handleAscend} onPromoSuccess={handlePromoSuccess} isPurchasing={isPurchasing} error={purchaseError} />,
   ]
 
   return (

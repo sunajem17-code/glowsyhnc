@@ -178,7 +178,7 @@ function BodyStatsSlider({ label, unit, value, displayValue, min, max, step = 1,
 // one component. onSave(height, weight) is called once, right when the user
 // taps "Save" on the input screen (not on the result screen's "Done") — the
 // result screen is purely a read of what was just saved.
-export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSave, onClose }) {
+export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSave, onClose, onDone, stepLabel, progressPct }) {
   const [phase, setPhase] = useState('form') // 'form' | 'result'
   const [height, setHeight] = useState(initialHeight || 175)
   const [weight, setWeight] = useState(initialWeight || 75)
@@ -206,7 +206,26 @@ export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSa
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: 'var(--bg)' }}
     >
-      <div className="flex justify-end px-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+      {/* Optional top progress bar + step label — only rendered when a parent
+          wizard (e.g. TrainingPlanIntro) passes these; the standalone
+          settings-row reopen from WorkoutPlan.jsx never passes them, so that
+          usage renders identically to before this was added. */}
+      {progressPct != null && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 z-20" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            className="h-full"
+            style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD}, #D4B96A)` }}
+            initial={false}
+            animate={{ width: `${progressPct}%` }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+        {stepLabel ? (
+          <span className="text-[10px] font-mono" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>{stepLabel}</span>
+        ) : <span />}
         <button
           onClick={() => { triggerHaptic(); onClose() }}
           aria-label="Close"
@@ -326,7 +345,7 @@ export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSa
           <div className="pb-10 pt-4">
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={() => { triggerHaptic(); onClose() }}
+              onClick={() => { triggerHaptic(); (onDone || onClose)() }}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
               style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >

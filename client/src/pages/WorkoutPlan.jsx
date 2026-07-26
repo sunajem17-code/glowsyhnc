@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight } from 'lucide-react'
@@ -7,12 +7,15 @@ import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
 import BodyStatsFlow from '../components/BodyStatsStep'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import TrainingPlanIntro from '../components/TrainingPlanIntro'
+import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 // Resize + JPEG-compress a raw File before sending to the server, same
 // approach used in Scan.jsx's toBase64 — keeps payloads small and fast.
-function fileToResizedBase64(file, maxPx = 1024) {
+// Exported so TrainingPlanIntro's photo step can reuse it rather than
+// duplicating the same canvas-resize logic.
+export function fileToResizedBase64(file, maxPx = 1024) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Could not read photo'))
@@ -336,13 +339,16 @@ export default function WorkoutPlan() {
   // ── Body stats (height/weight) — collected here instead of onboarding, so
   // they're gathered when actually needed (training-phase calculation) rather
   // than upfront for every user regardless of whether they ever open this
-  // screen. Auto-opens once, the first time this screen loads with no stats
-  // saved yet; also reachable any time via the settings row below.
+  // screen. For a first-time user (no physique score yet), this now happens
+  // as step 2 of TrainingPlanIntro instead of an auto-popping modal racing
+  // the old gate screen — this auto-open only still applies to a returning
+  // user who somehow has a plan already but never set stats (edge case, not
+  // the common path). Also reachable any time via the settings row below.
   const [showBodyStats, setShowBodyStats] = useState(false)
   const hasBodyStats = userProfile?.height != null && userProfile?.weight != null
 
   useEffect(() => {
-    if (!hasBodyStats) setShowBodyStats(true)
+    if (physiqueScores && !hasBodyStats) setShowBodyStats(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -351,41 +357,21 @@ export default function WorkoutPlan() {
     api.user.update({ height_cm: height, weight_kg: weight }).catch(() => {})
   }
 
-  // ── Body-only quick scan (no face required) ──────────────────────────────────
-  const bodyFileInputRef = useRef(null)
-  const [bodyScanLoading, setBodyScanLoading] = useState(false)
-  const [bodyScanError, setBodyScanError]     = useState('')
-
-  async function handleBodyPhotoSelected(e) {
-    const file = e.target.files?.[0]
-    e.target.value = '' // allow re-selecting the same file later
-    if (!file) return
-
-    setBodyScanLoading(true)
-    setBodyScanError('')
-    try {
-      const bodyImage = await fileToResizedBase64(file)
-      const { physiqueScore } = await api.ai.scorePhysique({ bodyImage, gender })
-      // Merge into currentScan if one exists (keeps any face data around),
-      // otherwise start a minimal scan record — Training Plan only ever
-      // reads physiqueScore + gender off this object.
-      setCurrentScan({
-        id: currentScan?.id ?? `scan-${Date.now()}`,
-        scanDate: currentScan?.scanDate ?? new Date().toISOString(),
-        ...currentScan,
-        gender,
-        physiqueScore,
-      })
-    } catch (err) {
-      console.error('[WorkoutPlan] body-only scan failed:', err.message)
-      setBodyScanError(
-        err.errorCode === 'rate_limited' || err.status === 429
-          ? 'High demand right now — please try again in a moment.'
-          : err.message || 'Could not analyze your photo. Please try again.'
-      )
-    } finally {
-      setBodyScanLoading(false)
-    }
+  // ── Body-only quick scan (no face required) — the photo/analysis call
+  // itself now lives in TrainingPlanIntro (step 3/4), reusing the same
+  // api.ai.scorePhysique endpoint; this just receives the result and does
+  // the same currentScan merge the old inline handler used to do directly.
+  function handleIntroComplete(physiqueScore) {
+    // Merge into currentScan if one exists (keeps any face data around),
+    // otherwise start a minimal scan record — Training Plan only ever
+    // reads physiqueScore + gender off this object.
+    setCurrentScan({
+      id: currentScan?.id ?? `scan-${Date.now()}`,
+      scanDate: currentScan?.scanDate ?? new Date().toISOString(),
+      ...currentScan,
+      gender,
+      physiqueScore,
+    })
   }
 
   // Infer training level from physique overall score
@@ -429,82 +415,20 @@ export default function WorkoutPlan() {
     loadPlan()
   }, [loadPlan])
 
-  // ── Gate: no body photo uploaded yet ─────────────────────────────────────────
+  // ── Gate: no body photo uploaded yet — runs the 4-step welcome → stats →
+  // photo → generating intro instead of a bare upload button. A returning
+  // user who already has a physique score skips straight past this entirely.
   if (!physiqueScores) {
     return (
-      <>
-      <MotionPage>
-        <PageHeader title="Training Plan" onBack={() => navigate(-1)} />
-        <div className="flex-1 flex flex-col items-center justify-center px-8 pb-24 text-center gap-5">
-          <div
-            className="w-20 h-20 rounded-3xl flex items-center justify-center"
-            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
-          >
-            <Dumbbell size={36} style={{ color: GOLD }} />
-          </div>
-          <div className="space-y-2">
-            <p className="font-heading font-bold text-[20px] text-primary leading-tight">
-              Add Your Physique Photo
-            </p>
-            <p className="font-body text-[13px] text-secondary leading-relaxed">
-              That's the only thing needed — take or upload one body photo and your plan is built from it. No face scan required here.
-            </p>
-          </div>
-
-          {bodyScanError && (
-            <div className="w-full flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-              <AlertCircle size={15} className="text-warning flex-shrink-0" />
-              <p className="text-xs text-warning font-body flex-1 text-left">{bodyScanError}</p>
-            </div>
-          )}
-
-          <input
-            ref={bodyFileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleBodyPhotoSelected}
-          />
-
-          <motion.button
-            whileTap={{ scale: bodyScanLoading ? 1 : 0.97 }}
-            disabled={bodyScanLoading}
-            onClick={() => { triggerHaptic(); bodyFileInputRef.current?.click() }}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{
-              background: GOLD_GRADIENT,
-              color: '#0A0A0A',
-              boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
-              opacity: bodyScanLoading ? 0.6 : 1,
-            }}
-          >
-            {bodyScanLoading ? (
-              <>
-                <RefreshCw size={16} className="animate-spin" />
-                Analyzing your photo…
-              </>
-            ) : (
-              <>
-                <Target size={16} />
-                Take or Upload Body Photo
-              </>
-            )}
-          </motion.button>
-        </div>
-      </MotionPage>
-      <AnimatePresence>
-        {showBodyStats && (
-          <BodyStatsFlow
-            initialHeight={userProfile?.height}
-            initialWeight={userProfile?.weight}
-            goal={userProfile?.goal}
-            onSave={handleBodyStatsSave}
-            onClose={() => setShowBodyStats(false)}
-          />
-        )}
-      </AnimatePresence>
-      </>
+      <TrainingPlanIntro
+        gender={gender}
+        initialHeight={userProfile?.height}
+        initialWeight={userProfile?.weight}
+        goal={userProfile?.goal}
+        onBodyStatsSave={handleBodyStatsSave}
+        onComplete={handleIntroComplete}
+        onClose={() => navigate(-1)}
+      />
     )
   }
 

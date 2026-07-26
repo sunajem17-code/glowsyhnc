@@ -9,6 +9,7 @@ import { api } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { EXTENDED_CATEGORIES, CategoryCard } from './CategoryCard'
+import PromoModal from './PromoModal'
 
 const G = GOLD
 const GOLD_GRAD = GOLD_GRADIENT
@@ -325,9 +326,10 @@ const CAROUSEL_SLIDE_VARIANTS = {
   exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error = '' }) {
+export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing = false, error = '' }) {
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
+  const [showPromo, setShowPromo] = useState(false)
 
   const cards = [
     { id: 'overall', el: <OverallCard scan={scan} /> },
@@ -435,7 +437,31 @@ export function StepScoresWaiting({ onAscend, scan, isPurchasing = false, error 
         {error && (
           <p className="text-center text-[12px] font-body font-semibold mt-2" style={{ color: TEXT }}>{error}</p>
         )}
+
+        {/* Promo code entry — web only, same as Premium.jsx/ScanUnlockGate.jsx/
+            Results.jsx (Apple IAP doesn't support external promo codes, so this
+            must never appear in a native build). Reuses the existing
+            PromoModal/redeem endpoint rather than a new one-off input. */}
+        {!isNative() && (
+          <button
+            onClick={() => setShowPromo(true)}
+            disabled={isPurchasing}
+            className="w-full mt-2 py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
+            style={{ color: 'rgba(198,168,92,0.5)' }}
+          >
+            Have a promo code?
+          </button>
+        )}
       </div>
+
+      <AnimatePresence>
+        {showPromo && (
+          <PromoModal
+            onClose={() => setShowPromo(false)}
+            onSuccess={() => { setShowPromo(false); onPromoSuccess?.() }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
