@@ -70,7 +70,18 @@
       "Bash(railway logs *)",
       "Bash(node --input-type=module)",
       "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" \"https://glowsyhnc-production-e16b.up.railway.app/api/auth/ping\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" \"https://glowsyhnc-production-e16b.up.railway.app/\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" \"https://glowsyhnc-production-e16b.up.railway.app/\")",
+      "Bash(./node_modules/.bin/cap sync *)",
+      "Bash(client/node_modules/.bin/cap sync *)",
+      "Bash(ls /Users/suleimannajem/ | head -30)",
+      "Bash(npm create *)",
+      "Bash(git -C /Users/suleimannajem/looksmaxing log -1 --format=\"%H %ci\" -- client/dist/index.html)",
+      "Bash(git -C /Users/suleimannajem/looksmaxing log -1 --format=\"%H %ci %s\" origin/main -- server/src/routes/aiScore.js)",
+      "Bash(python3 -c \"import cv2; print\\(cv2.__version__\\)\")",
+      "Bash(python3 -c \"import numpy; print\\(numpy.__version__\\)\")",
+      "Bash(cp face-metrics-demo.jpg face-metrics-demo.jpg.bak)",
+      "Bash(cp face-metrics-demo-female.jpg face-metrics-demo-female.jpg.bak)",
+      "Bash(python3 *)"
     ]
   }
 }
