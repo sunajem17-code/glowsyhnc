@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion'
-import { Share2, ArrowRight, ChevronDown, ChevronUp, ChevronRight, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Beef, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
+import { Share2, ArrowRight, ChevronDown, ChevronUp, ChevronRight, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import logo from '../assets/ascendus-icon.png'
@@ -16,7 +16,7 @@ import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
 import { scoreColor } from '../utils/analysis'
 import { isNative, purchasePro, restorePurchases } from '../utils/iap'
-import { GOLD_GRADIENT } from '../utils/theme'
+import { GOLD_GRADIENT, RED } from '../utils/theme'
 
 // Keys must match tier.label values from analysis.js MALE_TIERS / FEMALE_TIERS
 const TIER_COLORS = {
@@ -1043,7 +1043,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         </div>
 
         {error && (
-          <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{error}</p>
+          <p className="text-center text-[11px] font-body mb-2" style={{ color: RED }}>{error}</p>
         )}
 
         {/* Restore Purchases — required by Apple */}
@@ -1163,7 +1163,7 @@ const SKIN_INGREDIENTS = {
 
 export default function Results() {
   const navigate = useNavigate()
-  const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, userProfile, user } = useStore()
+  const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, user } = useStore()
   const [showShareCard,   setShowShareCard]   = useState(false)
   // Secret dev-only score override — only ever true for the account that
   // redeemed the SOHAIL promo code (checked server-side, see user.promoRedeemed
@@ -1233,13 +1233,12 @@ export default function Results() {
   // TEMP TRACE — remove after tier-consistency verification is done.
   console.log('[TIER-TRACE] Results.jsx currentScan fields:', { umaxScore, glowScore, tierUsedByReveal: tier, gender })
   const pillars = scanPillars ?? aiScore?.pillars ?? null
-  const physiqueScore = currentScan.physiqueScore ?? aiScore?.physiqueScore ?? null
 
-  // Potential: face ceiling is +1.4 normally; physique adds more upside when weak
-  const physiqueUpside = physiqueScore
-    ? Math.max(0, (7.5 - (physiqueScore.overall ?? 5)) * 0.30 * 0.3)  // physique gap × weight × dampener
-    : 0
-  const potentialScore = Math.min(10, (glowScore ?? 5) + 1.4 + physiqueUpside)
+  // Potential: face ceiling is +1.4. Physique scoring no longer happens as
+  // part of the main scan (see Training Plan flow for that), so this no
+  // longer factors in a physique-based upside — old scans that happen to
+  // still have stored physiqueScore data are intentionally not read here.
+  const potentialScore = Math.min(10, (glowScore ?? 5) + 1.4)
 
   const profileData      = aiScore?.profileData   ?? null
   const profileScore     = aiScore?.profileScore  ?? null
@@ -1299,52 +1298,6 @@ export default function Results() {
     skinIssues.includes('oiliness')    ? 'Niacinamide 10%'               : null,
     'Moisturizer (heavier than AM is fine)',
   ].filter(Boolean)
-
-  // ─── Nutrition Plan (TDEE) ──────────────────────────────────────────────────
-  const nutHeightCm = userProfile?.heightCm ?? null
-  const nutWeightKg = userProfile?.weightKg ?? null
-  const nutGender   = userProfile?.gender ?? gender ?? 'male'
-  const nutGoal     = userProfile?.goal ?? null
-
-  const tdee = (() => {
-    if (!nutHeightCm || !nutWeightKg) return null
-    const age = 25 // default — age not collected in onboarding
-    const bmr = nutGender === 'female'
-      ? 10 * nutWeightKg + 6.25 * nutHeightCm - 5 * age - 161
-      : 10 * nutWeightKg + 6.25 * nutHeightCm - 5 * age + 5
-    return Math.round(bmr * 1.55)
-  })()
-
-  const nutritionPhase =
-    nutGoal === 'Lose Fat' ? 'CUT' :
-    nutGoal === 'Build Muscle' ? 'BULK' : 'RECOMP'
-
-  const nutritionTarget = tdee == null ? null :
-    nutritionPhase === 'CUT'  ? tdee - 500 :
-    nutritionPhase === 'BULK' ? tdee + 300 : tdee
-
-  const proteinTarget = nutWeightKg ? Math.round(nutWeightKg * 2.2 * 0.9) : null
-
-  const nutritionPhaseLabel =
-    nutritionPhase === 'CUT'  ? 'Cut Phase' :
-    nutritionPhase === 'BULK' ? 'Lean Bulk' : 'Recomp'
-
-  const nutritionProjection =
-    nutritionPhase === 'CUT'  ? 'Lose ~1lb/week · improves appearance score +0.8 in 12 weeks' :
-    nutritionPhase === 'BULK' ? 'Gain 0.5–1lb/week lean muscle · improves Dimorphism score +0.6 in 12 weeks' :
-    'Simultaneous fat loss + muscle gain · improves overall score +0.5 in 12 weeks'
-
-  const nutritionMacros = nutritionTarget ? {
-    protein: proteinTarget ?? Math.round((nutritionTarget * 0.35) / 4),
-    carbs:   Math.round((nutritionTarget * 0.40) / 4),
-    fats:    Math.round((nutritionTarget * 0.25) / 9),
-  } : null
-
-  const nutritionFraming = {
-    CUT:    { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} − 500 cal deficit`, pillar: 'Improves your Dimorphism score — lower body fat directly reveals jawline definition and facial bone structure.' },
-    BULK:   { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} + 300 cal surplus`,  pillar: 'Improves your Dimorphism score — muscle mass increases structural masculinity and V-taper expression.' },
-    RECOMP: { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} maintenance calories`, pillar: 'Maintains Harmony score while improving Dimorphism — the most balanced appearance protocol.' },
-  }[nutritionPhase]
 
   function handleShare() {
     setShowShareCard(true)
@@ -1535,17 +1488,12 @@ export default function Results() {
               ))}
             </div>
           </div>
-          {(facialStructure || (aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided')) && (
+          {facialStructure && (
             <div className="mt-2 text-[10px] text-secondary font-body leading-relaxed">
               {facialStructure === 'average'
                 ? <>Overall facial structure sits in a solid baseline range with real upside to unlock.</>
-                : facialStructure
-                  ? <>Facial structure is <span className="font-bold capitalize text-primary">{facialStructure}</span> — a genuine asset to build on.</>
-                  : null
+                : <>Facial structure is <span className="font-bold capitalize text-primary">{facialStructure}</span> — a genuine asset to build on.</>
               }
-              {aiScore?.bodyFatLevel && aiScore.bodyFatLevel !== 'not_provided' && (
-                <>{facialStructure ? ' ' : ''}Body composition reads as <span className="font-bold capitalize text-primary">{aiScore.bodyFatLevel.replace('_', ' ')}</span>.</>
-              )}
             </div>
           )}
         </Section>
@@ -1662,140 +1610,6 @@ export default function Results() {
               {((pillars.harmony + pillars.angularity + pillars.features + pillars.dimorphism) / 4).toFixed(1)}/10
             </p>
           </div>
-        </Section>
-      )}
-
-      {/* ── Physique Score ───────────────────────────────────────── */}
-      {physiqueScore && (
-        <Section title="Physique Rating" icon={<Zap size={16} style={{ color: '#C6A85C' }} />} defaultOpen={true}>
-          <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
-            Physique scored across 5 categories from your body photo.
-          </p>
-          <div className="space-y-0">
-            {[
-              { key: 'proportions',          label: 'Proportions',     score: physiqueScore.proportions,          desc: gender === 'female' ? 'Waist-to-hip ratio, shoulder balance, overall silhouette.' : 'Shoulder-to-waist V-taper, chest-to-hip ratio, limb symmetry.' },
-              { key: 'leanness',             label: 'Leanness',        score: physiqueScore.leanness,             desc: 'Visible muscle definition and body fat level.' },
-              { key: 'frame',                label: 'Frame',           score: physiqueScore.frame,                desc: 'Natural bone structure, shoulder width, and clavicle length.' },
-              { key: 'posture',              label: 'Posture',         score: physiqueScore.posture,              desc: 'Spine alignment, shoulder position, and overall stance.' },
-              { key: 'overall_presentation', label: 'Presentation',    score: physiqueScore.overall_presentation, desc: 'Grooming, clothing fit, and how the physique is presented.' },
-            ].map(({ key, label, score: rawScore, desc }) => {
-              const score = rawScore ?? 5.0
-              const color = score >= 7 ? '#34C759' : score >= 5 ? '#F5A623' : '#E07A5F'
-              const pct = ((score - 1) / 9) * 100
-              return (
-                <div key={key} className="py-3 border-b border-default last:border-0">
-                  <div className="flex items-center gap-3 mb-1.5">
-                    {isPremium ? (
-                      <div className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0"
-                        style={{ color, background: score >= 7 ? 'rgba(52,199,89,0.12)' : score >= 5 ? 'rgba(245,166,35,0.12)' : 'rgba(224,122,95,0.12)' }}>
-                        {score.toFixed(1)}
-                      </div>
-                    ) : (
-                      <div className="w-12 text-center py-1 rounded-lg text-xs font-mono font-bold flex-shrink-0 select-none cursor-pointer"
-                        style={{ color, background: 'rgba(245,166,35,0.12)', filter: 'blur(5px)' }}
-                        onClick={() => navigate('/premium')}>
-                        {score.toFixed(1)}
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm font-heading font-bold text-primary">{label}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden" style={!isPremium ? { filter: 'blur(3px)', cursor: 'pointer' } : {}} onClick={!isPremium ? () => navigate('/premium') : undefined}>
-                          <motion.div className="h-full rounded-full" style={{ background: color }}
-                            initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: 'easeOut' }} />
-                        </div>
-                        <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: isPremium ? color : 'transparent' }}>/10</span>
-                      </div>
-                    </div>
-                  </div>
-                  {isPremium
-                    ? <p className="text-[10px] text-secondary font-body leading-relaxed mt-1" style={{ paddingLeft: '60px' }}>{desc}</p>
-                    : <div style={{ paddingLeft: '60px' }}><ProText text={desc} onUpgrade={() => navigate('/premium')} /></div>
-                  }
-                </div>
-              )
-            })}
-          </div>
-          <div className="mt-3 pt-3 border-t border-default flex items-center justify-between">
-            <p className="text-[10px] font-heading font-bold text-secondary uppercase tracking-wide">Physique Score (avg)</p>
-            <p className="text-sm font-mono font-bold text-primary">{physiqueScore.overall?.toFixed(1) ?? '—'}/10</p>
-          </div>
-          {/* Physique tier label */}
-          {physiqueScore.overall != null && (() => {
-            const avg = physiqueScore.overall
-            const { label: ptLabel, color: ptColor } =
-              avg >= 8.0 ? { label: 'Elite Physique',   color: '#A29BFE' }
-              : avg >= 6.5 ? { label: 'Athletic Build',  color: '#34C759' }
-              : avg >= 5.0 ? { label: 'Developing',      color: '#F5A623' }
-              :               { label: 'Foundation Stage', color: '#E07A5F' }
-            return (
-              <div className="mt-3 flex items-center justify-center">
-                <span className="px-3 py-1 rounded-full text-[10px] font-heading font-bold uppercase tracking-widest"
-                  style={{ background: `${ptColor}18`, border: `1px solid ${ptColor}44`, color: ptColor }}>
-                  {ptLabel}
-                </span>
-              </div>
-            )
-          })()}
-
-          {physiqueScore.physique_notes && isPremium && (
-            <p className="text-[10px] text-secondary font-body mt-2 leading-relaxed italic">{physiqueScore.physique_notes}</p>
-          )}
-
-          {/* ── Strengths & Areas to Develop ── */}
-          {(physiqueScore.physique_strengths?.length > 0 || physiqueScore.physique_improvements?.length > 0) && (
-            <div className="mt-4 pt-4 border-t border-default space-y-3">
-              {physiqueScore.physique_strengths?.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-heading font-bold uppercase tracking-widest mb-2" style={{ color: '#34C759' }}>Strengths</p>
-                  <div className="space-y-1.5">
-                    {physiqueScore.physique_strengths.map((s, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(52,199,89,0.15)' }}>
-                          <span className="text-[8px] font-bold" style={{ color: '#34C759' }}>✓</span>
-                        </span>
-                        {isPremium
-                          ? <p className="text-[11px] font-body leading-relaxed text-primary">{s}</p>
-                          : <p className="text-[11px] font-body leading-relaxed text-primary select-none" style={{ filter: 'blur(4px)' }}>{s}</p>
-                        }
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {physiqueScore.physique_improvements?.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-heading font-bold uppercase tracking-widest mb-2" style={{ color: '#F5A623' }}>Areas to Develop</p>
-                  <div className="space-y-1.5">
-                    {physiqueScore.physique_improvements.map((imp, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(245,166,35,0.15)' }}>
-                          <Target size={8} style={{ color: '#F5A623' }} />
-                        </span>
-                        {isPremium
-                          ? <p className="text-[11px] font-body leading-relaxed text-primary">{imp}</p>
-                          : <p className="text-[11px] font-body leading-relaxed text-primary select-none" style={{ filter: 'blur(4px)' }}>{imp}</p>
-                        }
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* CTA to Plan tab */}
-              <button
-                onClick={() => navigate('/workout-plan')}
-                className="w-full mt-2 py-3 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[13px] transition-opacity active:opacity-75"
-                style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)', color: '#C6A85C' }}
-              >
-                <Dumbbell size={14} />
-                View Your Training Plan
-                <ArrowRight size={13} />
-              </button>
-              <p className="text-[9px] text-secondary font-body text-center leading-relaxed opacity-60">
-                General guidance only · not a substitute for professional training or medical advice
-              </p>
-            </div>
-          )}
         </Section>
       )}
 
@@ -2170,106 +1984,6 @@ export default function Results() {
         gender={gender}
         onUpgrade={() => navigate('/premium')}
       />
-
-      {/* ── Nutrition Plan ────────────────────────────────────────── */}
-      <Section title="Nutrition Plan" icon={<Beef size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false} badge="PRO">
-        {/* Free: calorie target + phase label */}
-        <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
-          <div className="text-center flex-shrink-0">
-            {nutritionTarget ? (
-              <>
-                <div className="text-2xl font-mono font-bold" style={{ color: '#F5A623' }}>{nutritionTarget.toLocaleString()}</div>
-                <div className="text-[9px] font-body text-secondary">cal/day</div>
-              </>
-            ) : (
-              <div className="text-sm font-heading font-bold text-secondary">—</div>
-            )}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-heading font-bold text-primary">{nutritionPhaseLabel}</p>
-            <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">{nutritionProjection}</p>
-            {!nutritionTarget && (
-              <p className="text-[10px] text-secondary font-body mt-1">Complete your height/weight in onboarding for exact targets.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Pro: full breakdown */}
-        {isPremium ? (
-          <div className="space-y-3">
-            {nutritionFraming && (
-              <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary mb-1">How This Works</p>
-                <p className="text-[11px] font-body text-primary leading-relaxed">
-                  <span className="font-bold">{nutritionFraming.calNote}</span>
-                  {tdee && nutritionTarget && nutritionPhase !== 'RECOMP' && (
-                    <> — a {Math.abs(nutritionTarget - tdee)} cal/day {nutritionPhase === 'CUT' ? 'deficit' : 'surplus'}.</>
-                  )}
-                </p>
-                <p className="text-[10px] text-secondary font-body mt-1 leading-relaxed">{nutritionFraming.pillar}</p>
-              </div>
-            )}
-
-            {nutritionMacros && (
-              <div>
-                <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary mb-2">Daily Macro Targets</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'Protein', value: nutritionMacros.protein + 'g', color: '#E07A5F', note: '~1g/lb bodyweight' },
-                    { label: 'Carbs',   value: nutritionMacros.carbs   + 'g', color: '#F5A623', note: 'fuel + performance' },
-                    { label: 'Fats',    value: nutritionMacros.fats    + 'g', color: '#34C759', note: 'hormones + skin' },
-                  ].map(({ label, value, color, note }) => (
-                    <div key={label} className="text-center p-2.5 rounded-xl" style={{ background: `${color}11`, border: `1px solid ${color}30` }}>
-                      <div className="text-base font-mono font-bold" style={{ color }}>{value}</div>
-                      <div className="text-[9px] font-heading font-bold text-secondary">{label}</div>
-                      <div className="text-[8px] text-secondary font-body mt-0.5">{note}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary">Appearance Framing</p>
-              {[
-                nutritionPhase === 'CUT'  && { label: 'Jawline',    text: 'Every 1% body fat drop reveals more bone structure. Lower body fat = more defined jaw = higher Dimorphism score.' },
-                nutritionPhase === 'CUT'  && { label: 'V-Taper',    text: 'As waist shrinks, your shoulder-to-waist ratio improves automatically — even without new muscle.' },
-                nutritionPhase === 'BULK' && { label: 'Dimorphism', text: 'Muscle mass increases masculine structural expression — Dimorphism is the single pillar most responsive to muscle gain.' },
-                nutritionPhase === 'BULK' && { label: 'V-Taper',    text: 'Shoulder and lat growth in surplus widens your silhouette faster than in recomp.' },
-                { label: 'Protein (all phases)', text: `Hit ${proteinTarget ?? '~160'}g protein/day. Protein preserves muscle during cuts, builds it during bulks, and directly improves skin texture and collagen over time.` },
-              ].filter(Boolean).map(({ label, text }, i) => (
-                <div key={i} className="flex gap-2.5 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.15)' }}>
-                    <span className="text-[9px] font-bold" style={{ color: '#C6A85C' }}>→</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-heading font-bold text-primary mb-0.5">{label}</p>
-                    <p className="text-[10px] text-secondary font-body leading-relaxed">{text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="relative rounded-2xl overflow-hidden">
-            <div className="blur-sm pointer-events-none select-none opacity-35 space-y-2">
-              {['Protein: 165g/day · 1g per lb bodyweight for appearance optimization', 'Carbs: 220g/day · Fuel training and recovery', 'Fats: 65g/day · Hormone production + skin health', 'Cut: −500 cal deficit · Lose 1lb/week, reveals jawline structure', 'Jawline unlocks: Every 1% body fat drop reveals more bone definition'].map((line, i) => (
-                <div key={i} className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
-                  <p className="text-[10px] font-body text-primary">{line}</p>
-                </div>
-              ))}
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
-              <Lock size={18} className="text-[#C6A85C] mb-2" />
-              <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
-              <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full macro breakdown framed around appearance improvement — not generic health advice</p>
-              <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
-                Upgrade to Pro →
-              </button>
-            </div>
-          </div>
-        )}
-      </Section>
 
       {/* ── Legal Disclaimers ─────────────────────────────────────── */}
       <div className="space-y-2 mb-4">

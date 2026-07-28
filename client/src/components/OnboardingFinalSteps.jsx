@@ -163,11 +163,8 @@ function OverallCard({ scan }) {
   const glowScore = scan?.glowScore ?? null
   const tier      = scan?.tier      ?? null
 
-  const physiqueUpside = scan?.physiqueScore
-    ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
-    : 0
   const potential = glowScore != null
-    ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
+    ? Math.min(10, glowScore + 1.4).toFixed(1)
     : null
 
   const symmetry          = scan?.faceData?.symmetry          ?? null

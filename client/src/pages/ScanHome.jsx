@@ -28,7 +28,7 @@ const SLIDE_VARIANTS = {
 // consumes all the space, leaving nothing to redistribute) but centers
 // BeginScanCard's now-shorter box+text+button group in the freed-up space
 // instead of leaving it pinned to the top with a dead gap at the bottom.
-function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, visualClassName = 'flex-1' }) {
+function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, visualClassName = 'flex-1', footer }) {
   return (
     <div
       className="flex flex-col justify-center h-full px-6 pb-4"
@@ -43,17 +43,24 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, vi
       <h2 className="font-heading font-bold text-[24px] text-primary mb-2" style={{ letterSpacing: '-0.02em' }}>
         {title}
       </h2>
-      <p className="font-body text-[14px] text-secondary mb-6 leading-relaxed">
-        {body}
-      </p>
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onAction() }}
-        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-        style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-      >
-        <Icon size={17} /> {cta}
-      </motion.button>
+      {/* footer lets a card swap out the default pitch-text + big CTA button
+          for something else (e.g. BodyCard's compact returning-user row)
+          without duplicating the visual/eyebrow/title markup above. */}
+      {footer ?? (
+        <>
+          <p className="font-body text-[14px] text-secondary mb-6 leading-relaxed">
+            {body}
+          </p>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { triggerHaptic(); onAction() }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+          >
+            <Icon size={17} /> {cta}
+          </motion.button>
+        </>
+      )}
     </div>
   )
 }
@@ -133,7 +140,13 @@ function PastResultCard({ scan, onView }) {
   )
 }
 
-function BodyCard({ onBody }) {
+function BodyCard({ onBody, physiqueScore, trainingSplit, bodyPhotoUrl }) {
+  // Once a physique score exists, a plan has been generated at least once —
+  // swap the generic first-time pitch for a compact "you already have a
+  // plan" row instead of repeating the same sales copy forever.
+  const hasPlan = physiqueScore?.overall != null
+  const planLabel = trainingSplit ?? 'Custom Plan'
+
   return (
     <CardShell
       eyebrow="PHYSIQUE"
@@ -147,6 +160,33 @@ function BodyCard({ onBody }) {
           <Dumbbell size={56} style={{ color: `${GOLD}66` }} />
         </div>
       }
+      footer={hasPlan ? (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onBody() }}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <div className="w-[52px] h-[52px] rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#0a0f22' }}>
+            {bodyPhotoUrl ? (
+              <img src={bodyPhotoUrl} alt="Your body" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Dumbbell size={22} style={{ color: `${GOLD}88` }} />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="font-heading font-bold text-[15px] text-primary truncate">
+              Physique · {physiqueScore.overall.toFixed(1)}
+            </p>
+            <p className="font-body text-[12px] text-secondary mt-0.5 truncate">
+              Plan active · {planLabel}
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-secondary flex-shrink-0" />
+        </motion.button>
+      ) : undefined}
     />
   )
 }
@@ -154,6 +194,7 @@ function BodyCard({ onBody }) {
 export default function ScanHome() {
   const navigate = useNavigate()
   const scans = useStore(s => s.scans)
+  const currentScan = useStore(s => s.currentScan)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
@@ -168,7 +209,17 @@ export default function ScanHome() {
       id: 'past',
       el: <PastResultCard scan={latestScan} onView={() => { setCurrentScan(latestScan); navigate('/results') }} />,
     }] : []),
-    { id: 'body', el: <BodyCard onBody={() => navigate('/workout-plan')} /> },
+    {
+      id: 'body',
+      el: (
+        <BodyCard
+          onBody={() => navigate('/workout-plan')}
+          physiqueScore={currentScan?.physiqueScore ?? null}
+          trainingSplit={currentScan?.trainingSplit ?? null}
+          bodyPhotoUrl={currentScan?.bodyPhotoUrl ?? null}
+        />
+      ),
+    },
   ]
 
   function goTo(idx) {

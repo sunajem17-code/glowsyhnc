@@ -7,6 +7,8 @@ import { api } from '../utils/api'
 import { fileToResizedBase64 } from '../pages/WorkoutPlan'
 import BodyStatsFlow from './BodyStatsStep'
 import logo from '../assets/ascendus-icon.png'
+import bodyGuideMale from '../assets/body-guide-male.jpg'
+import bodyGuideFemale from '../assets/body-guide-female.jpg'
 
 // ── 4-step intro that runs the first time a user opens Training Plan ─────────
 // Replaces the old bare "Add Your Physique Photo" gate screen in
@@ -22,7 +24,7 @@ const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.5)'
 const STEP_TOTAL = 4
 
-function StepChrome({ step, children }) {
+function StepChrome({ step, showStepLabel = true, children }) {
   const pct = (step / STEP_TOTAL) * 100
   return (
     <div className="relative flex flex-col h-full" style={{ background: BG }}>
@@ -38,11 +40,13 @@ function StepChrome({ step, children }) {
       <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
         <img src={logo} alt="Ascendus" style={{ width: 20, height: 20, mixBlendMode: 'lighten', opacity: 0.65 }} />
       </div>
-      <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-        <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
-          Step {step} of {STEP_TOTAL}
-        </span>
-      </div>
+      {showStepLabel && (
+        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+          <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Step {step} of {STEP_TOTAL}
+          </span>
+        </div>
+      )}
       {children}
     </div>
   )
@@ -97,51 +101,78 @@ function WelcomeStep({ onNext }) {
   )
 }
 
-function PhotoStep({ onPhotoSelected, error, loading }) {
+function PhotoStep({ gender, onPhotoSelected, error, loading }) {
   const fileInputRef = useRef(null)
+  const frameStyle = { width: '60vw', maxWidth: 260 }
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
-      <div
-        className="w-20 h-20 rounded-3xl flex items-center justify-center"
-        style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
-      >
-        <Target size={36} style={{ color: GOLD }} />
-      </div>
-      <div className="space-y-2">
-        <p className="font-heading font-bold text-[20px] leading-tight" style={{ color: TEXT }}>
-          Add a photo of your body
-        </p>
-        <p className="font-body text-[13px] leading-relaxed" style={{ color: DIM }}>
-          That's the only thing needed — take or upload one body photo and your plan is built from it.
-        </p>
-      </div>
-
-      {error && (
-        <div className="w-full flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-          <AlertCircle size={15} style={{ color: '#EF4444', flexShrink: 0 }} />
-          <p className="text-xs font-body flex-1 text-left" style={{ color: '#EF4444' }}>{error}</p>
+    <div className="flex-1 flex flex-col px-8 text-center" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)' }}>
+      {/* Top-anchored group — step label, photo, and copy sit close together
+          instead of being centered as one lump with empty space above/below.
+          The step label shares the frame's own width so its left edge lines
+          up with the frame's left edge even though both are horizontally
+          centered as a unit by the parent's items-center. */}
+      <div className="flex flex-col items-center gap-3">
+        <div style={frameStyle} className="text-left">
+          <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Step 3 of {STEP_TOTAL}
+          </span>
         </div>
-      )}
+        <div
+          className="relative rounded-2xl overflow-hidden"
+          style={{ ...frameStyle, aspectRatio: '4 / 5', border: `1px solid ${GOLD}`, boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+        >
+          <img
+            src={gender === 'female' ? bodyGuideFemale : bodyGuideMale}
+            alt="Example body photo"
+            className="w-full h-full object-cover object-top"
+          />
+          <span
+            className="absolute top-2 left-2 px-2 py-0.5 rounded-full font-heading font-bold uppercase tracking-wide"
+            style={{ fontSize: 9, color: GOLD, background: 'rgba(10,10,10,0.65)', border: `1px solid ${GOLD}` }}
+          >
+            Example
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-heading font-bold text-[20px] leading-tight" style={{ color: TEXT }}>
+            Add a photo of your body
+          </p>
+          <p className="font-body text-[13px] leading-relaxed" style={{ color: DIM }}>
+            That's the only thing needed — take or upload one body photo and your plan is built from it.
+          </p>
+        </div>
+      </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={onPhotoSelected}
-      />
+      <div className="flex-1" />
 
-      <motion.button
-        whileTap={{ scale: loading ? 1 : 0.97 }}
-        disabled={loading}
-        onClick={() => { triggerHaptic(); fileInputRef.current?.click() }}
-        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-        style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)', opacity: loading ? 0.6 : 1 }}
-      >
-        <Target size={16} />
-        Take or Upload Body Photo
-      </motion.button>
+      <div className="pb-10 pt-4">
+        {error && (
+          <div className="w-full flex items-center gap-2 px-4 py-3 mb-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <AlertCircle size={15} style={{ color: '#EF4444', flexShrink: 0 }} />
+            <p className="text-xs font-body flex-1 text-left" style={{ color: '#EF4444' }}>{error}</p>
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={onPhotoSelected}
+        />
+
+        <motion.button
+          whileTap={{ scale: loading ? 1 : 0.97 }}
+          disabled={loading}
+          onClick={() => { triggerHaptic(); fileInputRef.current?.click() }}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+          style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)', opacity: loading ? 0.6 : 1 }}
+        >
+          <Target size={16} />
+          Take or Upload Body Photo
+        </motion.button>
+      </div>
     </div>
   )
 }
@@ -196,7 +227,7 @@ export default function TrainingPlanIntro({ gender, initialHeight, initialWeight
     try {
       const bodyImage = await fileToResizedBase64(file)
       const { physiqueScore } = await api.ai.scorePhysique({ bodyImage, gender })
-      onComplete(physiqueScore)
+      onComplete(physiqueScore, bodyImage)
     } catch (err) {
       console.error('[TrainingPlanIntro] body scan failed:', err.message)
       setAnalysisError(
@@ -226,8 +257,8 @@ export default function TrainingPlanIntro({ gender, initialHeight, initialWeight
         )}
         {step === 3 && (
           <motion.div key="photo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: EASE_STANDARD }} className="h-full">
-            <StepChrome step={3}>
-              <PhotoStep onPhotoSelected={handlePhotoSelected} error={analysisError} loading={analyzing} />
+            <StepChrome step={3} showStepLabel={false}>
+              <PhotoStep gender={gender} onPhotoSelected={handlePhotoSelected} error={analysisError} loading={analyzing} />
             </StepChrome>
           </motion.div>
         )}

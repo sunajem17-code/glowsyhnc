@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight } from 'lucide-react'
+import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight, Beef, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
@@ -35,6 +35,28 @@ export function fileToResizedBase64(file, maxPx = 1024) {
     }
     reader.readAsDataURL(file)
   })
+}
+
+// ── Retry with backoff for genuinely transient failures ───────────────────────
+// Only retries network blips / our-server 5xx — never 429 (rate limit) or 400
+// (bad request), since an immediate retry can't fix either of those and would
+// just waste the demo/free-tier's already-scarce Claude call budget.
+async function callWorkoutPlanWithRetry(payload, maxAttempts = 3) {
+  let lastErr
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await api.ai.workoutPlan(payload)
+    } catch (err) {
+      lastErr = err
+      const isRateLimited = err.status === 429 || err.errorCode === 'claude_rate_limited' || err.errorCode === 'rate_limited'
+      const isBadRequest  = err.status === 400
+      if (isRateLimited || isBadRequest || attempt === maxAttempts) throw err
+      const delayMs = 800 * 2 ** (attempt - 1) // 800ms, then 1600ms
+      console.warn(`[WorkoutPlan] AI plan attempt ${attempt}/${maxAttempts} failed (${err.message}) — retrying in ${delayMs}ms`)
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+  throw lastErr
 }
 
 // ── Fallback plan (used if AI call fails) ─────────────────────────────────────
@@ -317,6 +339,28 @@ function WeakAreaChips({ physiqueScores }) {
   )
 }
 
+// ── Collapsible section (Pro-gated badge support) ───────────────────────────────
+function Section({ title, icon, children, defaultOpen = true, badge }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="card">
+      <button className="w-full flex items-center gap-2 mb-1" onClick={() => setOpen(o => !o)}>
+        <span className="flex-shrink-0">{icon}</span>
+        <h2 className="font-heading font-bold text-sm text-primary flex-1 text-left">{title}</h2>
+        {badge && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#C6A85C]/10 text-[#C6A85C]">{badge}</span>}
+        {open ? <ChevronUp size={14} className="text-secondary" /> : <ChevronDown size={14} className="text-secondary" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }} className="overflow-hidden">
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ── Split badge ────────────────────────────────────────────────────────────────
 const SPLIT_ICONS = {
   beginner:     <Zap size={14} />,
@@ -357,20 +401,71 @@ export default function WorkoutPlan() {
     api.user.update({ height_cm: height, weight_kg: weight }).catch(() => {})
   }
 
+  // ─── Nutrition Plan (TDEE) ──────────────────────────────────────────────────
+  // Moved here from the main face-scan results screen — this flow is the only
+  // place real height/weight (userProfile.height/weight, set above) actually
+  // exists, so TDEE/macros now resolve instead of always showing "—".
+  const nutHeightCm = userProfile?.height ?? null
+  const nutWeightKg = userProfile?.weight ?? null
+  const nutGoal     = userProfile?.goal ?? null
+
+  const tdee = (() => {
+    if (!nutHeightCm || !nutWeightKg) return null
+    const age = 25 // default — age not collected in onboarding
+    const bmr = gender === 'female'
+      ? 10 * nutWeightKg + 6.25 * nutHeightCm - 5 * age - 161
+      : 10 * nutWeightKg + 6.25 * nutHeightCm - 5 * age + 5
+    return Math.round(bmr * 1.55)
+  })()
+
+  const nutritionPhase =
+    nutGoal === 'Lose Fat' ? 'CUT' :
+    nutGoal === 'Build Muscle' ? 'BULK' : 'RECOMP'
+
+  const nutritionTarget = tdee == null ? null :
+    nutritionPhase === 'CUT'  ? tdee - 500 :
+    nutritionPhase === 'BULK' ? tdee + 300 : tdee
+
+  const proteinTarget = nutWeightKg ? Math.round(nutWeightKg * 2.2 * 0.9) : null
+
+  const nutritionPhaseLabel =
+    nutritionPhase === 'CUT'  ? 'Cut Phase' :
+    nutritionPhase === 'BULK' ? 'Lean Bulk' : 'Recomp'
+
+  const nutritionProjection =
+    nutritionPhase === 'CUT'  ? 'Lose ~1lb/week while preserving muscle' :
+    nutritionPhase === 'BULK' ? 'Gain 0.5–1lb/week lean muscle' :
+    'Simultaneous fat loss + muscle gain'
+
+  const nutritionMacros = nutritionTarget ? {
+    protein: proteinTarget ?? Math.round((nutritionTarget * 0.35) / 4),
+    carbs:   Math.round((nutritionTarget * 0.40) / 4),
+    fats:    Math.round((nutritionTarget * 0.25) / 9),
+  } : null
+
+  const nutritionFraming = {
+    CUT:    { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} − 500 cal deficit`, pillar: 'Lower body fat reveals more muscle definition and improves your V-taper.' },
+    BULK:   { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} + 300 cal surplus`,  pillar: 'Muscle mass gain widens your shoulder-to-waist ratio and increases overall structural size.' },
+    RECOMP: { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} maintenance calories`, pillar: 'Builds muscle while keeping body fat stable — the most balanced physique protocol.' },
+  }[nutritionPhase]
+
   // ── Body-only quick scan (no face required) — the photo/analysis call
   // itself now lives in TrainingPlanIntro (step 3/4), reusing the same
   // api.ai.scorePhysique endpoint; this just receives the result and does
   // the same currentScan merge the old inline handler used to do directly.
-  function handleIntroComplete(physiqueScore) {
+  function handleIntroComplete(physiqueScore, bodyPhotoUrl) {
     // Merge into currentScan if one exists (keeps any face data around),
     // otherwise start a minimal scan record — Training Plan only ever
-    // reads physiqueScore + gender off this object.
+    // reads physiqueScore + gender off this object. bodyPhotoUrl is stored
+    // purely for ScanHome's returning-user thumbnail (see effect below for
+    // trainingSplit) — WorkoutPlan itself never reads it back.
     setCurrentScan({
       id: currentScan?.id ?? `scan-${Date.now()}`,
       scanDate: currentScan?.scanDate ?? new Date().toISOString(),
       ...currentScan,
       gender,
       physiqueScore,
+      bodyPhotoUrl,
     })
   }
 
@@ -399,10 +494,22 @@ export default function WorkoutPlan() {
     }
 
     try {
-      const result = await api.ai.workoutPlan({ physiqueScores, gender, trainingLevel: inferredLevel })
+      const result = await callWorkoutPlanWithRetry({ physiqueScores, gender, trainingLevel: inferredLevel })
       if (result?.fallback) throw new Error('server fallback')
       setPlan(result)
-    } catch {
+    } catch (err) {
+      // Log the real error — status/errorCode/message/stack — instead of
+      // silently swallowing it. This was the actual reason "why did it fail"
+      // was unanswerable before: the catch block never looked at `err`.
+      console.error('[WorkoutPlan] AI plan generation failed:', {
+        status: err.status, errorCode: err.errorCode, message: err.message, stack: err.stack,
+      })
+      const isRateLimited = err.status === 429 || err.errorCode === 'claude_rate_limited'
+      setError(
+        isRateLimited
+          ? "You've hit your hourly AI plan limit. Showing a template for now — try again in about an hour."
+          : (err.message || 'Could not generate your personalized plan.')
+      )
       const fallback = buildFallback(physiqueScores, gender)
       setPlan(fallback)
       setIsFallback(true)
@@ -414,6 +521,16 @@ export default function WorkoutPlan() {
   useEffect(() => {
     loadPlan()
   }, [loadPlan])
+
+  // Mirror the resolved split label onto currentScan (AI-generated or
+  // fallback, doesn't matter which) purely so ScanHome's Body card can show
+  // "Plan active · <split>" without needing this page open.
+  useEffect(() => {
+    if (plan?.split && currentScan?.trainingSplit !== plan.split) {
+      setCurrentScan({ ...currentScan, trainingSplit: plan.split })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan])
 
   // ── Gate: no body photo uploaded yet — runs the 4-step welcome → stats →
   // photo → generating intro instead of a bare upload button. A returning
@@ -494,7 +611,7 @@ export default function WorkoutPlan() {
           >
             <AlertCircle size={14} style={{ color: '#F5A623', flexShrink: 0, marginTop: 1 }} />
             <p className="font-body text-[11px] leading-relaxed" style={{ color: '#F5A623' }}>
-              Showing a template plan based on your physique score. Personalized AI plan failed to load.
+              {error || 'Showing a template plan based on your physique score. Personalized AI plan failed to load.'}
             </p>
             <button onClick={() => { triggerHaptic(); loadPlan() }} className="flex-shrink-0">
               <RefreshCw size={13} style={{ color: '#F5A623' }} />
@@ -525,6 +642,108 @@ export default function WorkoutPlan() {
               <DayCard key={i} day={day} index={i} />
             ))}
           </div>
+        )}
+
+        {/* Nutrition Plan */}
+        {!loading && (
+          <Section title="Nutrition Plan" icon={<Beef size={16} style={{ color: '#C6A85C' }} />} defaultOpen={false} badge="PRO">
+            {/* Free: calorie target + phase label */}
+            <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
+              <div className="text-center flex-shrink-0">
+                {nutritionTarget ? (
+                  <>
+                    <div className="text-2xl font-mono font-bold" style={{ color: '#F5A623' }}>{nutritionTarget.toLocaleString()}</div>
+                    <div className="text-[9px] font-body text-secondary">cal/day</div>
+                  </>
+                ) : (
+                  <div className="text-sm font-heading font-bold text-secondary">—</div>
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-heading font-bold text-primary">{nutritionPhaseLabel}</p>
+                <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">{nutritionProjection}</p>
+                {!nutritionTarget && (
+                  <p className="text-[10px] text-secondary font-body mt-1">Add your body stats above for exact targets.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Pro: full breakdown */}
+            {isPremium ? (
+              <div className="space-y-3">
+                {nutritionFraming && (
+                  <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary mb-1">How This Works</p>
+                    <p className="text-[11px] font-body text-primary leading-relaxed">
+                      <span className="font-bold">{nutritionFraming.calNote}</span>
+                      {tdee && nutritionTarget && nutritionPhase !== 'RECOMP' && (
+                        <> — a {Math.abs(nutritionTarget - tdee)} cal/day {nutritionPhase === 'CUT' ? 'deficit' : 'surplus'}.</>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-secondary font-body mt-1 leading-relaxed">{nutritionFraming.pillar}</p>
+                  </div>
+                )}
+
+                {nutritionMacros && (
+                  <div>
+                    <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary mb-2">Daily Macro Targets</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Protein', value: nutritionMacros.protein + 'g', color: '#E07A5F', note: '~1g/lb bodyweight' },
+                        { label: 'Carbs',   value: nutritionMacros.carbs   + 'g', color: '#F5A623', note: 'fuel + performance' },
+                        { label: 'Fats',    value: nutritionMacros.fats    + 'g', color: '#34C759', note: 'hormones + recovery' },
+                      ].map(({ label, value, color, note }) => (
+                        <div key={label} className="text-center p-2.5 rounded-xl" style={{ background: `${color}11`, border: `1px solid ${color}30` }}>
+                          <div className="text-base font-mono font-bold" style={{ color }}>{value}</div>
+                          <div className="text-[9px] font-heading font-bold text-secondary">{label}</div>
+                          <div className="text-[8px] text-secondary font-body mt-0.5">{note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary">Physique Framing</p>
+                  {[
+                    nutritionPhase === 'CUT'  && { label: 'V-Taper', text: 'As waist shrinks, your shoulder-to-waist ratio improves automatically — even without new muscle.' },
+                    nutritionPhase === 'CUT'  && { label: 'Muscle Retention', text: 'A moderate deficit (not aggressive) protects the muscle you already have while you lose fat.' },
+                    nutritionPhase === 'BULK' && { label: 'Structural Size', text: 'Muscle mass increases your overall frame size — the main driver of a strong V-taper.' },
+                    nutritionPhase === 'BULK' && { label: 'V-Taper', text: 'Shoulder and lat growth in surplus widens your silhouette faster than in recomp.' },
+                    { label: 'Protein (all phases)', text: `Hit ${proteinTarget ?? '~160'}g protein/day. Protein preserves muscle during cuts, builds it during bulks, and supports recovery between sessions.` },
+                  ].filter(Boolean).map(({ label, text }, i) => (
+                    <div key={i} className="flex gap-2.5 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.15)' }}>
+                        <span className="text-[9px] font-bold" style={{ color: '#C6A85C' }}>→</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-heading font-bold text-primary mb-0.5">{label}</p>
+                        <p className="text-[10px] text-secondary font-body leading-relaxed">{text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden">
+                <div className="blur-sm pointer-events-none select-none opacity-35 space-y-2">
+                  {['Protein: 165g/day · 1g per lb bodyweight for muscle retention', 'Carbs: 220g/day · Fuel training and recovery', 'Fats: 65g/day · Hormone production + recovery', 'Cut: −500 cal deficit · Lose 1lb/week while preserving muscle', 'V-Taper: Lower body fat reveals more shoulder-to-waist definition'].map((line, i) => (
+                    <div key={i} className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
+                      <p className="text-[10px] font-body text-primary">{line}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
+                  <Lock size={18} className="text-[#C6A85C] mb-2" />
+                  <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
+                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full macro breakdown framed around your physique goals — not generic health advice</p>
+                  <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
+                    Upgrade to Pro →
+                  </button>
+                </div>
+              </div>
+            )}
+          </Section>
         )}
 
         {/* Disclaimer */}

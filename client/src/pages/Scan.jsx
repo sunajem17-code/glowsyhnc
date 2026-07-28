@@ -12,14 +12,12 @@ import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/side-profile-guide.png'
 import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
-import bodyGuideMale from '../assets/body-guide-male.jpg'
-import bodyGuideFemale from '../assets/body-guide-female.jpg'
 import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
 import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { startFaceScan } from '../utils/faceScan'
-import { analyzeBodyPhoto, analyzeSideProfile } from '../utils/photoGeometry'
+import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
@@ -361,28 +359,39 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
   }
 
   return (
-    <div className={stepNum === 1 ? 'flex flex-col h-full px-3' : 'flex flex-col h-full px-4'}>
+    <div className="flex flex-col h-full px-3">
       {cameraOpen && (
         <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
       )}
 
+      {/* Instruction caption — side-profile-specific content, the one thing
+          that's intentionally NOT shared with step 1 (which shows no
+          caption at all). Kept minimal (one line, no box/padding section)
+          so it doesn't disrupt the otherwise-identical layout below it. */}
+      {stepNum === 2 && (
+        <p className="text-xs text-secondary font-body pt-2 pb-1">
+          Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera
+        </p>
+      )}
+
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below.
-          Step 1 (face photo) uses a near-full-width, aspect-ratio-driven frame instead of the
-          shared flex-1/max-h-80 box, so it dominates the screen instead of sitting in a smaller
-          centered box. */}
+          Steps 1 and 2 share the same near-full-width frame shape/border/glow,
+          but step 1's aspect ratio is intentionally 4/5 (not 3/4 like step 2)
+          — see the object-fit: cover + object-position: bottom comment below
+          for why this specific ratio matters there. */}
       <div
-        className={stepNum === 1
-          ? 'relative w-full aspect-[4/5] rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none'
-          : 'relative flex-1 max-h-80 rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none'}
+        className={`relative w-full ${stepNum === 1 ? 'aspect-[4/5]' : 'aspect-[3/4]'} rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none`}
         style={{
-          background: stepNum === 3 ? '#0a0f22' : (stepNum === 1 || stepNum === 2) ? '#000000' : '#111827',
-          // Gold frame — step 1 only, same weight/opacity idiom as the rest of
-          // the app's gold accents (solid GOLD for the border itself, the
-          // equivalent rgba(198,168,92,X) for the soft outer glow, since
-          // there's no alpha-variant helper for the hex token elsewhere in
-          // this codebase either — see Premium.jsx's GOLD_BORDER/${GOLD}NN
+          background: '#000000',
+          // Gold frame — steps 1 and 2 (Face Photo, Side Profile) share it,
+          // same weight/opacity idiom as the rest of the app's gold accents
+          // (solid GOLD for the border itself, the equivalent
+          // rgba(198,168,92,X) for the soft outer glow, since there's no
+          // alpha-variant helper for the hex token elsewhere in this
+          // codebase either — see Premium.jsx's GOLD_BORDER/${GOLD}NN
           // pattern, ScanUnlockGate's badge borders).
-          ...(stepNum === 1 ? { border: `1.5px solid ${GOLD}`, boxShadow: '0 0 16px rgba(198,168,92,0.25)' } : {}),
+          border: `1.5px solid ${GOLD}`,
+          boxShadow: '0 0 16px rgba(198,168,92,0.25)',
         }}
       >
         {photo ? (
@@ -464,48 +473,34 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             className="absolute inset-0 w-full h-full"
             style={{ objectFit: 'contain' }}
           />
-        ) : stepNum === 3 ? (
-          <img
-            src={gender === 'female' ? bodyGuideFemale : bodyGuideMale}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-top"
-          />
         ) : stepNum === 1 ? (
-          // object-contain (not cover/top) so the whole face shows — cover+top
-          // was cropping this tall portrait down to just forehead/eyes. Also
-          // re-cropped the source asset itself tighter to the face (was
-          // 1000x2167 with a lot of dead neck/torso/black space below the
-          // chin, now 1000x1400) so contain doesn't shrink it down to a tiny
-          // letterboxed strip. Inline style, not just the Tailwind class —
-          // belt-and-suspenders against any build/purge weirdness.
+          // object-fit: cover + object-position: bottom (not contain) — this
+          // is a deliberate, computed crop, not a guess. Container is
+          // aspect-[4/5] (0.8); image is 1000x1400 (0.7143). Under cover,
+          // that mismatch always scales by width (image is narrower than
+          // the box), which overflows the box's height by a fixed amount
+          // regardless of viewport size: 1400 - (1.25 / (1000/1000)) *
+          // 1000 = 150 source px. object-position: bottom anchors the
+          // image's bottom edge to the box's bottom edge, so those 150px
+          // come off the TOP only — exactly enough to crop out the orange
+          // dot (source rows 63-75) and the empty space around it, with
+          // ~60px of margin before the hairline (~row 210), which never
+          // gets touched. The chin (row ~1297) stays fully clear of the
+          // bottom edge — this crop budget comes off the top exclusively,
+          // it doesn't eat into the bottom margin at all (verified: chin
+          // margin is ~44px at 428px width, slightly MORE than it was
+          // under the old aspect-[3/4]+contain framing, not less).
           <img
             src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'contain' }}
+            style={{ objectFit: 'cover', objectPosition: 'center bottom' }}
           />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
             <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
           </div>
-        )}
-        {/* Corner guides — decorative only. Dropped for step 1's redesigned
-            frame, which is meant to be just the photo/reference image with
-            nothing else cluttering it. */}
-        {!photo && stepNum !== 1 && (
-          <>
-            {[['top-3 left-3', true, false, true, false], ['top-3 right-3', true, false, false, true],
-              ['bottom-3 left-3', false, true, true, false], ['bottom-3 right-3', false, true, false, true]].map(([pos, t, b, l, r], i) => (
-              <div key={i} className={`absolute ${pos} w-6 h-6`} style={{
-                borderTopWidth: t ? 2 : 0, borderBottomWidth: b ? 2 : 0,
-                borderLeftWidth: l ? 2 : 0, borderRightWidth: r ? 2 : 0,
-                borderColor: '#C6A85C', borderStyle: 'solid',
-                borderRadius: `${t && l ? 4 : 0}px ${t && r ? 4 : 0}px ${b && r ? 4 : 0}px ${b && l ? 4 : 0}px`,
-              }} />
-            ))}
-          </>
         )}
       </div>
 
@@ -529,72 +524,73 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           Profile step just invited people to turn 90° before tapping it,
           which broke tracking — so step 2 only ever needs a photo now, no
           separate scan action. */}
-      {stepNum === 1 ? (
-        canAutoLiveScan ? (
-          <div className="mb-1">
-            {/* Hidden entirely while the "Now scanning…" transition/overlay is up —
-                that state has its own inline skip link, so nothing duplicates it here. */}
-            {!showScanOverlay && (
-              !photo && !arScanDone ? (
+      {canAutoLiveScan ? (
+        <div className="mb-1">
+          {/* Hidden entirely while the "Now scanning…" transition/overlay is up —
+              that state has its own inline skip link, so nothing duplicates it here. */}
+          {!showScanOverlay && (
+            !photo && !arScanDone ? (
+              <button
+                onClick={() => setShowActionSheet(true)}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+                style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+              >
+                <Camera size={18} style={{ color: '#0A0A0A' }} />
+                <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+                  Upload or Take a Selfie
+                </span>
+              </button>
+            ) : (
+              // Settled (scan succeeded, was skipped, or the native modal was
+              // cancelled) — a lightweight retake control, not a full pill.
+              // Reopening the action sheet still offers "Live Face Scan" as a
+              // manual option, so this doubles as the recovery path if the
+              // native modal was dismissed without using the skip link above.
+              <div className="flex flex-col items-center gap-1.5">
                 <button
                   onClick={() => setShowActionSheet(true)}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
                 >
-                  <Camera size={18} style={{ color: '#0A0A0A' }} />
-                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-                    Upload or Take a Selfie
+                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    Retake Photo
                   </span>
                 </button>
-              ) : (
-                // Settled (scan succeeded, was skipped, or the native modal was
-                // cancelled) — a lightweight retake control, not a full pill.
-                // Reopening the action sheet still offers "Live Face Scan" as a
-                // manual option, so this doubles as the recovery path if the
-                // native modal was dismissed without using the skip link above.
-                <div className="flex flex-col items-center gap-1.5">
+                {!arScanDone && !arScanSkipped && onSkipScan && (
                   <button
-                    onClick={() => setShowActionSheet(true)}
-                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
+                    onClick={onSkipScan}
+                    className="text-[11px] font-body underline active:opacity-60 transition-opacity"
+                    style={{ color: 'rgba(255,255,255,0.35)' }}
                   >
-                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      Retake Photo
-                    </span>
+                    Skip Live Face Scan — use photo only
                   </button>
-                  {!arScanDone && !arScanSkipped && onSkipScan && (
-                    <button
-                      onClick={onSkipScan}
-                      className="text-[11px] font-body underline active:opacity-60 transition-opacity"
-                      style={{ color: 'rgba(255,255,255,0.35)' }}
-                    >
-                      Skip Live Face Scan — use photo only
-                    </button>
-                  )}
-                </div>
-              )
-            )}
+                )}
+              </div>
+            )
+          )}
 
-            <AnimatePresence>
-              {showActionSheet && (
-                <PhotoActionSheet
-                  onClose={() => setShowActionSheet(false)}
-                  options={[
-                    ...(isNative() && onLiveScan ? [{
-                      label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
-                      icon: Star,
-                      highlight: true,
-                      onSelect: () => { setShowActionSheet(false); onLiveScan() },
-                    }] : []),
-                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-                  ]}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        ) : (
+          <AnimatePresence>
+            {showActionSheet && (
+              <PhotoActionSheet
+                onClose={() => setShowActionSheet(false)}
+                options={[
+                  ...(isNative() && onLiveScan ? [{
+                    label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
+                    icon: Star,
+                    highlight: true,
+                    onSelect: () => { setShowActionSheet(false); onLiveScan() },
+                  }] : []),
+                  { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                  { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+                ]}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (
         <div className="mb-1">
+          {/* Same pill button on both steps — label swaps "Selfie" for "Photo"
+              on step 2 since it's a profile shot, not a front-facing selfie. */}
           <button
             onClick={() => setShowActionSheet(true)}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
@@ -602,7 +598,9 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           >
             <Camera size={18} style={{ color: '#0A0A0A' }} />
             <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-              {photo || arScanDone ? 'Retake Selfie' : 'Upload or Take a Selfie'}
+              {photo || arScanDone
+                ? (stepNum === 1 ? 'Retake Selfie' : 'Retake Photo')
+                : (stepNum === 1 ? 'Upload or Take a Selfie' : 'Upload or Take a Photo')}
             </span>
           </button>
 
@@ -624,7 +622,10 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               <PhotoActionSheet
                 onClose={() => setShowActionSheet(false)}
                 options={[
-                  ...(isNative() && onLiveScan ? [{
+                  // Live Face Scan explicitly gated to step 1 — ARKit can't
+                  // reliably track a real 90° turn, so step 2 never offers
+                  // it, regardless of what onLiveScan/isNative() resolve to.
+                  ...(stepNum === 1 && isNative() && onLiveScan ? [{
                     label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
                     icon: Star,
                     highlight: true,
@@ -636,38 +637,6 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               />
             )}
           </AnimatePresence>
-        </div>
-        )
-      ) : (
-        <div className="grid grid-cols-2 gap-3 mb-1">
-          {/* Take Photo — solid gold border */}
-          <button
-            onClick={handleCameraClick}
-            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-            style={{
-              background: 'rgba(201,168,76,0.06)',
-              border: '2px solid #C6A85C',
-              borderRadius: 12,
-              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
-            }}
-          >
-            <Camera size={20} style={{ color: '#C6A85C' }} />
-            <span className="text-xs font-heading font-bold text-white">Take Photo</span>
-          </button>
-          {/* Upload Photo — identical gold border, no greyed-out look */}
-          <button
-            onClick={handleUploadClick}
-            className="flex flex-col items-center gap-2 py-4 active:scale-95 transition-transform"
-            style={{
-              background: 'rgba(201,168,76,0.06)',
-              border: '2px solid #C6A85C',
-              borderRadius: 12,
-              boxShadow: '0 0 12px rgba(201,168,76,0.3)',
-            }}
-          >
-            <Upload size={20} style={{ color: '#C6A85C' }} />
-            <span className="text-xs font-heading font-bold text-white">Upload Photo</span>
-          </button>
         </div>
       )}
     </div>
@@ -946,14 +915,13 @@ function ChecklistRow({ step: s, i, currentStep }) {
 }
 
 // ─── Main Scan Page ───────────────────────────────────────────────────────────
-// Steps: 0=gender  1=face  2=side-profile  3=body  4=analyzing
+// Steps: 0=gender  1=face  2=side-profile  3=analyzing
+// Body Photo / physique scoring is intentionally NOT part of this flow —
+// physique scoring only happens in the separate Training Plan flow
+// (TrainingPlanIntro.jsx's own body-photo step, via /score/physique).
 
-const STEP_META = [
-  { title: 'Select Gender',  subtitle: 'For accurate Overall Rating results' },
-  { title: 'Face Photo',     subtitle: 'Take your photo' },
-  { title: 'Side Profile',   subtitle: 'Optional · Unlocks profile analysis' },
-  { title: 'Body Photo',     subtitle: 'Optional · Unlocks physique score' },
-]
+// Only step 0 (gender select) still uses PageHeader's title/subtitle —
+// steps 1 and 2 render their own matching custom header instead (below).
 
 export default function Scan() {
   const navigate = useNavigate()
@@ -990,7 +958,6 @@ export default function Scan() {
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
-  const [bodyPhoto, setBodyPhoto]         = useState(null)
   const [faceMetrics, setFaceMetrics]     = useState(null)   // ARKit geometry results
   const [arScanDone, setArScanDone]       = useState(false)  // true when ARKit replaced photo
   const [arScanSkipped, setArScanSkipped] = useState(false)  // user opted out of Live Face Scan after uploading/taking a static photo
@@ -1115,14 +1082,13 @@ export default function Scan() {
   }, [step, facePhoto, geometrySatisfied, faceScanBusy])
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
-  async function startAnalysis(skipSideOverride = false, skipBodyOverride = false) {
+  async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
     const skipSide = skipSideOverride
-    const skipBody = skipBodyOverride
     const g        = gender ?? 'male'
     setGender(g)
-    setStep(4)  // analyzing
+    setStep(3)  // analyzing
     setError('')
     setAnalysisStep(0)
 
@@ -1132,8 +1098,6 @@ export default function Scan() {
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
-      const bodyB64 = (!skipBody && bodyPhoto) ? await toBase64(bodyPhoto) : null
-      if (bodyB64) setBodyPhoto(bodyB64)
 
       // Real, on-device geometry — Apple's Vision framework measuring actual
       // detected joints/landmarks in the photos already taken above, not an
@@ -1142,10 +1106,6 @@ export default function Scan() {
       // detection fails or confidence is too low, these stay null and the
       // AI scorer below just falls back to its own visual read — we never
       // invent a plausible-looking measurement to fill the gap.
-      const bodyGeometryResult = (isNative() && bodyB64) ? await analyzeBodyPhoto(bodyB64) : null
-      const bodyGeometry = bodyGeometryResult?.detected
-        ? { shoulderHipRatio: bodyGeometryResult.shoulderHipRatio ?? null, spineLeanDegrees: bodyGeometryResult.spineLeanDegrees ?? null }
-        : null
       const sideProfileGeometryResult = (isNative() && sideB64) ? await analyzeSideProfile(sideB64) : null
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
@@ -1174,8 +1134,6 @@ export default function Scan() {
           hasSideProfile:  false,
           faceSubScores:   { symmetry: score, jawlineDefinition: null, skinClarity: null, facialProportions: null, eyeArea: null, facialHarmony: null },
           pillars:         null,
-          physiqueScore:   null,
-          bodyFatLevel:    null,
           insights:        ['Score derived from live TrueDepth face geometry. Take a photo scan for full AI analysis.'],
         }
       } else if (token === 'demo-token') {
@@ -1212,14 +1170,6 @@ export default function Scan() {
           },
           facialStructure:  'Oval',
           hairType:         null,
-          physiqueScore: bodyB64 ? {
-            overall:        Math.round((6.5 + Math.random()) * 10) / 10,
-            body_fat_level: 'Athletic',
-            muscularity:    Math.round((6.5 + Math.random()) * 10) / 10,
-            proportions:    Math.round((7.0 + Math.random() * 0.5) * 10) / 10,
-            posture:        Math.round((6.8 + Math.random() * 0.6) * 10) / 10,
-          } : null,
-          bodyFatLevel: bodyB64 ? 'Athletic' : null,
           insights: ['Demo mode — sign up for a real account to get AI-powered analysis'],
         }
       } else {
@@ -1228,8 +1178,6 @@ export default function Scan() {
           const scoreCall = api.ai.score({
             faceImage: faceB64,
             ...(sideB64 ? { sideImage: sideB64 } : {}),
-            ...(bodyB64 ? { bodyImage: bodyB64 } : {}),
-            ...(bodyGeometry ? { bodyGeometry } : {}),
             ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
             gender: g,
             ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
@@ -1283,15 +1231,13 @@ export default function Scan() {
         // follow-up request (see below); absent/undefined for demo/ARKit
         // scans, which never produce extended metrics at all.
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
-        physiqueScore:    aiResult.physiqueScore    ?? null,
-        bodyFatLevel:     aiResult.bodyFatLevel     ?? null,
         // ARKit live scan geometry — present when user used TrueDepth face scan
         faceMetrics:      faceMetrics ?? undefined,
-        // Real, on-device Vision-framework geometry (body pose joints /
-        // side-profile landmarks) — present only when detection actually
-        // succeeded with adequate confidence. Same "measure, don't guess"
-        // principle as faceMetrics above, for the body and side profile.
-        bodyGeometry:         bodyGeometry ?? undefined,
+        // Real, on-device Vision-framework geometry (side-profile landmarks)
+        // — present only when detection actually succeeded with adequate
+        // confidence. Same "measure, don't guess" principle as faceMetrics
+        // above. (Body geometry/physique scoring intentionally no longer
+        // happens here — see the Training Plan flow's own body-photo step.)
         sideProfileGeometry:  sideProfileGeometry ?? undefined,
       }
 
@@ -1356,12 +1302,7 @@ export default function Scan() {
           angularity:       aiResult.pillars?.angularity,
           features:         aiResult.pillars?.features,
           dimorphism:       aiResult.pillars?.dimorphism,
-          potentialScore:   (() => {
-            const physiqueUpside = aiResult.physiqueScore
-              ? Math.max(0, (7.5 - (aiResult.physiqueScore.overall ?? 5)) * 0.30 * 0.3)
-              : 0
-            return Math.min(10, (aiResult.overallScore ?? 5) + 1.4 + physiqueUpside)
-          })(),
+          potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
           hairTypeDetected: aiResult.hairType,
           faceShape:        aiResult.facialStructure,
           faceImageUrl,
@@ -1383,12 +1324,12 @@ export default function Scan() {
       if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
-        setStep(3)
+        setStep(2)
       } else if (err.errorCode === 'claude_rate_limited') {
         // User hit their own hourly Claude limit — retrying in 30s won't help.
         // Show a static "limit reached" card instead of an auto-retry countdown.
         setClaudeRateLimited(true)
-        setStep(3)
+        setStep(2)
       } else {
         // IMPORTANT: only trust err.status/err.errorCode here, both of which are
         // exclusively set by api.js's request() helper when parsing a REAL HTTP
@@ -1415,14 +1356,14 @@ export default function Scan() {
         } else {
           setError(err.message || 'Analysis failed. Please try again.')
         }
-        setStep(3)
+        setStep(2)
       }
     }
   }
 
   startAnalysisRef.current = startAnalysis
 
-  const isAnalyzing = step === 4
+  const isAnalyzing = step === 3
 
   if (showConsent) {
     return (
@@ -1441,12 +1382,13 @@ export default function Scan() {
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
       </Helmet>
 
-      {/* Header — step 1 (Face Photo) gets a plain back-arrow + title header,
-          no subtitle/progress-bar, so the photo frame below can dominate the
-          screen instead of competing with a caption row. Other steps keep
-          the existing PageHeader + progress-bar treatment. */}
+      {/* Header — steps 1 and 2 (Face Photo, Side Profile) render the exact
+          same markup (only the title text differs), so the two screens are
+          guaranteed pixel-identical rather than two separately hand-tuned
+          copies that can drift apart. Step 0 (gender select) is the only
+          one still using PageHeader. */}
       {!isAnalyzing && (
-        step === 1 ? (
+        (step === 1 || step === 2) ? (
           <div
             className="flex items-center gap-3 px-4 pb-4 flex-shrink-0"
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
@@ -1458,39 +1400,18 @@ export default function Scan() {
             >
               <ChevronLeft size={20} className="text-primary" />
             </button>
-            <h1 className="font-heading font-bold text-[18px] text-primary">Take Your Front Photo</h1>
+            <h1 className="font-heading font-bold text-[18px] text-primary">
+              {step === 1 ? 'Take Your Front Photo' : 'Side Profile'}
+            </h1>
           </div>
         ) : (
           <PageHeader
-            title={STEP_META[step]?.title ?? ''}
-            subtitle={STEP_META[step]?.subtitle ?? ''}
+            title="Select Gender"
+            subtitle="For accurate Overall Rating results"
             back
-            // Body Photo (step 3) is a close (X), not a back-arrow — tapping
-            // it exits the scan flow entirely (same convention as X buttons
-            // elsewhere in onboarding, e.g. TrainingPlanIntro's BodyStatsFlow
-            // close), rather than relying on navigate(-1)'s browser-history
-            // default, which can land somewhere unrelated to this flow.
-            icon={step === 3 ? X : undefined}
-            onBack={step === 0 || step === 3 ? () => navigate('/scan') : undefined}
+            onBack={() => navigate('/scan')}
           />
         )
-      )}
-
-      {/* Progress bar (photo steps 2–3 only — step 1 uses its own plain header above) */}
-      {step >= 2 && step <= 3 && (
-        <div className="px-4 pb-3">
-          <div className="flex gap-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex-1 h-1 rounded-full transition-colors duration-300"
-                style={{ background: i <= step ? '#C6A85C' : 'var(--border)' }} />
-            ))}
-          </div>
-          <p className="text-xs text-secondary font-body mt-1.5">
-            {step === 2
-              ? 'Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera'
-              : 'Full body visible · Stand straight · Good lighting · Fitted clothing'}
-          </p>
-        </div>
       )}
 
       {/* Content */}
@@ -1507,15 +1428,6 @@ export default function Scan() {
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
               <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} onScanningChange={setFaceScanBusy} />
-            </motion.div>
-          )}
-          {step === 3 && (
-            <motion.div key="body" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <PhotoUploadStep stepNum={3}
-                guide="Stand facing the camera. Full body visible from head to feet. Good lighting, fitted clothing for accurate physique scoring."
-                photo={bodyPhoto}
-                gender={gender}
-                onPhoto={url => { setBodyPhoto(url); setError('') }} />
             </motion.div>
           )}
           {step === 2 && (
@@ -1674,20 +1586,23 @@ export default function Scan() {
               turned into an auto-fire — retakes need the faceScanBusy gate
               too. */}
 
-          {/* Step 2: side profile → advance to body step. geometrySatisfied
-              is already guaranteed true by the time anyone reaches this step
-              (step 1's gate requires it), and there's no Live Face Scan
-              action offered here anymore — so the only real requirement left
-              is a photo. Skip Side Profile remains the escape hatch since
-              this whole step is optional. */}
+          {/* Step 2: side profile → this is now the last capture step, so its
+              "Continue" fires the actual analysis directly instead of
+              advancing to a body step. geometrySatisfied is already
+              guaranteed true by the time anyone reaches here (step 1's gate
+              requires it), and there's no Live Face Scan action offered here
+              anymore — so the only real requirement left is a photo. Skip
+              Side Profile remains the escape hatch since this step is
+              optional; it also fires analysis directly, just without the
+              side image. */}
           {step === 2 && (
             <>
               {sidePhoto ? (
                 <button
-                  onClick={() => { setStep(3); setError('') }}
+                  onClick={() => startAnalysis(false)}
                   className="btn-amber"
                 >
-                  Continue →
+                  ✦ Full Scan — Analyze Now
                 </button>
               ) : (
                 <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -1695,7 +1610,7 @@ export default function Scan() {
                 </p>
               )}
               <button
-                onClick={() => { setStep(3); setError('') }}
+                onClick={() => startAnalysis(true)}
                 className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
                 style={{
                   border: '1px solid rgba(201,168,76,0.4)',
@@ -1708,41 +1623,6 @@ export default function Scan() {
                 <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   Skip Side Profile
                 </span>
-              </button>
-            </>
-          )}
-
-          {/* Step 3: body photo */}
-          {step === 3 && (
-            <>
-              <button
-                onClick={() => startAnalysis(!sidePhoto, false)}
-                className="btn-amber"
-                disabled={!bodyPhoto}
-                style={!bodyPhoto ? { opacity: 0.55 } : {}}
-              >
-                {bodyPhoto ? '✦ Full Scan — Analyze Now' : 'Take or upload body photo first'}
-              </button>
-              <button
-                onClick={() => startAnalysis(!sidePhoto, true)}
-                className="w-full mt-3 flex items-center justify-center gap-3 active:opacity-70 transition-opacity"
-                style={{
-                  border: '3px solid #C6A85C',
-                  background: 'rgba(201,168,76,0.04)',
-                  borderRadius: 12,
-                  padding: '16px 20px',
-                  boxShadow: '0 0 16px rgba(201,168,76,0.4)',
-                }}
-              >
-                <SkipForward size={18} style={{ color: '#C6A85C', flexShrink: 0 }} />
-                <div className="text-left">
-                  <p className="font-heading text-[14px] leading-tight" style={{ color: '#ffffff', fontWeight: 600 }}>
-                    Skip Body Photo
-                  </p>
-                  <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Analyze face only
-                  </p>
-                </div>
               </button>
             </>
           )}

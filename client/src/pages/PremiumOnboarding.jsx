@@ -1412,8 +1412,6 @@ function StepScanCapture({ gender, onDone, onBack }) {
         pillars:          aiResult.pillars          ?? null,
         extendedMetrics:  aiResult.extendedMetrics  ?? null,
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
-        physiqueScore:    null,
-        bodyFatLevel:     null,
       }
 
       console.log('[SCAN DONE] calling onDone with scanRecord id:', scanRecord.id)

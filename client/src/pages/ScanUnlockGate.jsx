@@ -10,7 +10,7 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import logo from '../assets/ascendus-icon.png'
-import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
 import { triggerHaptic } from '../utils/haptics'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -74,9 +74,8 @@ function getBiggestGrowthArea(scan) {
     if (fd.facialHarmony     != null) candidates.push({ label: 'Facial Harmony',       score: fd.facialHarmony,     detail: 'How well your facial thirds and feature proportions balance against each other' })
     if (fd.facialProportions != null) candidates.push({ label: 'Facial Proportions',   score: fd.facialProportions, detail: 'Upper to lower face ratio and the width-to-length balance relative to ideal benchmarks' })
   }
-  if (scan.physiqueScore?.overall != null) {
-    candidates.push({ label: 'Body & Physique', score: scan.physiqueScore.overall, detail: 'Muscle-to-fat ratio, shoulder-to-waist taper, and the visual impact of your current physique' })
-  }
+  // Physique is intentionally not a candidate here — physique scoring no
+  // longer happens as part of the main scan (see Training Plan flow).
   if (!candidates.length) return null
   return candidates.reduce((low, c) => c.score < low.score ? c : low)
 }
@@ -100,11 +99,8 @@ function Card1Score({ scan }) {
   const growthArea     = getBiggestGrowthArea(scan)
   const topStrength    = getStrongestFeature(scan)
 
-  const physiqueUpside = scan?.physiqueScore
-    ? Math.max(0, (7.5 - (scan.physiqueScore.overall ?? 5)) * 0.09)
-    : 0
   const potential = glowScore != null
-    ? Math.min(10, glowScore + 1.4 + physiqueUpside).toFixed(1)
+    ? Math.min(10, glowScore + 1.4).toFixed(1)
     : null
 
   // pct drives each tile's progress bar. Tier itself is a string label, so it
@@ -501,7 +497,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
                 </p>
               )}
               {error && (
-                <p className="text-center text-[11px] font-body" style={{ color: '#EF4444' }}>{error}</p>
+                <p className="text-center text-[11px] font-body" style={{ color: RED }}>{error}</p>
               )}
             </>
           )

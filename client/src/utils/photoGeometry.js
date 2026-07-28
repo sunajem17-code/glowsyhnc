@@ -4,29 +4,11 @@ import { registerPlugin } from '@capacitor/core'
 // until the native layer is ready, so it's safe to call at module load time.
 const PhotoGeometryPlugin = registerPlugin('PhotoGeometryPlugin')
 
-/**
- * Runs Apple Vision's VNDetectHumanBodyPoseRequest against an already-taken
- * body photo (base64 data URL) and returns real measured joint geometry —
- * NOT an AI vision guess. Used to ground the physique scorer's
- * "proportions"/"posture" categories in an actual measurement instead of
- * pure visual estimation, and can be shown to the user directly as a real
- * number.
- *
- * Always resolves (never rejects) so callers don't need try/catch. Returns
- * { supported: false } on web / non-native, or { supported: true, detected:
- * false, reason } when a body genuinely wasn't detected with confidence —
- * never fabricates a plausible-looking number in that case.
- */
-export async function analyzeBodyPhoto(imageDataUrl) {
-  if (!imageDataUrl) return { supported: false }
-  try {
-    const result = await PhotoGeometryPlugin.analyzeBodyPhoto({ imageData: imageDataUrl })
-    return result
-  } catch (err) {
-    console.warn('[PhotoGeometry] analyzeBodyPhoto native call failed (non-fatal):', err?.message ?? err)
-    return { supported: false, nativeError: true, message: err?.message ?? String(err) }
-  }
-}
+// analyzeBodyPhoto (Vision body-pose geometry) was removed from here — its
+// only caller was the main scan flow's body-photo step, which no longer
+// exists (physique scoring now only happens in the Training Plan flow, which
+// doesn't use on-device geometry detection). The native PhotoGeometryPlugin
+// method itself is untouched/dormant on the native side, just unused from JS.
 
 /**
  * Runs Apple Vision's VNDetectFaceLandmarksRequest against an already-taken
@@ -35,8 +17,9 @@ export async function analyzeBodyPhoto(imageDataUrl) {
  * ARKit already gives the front-facing face scan. 2D-projection based (no
  * depth), so it's an estimate — just a measured one instead of a guessed one.
  *
- * Always resolves (never rejects). See analyzeBodyPhoto for the shape of a
- * "not detected" result.
+ * Always resolves (never rejects). Returns { supported: false } on web /
+ * non-native, or { supported: true, detected: false, reason } when a face
+ * genuinely wasn't detected with confidence.
  */
 export async function analyzeSideProfile(imageDataUrl) {
   if (!imageDataUrl) return { supported: false }

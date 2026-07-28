@@ -7,7 +7,7 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import { isNative, purchasePro, restorePurchases, initRevenueCat, checkTrialEligibility } from '../utils/iap'
-import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 
@@ -330,7 +330,7 @@ export default function Premium() {
         </p>
 
         {checkoutError && (
-          <p className="text-center text-[11px] font-body mb-2" style={{ color: '#EF4444' }}>{checkoutError}</p>
+          <p className="text-center text-[11px] font-body mb-2" style={{ color: RED }}>{checkoutError}</p>
         )}
 
         {/* Promo code link — web only (Apple IAP does not support external promo codes) */}

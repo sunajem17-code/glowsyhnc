@@ -253,6 +253,7 @@ export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSa
                 label="Height"
                 unit={units === 'imperial' ? `${feet}'${inches}"` : 'cm'}
                 value={height}
+                displayValue={units === 'imperial' ? '' : undefined}
                 min={140}
                 max={220}
                 onChange={setHeight}
