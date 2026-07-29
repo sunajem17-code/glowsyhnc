@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Check, Loader2, ChevronRight, ChevronDown, Zap, Trophy, BarChart2, Lock } from 'lucide-react'
+import { Star, Sparkles, Check, Loader2, ChevronDown, Lock, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { purchasePro, isNative } from '../utils/iap'
+import { isNative } from '../utils/iap'
 import { api } from '../utils/api'
+import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { EXTENDED_CATEGORIES, CategoryCard } from './CategoryCard'
@@ -323,10 +324,128 @@ const CAROUSEL_SLIDE_VARIANTS = {
   exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
+// ── Exit-intent: annual-discount offer ──────────────────────────────────────
+// Shown every time the user taps the close (X) on StepScoresWaiting — there
+// is deliberately no "only show once, skip straight through afterward" path.
+// An earlier version gated this behind a persisted flag so only the first-
+// ever tap saw the offer and every tap after that skipped straight to a
+// free/limited-access exit; that was a real bypass and has been removed.
+// Same modal-shell pattern as PromoModal.jsx (backdrop + centered
+// gold-bordered card) for visual consistency with the other overlay already
+// used on this exact screen.
+//
+// ⚠️ PENDING DEPENDENCY — not wired to a real purchase yet. $22.99/yr has no
+// corresponding App Store Connect subscription product or RevenueCat package
+// right now. purchasePro() (utils/iap.js) only resolves the CURRENT RC
+// offering's 'monthly'/'annual' slots — the existing $7.99/mo and $49.99/yr
+// products — it has no way to reach a third, differently-priced annual
+// product by plan name. Once that product exists in App Store Connect +
+// RevenueCat, handleClaim in StepScoresWaiting needs the real product/package
+// identifier to fetch it directly (e.g.
+// offerings.current.availablePackages.find(p => p.identifier === '<real id>')),
+// not just a new string passed to purchasePro(). Intentionally inert until
+// then — see handleClaim below.
+function AnnualDiscountOfferModal({ onClaim, onDecline }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-[80] flex items-center justify-center px-6"
+      style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onDecline() }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 12 }}
+        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        exit={{    opacity: 0, scale: 0.94, y: 12 }}
+        transition={{ duration: 0.22, ease: EASE_STANDARD }}
+        className="w-full max-w-[320px] rounded-2xl p-6 text-center"
+        style={{
+          background: '#111111',
+          border: '1px solid rgba(198,168,92,0.22)',
+          boxShadow: '0 8px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(198,168,92,0.08)',
+        }}
+      >
+        <div className="flex justify-end mb-1">
+          <button
+            onClick={onDecline}
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
+            style={{ background: 'rgba(255,255,255,0.07)' }}
+            aria-label="Close"
+          >
+            <X size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+          </button>
+        </div>
+
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)' }}
+        >
+          <Tag size={26} style={{ color: G }} />
+        </div>
+
+        <p className="font-heading font-bold text-[20px] text-white leading-tight mb-2">
+          Wait — before you go
+        </p>
+        <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
+          Take 54% off your first year, just for today.
+        </p>
+
+        <div className="flex items-center justify-center gap-2 mb-5">
+          <span className="font-body text-[15px] line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>$49.99/yr</span>
+          <span className="font-heading font-bold text-[26px]" style={{ color: G }}>$22.99/yr</span>
+        </div>
+
+        <button
+          onClick={onClaim}
+          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5"
+          style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
+        >
+          Claim Discount — $22.99/yr
+        </button>
+        <button
+          onClick={onDecline}
+          className="w-full py-2 font-body text-[12px] transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(255,255,255,0.35)' }}
+        >
+          No thanks, I'll pay full price later
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing = false, error = '' }) {
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
   const [showPromo, setShowPromo] = useState(false)
+  const [showDiscountOffer, setShowDiscountOffer] = useState(false)
+
+  // Every tap of the X shows the discount offer — no persisted "already seen
+  // it, skip straight through" state. There is intentionally no way to exit
+  // this screen into any free/limited-access view; the only forward paths
+  // are purchase, referral, or a promo code.
+  function handleCloseAttempt() {
+    triggerHaptic()
+    setShowDiscountOffer(true)
+  }
+
+  // Decline just dismisses the popup — the user lands back on this same
+  // Ascendus Analysis screen, no navigation, no free/limited-access exit.
+  function handleDeclineOffer() {
+    triggerHaptic()
+    setShowDiscountOffer(false)
+  }
+
+  function handleClaimOffer() {
+    triggerHaptic()
+    // TODO: wire to the real purchase once the discounted-annual product
+    // exists in App Store Connect + RevenueCat — see the PENDING DEPENDENCY
+    // comment above AnnualDiscountOfferModal. Intentionally a no-op for now.
+    console.warn('[AnnualDiscountOffer] Claim tapped — no real product wired yet.')
+  }
 
   const cards = [
     { id: 'overall', el: <OverallCard scan={scan} /> },
@@ -353,7 +472,21 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: BG }}>
+    <div className="flex flex-col h-full relative" style={{ background: BG }}>
+      {/* Close — top-right corner, same size/shape/token convention as
+          BodyStatsStep.jsx's close button, adapted to this screen's own
+          forced-dark palette (SURFACE/TEXT) instead of the light/dark-
+          adaptive CSS vars that button uses, since this screen never
+          follows system theme. */}
+      <button
+        onClick={handleCloseAttempt}
+        aria-label="Close"
+        className="absolute right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: SURFACE, border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        <X size={17} style={{ color: TEXT }} />
+      </button>
+
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
@@ -459,194 +592,15 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
           />
         )}
       </AnimatePresence>
-    </div>
-  )
-}
 
-// ── STEP: Paywall ─────────────────────────────────────────────────────────────────
-export function StepPaywall({ onUnlocked, onSkip }) {
-  const [plan, setPlan] = useState('annual')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const setIsPremium = useStore(s => s.setIsPremium)
-  const startProTrial = useStore(s => s.startProTrial)
-
-  const benefits = [
-    { icon: Trophy, text: 'Full AI Glow Score + face breakdown' },
-    { icon: Zap, text: 'Personalized 12-week glow-up plan' },
-    { icon: BarChart2, text: 'AI improvement coach & weekly check-ins' },
-  ]
-
-  async function startTrial() {
-    setLoading(true)
-    setError('')
-    try {
-      if (isNative()) {
-        const result = await purchasePro(plan)
-        if (result?.success) { api.payments.syncRc().catch(() => {}); setIsPremium(true); onUnlocked() }
-        else setLoading(false)
-      } else {
-        startProTrial()
-        onUnlocked()
-      }
-    } catch (err) {
-      const msg = (err?.message || '').toLowerCase()
-      if (!msg.includes('cancel')) setError('Unable to start your trial. Please try again.')
-      setLoading(false)
-    }
-  }
-
-  async function buyNow() {
-    setLoading(true)
-    setError('')
-    try {
-      if (isNative()) {
-        const result = await purchasePro(plan)
-        if (result?.success) { api.payments.syncRc().catch(() => {}); setIsPremium(true); onUnlocked() }
-        else setLoading(false)
-      } else {
-        startProTrial()
-        onUnlocked()
-      }
-    } catch (err) {
-      const msg = (err?.message || '').toLowerCase()
-      if (!msg.includes('cancel')) setError('Unable to complete purchase. Please try again.')
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full" style={{ background: BG }}>
-
-      {/* Top gold glow */}
-      <div style={{
-        position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
-        width: 300, height: 300, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(198,168,92,0.15) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      <div className="flex-1 overflow-y-auto px-6 pt-14 pb-4 flex flex-col">
-
-        {/* Crown + badge */}
-        <div className="flex flex-col items-center mb-8">
-          <motion.img
-            src={logo}
-            alt="Ascendus"
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 240, damping: 18 }}
-            style={{ width: 64, height: 64, mixBlendMode: 'lighten', marginBottom: 14 }}
+      <AnimatePresence>
+        {showDiscountOffer && (
+          <AnnualDiscountOfferModal
+            onClaim={handleClaimOffer}
+            onDecline={handleDeclineOffer}
           />
-          <div
-            className="px-5 py-1.5 rounded-full font-heading font-bold text-[11px] tracking-widest"
-            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)', color: G }}
-          >
-            ASCENDUS PRO
-          </div>
-        </div>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="font-heading font-bold text-[30px] leading-tight text-center mb-1"
-          style={{ color: TEXT, letterSpacing: '-0.02em' }}
-        >
-          Start your glow-up<br />for free.
-        </motion.h1>
-        <p className="font-body text-[13px] text-center mb-7" style={{ color: DIM }}>
-          3 days free · cancel anytime
-        </p>
-
-        {/* Benefits */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex flex-col gap-3 mb-7"
-        >
-          {benefits.map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.2)' }}
-              >
-                <Icon size={14} style={{ color: G }} />
-              </div>
-              <span className="font-body text-[13.5px]" style={{ color: 'rgba(255,255,255,0.8)' }}>{text}</span>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Plan toggle */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-2 gap-2 mb-5"
-        >
-          {[
-            { key: 'monthly', label: 'Monthly', price: '$1.84', per: '/wk', badge: null },
-            { key: 'annual', label: 'Annual', price: '$0.96', per: '/wk', badge: 'SAVE 48%' },
-          ].map(({ key, label, price, per, badge }) => (
-            <button
-              key={key}
-              onClick={() => setPlan(key)}
-              className="py-4 rounded-2xl text-center relative overflow-hidden transition-all"
-              style={{
-                background: plan === key ? 'rgba(198,168,92,0.12)' : SURFACE,
-                border: `1.5px solid ${plan === key ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
-              }}
-            >
-              {badge && (
-                <div
-                  className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-heading font-bold"
-                  style={{ background: G, color: '#000' }}
-                >
-                  {badge}
-                </div>
-              )}
-              <p className="font-heading font-bold text-[11px] mb-1"
-                style={{ color: plan === key ? G : 'rgba(255,255,255,0.35)' }}>
-                {label}
-              </p>
-              <p className="font-heading font-bold text-[22px] leading-none"
-                style={{ color: plan === key ? TEXT : 'rgba(255,255,255,0.55)' }}>
-                {price}
-                <span className="text-[12px] font-normal">{per}</span>
-              </p>
-            </button>
-          ))}
-        </motion.div>
-
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={buyNow}
-          disabled={loading}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
-          style={{ background: GOLD_GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.4)' }}
-        >
-          {loading && <Loader2 size={16} className="animate-spin" />}
-          {loading ? 'Processing…' : plan === 'annual' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
-        </motion.button>
-
-        {error && <p className="text-center text-[11px] font-body mt-2" style={{ color: '#EF4444' }}>{error}</p>}
-      </div>
-
-      <div className="px-6 pb-10 pt-1 flex-shrink-0">
-        <button
-          onClick={onSkip}
-          disabled={loading}
-          className="w-full py-2 font-body text-[13px] text-center flex items-center justify-center gap-1 transition-opacity hover:opacity-70 disabled:opacity-40"
-          style={{ color: DIM }}
-        >
-          Maybe later <ChevronRight size={13} />
-        </button>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

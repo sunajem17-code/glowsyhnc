@@ -668,17 +668,26 @@ function useRotatingIndex(length, intervalMs) {
   return index
 }
 
-// Same 5 real facial regions/vertical positions established in the prior
-// label work (cy% top to bottom on the photo) — now used as lookup bands for
-// a horizontal sweep line's position instead of driving a separate timer.
-const SWEEP_FEATURE_ROWS = [22, 38, 54, 70, 86]
-const SWEEP_FEATURE_LABELS = ['Scanning forehead', 'Scanning eye symmetry', 'Scanning nose bridge', 'Scanning jawline', 'Scanning chin']
+// Matches the 6 category names from the Ascendus Analysis results carousel
+// (CategoryCard.jsx's EXTENDED_CATEGORIES + OnboardingFinalSteps.jsx's
+// OverallCard), sequenced top-to-bottom anatomically — not the carousel's own
+// display order — since these ride a sweep line that physically moves down
+// the face and needs to stay in the region it's naming. Overall lands last as
+// a summary beat rather than a specific position.
+const SWEEP_FEATURE_ROWS = [16, 30, 45, 59, 74, 88]
+const SWEEP_FEATURE_LABELS = ['Scanning upper third', 'Scanning eyes', 'Scanning midface', 'Scanning lower third', 'Scanning miscellaneous', 'Scanning overall']
 // Midpoints between adjacent rows above — the band boundaries the sweep
 // line's live percentage position is tested against.
-const SWEEP_BAND_THRESHOLDS = [30, 46, 62, 78]
+const SWEEP_BAND_THRESHOLDS = [23, 38, 52, 67, 81]
 // One-way top-to-bottom pass; the line bounces (reverses), so a full cycle
-// is 2x this. ~3 bounce cycles fit inside the real ~17s core-score wait.
-const SWEEP_ONE_WAY_MS = 2800
+// is 2x this. Was 2800ms — too slow to guarantee even one full pass through
+// all 6 labels before a fast (~1-2s) backend response ends the analyzing
+// screen, so on a quick response the label could land on whichever band the
+// response happened to catch it on (usually the last one, "overall") rather
+// than having cycled through all 6. 1200ms keeps every band on-screen long
+// enough to read (168-276ms each) while guaranteeing a full one-way pass —
+// hitting all 6 labels once, in order — completes within that ~1-2s window.
+const SWEEP_ONE_WAY_MS = 1200
 
 function bandForSweepPct(pct) {
   for (let i = 0; i < SWEEP_BAND_THRESHOLDS.length; i++) {

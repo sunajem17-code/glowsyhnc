@@ -569,7 +569,7 @@ export default function WorkoutPlan() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="font-heading font-bold text-[10px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>
-                AI-Generated Plan
+                {isPremium ? 'AI-Generated Plan' : 'Sample Plan'}
               </p>
               <h1 className="font-heading font-bold text-[20px] text-primary leading-tight">{splitLabel}</h1>
             </div>
@@ -635,13 +635,37 @@ export default function WorkoutPlan() {
           </div>
         )}
 
-        {/* Plan days */}
+        {/* Plan days — Pro-gated, same Section badge + blurred-locked-preview
+            pattern as the Nutrition Plan section below (and Results.jsx).
+            Free users used to get this fully expanded and fully usable with
+            no indication it wasn't the real Pro plan — that silent swap is
+            exactly what's being fixed here. */}
         {!loading && plan?.days && (
-          <div className="space-y-3">
-            {plan.days.map((day, i) => (
-              <DayCard key={i} day={day} index={i} />
-            ))}
-          </div>
+          <Section title="Your Training Split" icon={<Dumbbell size={16} style={{ color: '#C6A85C' }} />} badge="PRO">
+            {isPremium ? (
+              <div className="space-y-3">
+                {plan.days.map((day, i) => (
+                  <DayCard key={i} day={day} index={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden">
+                <div className="blur-sm pointer-events-none select-none opacity-35 space-y-3">
+                  {plan.days.map((day, i) => (
+                    <DayCard key={i} day={day} index={i} />
+                  ))}
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
+                  <Lock size={18} className="text-[#C6A85C] mb-2" />
+                  <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
+                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Your full personalized training split, built around your weak areas — not a generic template</p>
+                  <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
+                    Upgrade to Pro →
+                  </button>
+                </div>
+              </div>
+            )}
+          </Section>
         )}
 
         {/* Nutrition Plan */}
