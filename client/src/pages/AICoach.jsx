@@ -16,7 +16,7 @@ const STARTER_PROMPTS = [
 ]
 
 const DEMO_TEASER = [
-  { role: 'assistant', content: "Your scan is loaded. Your biggest growth opportunity is jawline definition — targeting this is your fastest path to 7+.", locked: false },
+  { role: 'assistant', content: "Your scan is loaded. Your biggest growth opportunity is jawline definition. Targeting this is your fastest path to 7+.", locked: false },
   { role: 'user', content: 'What should I do about it?', locked: false },
   { role: 'assistant', content: 'Unlock AI Coach to get your personalized jawline protocol and full improvement plan.', locked: true },
 ]
@@ -165,8 +165,8 @@ export default function AICoach() {
     if (messages.length > 0) return
     if (latestScan) {
       const greeting = isPremium
-        ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
-        : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} — make them count. Ask me anything.`
+        ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything. I'll tell you exactly what to work on.`
+        : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
       setMessages([{ role: 'assistant', content: greeting }])
     } else if (isPremium) {
       setMessages([{ role: 'assistant', content: 'No scan data yet. Run a scan first, then I can give you personalized advice.' }])
@@ -246,7 +246,7 @@ export default function AICoach() {
               {isPremium
                 ? (latestScan ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded` : 'No scan yet')
                 : freeCoachLocked
-                  ? 'Free limit reached — upgrade for unlimited'
+                  ? 'Free limit reached: upgrade for unlimited'
                   : `${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} remaining`}
             </p>
           </div>
@@ -257,8 +257,8 @@ export default function AICoach() {
               triggerHaptic()
               if (latestScan) {
                 const greeting = isPremium
-                  ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything — I'll tell you exactly what to work on.`
-                  : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} — make them count. Ask me anything.`
+                  ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything. I'll tell you exactly what to work on.`
+                  : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
                 setMessages([{ role: 'assistant', content: greeting }])
               } else {
                 setMessages([])
@@ -284,7 +284,7 @@ export default function AICoach() {
         >
           <span className="text-[12px] flex-shrink-0 mt-0.5" style={{ color: GOLD }}>ℹ</span>
           <p className="font-body text-[10px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            For informational purposes only — not medical advice. Sources:{' '}
+            For informational purposes only, not medical advice. Sources:{' '}
             <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>Healthline</a>
             ,{' '}
             <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>NIH</a>
@@ -398,7 +398,7 @@ export default function AICoach() {
             </div>
             <ul className="space-y-1 mb-3">
               {[
-                'Unlimited chat — no tokens, no limits',
+                'Unlimited chat: no tokens, no limits',
                 'Personalized protocols from your scan',
                 'Updated with every new scan',
               ].map((f, i) => (

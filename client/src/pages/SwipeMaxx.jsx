@@ -119,7 +119,7 @@ export default function SwipeMaxx() {
           </div>
           <h2 className="font-heading font-bold text-xl text-primary">Pro Feature</h2>
           <p className="font-body text-sm text-secondary max-w-[260px]">
-            Upload your photos and AI picks your best dating profile photo — with reasons and tips.
+            Upload your photos and AI picks your best dating profile photo, with reasons and tips.
           </p>
           <motion.button
             whileTap={{ scale: 0.97 }}

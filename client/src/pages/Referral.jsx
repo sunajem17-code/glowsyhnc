@@ -28,7 +28,7 @@ export default function Referral() {
   const [copied, setCopied] = useState(false)
   const [trialStarted, setTrialStarted] = useState(proTrialActive)
 
-  const shareText = `I've been using Ascendus to level up my looks — it gives you an AI Glow Score and a custom plan. Try it free 👇\n${link}`
+  const shareText = `I've been using Ascendus to level up my looks. It gives you an AI Glow Score and a custom plan. Try it free 👇\n${link}`
 
   function copyLink() {
     navigator.clipboard.writeText(link).then(() => {
@@ -187,7 +187,7 @@ export default function Referral() {
                 className="mt-3 py-2.5 rounded-xl text-center font-heading font-bold text-sm"
                 style={{ background: 'rgba(198,168,92,0.1)', color: GOLD }}
               >
-                Pro trial active — enjoy!
+                Pro trial active, enjoy!
               </motion.div>
             )}
           </AnimatePresence>

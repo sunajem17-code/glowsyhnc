@@ -222,7 +222,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 text-left">
                 <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>New scan ready</p>
-                <p className="font-body text-[11px] text-secondary">It's been {daysSinceScan} days — track your progress</p>
+                <p className="font-body text-[11px] text-secondary">It's been {daysSinceScan} days, track your progress</p>
               </div>
               <ChevronRight size={14} style={{ color: GOLD }} />
             </button>
@@ -267,21 +267,21 @@ export default function Dashboard() {
         {[
           {
             label: 'Face',
-            value: latestScan?.faceData?.aestheticScore != null ? latestScan.faceData.aestheticScore.toFixed(1) : '—',
+            value: latestScan?.faceData?.aestheticScore != null ? latestScan.faceData.aestheticScore.toFixed(1) : 'N/A',
             icon: Activity,
             color: GOLD,
             bg: 'rgba(198,168,92,0.08)',
           },
           {
             label: 'Skin',
-            value: skin ? skin.toFixed(1) : '—',
+            value: skin ? skin.toFixed(1) : 'N/A',
             icon: Droplets,
             color: '#E8A000',
             bg: 'rgba(232,160,0,0.08)',
           },
           {
             label: 'Streak',
-            value: streak.current ? `${streak.current}d` : '—',
+            value: streak.current ? `${streak.current}d` : 'N/A',
             icon: Flame,
             color: '#EF4444',
             bg: 'rgba(239,68,68,0.08)',

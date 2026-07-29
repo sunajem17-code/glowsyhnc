@@ -293,7 +293,7 @@ export default function DailyCheckin() {
             disabled={completionScore === 0}
             className={`btn-primary mb-8 ${completionScore === 0 ? 'opacity-50' : ''}`}
           >
-            {completionScore === 5 ? <span className="flex items-center justify-center gap-1.5"><Flame size={16} style={{ color: '#FF6B35' }} /> Perfect Day — Log Check-In!</span> : <span className="flex items-center justify-center gap-1.5"><CheckCircle2 size={16} /> Log Today's Check-In</span>}
+            {completionScore === 5 ? <span className="flex items-center justify-center gap-1.5"><Flame size={16} style={{ color: '#FF6B35' }} /> Perfect Day, Log Check-In!</span> : <span className="flex items-center justify-center gap-1.5"><CheckCircle2 size={16} /> Log Today's Check-In</span>}
           </button>
         </div>
       )}

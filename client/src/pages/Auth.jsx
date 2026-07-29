@@ -49,7 +49,7 @@ export default function Auth() {
         err.message?.includes('(504)')
       setError(
         isNetworkError
-          ? 'Server unavailable. Use "Try Demo" below to explore all features instantly — no account needed.'
+          ? 'Server unavailable. Use "Try Demo" below to explore all features instantly, no account needed.'
           : err.message || 'Something went wrong. Please try again.'
       )
     } finally {
@@ -311,7 +311,7 @@ export default function Auth() {
             className="btn-ghost"
             style={{ borderColor: 'var(--border-strong)' }}
           >
-            Try Demo — No Account Needed
+            Try Demo (No Account Needed)
           </button>
         </div>
       </motion.form>

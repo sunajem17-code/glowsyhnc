@@ -13,14 +13,14 @@ export const AFFILIATE_PRODUCTS = {
     name:     'CeraVe Moisturising Cream',
     category: 'skin',
     url:      'https://www.amazon.ca/dp/B00TTD9BRC?tag=YOUR-TAG-20',
-    reason:   'Dermatologist-recommended daily moisturiser — improves skin texture and barrier.',
+    reason:   'Dermatologist-recommended daily moisturiser. Improves skin texture and barrier.',
     icon:     '🧴',
   },
   vitamin_c_serum: {
     name:     'TruSkin Vitamin C Serum',
     category: 'skin',
     url:      'https://www.amazon.ca/dp/B01M0LXRGE?tag=YOUR-TAG-20',
-    reason:   'Brightens skin tone and reduces dark spots — top-rated vitamin C serum.',
+    reason:   'Brightens skin tone and reduces dark spots, top-rated vitamin C serum.',
     icon:     '✨',
   },
   sunscreen_spf50: {
@@ -191,6 +191,6 @@ export function ProductRecommendations({ scores = {}, userId }) {
 
     createElement('p', {
       style: { fontSize: 10, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }
-    }, 'Affiliate links — we earn a small commission at no cost to you')
+    }, 'Affiliate links, we earn a small commission at no cost to you')
   )
 }

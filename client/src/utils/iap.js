@@ -96,6 +96,52 @@ export async function purchasePro(plan = 'monthly') {
 export const purchaseMonthly = () => purchasePro('monthly')
 export const purchaseYearly  = () => purchasePro('yearly')
 
+// ── Discounted annual (exit-intent offer) ─────────────────────────────────────
+// A separate, differently-priced product from the standard monthly/annual
+// slots above, so it can't be reached via purchasePro('annual') — that only
+// ever resolves offerings.current.annual (the $49.99/yr product). This
+// searches every package across every configured offering for the one whose
+// underlying store product matches the real product ID, since RevenueCat
+// commonly puts a promotional product in its own offering rather than the
+// default one.
+const DISCOUNT_ANNUAL_PRODUCT_ID = 'com.ascendus.app.yearly.discount'
+
+export async function purchaseDiscountedAnnual() {
+  if (!isNative()) return { success: false, reason: 'web' }
+  try {
+    await initRevenueCat()
+
+    let offerings
+    try {
+      offerings = await Purchases.getOfferings()
+    } catch {
+      throw new Error('Unable to load subscription options. Please check your internet connection and try again.')
+    }
+
+    const searchSpace = [offerings?.current, ...Object.values(offerings?.all ?? {})].filter(Boolean)
+    let pkg = null
+    for (const offering of searchSpace) {
+      pkg = offering.availablePackages?.find(p => p.product?.identifier === DISCOUNT_ANNUAL_PRODUCT_ID)
+      if (pkg) break
+    }
+
+    // Genuinely missing from RevenueCat's config (product not created there
+    // yet, or not attached to any offering) — distinct reason so callers can
+    // show a real "not available" message instead of a generic purchase error.
+    if (!pkg) return { success: false, reason: 'not_configured' }
+
+    const result = await Purchases.purchasePackage({ aPackage: pkg })
+    const active = result?.customerInfo?.entitlements?.active ?? {}
+    const isPro = !!active[ENTITLEMENT_ID]
+    return { success: isPro, customerInfo: result.customerInfo }
+  } catch (e) {
+    if (isCancelError(e)) {
+      return { success: false, reason: 'cancelled' }
+    }
+    throw new Error('Unable to complete purchase. Please try again.')
+  }
+}
+
 // ── Restore ───────────────────────────────────────────────────────────────────
 export async function restorePurchases() {
   if (!isNative()) return null

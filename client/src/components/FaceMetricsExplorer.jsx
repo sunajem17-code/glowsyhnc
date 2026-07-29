@@ -62,7 +62,7 @@ const METRIC_DEFS = [
 ]
 
 function formatValue(value, unit) {
-  if (value == null) return '—'
+  if (value == null) return 'N/A'
   if (unit === '°') return `${value.toFixed(1)}°`
   if (unit === 'mm') return `${value.toFixed(1)} mm`
   if (unit === 'cm') return `${value.toFixed(1)} cm`
@@ -113,7 +113,7 @@ export default function FaceMetricsExplorer() {
       <div className="flex items-center justify-between mb-3">
         <p className="font-heading font-bold text-[15px] text-primary">Face Metrics</p>
         <p className="text-[11px] text-secondary font-body">
-          {isDemo ? 'Example — tap a stat' : 'Tap a stat to see it on your face'}
+          {isDemo ? 'Example: tap a stat' : 'Tap a stat to see it on your face'}
         </p>
       </div>
 

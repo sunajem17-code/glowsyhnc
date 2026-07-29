@@ -161,7 +161,7 @@ export default function TransformationScreen({ onNext }) {
           className="font-body text-[14px] leading-relaxed"
           style={{ color: 'rgba(255,255,255,0.45)' }}
         >
-          Members who follow their Ascendus plan for 12 weeks see significant improvements in their Glow Score — posture, skin, grooming, and physique.
+          Members who follow their Ascendus plan for 12 weeks see significant improvements in their Glow Score: posture, skin, grooming, and physique.
         </motion.p>
 
         {/* Stats row */}

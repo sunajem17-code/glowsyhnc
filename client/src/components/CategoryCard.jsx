@@ -151,7 +151,7 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
     const score = data[key]?.score ?? null
     return {
       label,
-      value: score != null ? score.toFixed(1) : '—',
+      value: score != null ? score.toFixed(1) : 'N/A',
       unit:  score != null ? '/10' : '',
       pct:   score != null ? Math.min(100, (score / 10) * 100) : 0,
     }
@@ -170,7 +170,7 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
               {label}
             </span>
             <div className="flex items-center justify-between mb-2">
-              {isPending && value === '—' ? (
+              {isPending && value === 'N/A' ? (
                 <motion.div
                   className="h-[22px] w-12 rounded-md"
                   style={{ background: 'rgba(198,168,92,0.15)' }}

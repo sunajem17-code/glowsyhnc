@@ -4,7 +4,7 @@ import { Star, Sparkles, Check, Loader2, ChevronDown, Lock, X, Tag } from 'lucid
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { isNative } from '../utils/iap'
+import { isNative, purchaseDiscountedAnnual } from '../utils/iap'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
@@ -182,12 +182,12 @@ function OverallCard({ scan }) {
 
   // Six real fields — same as Card1Score, not fabricated categories.
   const lockedMetrics = [
-    { label: 'PSL Tier',           value: tier ?? '—',                                                    unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
-    { label: 'Potential',          value: potential ?? '—',                                                unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
-    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : '—',                    unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
-    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : '—',  unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
-    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : '—',               unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
-    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : '—',   unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
+    { label: 'PSL Tier',           value: tier ?? 'N/A',                                                  unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { label: 'Potential',          value: potential ?? 'N/A',                                              unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                  unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -334,18 +334,15 @@ const CAROUSEL_SLIDE_VARIANTS = {
 // gold-bordered card) for visual consistency with the other overlay already
 // used on this exact screen.
 //
-// ⚠️ PENDING DEPENDENCY — not wired to a real purchase yet. $22.99/yr has no
-// corresponding App Store Connect subscription product or RevenueCat package
-// right now. purchasePro() (utils/iap.js) only resolves the CURRENT RC
-// offering's 'monthly'/'annual' slots — the existing $7.99/mo and $49.99/yr
-// products — it has no way to reach a third, differently-priced annual
-// product by plan name. Once that product exists in App Store Connect +
-// RevenueCat, handleClaim in StepScoresWaiting needs the real product/package
-// identifier to fetch it directly (e.g.
-// offerings.current.availablePackages.find(p => p.identifier === '<real id>')),
-// not just a new string passed to purchasePro(). Intentionally inert until
-// then — see handleClaim below.
-function AnnualDiscountOfferModal({ onClaim, onDecline }) {
+// Wired to the real com.ascendus.app.yearly.discount product via
+// purchaseDiscountedAnnual() (utils/iap.js), which searches every RevenueCat
+// offering for a package whose underlying store product matches that ID —
+// purchasePro() alone can't reach it since that only resolves the standard
+// monthly/annual slots. If RevenueCat doesn't have the product attached to
+// any offering yet, purchaseDiscountedAnnual() resolves reason:'not_configured'
+// and handleClaimOffer below shows that as a real, honest "not available yet"
+// message instead of pretending the purchase happened.
+function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -387,27 +384,34 @@ function AnnualDiscountOfferModal({ onClaim, onDecline }) {
         </div>
 
         <p className="font-heading font-bold text-[20px] text-white leading-tight mb-2">
-          Wait — before you go
+          Wait, before you go.
         </p>
         <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
-          Take 54% off your first year, just for today.
+          Take 50% off your first year, just for today.
         </p>
 
         <div className="flex items-center justify-center gap-2 mb-5">
           <span className="font-body text-[15px] line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>$49.99/yr</span>
-          <span className="font-heading font-bold text-[26px]" style={{ color: G }}>$22.99/yr</span>
+          <span className="font-heading font-bold text-[26px]" style={{ color: G }}>$24.99/yr</span>
         </div>
+
+        {error && (
+          <p className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error}</p>
+        )}
 
         <button
           onClick={onClaim}
-          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5"
+          disabled={loading}
+          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
-          Claim Discount — $22.99/yr
+          {loading && <Loader2 size={15} className="animate-spin" />}
+          {loading ? 'Processing…' : 'Claim Discount ($24.99/yr)'}
         </button>
         <button
           onClick={onDecline}
-          className="w-full py-2 font-body text-[12px] transition-opacity hover:opacity-70"
+          disabled={loading}
+          className="w-full py-2 font-body text-[12px] transition-opacity hover:opacity-70 disabled:opacity-40"
           style={{ color: 'rgba(255,255,255,0.35)' }}
         >
           No thanks, I'll pay full price later
@@ -422,6 +426,9 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   const [direction, setDirection] = useState(1)
   const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
+  const [claimLoading, setClaimLoading] = useState(false)
+  const [claimError, setClaimError] = useState('')
+  const setIsPremium = useStore(s => s.setIsPremium)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
   // it, skip straight through" state. There is intentionally no way to exit
@@ -429,6 +436,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   // are purchase, referral, or a promo code.
   function handleCloseAttempt() {
     triggerHaptic()
+    setClaimError('')
     setShowDiscountOffer(true)
   }
 
@@ -439,12 +447,36 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     setShowDiscountOffer(false)
   }
 
-  function handleClaimOffer() {
+  async function handleClaimOffer() {
     triggerHaptic()
-    // TODO: wire to the real purchase once the discounted-annual product
-    // exists in App Store Connect + RevenueCat — see the PENDING DEPENDENCY
-    // comment above AnnualDiscountOfferModal. Intentionally a no-op for now.
-    console.warn('[AnnualDiscountOffer] Claim tapped — no real product wired yet.')
+    if (!isNative()) {
+      // Web has no equivalent Stripe price for this offer yet — flag rather
+      // than silently doing nothing or granting anything unpurchased.
+      setClaimError('This offer is only available in the app right now.')
+      return
+    }
+    setClaimLoading(true)
+    setClaimError('')
+    try {
+      const result = await purchaseDiscountedAnnual()
+      if (result?.success) {
+        const rcUserId = result.customerInfo?.originalAppUserId
+        api.payments.syncRc(rcUserId).catch(() => {})
+        setIsPremium(true)
+        setShowDiscountOffer(false)
+        onPromoSuccess?.()
+        return
+      }
+      if (result?.reason === 'not_configured') {
+        setClaimError("This offer isn't set up yet. Please try again shortly.")
+      } else if (result?.reason !== 'cancelled') {
+        setClaimError('Unable to complete purchase. Please try again.')
+      }
+    } catch {
+      setClaimError('Unable to complete purchase. Please try again.')
+    } finally {
+      setClaimLoading(false)
+    }
   }
 
   const cards = [
@@ -598,6 +630,8 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
           <AnnualDiscountOfferModal
             onClaim={handleClaimOffer}
             onDecline={handleDeclineOffer}
+            loading={claimLoading}
+            error={claimError}
           />
         )}
       </AnimatePresence>

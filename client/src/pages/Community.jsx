@@ -366,7 +366,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
                   <PhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  />
                 </div>
                 <p className="font-body text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
-                  Optional — show your transformation
+                  Optional: show your transformation
                 </p>
               </div>
             </>
@@ -377,7 +377,7 @@ function ShareModal({ onClose, onPosted, user, scans }) {
                 style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}>
                 <Star size={16} style={{ color: GOLD, flexShrink: 0 }} />
                 <p className="font-body text-[12px] text-secondary leading-relaxed">
-                  Post your photo and get rated 1–10 by the community. Anonymous — only your display name is shown.
+                  Post your photo and get rated 1–10 by the community. Anonymous. Only your display name is shown.
                 </p>
               </div>
               <div>
@@ -671,7 +671,7 @@ const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate })
         <div className="flex items-center gap-1">
           <Star size={14} fill={GOLD} style={{ color: GOLD }} />
           <span className="font-mono font-bold text-[15px]" style={{ color: GOLD }}>
-            {post.avg_rating != null ? Number(post.avg_rating).toFixed(1) : '—'}
+            {post.avg_rating != null ? Number(post.avg_rating).toFixed(1) : 'N/A'}
           </span>
         </div>
         <span className="font-body text-[11px] text-secondary">
@@ -857,7 +857,7 @@ function EditSheet({ post, onClose, onSaved }) {
         />
 
         <label className="block text-[11px] font-heading font-semibold uppercase tracking-widest text-secondary mb-1.5">
-          Caption <span style={{ color: 'rgba(255,255,255,0.3)' }}>— optional</span>
+          Caption <span style={{ color: 'rgba(255,255,255,0.3)' }}>(optional)</span>
         </label>
         <textarea
           value={caption}

@@ -88,7 +88,7 @@ export async function scheduleRescanNotification(daysUntilReady = 14) {
         {
           id: RESCAN_NOTIF_ID,
           title: 'Your rescan is ready ✦',
-          body: "It's been 2 weeks. See how much you've improved — rescan now.",
+          body: "It's been 2 weeks. See how much you've improved. Rescan now.",
           schedule: { at },
           sound: 'default',
           smallIcon: 'ic_stat_icon',

@@ -63,11 +63,11 @@ const CUTS = {
     maintenanceFreq: 'Every 3–4 weeks',
     products: ['Matte clay', 'Sea salt spray'],
     barberScript: {
-      say: `"Low skin fade on the sides and back — fade it from skin at the bottom up to about a 2 guard by the time you reach the parietal ridge. Leave the top at roughly 2 to 2.5 inches. Crop the fringe horizontally, then texturize the top with scissors, point cutting — I want movement, not bulk. Keep the hairline natural."`,
+      say: `"Low skin fade on the sides and back, fade it from skin at the bottom up to about a 2 guard by the time you reach the parietal ridge. Leave the top at roughly 2 to 2.5 inches. Crop the fringe horizontally, then texturize the top with scissors, point cutting, I want movement, not bulk. Keep the hairline natural."`,
       sideGuard: 'Skin fade → 1 → 2',
       fadeType: 'Low skin fade',
       topLength: '2 to 2.5 inches',
-      blendStyle: 'Hard part optional — clean blend otherwise',
+      blendStyle: 'Hard part optional, clean blend otherwise',
       styling: 'Apply matte clay to damp hair, push forward, rough dry. No shine.',
     },
   },
@@ -79,7 +79,7 @@ const CUTS = {
     maintenanceFreq: 'Every 2–3 weeks',
     products: ['Medium-hold pomade', 'Blow dryer'],
     barberScript: {
-      say: `"Mid taper fade on the sides — start with a 1 at the bottom and blend into a 3 by the temples. Leave the top 3 to 3.5 inches. I want a quiff — blow dry the top back and up with volume at the roots. Taper the sides clean, no hard line unless I ask. Natural hairline."`,
+      say: `"Mid taper fade on the sides, start with a 1 at the bottom and blend into a 3 by the temples. Leave the top 3 to 3.5 inches. I want a quiff, blow dry the top back and up with volume at the roots. Taper the sides clean, no hard line unless I ask. Natural hairline."`,
       sideGuard: '1 → 2 → 3',
       fadeType: 'Mid taper',
       topLength: '3 to 3.5 inches',
@@ -95,7 +95,7 @@ const CUTS = {
     maintenanceFreq: 'Every 3–4 weeks',
     products: ['Strong-hold pomade', 'Fine-tooth comb'],
     barberScript: {
-      say: `"Disconnected undercut — I want the sides cut short with a 1.5 guard, no fade, clean disconnect at the parietal ridge. Leave the top long, at least 4 inches. No thinning on top, I want full weight. Hairline natural."`,
+      say: `"Disconnected undercut, I want the sides cut short with a 1.5 guard, no fade, clean disconnect at the parietal ridge. Leave the top long, at least 4 inches. No thinning on top, I want full weight. Hairline natural."`,
       sideGuard: '1.5 guard, no fade',
       fadeType: 'Disconnected (no fade)',
       topLength: '4+ inches',
@@ -111,7 +111,7 @@ const CUTS = {
     maintenanceFreq: 'Every 3 weeks',
     products: ['Medium pomade or cream', 'Side comb'],
     barberScript: {
-      say: `"Classic taper — 1.5 guard at the bottom, taper up to a 3 or 4 by the crown. Side part on the left, comb the top over. Top length about 2.5 inches. Scissors only on top, point cut the ends. Clean neckline, natural sideburns."`,
+      say: `"Classic taper, 1.5 guard at the bottom, taper up to a 3 or 4 by the crown. Side part on the left, comb the top over. Top length about 2.5 inches. Scissors only on top, point cut the ends. Clean neckline, natural sideburns."`,
       sideGuard: '1.5 → 3',
       fadeType: 'Low taper',
       topLength: '2.5 inches with side part',
@@ -127,7 +127,7 @@ const CUTS = {
     maintenanceFreq: 'Every 1–2 weeks',
     products: ['None, or light moisturizer'],
     barberScript: {
-      say: `"All-over 3 guard, taper the sides and back down to a 1.5 at the bottom. Blend the sides into the top. Tight, clean neckline — squared, not rounded."`,
+      say: `"All-over 3 guard, taper the sides and back down to a 1.5 at the bottom. Blend the sides into the top. Tight, clean neckline, squared, not rounded."`,
       sideGuard: '1.5 → 3',
       fadeType: 'Taper',
       topLength: 'Guard 3 (3/8 inch)',
@@ -143,7 +143,7 @@ const CUTS = {
     maintenanceFreq: 'Every 2–3 weeks',
     products: ['Clay wax', 'Blow dryer optional'],
     barberScript: {
-      say: `"Mid fade — skin at the bottom, blend up through a 1, 1.5, to a 2.5 at the temples. Leave the top about 3 inches. Texturize the top with scissors, point cutting — loose movement, not stiff. No hard part, natural fade into the top."`,
+      say: `"Mid fade, skin at the bottom, blend up through a 1, 1.5, to a 2.5 at the temples. Leave the top about 3 inches. Texturize the top with scissors, point cutting, loose movement, not stiff. No hard part, natural fade into the top."`,
       sideGuard: 'Skin → 1 → 2.5',
       fadeType: 'Mid skin fade',
       topLength: '3 inches',
@@ -159,7 +159,7 @@ const CUTS = {
     maintenanceFreq: 'Every 3–4 weeks',
     products: ['Matte paste'],
     barberScript: {
-      say: `"High skin fade — tight on the sides, skin from the bottom blending into a 2 by the parietal. Leave the top 1.5 to 2 inches. Straight fringe, cut horizontally about half an inch above the eyebrows. No volume on top — flat, textured fringe."`,
+      say: `"High skin fade, tight on the sides, skin from the bottom blending into a 2 by the parietal. Leave the top 1.5 to 2 inches. Straight fringe, cut horizontally about half an inch above the eyebrows. No volume on top, flat, textured fringe."`,
       sideGuard: 'Skin → 1 → 2',
       fadeType: 'High skin fade',
       topLength: '1.5 to 2 inches, flat fringe',
@@ -175,7 +175,7 @@ const CUTS = {
     maintenanceFreq: 'Every 3 weeks',
     products: ['Medium pomade or cream'],
     barberScript: {
-      say: `"Low taper on the sides — 1 guard at the bottom fading to a 3. Hard part on the left side, razor sharp. Leave the top about 3 inches. Comb it clean over the part. No texture, controlled finish."`,
+      say: `"Low taper on the sides, 1 guard at the bottom fading to a 3. Hard part on the left side, razor sharp. Leave the top about 3 inches. Comb it clean over the part. No texture, controlled finish."`,
       sideGuard: '1 → 3',
       fadeType: 'Low taper + hard part',
       topLength: '3 inches combed over',
@@ -191,7 +191,7 @@ const CUTS = {
     maintenanceFreq: 'Every 4–5 weeks',
     products: ['Light cream or sea salt spray'],
     barberScript: {
-      say: `"Low taper on the sides — 1.5 at the bottom up to a 3, nothing above the temples. Leave the top long, 3.5 to 4 inches. I want a middle part — the top needs to fall naturally on both sides. Trim the ends to clean it up, no layers. Hairline natural."`,
+      say: `"Low taper on the sides, 1.5 at the bottom up to a 3, nothing above the temples. Leave the top long, 3.5 to 4 inches. I want a middle part, the top needs to fall naturally on both sides. Trim the ends to clean it up, no layers. Hairline natural."`,
       sideGuard: '1.5 → 3',
       fadeType: 'Low taper, conservative',
       topLength: '3.5 to 4 inches, center parted',
@@ -207,7 +207,7 @@ const CUTS = {
     maintenanceFreq: 'Every 2 weeks',
     products: ['Strong pomade or mousse'],
     barberScript: {
-      say: `"High fade — skin at the bottom fading up clean, the fade line should sit high, about an inch below the crown. Leave the top at least 3 inches. I want volume — blow dry it up. Natural hairline."`,
+      say: `"High fade, skin at the bottom fading up clean, the fade line should sit high, about an inch below the crown. Leave the top at least 3 inches. I want volume, blow dry it up. Natural hairline."`,
       sideGuard: 'Skin → 1 → 2',
       fadeType: 'High skin fade',
       topLength: '3+ inches with height',
@@ -345,7 +345,7 @@ export const FACE_PROFILES = {
     recommendations: [
       {
         ...CUTS.side_part,
-        why: 'The side part adds visual width to the forehead — the narrowest point of a diamond face. This creates better overall proportion.',
+        why: 'The side part adds visual width to the forehead, the narrowest point of a diamond face. This creates better overall proportion.',
         matchScore: 97,
       },
       {
@@ -409,9 +409,9 @@ export function getModifiedRecommendations(faceShape, hairline, density) {
     cuts = cuts.map(c => ({
       ...c,
       hairlineNote: c.id === 'slick_back_undercut' || c.id === 'side_part'
-        ? 'Note: A receding hairline makes this cut less effective — slicked-back styles expose the recession.'
+        ? 'Note: A receding hairline makes this cut less effective. Slicked-back styles expose the recession.'
         : c.id === 'buzz_cut'
-        ? 'Note: A buzz cut is a strong choice with a receding hairline — it removes the contrast.'
+        ? 'Note: A buzz cut is a strong choice with a receding hairline. It removes the contrast.'
         : null,
     }))
   }

@@ -69,7 +69,7 @@ function getBiggestGrowthArea(scan) {
   const fd = scan.faceData
   if (fd) {
     if (fd.jawlineDefinition != null) candidates.push({ label: 'Jawline & Structure', score: fd.jawlineDefinition, detail: 'How much definition and angularity your jawline currently has versus its structural ceiling' })
-    if (fd.skinClarity       != null) candidates.push({ label: 'Skin Clarity',         score: fd.skinClarity,       detail: 'Texture, tone evenness, and clarity — the single highest-ROI area to address first' })
+    if (fd.skinClarity       != null) candidates.push({ label: 'Skin Clarity',         score: fd.skinClarity,       detail: 'Texture, tone evenness, and clarity. The single highest-ROI area to address first' })
     if (fd.eyeArea           != null) candidates.push({ label: 'Eye Area',             score: fd.eyeArea,           detail: 'Periorbital definition, under-eye quality, and how your eye shape reads on camera' })
     if (fd.facialHarmony     != null) candidates.push({ label: 'Facial Harmony',       score: fd.facialHarmony,     detail: 'How well your facial thirds and feature proportions balance against each other' })
     if (fd.facialProportions != null) candidates.push({ label: 'Facial Proportions',   score: fd.facialProportions, detail: 'Upper to lower face ratio and the width-to-length balance relative to ideal benchmarks' })
@@ -113,12 +113,12 @@ function Card1Score({ scan }) {
   const toScorePct = v => v != null ? Math.min(100, (v / 10) * 100) : 0
 
   const lockedMetrics = [
-    { label: 'PSL Tier',           value: tier ?? '—',                                              unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
-    { label: 'Potential',          value: potential ?? '—',                                         unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
-    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : '—',                     unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
-    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : '—',   unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
-    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : '—',               unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
-    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : '—',   unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
+    { label: 'PSL Tier',           value: tier ?? 'N/A',                                            unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { label: 'Potential',          value: potential ?? 'N/A',                                       unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                   unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -149,7 +149,7 @@ function Card1Score({ scan }) {
           <BlurLock size="lg">
             <div className="flex items-end gap-1.5 mb-3">
               <span className="font-heading font-bold leading-none" style={{ fontSize: 62, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {glowScore != null ? glowScore.toFixed(1) : '—'}
+                {glowScore != null ? glowScore.toFixed(1) : 'N/A'}
               </span>
               <span className="font-heading font-bold text-[19px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
             </div>
@@ -512,7 +512,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
             className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
             style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
           >
-            <UserPlus size={14} /> Invite 3 Friends — Get Free Access
+            <UserPlus size={14} /> Invite 3 Friends: Get Free Access
           </button>
         )}
 
@@ -636,7 +636,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
   const navigate                    = useNavigate()
 
   const link      = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
-  const shareText = `I'm using Ascendus to track my glow-up — it gives you an AI Glow Score and a custom plan. Try it free 👇 ${link}`
+  const shareText = `I'm using Ascendus to track my glow-up. It gives you an AI Glow Score and a custom plan. Try it free 👇 ${link}`
 
   async function pollCount() {
     try { const { count: fresh } = await api.referral.count(); setCount(fresh ?? 0); return fresh ?? 0 }
@@ -716,7 +716,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
         </div>
         <div className="mb-5 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
           <p className="text-[10.5px] font-body leading-relaxed" style={{ color: 'rgba(198,168,92,0.75)' }}>
-            <span className="font-bold">How it counts:</span> a friend registers with your link — only real sign-ups count.
+            <span className="font-bold">How it counts:</span> a friend registers with your link. Only real sign-ups count.
           </p>
         </div>
         {!done && (

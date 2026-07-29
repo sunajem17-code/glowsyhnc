@@ -34,7 +34,7 @@ export const MALE_TIERS = [
     label: 'True Adam', shortLabel: 'True Adam',
     color: '#FFD700', bg: 'rgba(255,215,0,0.13)', border: '#FFD700',
     Icon: Crown,
-    desc: 'Practically flawless. Exceptional proportions and facial harmony. Extremely rare — top 0.1% of the population. Near-perfect structural and aesthetic alignment.',
+    desc: 'Practically flawless. Exceptional proportions and facial harmony. Extremely rare, top 0.1% of the population. Near-perfect structural and aesthetic alignment.',
     percentile: 'Top 0.1%',
     nextTier: null,
     nextTierSteps: ['This tier is the realistic ceiling. Maintain and optimize.'],
@@ -48,7 +48,7 @@ export const MALE_TIERS = [
     percentile: 'Top 1–2%',
     nextTier: 'True Adam',
     nextTierSteps: [
-      'Optimize body composition — leaner face reveals more definition.',
+      'Optimize body composition. A leaner face reveals more definition.',
       'Advanced skincare protocol (retinoids, professional treatments).',
       'Refine grooming to match structural strengths precisely.',
     ],
@@ -62,9 +62,9 @@ export const MALE_TIERS = [
     percentile: 'Top 5–10%',
     nextTier: 'Adam Lite',
     nextTierSteps: [
-      'Identify and target weakest sub-score — one focused improvement closes the gap.',
+      'Identify and target weakest sub-score. One focused improvement closes the gap.',
       'Body fat reduction to reveal bone structure more clearly.',
-      'Consistent skincare routine — texture and clarity are high ROI at this tier.',
+      'Consistent skincare routine. Texture and clarity are high ROI at this tier.',
     ],
   },
   {
@@ -78,7 +78,7 @@ export const MALE_TIERS = [
     nextTierSteps: [
       'Build consistency in grooming, skincare, and body composition simultaneously.',
       'Optimize haircut to complement facial structure.',
-      'Focus on the weakest sub-score — small adjustments have outsized impact.',
+      'Focus on the weakest sub-score. Small adjustments have outsized impact.',
     ],
   },
   {
@@ -91,7 +91,7 @@ export const MALE_TIERS = [
     nextTier: 'Chadlite',
     nextTierSteps: [
       'Skincare protocol (cleanser → BHA/AHA → moisturizer → SPF daily) for 8 weeks.',
-      'Body composition improvement — leaner face alone shifts tier perception significantly.',
+      'Body composition improvement. A leaner face alone shifts tier perception significantly.',
       'Haircut optimization is the fastest appearance upgrade.',
     ],
   },
@@ -100,12 +100,12 @@ export const MALE_TIERS = [
     label: 'Mid Tier Normie', shortLabel: 'Mid Tier Normie',
     color: '#FDCB6E', bg: 'rgba(253,203,110,0.11)', border: '#E17055',
     Icon: Minus,
-    desc: 'Average. Balanced but not striking. High ROI available — targeted looksmaxxing moves the needle fast. Can reach High Tier Normie within months.',
+    desc: 'Average. Balanced but not striking. High ROI available, targeted looksmaxxing moves the needle fast. Can reach High Tier Normie within months.',
     percentile: 'Middle 40–60%',
     nextTier: 'High Tier Normie',
     nextTierSteps: [
-      'Start a structured gym protocol — visible physique changes shift facial perception.',
-      'Address skin quality first — highest ROI improvement at this tier.',
+      'Start a structured gym protocol. Visible physique changes shift facial perception.',
+      'Address skin quality first. Highest ROI improvement at this tier.',
       'Grooming audit: haircut, brow shaping, beard maintenance are immediate wins.',
     ],
   },
@@ -120,7 +120,7 @@ export const MALE_TIERS = [
     nextTierSteps: [
       'Body weight normalization is the single highest-impact intervention.',
       'Establish consistent hygiene and basic grooming baseline.',
-      'Skincare protocol — even basic care produces visible change within 6 weeks.',
+      'Skincare protocol. Even basic care produces visible change within 6 weeks.',
     ],
   },
   {
@@ -134,7 +134,7 @@ export const MALE_TIERS = [
     nextTierSteps: [
       'Body weight normalization is the single highest-impact intervention.',
       'Establish consistent hygiene and basic grooming baseline.',
-      'Skincare protocol — even basic care produces visible change within 6 weeks.',
+      'Skincare protocol. Even basic care produces visible change within 6 weeks.',
     ],
   },
 ]
@@ -145,7 +145,7 @@ export const FEMALE_TIERS = [
     label: 'True Eve', shortLabel: 'True Eve',
     color: '#FFD700', bg: 'rgba(255,215,0,0.13)', border: '#FFD700',
     Icon: Crown,
-    desc: 'Practically flawless. Exceptional proportions and facial harmony. Extremely rare — top 0.1% of the population.',
+    desc: 'Practically flawless. Exceptional proportions and facial harmony. Extremely rare, top 0.1% of the population.',
     percentile: 'Top 0.1%',
     nextTier: null,
     nextTierSteps: ['This tier is the realistic ceiling. Maintain and optimize.'],
@@ -159,7 +159,7 @@ export const FEMALE_TIERS = [
     percentile: 'Top 1–2%',
     nextTier: 'True Eve',
     nextTierSteps: [
-      'Advanced skincare protocol — retinoids and professional treatments.',
+      'Advanced skincare protocol. Retinoids and professional treatments.',
       'Optimize body composition for facial definition.',
       'Refine grooming and style to complement structural strengths.',
     ],
@@ -173,8 +173,8 @@ export const FEMALE_TIERS = [
     percentile: 'Top 5–10%',
     nextTier: 'Eve Lite',
     nextTierSteps: [
-      'Identify and target weakest sub-score — one focused improvement closes the gap.',
-      'Advanced skincare — retinoids and vitamin C for texture and clarity.',
+      'Identify and target weakest sub-score. One focused improvement closes the gap.',
+      'Advanced skincare. Retinoids and vitamin C for texture and clarity.',
       'Body composition optimization for facial definition.',
     ],
   },
@@ -187,8 +187,8 @@ export const FEMALE_TIERS = [
     percentile: 'Top 10–15%',
     nextTier: 'Eve',
     nextTierSteps: [
-      'Identify and target weakest sub-score — one focused improvement closes the gap.',
-      'Consistent skincare routine — texture and clarity are high ROI.',
+      'Identify and target weakest sub-score. One focused improvement closes the gap.',
+      'Consistent skincare routine. Texture and clarity are high ROI.',
       'Body composition optimization for facial definition.',
     ],
   },
@@ -202,7 +202,7 @@ export const FEMALE_TIERS = [
     nextTier: 'Stacy',
     nextTierSteps: [
       'Skincare protocol (cleanser → BHA/AHA → moisturizer → SPF daily) for 8 weeks.',
-      'Body composition improvement — leaner face alone shifts tier perception.',
+      'Body composition improvement. A leaner face alone shifts tier perception.',
       'Haircut and style optimization for the fastest upgrade.',
     ],
   },
@@ -211,12 +211,12 @@ export const FEMALE_TIERS = [
     label: 'Mid Tier Becky', shortLabel: 'Mid Tier Becky',
     color: '#FDCB6E', bg: 'rgba(253,203,110,0.11)', border: '#E17055',
     Icon: Minus,
-    desc: 'Average. Balanced but not striking. High ROI available — skincare, fitness, and grooming can reach High Tier Becky within months.',
+    desc: 'Average. Balanced but not striking. High ROI available, skincare, fitness, and grooming can reach High Tier Becky within months.',
     percentile: 'Middle 40–60%',
     nextTier: 'High Tier Becky',
     nextTierSteps: [
-      'Start a structured skincare protocol — highest ROI at this tier.',
-      'Fitness and body composition — visible changes shift tier perception fast.',
+      'Start a structured skincare protocol. Highest ROI at this tier.',
+      'Fitness and body composition. Visible changes shift tier perception fast.',
       'Style and grooming audit: haircut and presentation are immediate wins.',
     ],
   },
@@ -231,7 +231,7 @@ export const FEMALE_TIERS = [
     nextTierSteps: [
       'Body weight normalization is the highest-impact intervention.',
       'Establish consistent skincare and grooming baseline.',
-      'Style upgrade — clothing and hair choices are immediate wins.',
+      'Style upgrade. Clothing and hair choices are immediate wins.',
     ],
   },
   {
@@ -245,7 +245,7 @@ export const FEMALE_TIERS = [
     nextTierSteps: [
       'Body weight normalization is the single highest-impact intervention.',
       'Establish consistent skincare and hygiene baseline.',
-      'Basic grooming and style upgrades — immediate wins available.',
+      'Basic grooming and style upgrades. Immediate wins available.',
     ],
   },
 ]
@@ -728,33 +728,33 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
     jawSharpness: {
       score: jawSharpS, label: 'Jawline Sharpness',
       assessment: sa(jawSharpS,
-        'Sharp, angular jaw — strong structural anchor for the face',
-        'Decent jaw definition visible — sharpenable through body fat reduction',
-        'Soft jawline present — body fat reduction and mewing are the primary fixes',
-        'Jaw definition has high improvement potential — the #1 angularity priority'),
+        'Sharp, angular jaw. A strong structural anchor for the face',
+        'Decent jaw definition visible, sharpenable through body fat reduction',
+        'Soft jawline present. Body fat reduction and mewing are the primary fixes',
+        'Jaw definition has high improvement potential. The #1 angularity priority'),
     },
     chinProjection: {
       score: chinS, label: 'Chin Projection',
       assessment: sa(chinS,
-        'Strong forward projection — adds depth and strength to the profile',
-        'Adequate chin projection — solid profile foundation',
-        'Moderate projection — chin is slightly recessed',
-        'Chin projection has significant improvement potential — a priority for side profile enhancement'),
+        'Strong forward projection. Adds depth and strength to the profile',
+        'Adequate chin projection. Solid profile foundation',
+        'Moderate projection. Chin is slightly recessed',
+        'Chin projection has significant improvement potential. A priority for side profile enhancement'),
     },
     cheekboneDefinition: {
       score: cheekS, label: 'Cheekbone Definition',
       assessment: sa(cheekS,
-        'High cheekbones clearly visible — strong facial architecture',
-        'Cheekbones present but not dominant — more visible when leaner',
-        'Relatively flat cheekbones — body fat reduction will uncover structure',
-        'Cheekbone structure has high reveal potential — significant leaning out will uncover it'),
+        'High cheekbones clearly visible. Strong facial architecture',
+        'Cheekbones present but not dominant, more visible when leaner',
+        'Relatively flat cheekbones. Body fat reduction will uncover structure',
+        'Cheekbone structure has high reveal potential. Significant leaning out will uncover it'),
     },
     facialLeanness: {
       score: leannessS, label: 'Facial Leanness',
       assessment: sa(leannessS,
-        'Very lean face — bone structure is fully visible throughout',
-        'Relatively lean — slight softness around the edges only',
-        'Moderate facial fat present — obscuring a portion of angular potential',
+        'Very lean face. Bone structure is fully visible throughout',
+        'Relatively lean, slight softness around the edges only',
+        'Moderate facial fat present, obscuring a portion of angular potential',
         'Leaning out will unlock significant angularity gains across all sub-scores'),
     },
   }
@@ -773,9 +773,9 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
       ? 'Moderate angularity. Structural potential is there but softened. Body fat reduction is the single highest-ROI intervention for this pillar.'
       : 'Limited angularity currently. Weight management and long-term mewing protocol are the clearest paths to meaningful improvement.',
     improvements: [
-      'Get to 12–14% body fat — jaw, chin, and cheekbones all become dramatically more visible below this threshold.',
-      'Mewing (correct tongue posture on the roof of the mouth) — produces measurable bone remodeling over 12–24+ months.',
-      'Mastic gum chewing — builds masseter hypertrophy and visually strengthens the jaw angle over 6–12 weeks.',
+      'Get to 12–14% body fat. Jaw, chin, and cheekbones all become dramatically more visible below this threshold.',
+      'Mewing (correct tongue posture on the roof of the mouth) produces measurable bone remodeling over 12–24+ months.',
+      'Mastic gum chewing builds masseter hypertrophy and visually strengthens the jaw angle over 6–12 weeks.',
     ],
   }
 
@@ -792,52 +792,52 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
         browRidge: {
           score: browS, label: 'Brow Ridge Prominence',
           assessment: sa(browS,
-            'Strong, prominent brow ridge — excellent hunter-eye framing and masculine depth',
-            'Moderate brow ridge — adds masculine character to the eye area',
-            'Flat brow ridge — limits the masculine framing of the eyes',
-            'Brow ridge has high improvement potential — a key dimorphism priority to develop'),
+            'Strong, prominent brow ridge. Excellent hunter-eye framing and masculine depth',
+            'Moderate brow ridge. Adds masculine character to the eye area',
+            'Flat brow ridge. Limits the masculine framing of the eyes',
+            'Brow ridge has high improvement potential. A key dimorphism priority to develop'),
         },
         jawStrength: {
           score: jawStrS, label: 'Jaw Width & Strength',
           assessment: sa(jawStrS,
-            'Wide, powerful jaw — a dominant, unmistakable masculine signal',
-            'Above average jaw width — solid masculine structural framing',
-            'Moderate jaw width — improvable with training and body fat reduction',
-            'Jaw width has clear improvement potential — the primary dimorphism development target'),
+            'Wide, powerful jaw. A dominant, unmistakable masculine signal',
+            'Above average jaw width. Solid masculine structural framing',
+            'Moderate jaw width, improvable with training and body fat reduction',
+            'Jaw width has clear improvement potential. The primary dimorphism development target'),
         },
         structure: {
           score: structureS, label: 'Structural Robustness',
           assessment: sa(structureS,
-            'Robust facial bone structure throughout — a strong, clearly masculine foundation',
-            'Good structural robustness — masculine features clearly visible',
-            'Facial structure is moderate — more refined than robustly masculine',
-            'Structure has clear growth potential — resistance training and fat loss directly improve this'),
+            'Robust facial bone structure throughout. A strong, clearly masculine foundation',
+            'Good structural robustness. Masculine features clearly visible',
+            'Facial structure is moderate, more refined than robustly masculine',
+            'Structure has clear growth potential. Resistance training and fat loss directly improve this'),
         },
       }
     : {
         softness: {
           score: softnessS, label: 'Facial Softness',
           assessment: sa(softnessS,
-            'Excellent facial softness — smooth, luminous feminine quality',
-            'Good softness — clearly feminine facial texture',
-            'Moderate softness — some areas are harder or more angular than ideal',
-            'Facial softness has improvement potential — skincare and grooming produce visible results here'),
+            'Excellent facial softness. Smooth, luminous feminine quality',
+            'Good softness. Clearly feminine facial texture',
+            'Moderate softness, some areas are harder or more angular than ideal',
+            'Facial softness has improvement potential. Skincare and grooming produce visible results here'),
         },
         delicacy: {
           score: delicacyS, label: 'Feature Delicacy',
           assessment: sa(delicacyS,
-            'Delicate, fine features — high femininity signaling throughout',
-            'Good feature delicacy — clearly feminine appearance',
-            'Features are moderate in delicacy — some coarser elements present',
-            'Feature delicacy has improvement potential — targeted grooming and skincare can refine this meaningfully'),
+            'Delicate, fine features. High femininity signaling throughout',
+            'Good feature delicacy. Clearly feminine appearance',
+            'Features are moderate in delicacy, some coarser elements present',
+            'Feature delicacy has improvement potential. Targeted grooming and skincare can refine this meaningfully'),
         },
         transitions: {
           score: transS, label: 'Feature Transitions',
           assessment: sa(transS,
-            'Smooth, graceful transitions between features — high overall harmony and femininity',
-            'Good transitions — face reads as cohesive and feminine',
+            'Smooth, graceful transitions between features. High overall harmony and femininity',
+            'Good transitions. Face reads as cohesive and feminine',
             'Some abrupt transitions between facial features',
-            'Feature transitions have room for refinement — skincare and grooming consistency improve this area'),
+            'Feature transitions have room for refinement. Skincare and grooming consistency improve this area'),
         },
       }
   const { strengths: dimStrengths, weaknesses: dimWeaknesses } = extractSW(dimSubScores)
@@ -864,14 +864,14 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
           : 'Femininity metrics have clear room to grow. Skincare, brow shaping, and grooming produce significant visible improvement at this level.'),
     improvements: gender === 'male'
       ? [
-          'Resistance training (compound lifts 4–5x/week) — increases testosterone expression and develops facial musculature.',
-          'Body fat reduction to 10–13% — reveals brow ridge and jaw bone structure that fat currently covers.',
+          'Resistance training (compound lifts 4–5x/week) increases testosterone expression and develops facial musculature.',
+          'Body fat reduction to 10–13%. Reveals brow ridge and jaw bone structure that fat currently covers.',
           'Brow grooming: keep brows thick, slightly lower, and straighter to simulate a stronger brow ridge.',
         ]
       : [
-          'Glass-skin skincare routine (hydration + brightening serums) — enhances the luminous quality of feminine features.',
-          'Arch-focused brow shaping — creates a more feminine, elevated frame around the eyes.',
-          'Facial massage and lymphatic drainage — reduces puffiness, enhances facial delicacy and definition.',
+          'Glass-skin skincare routine (hydration + brightening serums) enhances the luminous quality of feminine features.',
+          'Arch-focused brow shaping creates a more feminine, elevated frame around the eyes.',
+          'Facial massage and lymphatic drainage reduces puffiness, enhances facial delicacy and definition.',
         ],
   }
 
@@ -884,44 +884,44 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
 
   const featSubScores = {
     eyes: {
-      score: eyeS, label: 'Eyes — Shape, Tilt & Depth',
+      score: eyeS, label: 'Eyes: Shape, Tilt & Depth',
       assessment: sa(eyeS,
-        'Hunter-eye configuration with positive canthal tilt — an extremely attractive and rare eye trait',
-        'Good eye area — decent tilt, shape, and perceived hooding',
-        'Average eye area — shape and tilt are neutral, no strong positive or negative signals',
-        'Eye area has high improvement potential — tilt, depth, and aperture are all addressable'),
+        'Hunter-eye configuration with positive canthal tilt, an extremely attractive and rare eye trait',
+        'Good eye area. Decent tilt, shape, and perceived hooding',
+        'Average eye area. Shape and tilt are neutral, no strong positive or negative signals',
+        'Eye area has high improvement potential. Tilt, depth, and aperture are all addressable'),
     },
     nose: {
-      score: noseS, label: 'Nose — Proportion & Harmony',
+      score: noseS, label: 'Nose: Proportion & Harmony',
       assessment: sa(noseS,
-        'Proportional nose in strong harmony with the face — does not detract from any other feature',
-        'Well-proportioned nose with minor asymmetry — reads as balanced',
-        'Nose proportion is average — not a standout positive or negative feature',
-        'Nose proportion is off-balance — may be oversized, asymmetric, or drawing excess attention'),
+        'Proportional nose in strong harmony with the face. Does not detract from any other feature',
+        'Well-proportioned nose with minor asymmetry, reads as balanced',
+        'Nose proportion is average. Not a standout positive or negative feature',
+        'Nose proportion is off-balance. May be oversized, asymmetric, or drawing excess attention'),
     },
     lips: {
-      score: lipsS, label: 'Lips — Definition & Balance',
+      score: lipsS, label: 'Lips: Definition & Balance',
       assessment: sa(lipsS,
-        'Well-defined, balanced lip structure — a clear positive feature contribution',
+        'Well-defined, balanced lip structure. A clear positive feature contribution',
         'Lips are adequately shaped with good upper/lower balance',
-        'Lip definition is moderate — neither strongly positive nor negative',
-        'Lip definition is lacking — hydration, care, and grooming can produce visible improvement'),
+        'Lip definition is moderate. Neither strongly positive nor negative',
+        'Lip definition is lacking. Hydration, care, and grooming can produce visible improvement'),
     },
     skin: {
-      score: skinS, label: 'Skin — Clarity & Texture',
+      score: skinS, label: 'Skin: Clarity & Texture',
       assessment: sa(skinS,
-        'Clear, even skin tone and texture — a major advantage that elevates overall facial impression',
-        'Good skin quality with minor texture variation — reads as healthy and well-maintained',
-        'Average skin quality — texture irregularities are present but highly addressable',
-        'Skin quality is the single highest-ROI improvement available — visible results within 8–12 weeks'),
+        'Clear, even skin tone and texture. A major advantage that elevates overall facial impression',
+        'Good skin quality with minor texture variation, reads as healthy and well-maintained',
+        'Average skin quality. Texture irregularities are present but highly addressable',
+        'Skin quality is the single highest-ROI improvement available. Visible results within 8–12 weeks'),
     },
     hair: {
-      score: hairS, label: 'Hair — Density & Hairline',
+      score: hairS, label: 'Hair: Density & Hairline',
       assessment: sa(hairS,
-        'Strong hair density with a defined hairline — excellent structural frame for facial features',
-        'Decent hair density — provides a solid frame for the face',
-        'Hair density and hairline are average — neither enhancing nor detracting',
-        'Hair and hairline have clear improvement potential — the right cut and care elevate the entire frame'),
+        'Strong hair density with a defined hairline. Excellent structural frame for facial features',
+        'Decent hair density. Provides a solid frame for the face',
+        'Hair density and hairline are average. Neither enhancing nor detracting',
+        'Hair and hairline have clear improvement potential. The right cut and care elevate the entire frame'),
     },
   }
   const { strengths: featStrengths, weaknesses: featWeaknesses } = extractSW(featSubScores)
@@ -932,16 +932,16 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
     strengths: featStrengths,
     weaknesses: featWeaknesses,
     explanation: featuresScore >= 7.5
-      ? 'Exceptional individual features. Eyes, nose, lips, skin, and hair each contribute positively — every feature enhances rather than detracts from the overall face.'
+      ? 'Exceptional individual features. Eyes, nose, lips, skin, and hair each contribute positively. Every feature enhances rather than detracts from the overall face.'
       : featuresScore >= 6.0
       ? 'Strong features overall with some clear standouts. Minor refinements through grooming and skincare can elevate this pillar meaningfully.'
       : featuresScore >= 5.0
       ? 'Average features with clear improvement potential. Skin quality and the eye area are the highest-ROI targets at this level.'
-      : 'Features have strong improvement potential. Skincare is the fastest lever — skin texture alone can shift this score by a full point within 8–12 weeks.',
+      : 'Features have strong improvement potential. Skincare is the fastest lever. Skin texture alone can shift this score by a full point within 8–12 weeks.',
     improvements: [
-      'Daily skincare protocol (retinoid + SPF minimum) — skin texture is the fastest-improving feature metric, visible within 6–10 weeks.',
-      'Eye area optimization: 8h sleep, low sodium, cold compresses, eye cream — puffiness and dark circles significantly reduce eye scores.',
-      'Haircut optimization via HairMaxx — the right cut for your face shape creates an immediate framing effect that elevates all features.',
+      'Daily skincare protocol (retinoid + SPF minimum). Skin texture is the fastest-improving feature metric, visible within 6–10 weeks.',
+      'Eye area optimization: 8h sleep, low sodium, cold compresses, eye cream. Puffiness and dark circles significantly reduce eye scores.',
+      'Haircut optimization via HairMaxx. The right cut for your face shape creates an immediate framing effect that elevates all features.',
     ],
   }
 
@@ -955,34 +955,34 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
     proportions: {
       score: propSubS, label: 'Facial Thirds Balance',
       assessment: sa(propSubS,
-        'Near-equal thirds (upper/mid/lower) — ideal 1:1:1 balance achieved',
-        'Facial thirds are well-balanced with only minor imbalance — reads as proportional',
-        'Facial thirds show imbalance — one region visibly dominates the others',
-        'Facial thirds have significant rebalancing potential — hairstyle and grooming choices are the fastest lever'),
+        'Near-equal thirds (upper/mid/lower). Ideal 1:1:1 balance achieved',
+        'Facial thirds are well-balanced with only minor imbalance, reads as proportional',
+        'Facial thirds show imbalance. One region visibly dominates the others',
+        'Facial thirds have significant rebalancing potential. Hairstyle and grooming choices are the fastest lever'),
     },
     symmetry: {
       score: symSubS, label: 'Left-Right Symmetry',
       assessment: sa(symSubS,
-        'Exceptional bilateral symmetry — a rare and powerful attractiveness signal',
-        'Good symmetry with minor natural variation — well above average',
-        'Moderate symmetry — noticeable but not severe asymmetry is present',
-        'Symmetry has clear improvement potential — posture, mewing, and sleep quality all move this metric'),
+        'Exceptional bilateral symmetry. A rare and powerful attractiveness signal',
+        'Good symmetry with minor natural variation, well above average',
+        'Moderate symmetry. Noticeable but not severe asymmetry is present',
+        'Symmetry has clear improvement potential. Posture, mewing, and sleep quality all move this metric'),
     },
     alignment: {
       score: alignS, label: 'Feature Alignment & Midface',
       assessment: sa(alignS,
-        'Features are well-aligned with excellent midface projection — strong structural coherence',
-        'Good feature alignment — midface is adequately projected forward',
-        'Feature alignment shows some offset — midface could project more forward',
+        'Features are well-aligned with excellent midface projection. Strong structural coherence',
+        'Good feature alignment. Midface is adequately projected forward',
+        'Feature alignment shows some offset. Midface could project more forward',
         'Feature alignment and midface projection have long-term improvement potential through mewing and posture work'),
     },
     balance: {
       score: balanceS, label: 'Overall Feature Balance',
       assessment: sa(balanceS,
-        'All features work together cohesively — the face reads as a unified, attractive whole',
-        'Features are fairly balanced — creates a coherent, positive overall impression',
-        'Feature balance is moderate — some features draw attention inconsistently',
-        'Feature balance has room to grow — your strongest features can shine more with targeted grooming and hairstyle work'),
+        'All features work together cohesively. The face reads as a unified, attractive whole',
+        'Features are fairly balanced. Creates a coherent, positive overall impression',
+        'Feature balance is moderate. Some features draw attention inconsistently',
+        'Feature balance has room to grow. Your strongest features can shine more with targeted grooming and hairstyle work'),
     },
   }
   const { strengths: harmStrengths, weaknesses: harmWeaknesses } = extractSW(harmSubScores)
@@ -995,13 +995,13 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
     explanation: harmonyScore >= 7.5
       ? 'Exceptional facial harmony. Balanced, symmetric, and cohesive. As the most heavily weighted pillar (35%), this is a significant overall advantage.'
       : harmonyScore >= 6.0
-      ? 'Good harmony — the face reads as cohesive and balanced. Minor proportional imbalances can be addressed through hairstyle and grooming choices.'
+      ? 'Good harmony. The face reads as cohesive and balanced. Minor proportional imbalances can be addressed through hairstyle and grooming choices.'
       : harmonyScore >= 5.0
       ? 'Moderate harmony. Some proportional imbalance is visible. Hairstyle, posture correction, and mewing can each correct perceived balance significantly.'
       : 'Harmony (35% weight) has the highest improvement impact available. Posture correction, hairstyle optimization, and mewing are your clearest paths to a meaningful score jump.',
     improvements: [
-      'Hairstyle directly alters perceived upper-third balance — use HairMaxx to find the cut that best corrects your specific facial thirds.',
-      'Posture correction (chin tuck + shoulder retraction) immediately improves perceived facial balance — zero-cost, instant improvement.',
+      'Hairstyle directly alters perceived upper-third balance. Use HairMaxx to find the cut that best corrects your specific facial thirds.',
+      'Posture correction (chin tuck + shoulder retraction) immediately improves perceived facial balance. Zero-cost, instant improvement.',
       'Mewing (correct tongue posture on palate) over months-to-years improves midface alignment, maxilla projection, and overall facial thirds.',
     ],
   }
@@ -1285,7 +1285,7 @@ export function getWeakestMetrics(pslMetrics, symmetry, gender = 'male') {
     { key: 'facialThirds', label: 'Facial Proportions (Thirds)', score: pslMetrics.facialThirds.score,
       fix: 'Ideal thirds are roughly 1:1:1 (forehead:midface:lower face). Hairstyle can balance upper third. Beard length and style affects lower third perception significantly.' },
     { key: 'skinTexture', label: 'Skin Texture & Clarity', score: pslMetrics.skinTexture.score,
-      fix: 'Consistent retinoid use (adapalene/tretinoin), chemical exfoliation (BHA/AHA), and SPF daily. Skin texture is one of the highest-ROI improvements — visible within 8–12 weeks.' },
+      fix: 'Consistent retinoid use (adapalene/tretinoin), chemical exfoliation (BHA/AHA), and SPF daily. Skin texture is one of the highest-ROI improvements, visible within 8–12 weeks.' },
     { key: 'noseHarmony', label: 'Nose Harmony', score: pslMetrics.noseHarmony.score,
       fix: 'Non-surgical rhinoplasty (filler) can address minor deviations. Hairstyles and facial hair can frame the nose differently. Rhinoplasty for structural issues.' },
     { key: 'maxilla', label: 'Midface / Maxilla', score: pslMetrics.maxilla.score,
@@ -1451,7 +1451,7 @@ export async function analyzeBodyPhoto(photoUrl, gender = 'male') {
         ? 'Average clavicle width. Lateral deltoid development through isolation movements (cable laterals, DB laterals) will significantly widen the visual shoulder frame.'
         : 'Average clavicle width. Targeted shoulder work and posture correction will maximize your shoulder-to-waist visual ratio.',
       Narrow: gender === 'male'
-        ? 'Narrow clavicle structure. This is the most important structural limitation to address. Prioritize lateral delt hypertrophy above all other muscle groups — this single change has the highest visual ROI.'
+        ? 'Narrow clavicle structure. This is the most important structural limitation to address. Prioritize lateral delt hypertrophy above all other muscle groups. This single change has the highest visual ROI.'
         : 'Narrow clavicle structure. Structured shoulder and upper-back training creates the visual width illusion. Posture correction also has significant impact.',
     }
 
@@ -1574,7 +1574,7 @@ export async function performFullScan(facePhotoUrl, bodyPhotoUrl, gender = 'male
   // rather than letting NaN/undefined reach the display layer.
   const isValidScore = (v) => v !== null && v !== undefined && !isNaN(v) && typeof v === 'number'
   if (!isValidScore(glowScores.glowScore) || !isValidScore(umaxScore)) {
-    throw new Error('Score calculation produced invalid results — please retake your scan with a clearer photo.')
+    throw new Error('Score calculation produced invalid results. Please retake your scan with a clearer photo.')
   }
 
   return {

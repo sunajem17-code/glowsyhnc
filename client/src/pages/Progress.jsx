@@ -277,9 +277,9 @@ export default function Progress() {
       {/* ── Overview cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Total Scans', value: history.length || scans.length || '—', icon: <Camera size={20} style={{ color: GOLD }} /> },
-          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : '—',   icon: <Trophy size={20} style={{ color: GOLD }} /> },
-          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : '—', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
+          { label: 'Total Scans', value: history.length || scans.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} /> },
+          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : 'N/A',   icon: <Trophy size={20} style={{ color: GOLD }} /> },
+          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : 'N/A', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
         ].map(({ label, value, icon }) => (
           <div key={label} className="card text-center py-3">
             <div className="flex justify-center mb-0.5">{icon}</div>
@@ -379,7 +379,7 @@ export default function Progress() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }} formatter={(v) => [v != null ? Number(v).toFixed(1) : '—', activeMetric.label]} />
+                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }} formatter={(v) => [v != null ? Number(v).toFixed(1) : 'N/A', activeMetric.label]} />
                     <Area type="monotone" dataKey={activeMetric.key} stroke={activeMetric.color} strokeWidth={2.5} fill="url(#areaGrad)" connectNulls dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6, fill: activeMetric.color }} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -438,7 +438,7 @@ export default function Progress() {
                     />
                     <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
                       <p className="text-white text-[9px] font-mono font-bold">
-                        {scan.overall_score != null ? Number(scan.overall_score).toFixed(1) : '—'}
+                        {scan.overall_score != null ? Number(scan.overall_score).toFixed(1) : 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -500,7 +500,7 @@ export default function Progress() {
             },
             bestScore >= 7.5 && {
               icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} />,
-              text: `Reached ${bestScore.toFixed(1)} — ${latestScan.tier || 'elite tier'}`,
+              text: `Reached ${bestScore.toFixed(1)}, ${latestScan.tier || 'elite tier'}`,
             },
           ].filter(Boolean).map((m, i) => (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">

@@ -115,7 +115,7 @@ function CancelModal({ onClose }) {
               style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.22)' }}>
               <p className="font-heading font-bold text-[13px] text-white mb-1">Stay for $7.99 this month</p>
               <p className="font-body text-[11px] text-white/50 mb-3">
-                50% off your next month — one-time offer to keep your progress alive.
+                50% off your next month, one-time offer to keep your progress alive.
               </p>
               <button
                 onClick={() => { triggerHaptic(); onClose() }}
@@ -214,7 +214,7 @@ function CancelModal({ onClose }) {
             <h3 className="font-heading font-bold text-[18px] text-white mb-2">Subscription Cancelled</h3>
             <p className="font-body text-sm text-white/50 mb-6 leading-relaxed">
               You'll have access until the end of your current period.<br />
-              Your data is saved — come back anytime.
+              Your data is saved. Come back anytime.
             </p>
             <button
               onClick={onClose}
@@ -372,7 +372,7 @@ export default function Profile() {
   }
 
   function handleShare() {
-    const shareText = `I've been tracking my glow-up with Ascendus! My current score: ${latestScan?.glowScore ?? '—'}/100`
+    const shareText = `I've been tracking my glow-up with Ascendus! My current score: ${latestScan?.glowScore ?? 'N/A'}/100`
     const shareUrl = 'https://ascendus.store'
     if (navigator.share) {
       navigator.share({ title: 'Ascendus', text: shareText, url: shareUrl })
@@ -509,9 +509,9 @@ export default function Profile() {
         className="grid grid-cols-3 gap-2.5 mb-5"
       >
         {[
-          { label: 'Total Scans', value: scans.length || '—', symbol: '#' },
-          { label: 'Best Score', value: bestScore || '—', symbol: '↑' },
-          { label: 'Streak', value: streak.current > 0 ? `${streak.current}d` : '—', symbol: '🔥' },
+          { label: 'Total Scans', value: scans.length || 'N/A', symbol: '#' },
+          { label: 'Best Score', value: bestScore || 'N/A', symbol: '↑' },
+          { label: 'Streak', value: streak.current > 0 ? `${streak.current}d` : 'N/A', symbol: '🔥' },
         ].map(({ label, value, symbol }) => (
           <div
             key={label}
@@ -738,7 +738,7 @@ export default function Profile() {
       >
         <Shield size={14} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
         <p className="text-[11px] font-body" style={{ color: TEXT_DIM }}>
-          <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Privacy First —</span>{' '}
+          <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Privacy First:</span>{' '}
           Photos are analyzed by AI and stored securely. We never sell your data.
         </p>
       </motion.div>
@@ -809,7 +809,7 @@ export default function Profile() {
 
               <p className="text-[13px] font-body mb-5" style={{ color: TEXT_DIM }}>
                 {latestScan
-                  ? `My Ascendus score is ${latestScan.glowScore}/100 — track your glow-up at ascendus.store`
+                  ? `My Ascendus score is ${latestScan.glowScore}/100. Track your glow-up at ascendus.store`
                   : 'Track your glow-up at ascendus.store'}
               </p>
 

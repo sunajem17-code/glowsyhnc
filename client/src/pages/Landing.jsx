@@ -25,7 +25,7 @@ const FEATURES = [
   {
     icon: Camera,
     title: 'AI Face Rating',
-    desc: 'Scored across 4 structural pillars — Harmony, Angularity, Features, Dimorphism. Jawline, symmetry, skin quality, facial thirds analyzed in 60 seconds.',
+    desc: 'Scored across 4 structural pillars: Harmony, Angularity, Features, Dimorphism. Jawline, symmetry, skin quality, facial thirds analyzed in 60 seconds.',
   },
   {
     icon: Star,
@@ -35,7 +35,7 @@ const FEATURES = [
   {
     icon: TrendingUp,
     title: '12-Week Looksmax Plan',
-    desc: 'A personalized roadmap targeting skincare, grooming, training, and posture — optimized for your exact lowest-scoring areas first.',
+    desc: 'A personalized roadmap targeting skincare, grooming, training, and posture, optimized for your exact lowest-scoring areas first.',
   },
   {
     icon: Zap,
@@ -58,7 +58,7 @@ const FEATURES = [
 const FAQ_ITEMS = [
   {
     q: 'How does the AI face rating work?',
-    a: 'Ascendus analyzes your photo using advanced AI vision models trained on facial structure, symmetry, skin quality, and golden-ratio proportions. You receive a score from 1–10 across four key pillars: Harmony, Angularity, Features, and Dimorphism — plus a celebrity lookalike match.',
+    a: 'Ascendus analyzes your photo using advanced AI vision models trained on facial structure, symmetry, skin quality, and golden-ratio proportions. You receive a score from 1–10 across four key pillars: Harmony, Angularity, Features, and Dimorphism, plus a celebrity lookalike match.',
   },
   {
     q: 'Is Ascendus free to use?',
@@ -66,7 +66,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How accurate is the AI face score?',
-    a: 'Our AI scores are based on objective structural analysis — symmetry, facial thirds, jawline definition, feature clarity, and skin quality. They are not subjective attractiveness ratings. Most users find scores consistent with feedback they have received from others.',
+    a: 'Our AI scores are based on objective structural analysis: symmetry, facial thirds, jawline definition, feature clarity, and skin quality. They are not subjective attractiveness ratings. Most users find scores consistent with feedback they have received from others.',
   },
   {
     q: 'What is looksmaxxing?',
@@ -124,7 +124,7 @@ export default function Landing() {
   return (
     <div style={{ background: SURFACE, color: TEXT, minHeight: '100vh' }}>
       <Helmet>
-        <title>Ascendus — Free AI Face Rating &amp; Looksmax Score</title>
+        <title>Ascendus | Free AI Face Rating &amp; Looksmax Score</title>
         <meta
           name="description"
           content="Get your free AI face rating, celebrity lookalike match, and personalized looksmax action plan. Scores your jawline, symmetry, skin quality, and more in 60 seconds."
@@ -134,7 +134,7 @@ export default function Landing() {
           content="face rating app, AI face rating, looksmax app, looksmaxxing, facial appearance score, celebrity lookalike, face analyzer, glow up app, jawline score, looksmax"
         />
         <link rel="canonical" href="https://ascendus.store/" />
-        <meta property="og:title" content="Ascendus — Free AI Face Rating &amp; Looksmax Score" />
+        <meta property="og:title" content="Ascendus | Free AI Face Rating &amp; Looksmax Score" />
         <meta
           property="og:description"
           content="Find out exactly where you stand and how to improve. AI face rating + 12-week looksmax plan. Free to start."
@@ -145,7 +145,7 @@ export default function Landing() {
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Ascendus — Free AI Face Rating &amp; Looksmax Score" />
+        <meta name="twitter:title" content="Ascendus | Free AI Face Rating &amp; Looksmax Score" />
         <meta
           name="twitter:description"
           content="AI face rating, celebrity lookalike, and your personalized glow-up plan. Free in 60 seconds."
@@ -318,7 +318,7 @@ export default function Landing() {
               margin: '0 auto 28px',
             }}
           >
-            Upload a photo. Get your Glow Score, celebrity lookalike, and a personalized looksmax plan — powered by AI.
+            Upload a photo. Get your Glow Score, celebrity lookalike, and a personalized looksmax plan, powered by AI.
           </p>
 
           {/* Primary CTA */}
@@ -536,7 +536,7 @@ export default function Landing() {
             {
               num: '03',
               title: 'Get your action plan',
-              desc: 'A personalized 12-week looksmax roadmap targeting your exact weaknesses — specific, trackable, ordered by impact.',
+              desc: 'A personalized 12-week looksmax roadmap targeting your exact weaknesses: specific, trackable, ordered by impact.',
             },
           ].map(({ num, title, desc }, i) => (
             <motion.div
@@ -655,7 +655,7 @@ export default function Landing() {
               name: 'Marcus T.',
               handle: '@marcust',
               score: '+18 pts',
-              quote: 'My posture went from D to B+ in 8 weeks. The 12-week plan is incredibly specific — not just "work out more."',
+              quote: 'My posture went from D to B+ in 8 weeks. The 12-week plan is incredibly specific, not just "work out more."',
             },
             {
               initial: 'S',
@@ -669,7 +669,7 @@ export default function Landing() {
               name: 'Jordan L.',
               handle: '@jordanl',
               score: '+14 pts',
-              quote: 'Best $7.99 I spend every month. The before/after comparison is addicting — you can actually see the progress.',
+              quote: 'Best $7.99 I spend every month. The before/after comparison is addicting, you can actually see the progress.',
             },
           ].map(({ initial, name, handle, score, quote }) => (
             <div

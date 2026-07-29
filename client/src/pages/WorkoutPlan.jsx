@@ -98,11 +98,11 @@ function buildFallback(physiqueScores, gender) {
           exercises: [
             { name: 'Romanian Deadlift', sets: 3, reps: '8-10', why: 'Hamstring and glute development balances the front/back ratio for proportions.' },
             ...(needsFrame
-              ? [{ name: 'Dumbbell Lateral Raise', sets: 4, reps: '12-15', why: 'Side delts create shoulder width — the fastest way to raise your frame score.' }]
+              ? [{ name: 'Dumbbell Lateral Raise', sets: 4, reps: '12-15', why: 'Side delts create shoulder width, the fastest way to raise your frame score.' }]
               : [{ name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', why: 'Upper chest fullness improves the silhouette from the front.' }]),
             { name: 'Dumbbell Row', sets: 3, reps: '10-12', why: 'Unilateral rows build lat thickness and correct left-right imbalances.' },
             { name: 'Cable Curl', sets: 3, reps: '10-12', why: 'Arm development fills out sleeves and improves overall aesthetic presentation.' },
-            ...(needsLeanness ? [{ name: '10-min Cardio Finisher', sets: 1, reps: '10 min', why: 'Steady-state cardio accelerates leanness — the single biggest driver of visible definition.' }] : []),
+            ...(needsLeanness ? [{ name: '10-min Cardio Finisher', sets: 1, reps: '10 min', why: 'Steady-state cardio accelerates leanness, the single biggest driver of visible definition.' }] : []),
           ],
         },
         {
@@ -110,7 +110,7 @@ function buildFallback(physiqueScores, gender) {
           focus: 'Weak point focus + mobility',
           exercises: [
             { name: 'Leg Press', sets: 3, reps: '10-12', why: 'Lower body volume ensures proportional leg development vs upper body.' },
-            { name: needsFrame ? 'Wide-Grip Pull-Up' : 'Cable Row', sets: 3, reps: '6-10', why: needsFrame ? 'Wide-grip pull-ups maximally recruit lat width — key for V-taper.' : 'Mid-back thickness anchors shoulder retraction and better posture.' },
+            { name: needsFrame ? 'Wide-Grip Pull-Up' : 'Cable Row', sets: 3, reps: '6-10', why: needsFrame ? 'Wide-grip pull-ups maximally recruit lat width, key for V-taper.' : 'Mid-back thickness anchors shoulder retraction and better posture.' },
             { name: 'Arnold Press', sets: 3, reps: '10-12', why: 'Full shoulder head recruitment builds 3D shoulder roundness for frame improvement.' },
             { name: needsPosture ? 'Band Pull-Apart' : 'Tricep Pushdown', sets: 3, reps: '15-20', why: needsPosture ? 'External rotation strength is the foundation of healthy, upright posture.' : 'Tricep development completes arm aesthetics alongside biceps.' },
             { name: 'Dead Bug', sets: 3, reps: '10/side', why: 'Core anti-extension strength supports neutral spine alignment and posture score.' },
@@ -126,44 +126,44 @@ function buildFallback(physiqueScores, gender) {
       trainingLevel: 'intermediate',
       days: [
         {
-          name: 'Upper A — Push',
+          name: 'Upper A: Push',
           focus: 'Chest, shoulder, tricep strength',
           exercises: [
             { name: 'Barbell Bench Press', sets: 4, reps: '5-6', why: 'Heavy pressing builds the raw strength base for chest and front delt mass.' },
             { name: 'Overhead Press', sets: 4, reps: '5-6', why: 'The overhead press is the most direct path to shoulder width improvement.' },
             { name: needsFrame ? 'Dumbbell Lateral Raise' : 'Incline Dumbbell Press', sets: 4, reps: needsFrame ? '12-15' : '10-12', why: needsFrame ? 'Lateral raises are the #1 exercise to widen shoulders and raise frame score.' : 'Incline press develops upper chest fullness visible in a shirt.' },
-            { name: 'Tricep Dip', sets: 3, reps: '8-12', why: 'Triceps make up 2/3 of arm size — key for overall arm aesthetic presentation.' },
-            { name: needsPosture ? 'Face Pull' : 'Lateral Raise Drop Set', sets: 3, reps: needsPosture ? '15-20' : '15→12→10', why: needsPosture ? 'Face pulls balance anterior/posterior shoulder strength — essential for fixing rounded shoulders.' : 'Drop sets push lateral head hypertrophy past what straight sets achieve.' },
+            { name: 'Tricep Dip', sets: 3, reps: '8-12', why: 'Triceps make up 2/3 of arm size, key for overall arm aesthetic presentation.' },
+            { name: needsPosture ? 'Face Pull' : 'Lateral Raise Drop Set', sets: 3, reps: needsPosture ? '15-20' : '15→12→10', why: needsPosture ? 'Face pulls balance anterior/posterior shoulder strength, essential for fixing rounded shoulders.' : 'Drop sets push lateral head hypertrophy past what straight sets achieve.' },
           ],
         },
         {
-          name: 'Lower A — Strength',
+          name: 'Lower A: Strength',
           focus: 'Quad, glute, hamstring power',
           exercises: [
             { name: 'Barbell Squat', sets: 4, reps: '5-6', why: 'Heavy squats build the leg mass that creates lower body proportional balance.' },
             { name: 'Romanian Deadlift', sets: 3, reps: '8-10', why: 'Hamstring + glute development corrects the leg/upper body proportion imbalance.' },
-            { name: 'Leg Press', sets: 3, reps: '10-12', why: 'Adds quad volume without spinal loading — high reps build visible sweep.' },
+            { name: 'Leg Press', sets: 3, reps: '10-12', why: 'Adds quad volume without spinal loading, high reps build visible sweep.' },
             { name: 'Leg Curl', sets: 3, reps: '10-12', why: 'Isolated hamstring work balances quad dominance for better leg proportions.' },
-            { name: needsLeanness ? '15-min HIIT Finisher' : 'Calf Raise', sets: needsLeanness ? 1 : 4, reps: needsLeanness ? '15 min' : '12-15', why: needsLeanness ? 'HIIT post-lift elevates EPOC — keeps you burning fat hours after the session ends.' : 'Calf development completes lower leg aesthetics and improves posture alignment.' },
+            { name: needsLeanness ? '15-min HIIT Finisher' : 'Calf Raise', sets: needsLeanness ? 1 : 4, reps: needsLeanness ? '15 min' : '12-15', why: needsLeanness ? 'HIIT post-lift elevates EPOC, keeps you burning fat hours after the session ends.' : 'Calf development completes lower leg aesthetics and improves posture alignment.' },
           ],
         },
         {
-          name: 'Upper B — Pull',
+          name: 'Upper B: Pull',
           focus: 'Back, bicep, rear delt width',
           exercises: [
             { name: needsFrame ? 'Wide-Grip Pull-Up' : 'Weighted Pull-Up', sets: 4, reps: '6-10', why: needsFrame ? 'Wide-grip lat recruitment is the fastest route to visible V-taper and frame improvement.' : 'Adding load to pull-ups compounds lat thickness into frame-altering width.' },
             { name: 'Barbell Row', sets: 4, reps: '6-8', why: 'Heavy rows build upper/mid back thickness that improves standing posture and frame.' },
             { name: 'Seated Cable Row', sets: 3, reps: '10-12', why: 'Mid-back density keeps shoulders retracted and supports structural posture score.' },
-            { name: needsPosture ? 'Rear Delt Fly' : 'Barbell Curl', sets: 3, reps: needsPosture ? '15-20' : '10-12', why: needsPosture ? 'Rear delt hypertrophy pulls shoulders back — the most direct fix for forward posture.' : 'Bicep peak development is the most visible arm aesthetic marker.' },
+            { name: needsPosture ? 'Rear Delt Fly' : 'Barbell Curl', sets: 3, reps: needsPosture ? '15-20' : '10-12', why: needsPosture ? 'Rear delt hypertrophy pulls shoulders back, the most direct fix for forward posture.' : 'Bicep peak development is the most visible arm aesthetic marker.' },
             { name: 'Hammer Curl', sets: 3, reps: '10-12', why: 'Brachialis development adds arm thickness and improves arm-to-frame ratio.' },
           ],
         },
         {
-          name: 'Lower B — Hypertrophy',
+          name: 'Lower B: Hypertrophy',
           focus: 'Glute, hamstring, conditioning',
           exercises: [
             { name: 'Bulgarian Split Squat', sets: 3, reps: '10-12/side', why: 'Unilateral glute/quad work corrects left-right imbalances that hurt proportions score.' },
-            { name: 'Hip Thrust', sets: 4, reps: '10-12', why: needsProportions ? 'Glute mass improves waist-to-hip ratio — a primary driver of your proportions score.' : 'Hip thrusts are the highest EMG glute exercise for posterior aesthetic development.' },
+            { name: 'Hip Thrust', sets: 4, reps: '10-12', why: needsProportions ? 'Glute mass improves waist-to-hip ratio, a primary driver of your proportions score.' : 'Hip thrusts are the highest EMG glute exercise for posterior aesthetic development.' },
             { name: 'Walking Lunge', sets: 3, reps: '12/side', why: 'Lunges build functional leg strength and visible quad sweep from the front.' },
             { name: needsLeanness ? '20-min Steady State Cardio' : 'Leg Extension', sets: needsLeanness ? 1 : 3, reps: needsLeanness ? '20 min' : '12-15', why: needsLeanness ? 'Zone 2 cardio is the most sustainable way to create the caloric deficit needed for your leanness score.' : 'Terminal quad isolation builds the teardrop and sweep visible in shorts.' },
             { name: 'Standing Calf Raise', sets: 4, reps: '15-20', why: 'Calf development completes proportional lower leg aesthetics.' },
@@ -179,7 +179,7 @@ function buildFallback(physiqueScores, gender) {
     trainingLevel: 'advanced',
     days: [
       {
-        name: 'Push A — Strength',
+        name: 'Push A: Strength',
         focus: 'Heavy chest and shoulder pressing',
         exercises: [
           { name: 'Barbell Bench Press', sets: 5, reps: '3-5', why: 'Max strength in pressing translates to greater hypertrophy capacity later in the week.' },
@@ -190,10 +190,10 @@ function buildFallback(physiqueScores, gender) {
         ],
       },
       {
-        name: 'Pull A — Strength',
+        name: 'Pull A: Strength',
         focus: 'Heavy back and bicep compound work',
         exercises: [
-          { name: 'Weighted Pull-Up', sets: 5, reps: '4-6', why: 'Progressive overload on pull-ups directly increases lat width — the core of frame score.' },
+          { name: 'Weighted Pull-Up', sets: 5, reps: '4-6', why: 'Progressive overload on pull-ups directly increases lat width, the core of frame score.' },
           { name: 'Barbell Row', sets: 5, reps: '4-6', why: 'Heavy rowing builds the upper back density that locks in upright posture.' },
           { name: needsPosture ? 'Rear Delt Row' : 'Cable Row', sets: 4, reps: needsPosture ? '12-15' : '8-10', why: needsPosture ? 'Targeting rear delts directly counters the protraction pattern causing your posture score to drop.' : 'Mid-back isolation after compounds fills in the detail for full back development.' },
           { name: 'EZ-Bar Curl', sets: 4, reps: '8-10', why: 'Bicep strength work ensures arm development keeps pace with growing back width.' },
@@ -201,19 +201,19 @@ function buildFallback(physiqueScores, gender) {
         ],
       },
       {
-        name: 'Legs A — Strength',
+        name: 'Legs A: Strength',
         focus: 'Squat-pattern strength + posterior chain',
         exercises: [
           { name: 'Barbell Squat', sets: 5, reps: '3-5', why: 'Foundational quad + glute strength that enables high-volume hypertrophy later in the week.' },
           { name: 'Romanian Deadlift', sets: 4, reps: '6-8', why: 'Heavy RDLs build hamstring mass that balances the front-to-back proportion of the legs.' },
           { name: 'Leg Press', sets: 4, reps: '8-10', why: 'Additional quad volume without spinal fatigue, allowing higher total leg stimulus.' },
-          { name: needsLeanness ? '15-min HIIT' : 'Leg Curl', sets: needsLeanness ? 1 : 4, reps: needsLeanness ? '15 min' : '10-12', why: needsLeanness ? 'Post-leg HIIT maximizes EPOC when glycogen is already depleted — peak fat-burning effect.' : 'Isolation curls balance quad/hamstring ratio for complete leg development.' },
+          { name: needsLeanness ? '15-min HIIT' : 'Leg Curl', sets: needsLeanness ? 1 : 4, reps: needsLeanness ? '15 min' : '10-12', why: needsLeanness ? 'Post-leg HIIT maximizes EPOC when glycogen is already depleted, peak fat-burning effect.' : 'Isolation curls balance quad/hamstring ratio for complete leg development.' },
           { name: 'Standing Calf Raise', sets: 5, reps: '10-12', why: 'Heavy-ish calf work drives the myofibrillar hypertrophy calves need to grow.' },
         ],
       },
       {
-        name: 'Push B — Hypertrophy',
-        focus: 'Volume and pump — chest, delt, tricep',
+        name: 'Push B: Hypertrophy',
+        focus: 'Volume and pump: chest, delt, tricep',
         exercises: [
           { name: 'Incline Dumbbell Press', sets: 4, reps: '10-12', why: 'Upper chest emphasis adds the fullness that reads well in shirts and from the side.' },
           { name: 'Cable Fly', sets: 4, reps: '12-15', why: 'Peak contraction cable flys create the chest detail visible at lower body fat.' },
@@ -223,25 +223,25 @@ function buildFallback(physiqueScores, gender) {
         ],
       },
       {
-        name: 'Pull B — Hypertrophy',
-        focus: 'Volume and detail — back, rear delt, bicep',
+        name: 'Pull B: Hypertrophy',
+        focus: 'Volume and detail: back, rear delt, bicep',
         exercises: [
           { name: 'Lat Pulldown', sets: 4, reps: '10-12', why: 'Lat pulldowns allow higher rep ranges for hypertrophy after heavy pull-up day.' },
           { name: 'Seated Cable Row', sets: 4, reps: '12-15', why: 'High-rep rowing builds the mid-back density that maintains structural posture.' },
-          { name: needsPosture ? 'Reverse Pec Deck' : 'Chest-Supported Row', sets: 4, reps: needsPosture ? '15-20' : '12-15', why: needsPosture ? 'Reverse pec deck isolates rear delts in full stretch — highest stimulus per rep for posture correction.' : 'Chest-supported rows eliminate lower back fatigue to maximize back stimulus.' },
+          { name: needsPosture ? 'Reverse Pec Deck' : 'Chest-Supported Row', sets: 4, reps: needsPosture ? '15-20' : '12-15', why: needsPosture ? 'Reverse pec deck isolates rear delts in full stretch, highest stimulus per rep for posture correction.' : 'Chest-supported rows eliminate lower back fatigue to maximize back stimulus.' },
           { name: 'Cable Curl', sets: 4, reps: '12-15', why: 'Constant-tension curls on the second pull day drives the bicep peak hypertrophy volume.' },
           { name: 'Incline Dumbbell Curl', sets: 3, reps: '12-15', why: 'Stretched-position curls recruit the long head bicep for fuller arm development.' },
         ],
       },
       {
-        name: 'Legs B — Hypertrophy',
-        focus: 'Volume and conditioning — quad, glute, conditioning',
+        name: 'Legs B: Hypertrophy',
+        focus: 'Volume and conditioning: quad, glute, conditioning',
         exercises: [
           { name: 'Bulgarian Split Squat', sets: 4, reps: '10-12/side', why: 'Unilateral leg work corrects side-to-side imbalances that drag down proportions score.' },
-          { name: 'Hip Thrust', sets: 4, reps: '12-15', why: needsProportions ? 'Glute hypertrophy improves waist-to-hip ratio — a primary component of your proportions score.' : 'Glute activation peaks in hip thrust — highest EMG of any glute exercise.' },
+          { name: 'Hip Thrust', sets: 4, reps: '12-15', why: needsProportions ? 'Glute hypertrophy improves waist-to-hip ratio, a primary component of your proportions score.' : 'Glute activation peaks in hip thrust, highest EMG of any glute exercise.' },
           { name: 'Leg Extension', sets: 4, reps: '15-20', why: 'High-rep quad isolation at end of the week drives the pump and detail work.' },
           { name: needsLeanness ? '20-min Steady State Cardio' : 'Walking Lunge', sets: needsLeanness ? 1 : 3, reps: needsLeanness ? '20 min' : '15/side', why: needsLeanness ? 'Zone 2 cardio on legs B provides the weekly deficit needed for visible leanness improvement.' : 'Loaded lunges add unilateral quad and glute volume without spine compression.' },
-          { name: 'Seated Calf Raise', sets: 5, reps: '15-20', why: 'Soleus training with bent knee — fills in the inner calf for complete lower leg development.' },
+          { name: 'Seated Calf Raise', sets: 5, reps: '15-20', why: 'Soleus training with bent knee, fills in the inner calf for complete lower leg development.' },
         ],
       },
     ],
@@ -446,7 +446,7 @@ export default function WorkoutPlan() {
   const nutritionFraming = {
     CUT:    { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} − 500 cal deficit`, pillar: 'Lower body fat reveals more muscle definition and improves your V-taper.' },
     BULK:   { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} + 300 cal surplus`,  pillar: 'Muscle mass gain widens your shoulder-to-waist ratio and increases overall structural size.' },
-    RECOMP: { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} maintenance calories`, pillar: 'Builds muscle while keeping body fat stable — the most balanced physique protocol.' },
+    RECOMP: { calNote: `${tdee != null ? tdee + ' TDEE' : 'TDEE'} maintenance calories`, pillar: 'Builds muscle while keeping body fat stable, the most balanced physique protocol.' },
   }[nutritionPhase]
 
   // ── Body-only quick scan (no face required) — the photo/analysis call
@@ -507,7 +507,7 @@ export default function WorkoutPlan() {
       const isRateLimited = err.status === 429 || err.errorCode === 'claude_rate_limited'
       setError(
         isRateLimited
-          ? "You've hit your hourly AI plan limit. Showing a template for now — try again in about an hour."
+          ? "You've hit your hourly AI plan limit. Showing a template for now, try again in about an hour."
           : (err.message || 'Could not generate your personalized plan.')
       )
       const fallback = buildFallback(physiqueScores, gender)
@@ -658,7 +658,7 @@ export default function WorkoutPlan() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
                   <Lock size={18} className="text-[#C6A85C] mb-2" />
                   <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
-                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Your full personalized training split, built around your weak areas — not a generic template</p>
+                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Your full personalized training split, built around your weak areas, not a generic template</p>
                   <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
                     Upgrade to Pro →
                   </button>
@@ -680,7 +680,7 @@ export default function WorkoutPlan() {
                     <div className="text-[9px] font-body text-secondary">cal/day</div>
                   </>
                 ) : (
-                  <div className="text-sm font-heading font-bold text-secondary">—</div>
+                  <div className="text-sm font-heading font-bold text-secondary">N/A</div>
                 )}
               </div>
               <div className="flex-1">
@@ -701,7 +701,7 @@ export default function WorkoutPlan() {
                     <p className="text-[11px] font-body text-primary leading-relaxed">
                       <span className="font-bold">{nutritionFraming.calNote}</span>
                       {tdee && nutritionTarget && nutritionPhase !== 'RECOMP' && (
-                        <> — a {Math.abs(nutritionTarget - tdee)} cal/day {nutritionPhase === 'CUT' ? 'deficit' : 'surplus'}.</>
+                        <>, a {Math.abs(nutritionTarget - tdee)} cal/day {nutritionPhase === 'CUT' ? 'deficit' : 'surplus'}.</>
                       )}
                     </p>
                     <p className="text-[10px] text-secondary font-body mt-1 leading-relaxed">{nutritionFraming.pillar}</p>
@@ -730,9 +730,9 @@ export default function WorkoutPlan() {
                 <div className="space-y-2">
                   <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-secondary">Physique Framing</p>
                   {[
-                    nutritionPhase === 'CUT'  && { label: 'V-Taper', text: 'As waist shrinks, your shoulder-to-waist ratio improves automatically — even without new muscle.' },
+                    nutritionPhase === 'CUT'  && { label: 'V-Taper', text: 'As waist shrinks, your shoulder-to-waist ratio improves automatically, even without new muscle.' },
                     nutritionPhase === 'CUT'  && { label: 'Muscle Retention', text: 'A moderate deficit (not aggressive) protects the muscle you already have while you lose fat.' },
-                    nutritionPhase === 'BULK' && { label: 'Structural Size', text: 'Muscle mass increases your overall frame size — the main driver of a strong V-taper.' },
+                    nutritionPhase === 'BULK' && { label: 'Structural Size', text: 'Muscle mass increases your overall frame size, the main driver of a strong V-taper.' },
                     nutritionPhase === 'BULK' && { label: 'V-Taper', text: 'Shoulder and lat growth in surplus widens your silhouette faster than in recomp.' },
                     { label: 'Protein (all phases)', text: `Hit ${proteinTarget ?? '~160'}g protein/day. Protein preserves muscle during cuts, builds it during bulks, and supports recovery between sessions.` },
                   ].filter(Boolean).map(({ label, text }, i) => (
@@ -760,7 +760,7 @@ export default function WorkoutPlan() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-2xl">
                   <Lock size={18} className="text-[#C6A85C] mb-2" />
                   <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
-                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full macro breakdown framed around your physique goals — not generic health advice</p>
+                  <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full macro breakdown framed around your physique goals, not generic health advice</p>
                   <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
                     Upgrade to Pro →
                   </button>

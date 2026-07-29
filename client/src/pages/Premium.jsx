@@ -173,7 +173,7 @@ export default function Premium() {
     const link = referralCode
       ? `https://ascendus.store/r/${referralCode}`
       : 'https://ascendus.store'
-    const text = `I use Ascendus to track my glow-up — check it out 🔥 ${link}`
+    const text = `I use Ascendus to track my glow-up, check it out 🔥 ${link}`
     if (navigator.share) {
       try { await navigator.share({ text, url: link }) } catch {}
     } else {
@@ -238,7 +238,7 @@ export default function Premium() {
   return (
     <MotionPage baseClassName="page-scroll-full" style={{ background: SURFACE }}>
       <Helmet>
-        <title>Ascendus Pro — Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
+        <title>Ascendus Pro | Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
         <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, celebrity lookalikes, body composition scores, and a personalized looksmax plan. Start your glow up today." />
         <meta name="keywords" content="looksmax pro, face rating app, glow up tracker, AI appearance score, looksmaxxing app, unlimited scans" />
       </Helmet>
@@ -323,7 +323,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'}
+          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($7.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
           {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
@@ -352,7 +352,7 @@ export default function Premium() {
           <div className="flex items-center gap-2 mb-2">
             <Users size={15} style={{ color: GOLD }} />
             <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
-              Share with 3 Friends — Get Pro Free
+              Share with 3 Friends: Get Pro Free
             </p>
           </div>
           <p className="font-body text-[11px] mb-3" style={{ color: TEXT_DIM }}>
@@ -395,7 +395,7 @@ export default function Premium() {
           {copyFailed && (
             <div className="mb-2.5 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <p className="font-body text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                Couldn't copy automatically — press and hold to copy manually:
+                Couldn't copy automatically. Press and hold to copy manually:
               </p>
               <p
                 className="font-mono text-[11px] break-all select-all"
@@ -561,8 +561,8 @@ export default function Premium() {
           {(() => {
             if (subscribingNow) return 'Opening checkout…'
             const eligible = trialEligibility[plan] === 'eligible'
-            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial — then $49.99/yr' : 'Start 3-Day Free Trial — then $7.99/mo'
-            return plan === 'yearly' ? 'Get Ascendus Pro — $49.99/yr' : 'Get Ascendus Pro — $7.99/mo'
+            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial (then $49.99/yr)' : 'Start 3-Day Free Trial (then $7.99/mo)'
+            return plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($7.99/mo)'
           })()}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>

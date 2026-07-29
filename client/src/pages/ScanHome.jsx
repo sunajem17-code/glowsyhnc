@@ -101,7 +101,7 @@ function PastResultCard({ scan, onView }) {
     <CardShell
       eyebrow="LAST SCAN"
       title="Past Result"
-      body={dateLabel ? `Your last scan — ${dateLabel}.` : 'Your most recent scan.'}
+      body={dateLabel ? `Your last scan: ${dateLabel}.` : 'Your most recent scan.'}
       cta="Results"
       icon={ChevronRight}
       onAction={onView}

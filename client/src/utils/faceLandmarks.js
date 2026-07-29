@@ -56,14 +56,14 @@ export async function getLandmarks(imageUrl) {
     // First real scan: WASM already loaded, should be fast (~500ms)
     // Give 15s total to account for slow devices
     const timeout = setTimeout(() => {
-      reject(new Error('Face mesh timeout — no face detected within 15s'))
+      reject(new Error('Face mesh timeout. No face detected within 15s'))
     }, 15000)
 
     mesh.onResults((results) => {
       clearTimeout(timeout)
       const lm = results.multiFaceLandmarks?.[0]
       if (!lm || lm.length < 468) {
-        reject(new Error('No face detected — ensure the photo shows a clear front-facing face'))
+        reject(new Error('No face detected. Ensure the photo shows a clear front-facing face'))
         return
       }
       resolve(lm)

@@ -28,7 +28,7 @@ const PHASE_INFO = {
     bg: 'rgba(239,68,68,0.08)',
     border: 'rgba(239,68,68,0.25)',
     headline: 'Your Phase: Cut',
-    why: 'Based on your goal and body stats, losing body fat is your highest-leverage move. Reducing body fat will reveal your jawline, V-taper, and muscle definition — directly boosting your score.',
+    why: 'Based on your goal and body stats, losing body fat is your highest-leverage move. Reducing body fat will reveal your jawline, V-taper, and muscle definition, directly boosting your score.',
     actions: ['500 cal/day deficit', '0.8–1g protein per lb', 'Cardio 3× per week', 'Strength training 4× per week'],
   },
   BULK: {
@@ -48,7 +48,7 @@ const PHASE_INFO = {
     bg: 'rgba(198,168,92,0.08)',
     border: 'rgba(198,168,92,0.25)',
     headline: 'Your Phase: Recomp',
-    why: "You're in the ideal zone to recompose — lose fat and build muscle simultaneously. This is the most effective phase for improving your overall appearance rating.",
+    why: "You're in the ideal zone to recompose. Lose fat and build muscle simultaneously. This is the most effective phase for improving your overall appearance rating.",
     actions: ['Maintenance calories (±100)', '1g protein per lb bodyweight', 'Strength training 4× per week', 'Track weekly photos for progress'],
   },
   MAINTENANCE: {
@@ -58,7 +58,7 @@ const PHASE_INFO = {
     bg: 'rgba(52,199,89,0.08)',
     border: 'rgba(52,199,89,0.25)',
     headline: 'Your Phase: Maintenance',
-    why: "You're happy with your current physique. Your plan focuses on consistency, optimizing grooming, skincare, and posture — the highest ROI improvements at your level.",
+    why: "You're happy with your current physique. Your plan focuses on consistency, optimizing grooming, skincare, and posture, the highest ROI improvements at your level.",
     actions: ['Maintenance calories', 'Strength training 3–4× per week', 'Focus on grooming & skincare', 'Posture correction protocol'],
   },
 }

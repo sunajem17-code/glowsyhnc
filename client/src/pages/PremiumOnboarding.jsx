@@ -325,10 +325,10 @@ function StepIntro({ onNext }) {
           className="space-y-4"
         >
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-            Research on social perception shows people form judgments about attractiveness, confidence, and trustworthiness within seconds of seeing a face — often before a single word is spoken. That snap judgment shapes dating, social, and even professional outcomes.
+            Research on social perception shows people form judgments about attractiveness, confidence, and trustworthiness within seconds of seeing a face, often before a single word is spoken. That snap judgment shapes dating, social, and even professional outcomes.
           </p>
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-            The good news: most of what drives that impression — grooming, skin, fitness, posture, style — is genuinely improvable, not fixed.
+            The good news: most of what drives that impression (grooming, skin, fitness, posture, style) is genuinely improvable, not fixed.
           </p>
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
             Ascendus uses AI to show you exactly where you stand and what's actually worth working on, so you're not guessing.
@@ -714,7 +714,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
       </div>
 
       <div className="pb-10 pt-2">
-        <GoldBtn label="I Agree — Continue →" onClick={handleAgree} disabled={!allChecked} />
+        <GoldBtn label="I Agree, Continue →" onClick={handleAgree} disabled={!allChecked} />
       </div>
     </div>
   )
@@ -1183,7 +1183,7 @@ const BMI_TIERS = [
     color: '#3B82F6',
     bg: 'rgba(59,130,246,0.09)',
     border: 'rgba(59,130,246,0.28)',
-    impact: 'Being underweight means your face looks gaunt and your frame lacks presence. Building muscle mass will fill out your jaw, neck, and shoulders — directly raising your score.',
+    impact: 'Being underweight means your face looks gaunt and your frame lacks presence. Building muscle mass will fill out your jaw, neck, and shoulders, directly raising your score.',
   },
   {
     max: 25,
@@ -1194,7 +1194,7 @@ const BMI_TIERS = [
     color: '#C6A85C',
     bg: 'rgba(198,168,92,0.09)',
     border: 'rgba(198,168,92,0.28)',
-    impact: "You're in the ideal range to recomp — lose fat and build muscle simultaneously. This is the most effective phase for improving your appearance rating.",
+    impact: "You're in the ideal range to recomp. Lose fat and build muscle simultaneously. This is the most effective phase for improving your appearance rating.",
   },
   {
     max: 30,
@@ -1216,7 +1216,7 @@ const BMI_TIERS = [
     color: '#EF4444',
     bg: 'rgba(239,68,68,0.09)',
     border: 'rgba(239,68,68,0.28)',
-    impact: 'Body fat reduction is your highest-impact lever. Leaning out reveals facial bone structure, jawline, and neck definition — three of the highest-weight metrics in your rating.',
+    impact: 'Body fat reduction is your highest-impact lever. Leaning out reveals facial bone structure, jawline, and neck definition, three of the highest-weight metrics in your rating.',
   },
 ]
 
@@ -1331,7 +1331,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
   async function toBase64(url, maxPx = 1024) {
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Photo processing timed out — please retake your photo')), 15_000)
+      setTimeout(() => reject(new Error('Photo processing timed out. Please retake your photo')), 15_000)
     )
     const convert = (async () => {
       const res = await fetch(url)
@@ -1375,7 +1375,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
       try {
         aiResult = await Promise.race([
           api.ai.score({ faceImage: faceB64, sideImage: sideB64, gender: gender || 'male' }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)),
         ])
       } finally {
         clearInterval(stageTimer)

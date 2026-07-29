@@ -73,7 +73,7 @@ function GenderSelector({ selected, onSelect }) {
           ))}
         </div>
         <p className="text-center text-[10px] text-secondary font-body mt-6">
-          This only affects tier labels and benchmarks — all analysis is private and on-device.
+          This only affects tier labels and benchmarks. All analysis is private and on-device.
         </p>
       </div>
     </div>
@@ -438,7 +438,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
                           className="text-[11px] font-body underline active:opacity-60 transition-opacity"
                           style={{ color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}
                         >
-                          Skip — use photo only
+                          Skip: use photo only
                         </button>
                       </motion.div>
                     )}
@@ -457,8 +457,8 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             </p>
             <p className="text-white/50 text-[11px] font-body text-center">
               {stepNum === 1
-                ? 'Geometry captured · Take a photo too — both are required'
-                : "This is your scan from the Face Photo step, not a new one — ARKit can't track a real 90° turn, so one scan covers both. Just add a photo below."}
+                ? 'Geometry captured · Take a photo too, both are required'
+                : "This is your scan from the Face Photo step, not a new one. ARKit can't track a real 90° turn, so one scan covers both. Just add a photo below."}
             </p>
           </div>
         ) : stepNum === 2 ? (
@@ -562,7 +562,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
                     className="text-[11px] font-body underline active:opacity-60 transition-opacity"
                     style={{ color: 'rgba(255,255,255,0.35)' }}
                   >
-                    Skip Live Face Scan — use photo only
+                    Skip Live Face Scan: use photo only
                   </button>
                 )}
               </div>
@@ -612,7 +612,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             >
               <SkipForward size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
               <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                Skip Live Face Scan — use photo only
+                Skip Live Face Scan: use photo only
               </span>
             </button>
           )}
@@ -1015,7 +1015,7 @@ export default function Scan() {
   // 15s timeout guards against WKWebView blob URL expiry silently hanging.
   async function toBase64(url, maxPx = 1024) {
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Photo processing timed out — please retake your photo')), 15_000)
+      setTimeout(() => reject(new Error('Photo processing timed out. Please retake your photo')), 15_000)
     )
     const convert = (async () => {
       const res = await fetch(url)
@@ -1179,7 +1179,7 @@ export default function Scan() {
           },
           facialStructure:  'Oval',
           hairType:         null,
-          insights: ['Demo mode — sign up for a real account to get AI-powered analysis'],
+          insights: ['Demo mode. Sign up for a real account to get AI-powered analysis'],
         }
       } else {
         try {
@@ -1192,7 +1192,7 @@ export default function Scan() {
             ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
           })
           const timeoutCall = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Analysis timed out — please try again')), 120_000)
+            setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
           )
           aiResult = await Promise.race([scoreCall, timeoutCall])
           // TEMP TRACE — remove after tier-consistency verification is done.
@@ -1386,7 +1386,7 @@ export default function Scan() {
   return (
     <div className="flex flex-col h-full bg-page">
       <Helmet>
-        <title>AI Face Rating &amp; Looksmax Scan — Ascendus</title>
+        <title>AI Face Rating &amp; Looksmax Scan | Ascendus</title>
         <meta name="description" content="Upload your photo for an instant AI face rating, celebrity lookalike match, and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
       </Helmet>
@@ -1436,13 +1436,13 @@ export default function Scan() {
               {/* Photo and Live Face Scan are now both required, so taking a
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting — no harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} onScanningChange={setFaceScanBusy} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting. No harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} onScanningChange={setFaceScanBusy} />
             </motion.div>
           )}
           {step === 2 && (
             <motion.div key="side" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               <PhotoUploadStep stepNum={2}
-                guide="Turn 90° to the right. Stand straight — arms relaxed at sides. 3–6 feet from camera. Natural lighting."
+                guide="Turn 90° to the right. Stand straight, arms relaxed at sides. 3–6 feet from camera. Natural lighting."
                 photo={sidePhoto}
                 arScanDone={arScanDone}
                 onLiveScan={handleLiveScan}
@@ -1611,7 +1611,7 @@ export default function Scan() {
                   onClick={() => startAnalysis(false)}
                   className="btn-amber"
                 >
-                  ✦ Full Scan — Analyze Now
+                  ✦ Full Scan: Analyze Now
                 </button>
               ) : (
                 <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>

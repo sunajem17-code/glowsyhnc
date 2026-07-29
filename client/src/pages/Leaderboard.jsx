@@ -108,7 +108,7 @@ export default function Leaderboard() {
   return (
     <MotionPage className="px-4">
       <Helmet>
-        <title>Looksmax Leaderboard — Most Improved This Week | Ascendus</title>
+        <title>Looksmax Leaderboard: Most Improved This Week | Ascendus</title>
         <meta name="description" content="See who's glowing up the most this week. Compare your AI appearance score against others and climb the weekly looksmax leaderboard." />
         <meta name="keywords" content="looksmax leaderboard, glow up ranking, face rating leaderboard, most improved, appearance score rank" />
       </Helmet>

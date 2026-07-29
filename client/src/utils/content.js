@@ -5,7 +5,7 @@ export const POSTURE_EXERCISES = [
   { id: 'pe1', name: 'Chin Tucks', target: 'forward_head', duration: 5, sets: 3, reps: '10 reps', difficulty: 1,
     steps: ['Stand or sit tall against a wall.', 'Gently draw chin straight back (not down).', 'Hold for 5 seconds.', 'Release and repeat.'],
     muscles: 'Deep neck flexors', gif: 'https://i.imgur.com/jyWIQHL.gif',
-    tip: 'Imagine making a double chin — that\'s correct form.' },
+    tip: 'Imagine making a double chin. That\'s correct form.' },
   { id: 'pe2', name: 'Wall Angels', target: 'rounded_shoulders', duration: 5, sets: 3, reps: '12 reps', difficulty: 2,
     steps: ['Stand with back flat against wall.', 'Arms at 90°, elbows touching wall.', 'Slowly raise arms overhead, keeping contact.', 'Lower back down slowly.'],
     muscles: 'Serratus anterior, lower traps', gif: 'https://i.imgur.com/example2.gif',
@@ -17,7 +17,7 @@ export const POSTURE_EXERCISES = [
   { id: 'pe4', name: 'Thoracic Extensions', target: 'kyphosis', duration: 5, sets: 3, reps: '10 reps', difficulty: 2,
     steps: ['Place foam roller perpendicular to spine.', 'Position at mid-back, hands behind head.', 'Extend over the roller gently.', 'Move roller up the spine, repeat.'],
     muscles: 'Erector spinae, thoracic extensors', gif: 'https://i.imgur.com/example4.gif',
-    tip: 'Only mobilize the thoracic spine — avoid lumbar.' },
+    tip: 'Only mobilize the thoracic spine. Avoid lumbar.' },
   { id: 'pe5', name: 'Band Pull-Aparts', target: 'rounded_shoulders', duration: 5, sets: 4, reps: '15 reps', difficulty: 1,
     steps: ['Hold resistance band at shoulder width.', 'Arms extended straight in front.', 'Pull band apart, squeezing shoulder blades.', 'Return slowly.'],
     muscles: 'Rhomboids, rear deltoids, traps', gif: 'https://i.imgur.com/example5.gif',
@@ -53,19 +53,19 @@ export const POSTURE_EXERCISES = [
   { id: 'pe13', name: 'Pallof Press', target: 'anterior_pelvic_tilt', duration: 8, sets: 3, reps: '12 reps', difficulty: 2,
     steps: ['Set cable at chest height, stand sideways.', 'Hold handle at chest.', 'Press straight out, resist rotation.', 'Hold 2s, return slowly.'],
     muscles: 'Core anti-rotation, obliques', gif: 'https://i.imgur.com/example13.gif',
-    tip: 'Keep hips square — don\'t let them rotate at all.' },
+    tip: 'Keep hips square. Don\'t let them rotate at all.' },
   { id: 'pe14', name: 'Scapular Push-Ups', target: 'rounded_shoulders', duration: 5, sets: 3, reps: '15 reps', difficulty: 1,
     steps: ['Start in push-up position.', 'Without bending elbows, let chest drop between shoulder blades.', 'Push back up by protracting shoulders.', 'Repeat.'],
     muscles: 'Serratus anterior, rhomboids', gif: 'https://i.imgur.com/example14.gif',
-    tip: 'This is all about the shoulder blades — not a regular push-up.' },
+    tip: 'This is all about the shoulder blades, not a regular push-up.' },
   { id: 'pe15', name: 'Couch Stretch', target: 'anterior_pelvic_tilt', duration: 5, sets: 2, reps: '90s each side', difficulty: 2,
     steps: ['Kneel with back shin against a couch/wall.', 'Step front foot forward into lunge.', 'Squeeze rear glute and tuck pelvis.', 'Hold position.'],
     muscles: 'Hip flexors, rectus femoris', gif: 'https://i.imgur.com/example15.gif',
-    tip: 'The pelvic tuck is essential — without it you won\'t feel the stretch.' },
+    tip: 'The pelvic tuck is essential. Without it you won\'t feel the stretch.' },
   { id: 'pe16', name: 'Jefferson Curl', target: 'general_spine', duration: 5, sets: 3, reps: '8 reps', difficulty: 3,
     steps: ['Stand on a step holding light weight.', 'Slowly curl spine forward vertebra by vertebra.', 'Arms hang, let head drop last.', 'Uncurl slowly from bottom up.'],
     muscles: 'Spinal erectors, hamstrings', gif: 'https://i.imgur.com/example16.gif',
-    tip: 'Use very light weight — this is a mobility exercise.' },
+    tip: 'Use very light weight. This is a mobility exercise.' },
   { id: 'pe17', name: 'Seated Row (Cable)', target: 'rounded_shoulders', duration: 8, sets: 4, reps: '12 reps', difficulty: 2,
     steps: ['Sit at cable row machine, slight knee bend.', 'Grip handles, torso upright.', 'Row elbows back, squeeze shoulder blades.', 'Return with control.'],
     muscles: 'Rhomboids, mid-traps, lats', gif: 'https://i.imgur.com/example17.gif',
@@ -73,7 +73,7 @@ export const POSTURE_EXERCISES = [
   { id: 'pe18', name: 'Lateral Neck Flexion Strengthening', target: 'forward_head', duration: 5, sets: 3, reps: '12 reps', difficulty: 1,
     steps: ['Place hand on side of head.', 'Push head into hand while resisting with hand.', 'Hold 5 seconds.', 'Switch sides.'],
     muscles: 'Lateral neck flexors', gif: 'https://i.imgur.com/example18.gif',
-    tip: 'Isometric — your head doesn\'t actually move.' },
+    tip: 'Isometric: your head doesn\'t actually move.' },
   { id: 'pe19', name: 'Active Hang', target: 'general_spine', duration: 5, sets: 3, reps: '30s hang', difficulty: 2,
     steps: ['Hang from pull-up bar, shoulders relaxed first.', 'Then activate shoulders (depress shoulder blades).', 'Keep core lightly engaged.', 'Breathe normally for full duration.'],
     muscles: 'Lats, shoulder stabilizers, spine decompression', gif: 'https://i.imgur.com/example19.gif',
@@ -155,7 +155,7 @@ export const SKINCARE_ROUTINES = {
     description: 'Reduces fine lines, firms skin, and promotes collagen production.',
     am: [
       { step: 1, action: 'Cleanser', product: 'Cetaphil Gentle Skin Cleanser', why: 'Gentle cleanse that preserves moisture barrier', affiliate: '#' },
-      { step: 2, action: 'Vitamin C Serum', product: 'Skinceuticals C E Ferulic (or Klairs alternative)', why: '15% L-ascorbic acid — the gold standard for collagen support', affiliate: '#' },
+      { step: 2, action: 'Vitamin C Serum', product: 'Skinceuticals C E Ferulic (or Klairs alternative)', why: '15% L-ascorbic acid, the gold standard for collagen support', affiliate: '#' },
       { step: 3, action: 'Moisturizer', product: 'The Ordinary Natural Moisturizing Factors', why: 'Seals in actives, provides ceramides', affiliate: '#' },
       { step: 4, action: 'SPF', product: 'Supergoop Unseen Sunscreen SPF 40', why: 'UV damage is the #1 cause of aging', affiliate: '#' },
     ],
@@ -174,7 +174,7 @@ export const SKINCARE_ROUTINES = {
       { step: 1, action: 'Cleanser', product: 'Neutrogena Brightening Daily Scrub', why: 'Gentle exfoliation to boost brightness', affiliate: '#' },
       { step: 2, action: 'Brightening Serum', product: 'The Ordinary Alpha Arbutin 2% + HA', why: 'Inhibits melanin production safely', affiliate: '#' },
       { step: 3, action: 'Niacinamide', product: 'The Ordinary Niacinamide 10% + Zinc', why: 'Reduces dark spots and redness', affiliate: '#' },
-      { step: 4, action: 'SPF', product: 'Black Girl Sunscreen SPF 30', why: 'UV exposure worsens hyperpigmentation — non-negotiable', affiliate: '#' },
+      { step: 4, action: 'SPF', product: 'Black Girl Sunscreen SPF 30', why: 'UV exposure worsens hyperpigmentation, non-negotiable', affiliate: '#' },
     ],
     pm: [
       { step: 1, action: 'Double Cleanse', product: 'Bioderma Micellar Water + CeraVe Hydrating Cleanser', why: 'Remove sunscreen and debris thoroughly', affiliate: '#' },
@@ -224,7 +224,7 @@ export const SKINCARE_ROUTINES = {
       { step: 1, action: 'Gentle Cleanser', product: 'Vanicream Gentle Facial Cleanser', why: 'Free of dyes, fragrance, and common irritants', affiliate: '#' },
       { step: 2, action: 'Calming Toner', product: 'Avene Thermal Spring Water', why: 'Instantly soothes reactive skin', affiliate: '#' },
       { step: 3, action: 'Moisturizer', product: 'La Roche-Posay Toleriane Double Repair', why: 'Ceramide + niacinamide: dual barrier repair', affiliate: '#' },
-      { step: 4, action: 'Mineral SPF', product: 'Blue Lizard Sensitive Mineral Sunscreen SPF 50', why: 'Zinc oxide only — no chemical filter irritants', affiliate: '#' },
+      { step: 4, action: 'Mineral SPF', product: 'Blue Lizard Sensitive Mineral Sunscreen SPF 50', why: 'Zinc oxide only, no chemical filter irritants', affiliate: '#' },
     ],
     pm: [
       { step: 1, action: 'Micellar Water', product: 'Bioderma Sensibio H2O', why: 'The gold standard for sensitive skin cleansing', affiliate: '#' },
@@ -235,33 +235,33 @@ export const SKINCARE_ROUTINES = {
 }
 
 export const GROOMING_TIPS = [
-  { id: 'g1', category: 'hairstyle', title: 'Oval Face — Best Hairstyles',
+  { id: 'g1', category: 'hairstyle', title: 'Oval Face: Best Hairstyles',
     description: 'The most versatile face shape. Almost any style works. Best options: textured quiff, side part, crew cut with texture, or long wavy styles. Avoid: extremely flat styles that elongate the face.',
-    tip: 'Your face shape suits both longer and shorter styles — experiment freely.' },
-  { id: 'g2', category: 'hairstyle', title: 'Round Face — Best Hairstyles',
+    tip: 'Your face shape suits both longer and shorter styles. Experiment freely.' },
+  { id: 'g2', category: 'hairstyle', title: 'Round Face: Best Hairstyles',
     description: 'Goal is to add height and reduce width. Best: high fade with volume on top, undercut with a pompadour, textured crop. Avoid: full beards without fade, bowl cuts, curly mid-length.',
-    tip: 'Volume on top elongates — always keep sides tight.' },
-  { id: 'g3', category: 'hairstyle', title: 'Square Face — Best Hairstyles',
+    tip: 'Volume on top elongates. Always keep sides tight.' },
+  { id: 'g3', category: 'hairstyle', title: 'Square Face: Best Hairstyles',
     description: 'Strong angles already. Goal: soften the jaw or accentuate masculinity. Best: side-swept styles, textured top with fade, longer curtain bangs. Avoid: buzzcuts (emphasizes jaw too much), full-top high volume.',
     tip: 'A little length and texture at the top balances a square jaw beautifully.' },
-  { id: 'g4', category: 'hairstyle', title: 'Oblong/Long Face — Best Hairstyles',
+  { id: 'g4', category: 'hairstyle', title: 'Oblong/Long Face: Best Hairstyles',
     description: 'Add width, reduce length. Best: fringe/bangs, mid-length sides, textured curls or waves, curtain hair. Avoid: styles that add height (mohawks, high pompadour), long straight hair.',
     tip: 'Curtain hair (center-parted, falling on sides) is near-perfect for long faces.' },
-  { id: 'g5', category: 'hairstyle', title: 'Heart Face — Best Hairstyles',
-    description: 'Wide forehead, narrow chin — add width below and de-emphasize forehead. Best: side part, layered medium length, wave styles, chin-length or longer. Avoid: center parts that draw attention to forehead width.',
+  { id: 'g5', category: 'hairstyle', title: 'Heart Face: Best Hairstyles',
+    description: 'Wide forehead, narrow chin. Add width below and de-emphasize forehead. Best: side part, layered medium length, wave styles, chin-length or longer. Avoid: center parts that draw attention to forehead width.',
     tip: 'Volume at the sides near the jaw balances the heart shape.' },
-  { id: 'g6', category: 'beard', title: 'Weak Jawline — Beard Styles',
+  { id: 'g6', category: 'beard', title: 'Weak Jawline: Beard Styles',
     description: 'Use beard to add structure. Best: short-to-medium stubble (3-7mm) along jawline and chin. Keep the cheek line clean. Full beard with defined edges creates the illusion of a stronger jaw.',
-    tip: 'Avoid no-beard if jaw is weak — even 2-3mm stubble adds definition.' },
-  { id: 'g7', category: 'beard', title: 'Strong Jawline — Beard Styles',
+    tip: 'Avoid no-beard if jaw is weak. Even 2-3mm stubble adds definition.' },
+  { id: 'g7', category: 'beard', title: 'Strong Jawline: Beard Styles',
     description: 'Enhance or let it breathe. Best: clean-shaven (shows the jaw), heavy stubble (5 o\'clock shadow), or a well-groomed full beard. All options work when the jaw is already strong.',
     tip: 'Stubble at 5-7mm is considered universally most attractive regardless of face shape.' },
-  { id: 'g8', category: 'beard', title: 'Round Face — Beard Styles',
+  { id: 'g8', category: 'beard', title: 'Round Face: Beard Styles',
     description: 'Add length to reduce roundness. Best: goatee-style with length at the chin, ducktail beard, or a full beard that\'s longer at the chin than cheeks. Avoid: full bushy cheek beards with no structure.',
-    tip: 'Keep cheeks tight or faded — length only at chin.' },
+    tip: 'Keep cheeks tight or faded. Length only at chin.' },
   { id: 'g9', category: 'eyebrow', title: 'Eyebrow Grooming Basics',
-    description: '1) Identify your natural arch — this is where the highest point should be. 2) Remove strays between brows (unibrow area). 3) Clean up the bottom edge (not top). 4) Trim long hairs flush with the brow. 5) Never over-pluck — always under-groom.',
-    tip: 'Most men only need a trim and unibrow cleanup — less is more.' },
+    description: '1) Identify your natural arch. This is where the highest point should be. 2) Remove strays between brows (unibrow area). 3) Clean up the bottom edge (not top). 4) Trim long hairs flush with the brow. 5) Never over-pluck. Always under-groom.',
+    tip: 'Most men only need a trim and unibrow cleanup. Less is more.' },
   { id: 'g10', category: 'glasses', title: 'Glasses by Face Shape',
     description: 'Round face: angular rectangular frames. Square face: round or oval frames. Oval face: almost any frame. Oblong face: deeper frames with strong horizontals. Heart face: bottom-heavy or rimless. Diamond: oval or rimless.',
     tip: 'The frame width should match the widest part of your face.' },
@@ -269,7 +269,7 @@ export const GROOMING_TIPS = [
     description: 'The bare minimum for healthy skin: 1) Cleanse AM + PM. 2) Moisturize AM + PM. 3) SPF every morning. That\'s it. Start there. Add actives (vitamin C, retinol, niacinamide) once the basics are consistent.',
     tip: 'Consistency with basics > expensive products used inconsistently.' },
   { id: 'g12', category: 'fragrance', title: 'Fragrance Guidance',
-    description: 'Apply to pulse points: neck, wrists, behind ears. Don\'t rub — pat. Fresh/citrus scents for day, woody/oriental for evening. 2-3 sprays max. Rotate fragrances to avoid nose blindness.',
+    description: 'Apply to pulse points: neck, wrists, behind ears. Don\'t rub. Pat. Fresh/citrus scents for day, woody/oriental for evening. 2-3 sprays max. Rotate fragrances to avoid nose blindness.',
     tip: 'A good fragrance is one of the highest ROI grooming investments.' },
 ]
 
@@ -298,16 +298,16 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
   add(2, 'skin', 'AM Skincare: Build the Habit', 'By now this should feel automatic. Cleanser → SPF 50. Every day, no exceptions. The habit matters more than the products.', 'daily', 5, 1)
   add(2, 'skin', 'PM: Add Niacinamide Serum', 'Introduce 10% niacinamide after cleansing, before moisturizer. Reduces pores and evens skin tone within 4 weeks.', 'daily', 7, 2)
   add(3, 'skin', 'AM Upgrade: Add Vitamin C Serum', '10–15% Vitamin C between cleanser and SPF. Brightens, fights pigmentation, and boosts SPF efficacy. Apply to dry skin.', 'daily', 7, 2)
-  add(3, 'skin', 'PM: Introduce Retinol 0.1% (2×/week)', 'Apply on dry skin 2×/week — Monday and Thursday. The most proven skin-improvement ingredient. Start low, build up.', '2x/week', 5, 3)
+  add(3, 'skin', 'PM: Introduce Retinol 0.1% (2×/week)', 'Apply on dry skin 2×/week, Monday and Thursday. The most proven skin-improvement ingredient. Start low, build up.', '2x/week', 5, 3)
   add(4, 'skin', 'AM Stack Locked: Cleanser + Vit C + SPF', 'Your morning routine is now a 3-step stack. Consistency here is the foundation of your long-term skin score.', 'daily', 7, 2)
   add(4, 'skin', 'PM: Assess Retinol Tolerance', 'No purging or irritation? Tolerating well. If irritated, move to once a week and buffer with moisturizer. Normal adjustment.', '2x/week', 5, 2)
   add(5, 'skin', 'PM: Increase Retinol to 3×/week', 'Skin has adapted. Increase to Mon/Wed/Fri. First visible texture improvements should appear this week.', '3x/week', 5, 3)
   add(5, 'skin', 'Add Eye Cream: Caffeine-Based', 'Caffeine eye cream applied morning. Reduces puffiness and dark circles. Major impact on perceived youth and health.', 'daily', 3, 1)
   add(6, 'skin', 'Routine Progress Check', 'Take a skin comparison photo in the same lighting as week 1. Skin clarity should show measurable improvement by now.', 'once', 10, 1)
-  add(7, 'skin', 'PM Upgrade: Consider Tretinoin 0.025%', 'If you have access, upgrade from retinol to tretinoin 0.025%. Prescription-strength results — apply 3×/week to dry skin.', '3x/week', 5, 3)
+  add(7, 'skin', 'PM Upgrade: Consider Tretinoin 0.025%', 'If you have access, upgrade from retinol to tretinoin 0.025%. Prescription-strength results. Apply 3×/week to dry skin.', '3x/week', 5, 3)
   add(7, 'skin', 'Add Hyaluronic Acid to AM Routine', 'Apply HA serum to damp skin before Vitamin C. Plumps skin and dramatically improves product absorption.', 'daily', 5, 2)
   add(8, 'skin', 'Dermarolling: First Session (0.5mm)', 'Clean dermaroller on cleansed skin. Creates micro-channels for product absorption. Apply hyaluronic acid immediately after. SPF the next day.', '1x/week', 20, 3)
-  add(9, 'skin', 'Routine Maintenance + Dermarolling (Week 2)', 'Full stack is locked. Second dermarolling session. Results are compounding now — stay consistent.', 'daily', 7, 2)
+  add(9, 'skin', 'Routine Maintenance + Dermarolling (Week 2)', 'Full stack is locked. Second dermarolling session. Results are compounding now. Stay consistent.', 'daily', 7, 2)
   add(10, 'skin', 'Add Peptide Serum to PM Routine', 'Matrixyl 3000 or copper peptides on alternating nights with retinol/tretinoin. Maximum collagen synthesis stimulus.', 'daily', 5, 2)
   add(11, 'skin', 'Full Skincare Stack: Maintenance Mode', 'All habits are locked in. This is maintenance. Improvements from here are pure compounding from consistent habits.', 'daily', 7, 1)
   add(12, 'skin', 'Final Skin Progress Photo', 'Same lighting, angle, and distance as week 1. Document your skin transformation over 12 weeks.', 'once', 5, 1)
@@ -330,7 +330,7 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
   add(2, 'grooming', 'Eyebrow Grooming', 'Clean up with threading or a barber trim. Defined brows make your eyes appear larger, sharper, and more symmetrical.', 'once', 20, 1)
   add(isFemale ? 3 : 4, 'grooming',
     isFemale ? 'Brow + Lash Enhancement Routine' : 'Beard Strategy: Define Your Look',
-    isFemale ? 'Brow shaping pencil or tint + lash serum for growth. Defines and frames your eyes — major face score improvement.' : 'Decide: grow with a defined neckline and cheekline, or clean shave with a precise razor edge. Your beard should enhance, not hide, your jawline.',
+    isFemale ? 'Brow shaping pencil or tint + lash serum for growth. Defines and frames your eyes. Major face score improvement.' : 'Decide: grow with a defined neckline and cheekline, or clean shave with a precise razor edge. Your beard should enhance, not hide, your jawline.',
     'once', 20, 2)
   add(6, 'grooming', 'Signature Fragrance', 'Visit a store. Test three options: one fresh, one warm, one bold. Choose one and wear it consistently. Scent is part of your aesthetic.', 'once', 30, 1)
   add(8, 'grooming', 'Teeth Whitening: 2-Week Course', 'Start a whitening strip course. Whiter teeth are a significant and underrated attractiveness upgrade. Crest 3D White or equivalent.', 'daily', 15, 1)
@@ -339,11 +339,11 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
 
   // ─── FACE (mewing + jaw) ────────────────────────────────────────────────────
   if (phase !== 'LEAN') {
-    add(1, 'face', 'Mewing: Start Correct Tongue Posture', 'Entire tongue flat against the palate — not just the tip. Suction hold. Lips together, teeth lightly touching. Maintain 24/7.', 'always', 0, 2)
+    add(1, 'face', 'Mewing: Start Correct Tongue Posture', 'Entire tongue flat against the palate, not just the tip. Suction hold. Lips together, teeth lightly touching. Maintain 24/7.', 'always', 0, 2)
     add(3, 'face', 'Mewing: 10-Minute Active Sessions', 'Dedicated 10-minute suction hold practice daily. This trains the habit faster than passive mewing alone.', 'daily', 10, 2)
     add(5, 'face', 'Mastic Gum: 20 min/day', 'Falim or mastic gum. Builds masseter definition. Most visible at lower body fat. Use while watching TV or commuting.', 'daily', 20, 2)
     add(7, 'face', 'Jaw Protocol: Triple Stack', 'Mewing 24/7 + 20 min mastic gum + 3×30 chin tucks daily. Maximum jaw definition stimulus. Difficulty increases progressively.', 'daily', 30, 3)
-    add(10, 'face', 'Mewing: Hard Mode — Peak Suction Hold', 'Your mewing should be automatic now. Apply maximum upward tongue pressure during dedicated sessions. Results are compounding.', 'daily', 10, 3)
+    add(10, 'face', 'Mewing: Hard Mode, Peak Suction Hold', 'Your mewing should be automatic now. Apply maximum upward tongue pressure during dedicated sessions. Results are compounding.', 'daily', 10, 3)
   } else {
     add(1, 'face', 'Mewing: Start Now (Compounds With Fat Loss)', 'Every % of fat you lose makes your bone structure more visible. Mewing now means results are already compounding.', 'always', 0, 2)
     add(4, 'face', 'Mastic Gum: Start at Lower Body Fat', 'You have lost enough fat that jaw muscle development is now visible. Add mastic gum 20 min/day.', 'daily', 20, 2)
@@ -353,7 +353,7 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
   // ─── TRAINING (phase-aware) ─────────────────────────────────────────────────
   if (phase === 'LEAN') {
     add(1, 'nutrition', 'Caloric Deficit: Track Everything (–400 kcal)', 'Calculate TDEE and subtract 400 calories. Fat loss reveals jawline and cheekbones faster than any other intervention.', 'daily', 10, 2)
-    add(1, 'training', 'Zone 2 Cardio: 20 min × 3/week', 'Conversational-pace cardio — walking uphill, cycling, or rowing. Foundation of your fat loss protocol.', '3x/week', 20, 1)
+    add(1, 'training', 'Zone 2 Cardio: 20 min × 3/week', 'Conversational-pace cardio: walking uphill, cycling, or rowing. Foundation of your fat loss protocol.', '3x/week', 20, 1)
     add(2, 'nutrition', 'Eliminate Liquid Calories', 'No juice, alcohol, or soft drinks. Water, black coffee, sparkling water only. Easy 300–500 calorie reduction per day.', 'daily', 0, 1)
     add(3, 'training', 'Add Resistance Training: 3×/week', 'Compound lifts to preserve muscle during deficit. Squat, row, overhead press. Muscle burns calories at rest.', '3x/week', 50, 2)
     add(4, 'training', 'Cardio Increase: 30 min Zone 2 × 4/week', 'Increase cardio volume. Fat loss should be 0.5–1% bodyweight per week. Dial in deficit if not matching target.', '4x/week', 30, 2)
@@ -378,7 +378,7 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
     add(11, 'training', 'Peak Performance Phase', 'Heavy compounds 3×/week + hypertrophy accessories 1×/week. You are at the peak of your 12-week program.', '4x/week', 75, 3)
   } else { // REFINE
     add(1, 'training', 'Strength Maintenance + Physique Refinement', 'Heavy compounds 3×/week. Add isolation work for shoulder caps, chest, and arms. Refine your V-taper.', '3x/week', 60, 2)
-    add(3, 'training', 'Add Advanced Accessories: Laterals + Face Pulls', 'Priority accessories for shoulder width — 4×15–20 lateral raises + 3×20 face pulls at every session.', '4x/week', 70, 2)
+    add(3, 'training', 'Add Advanced Accessories: Laterals + Face Pulls', 'Priority accessories for shoulder width: 4×15–20 lateral raises + 3×20 face pulls at every session.', '4x/week', 70, 2)
     add(5, 'training', 'Full Program Running: Peak Physique Ahead', 'Your training is optimized. Progressive overload on compounds + high-rep isolations. Peak aesthetics in 6 weeks.', '4x/week', 70, 3)
     add(7, 'skin', 'Professional Facial or Chemical Peel', 'Book an AHA peel or HydraFacial. One session delivers results no home routine can match. Major texture and tone upgrade.', 'once', 60, 2)
     add(8, 'style', 'Wardrobe Refinement: Quality Over Quantity', 'Audit your wardrobe. Remove anything that does not fit perfectly. Replace with 3–5 quality, well-fitted pieces.', 'once', 90, 2)
@@ -401,7 +401,7 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
   }
 
   if (lowF) {
-    add(1, 'skin', 'Features Priority: SPF 50+ Non-Negotiable', 'UV damage is the primary driver of features score decline. SPF every single day — even indoors, even in winter. Non-negotiable.', 'daily', 2, 1)
+    add(1, 'skin', 'Features Priority: SPF 50+ Non-Negotiable', 'UV damage is the primary driver of features score decline. SPF every single day, even indoors, even in winter. Non-negotiable.', 'daily', 2, 1)
     add(5, 'skin', 'Dermarolling 0.5mm (Features Protocol)', 'Micro-needling improves texture, pore appearance, and product absorption. Weekly sessions compound over months.', '1x/week', 20, 3)
     add(9, 'skin', 'Consider Professional Skin Treatment', 'A professional chemical peel or microneedling session at this stage delivers results beyond any home routine. Book a consultation.', 'once', 5, 2)
   }
@@ -412,12 +412,12 @@ export function generatePlanTasks(faceData, pillars = null, phase = 'TRANSFORM',
   }
 
   if (lowD && isFemale) {
-    add(2, 'style', 'Silhouette: High-Waisted Styling Audit', 'High-waisted bottoms emphasize waist-to-hip ratio — the primary feminine dimorphism driver. Audit your wardrobe this week.', 'once', 60, 1)
+    add(2, 'style', 'Silhouette: High-Waisted Styling Audit', 'High-waisted bottoms emphasize waist-to-hip ratio, the primary feminine dimorphism driver. Audit your wardrobe this week.', 'once', 60, 1)
     add(5, 'training', 'Hip Thrust Priority: 4×12', 'Hip thrusts are the #1 glute builder. Heavy hip thrusts reshape the feminine silhouette faster than any other exercise.', '3x/week', 15, 2)
   }
 
   if (lowA) {
-    add(1, 'face', 'Angularity: Mewing 24/7 — Suction Hold', 'Entire tongue flat on palate with suction hold. This is your primary angularity intervention. Do it always, every waking moment.', 'always', 0, 2)
+    add(1, 'face', 'Angularity: Mewing 24/7, Suction Hold', 'Entire tongue flat on palate with suction hold. This is your primary angularity intervention. Do it always, every waking moment.', 'always', 0, 2)
     add(3, 'face', 'Angularity: Mastic Gum 20 min + Chin Tucks', 'Mastic gum builds masseter definition. Stack with 3×30 chin tucks. Double stimulus for jaw structure.', 'daily', 25, 3)
     add(6, 'face', 'Angularity: Peak Jawline Protocol', 'Mewing 24/7 + mastic gum 20 min + chin tucks 4×30 + caloric deficit if applicable. Maximum structural stimulus.', 'daily', 35, 3)
   }

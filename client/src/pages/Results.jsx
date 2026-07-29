@@ -193,7 +193,7 @@ const HAIRSTYLE_RECS = {
     },
     average: {
       label: 'Average Face · Straight Hair',
-      advice: 'Versatile face shape — most styles work. Aim for clean execution.',
+      advice: 'Versatile face shape. Most styles work. Aim for clean execution.',
       cuts: [
         { name: 'Undercut', why: 'Clean contrast, always sharp' },
         { name: 'Ivy League / Side Part', why: 'Classic and timeless' },
@@ -213,13 +213,13 @@ const HAIRSTYLE_RECS = {
     },
     strong: {
       label: 'Strong Structure · Straight Hair',
-      advice: 'Elite bone structure — almost any style works.',
+      advice: 'Elite bone structure. Almost any style works.',
       cuts: [
         { name: 'Caesar Cut', why: 'Timeless for strong jaw and brow ridge' },
         { name: 'Modern Pompadour', why: 'Commands attention, pairs with structure' },
         { name: 'French Crop / Buzz', why: 'Both showcase structure without fighting it' },
       ],
-      avoid: 'Messy, unkempt styles — the only thing that can pull you down',
+      avoid: 'Messy, unkempt styles. The only thing that can pull you down',
     },
   },
 
@@ -233,11 +233,11 @@ const HAIRSTYLE_RECS = {
         { name: 'Quiff with Fade', why: 'Directs volume upward, not outward' },
         { name: 'Fringe with Taper', why: 'Softens roundness, adds forward length' },
       ],
-      avoid: 'Letting waves grow out wide on the sides — widens the face',
+      avoid: 'Letting waves grow out wide on the sides. Widens the face',
     },
     average: {
       label: 'Average Face · Wavy Hair',
-      advice: 'Wavy texture is versatile — lean into natural movement.',
+      advice: 'Wavy texture is versatile. Lean into natural movement.',
       cuts: [
         { name: 'Messy Textured Cut', why: 'Natural movement enhances features' },
         { name: 'Curtain Fringe', why: 'Trending and flattering on most face shapes' },
@@ -263,7 +263,7 @@ const HAIRSTYLE_RECS = {
         { name: 'Slick Back', why: 'Shows off structure completely' },
         { name: 'Curtain Fringe', why: 'Softens without hiding your strong structure' },
       ],
-      avoid: 'Over-product and helmet hair — your natural texture is the asset',
+      avoid: 'Over-product and helmet hair. Your natural texture is the asset',
     },
   },
 
@@ -273,21 +273,21 @@ const HAIRSTYLE_RECS = {
       label: 'Round Face · Curly Hair',
       advice: 'Height is your best friend. Keep the sides tapered and stack volume upward.',
       cuts: [
-        { name: 'Curly Top Fade', why: 'Volume stays on top, sides stay tight — elongates face' },
+        { name: 'Curly Top Fade', why: 'Volume stays on top, sides stay tight. Elongates face' },
         { name: 'Defined Curl with Taper', why: 'Structure and definition prevent width-spreading' },
         { name: 'Curly Fringe Forward', why: 'Brings the eye forward and down, reducing roundness' },
       ],
-      avoid: 'Wide curly afro shapes or letting sides grow out — adds width to an already wide face',
+      avoid: 'Wide curly afro shapes or letting sides grow out. Adds width to an already wide face',
     },
     average: {
       label: 'Average Face · Curly Hair',
-      advice: 'Lucky — curly hair works well here. Focus on definition and moisture.',
+      advice: 'Lucky. Curly hair works well here. Focus on definition and moisture.',
       cuts: [
         { name: 'Curly Top Fade', why: 'Clean and modern, suits the balanced shape' },
         { name: 'Defined Curl Afro', why: 'Natural texture shines with balanced proportions' },
         { name: 'Curtain Curls', why: 'Soft and flattering, works with curl pattern' },
       ],
-      avoid: 'Letting curls dry out and frizz — definition is everything',
+      avoid: 'Letting curls dry out and frizz. Definition is everything',
     },
     defined: {
       label: 'Defined Face · Curly Hair',
@@ -301,13 +301,13 @@ const HAIRSTYLE_RECS = {
     },
     strong: {
       label: 'Strong Structure · Curly Hair',
-      advice: 'Elite structure + curls is a rare combo — own it.',
+      advice: 'Elite structure + curls is a rare combo. Own it.',
       cuts: [
         { name: 'High Fade with Curly Top', why: 'Maximizes the contrast with strong bone structure' },
         { name: 'Defined Full Curl', why: 'Volume complements without overpowering the face' },
-        { name: 'Curly Caesar', why: 'Classic cut adapted for curls — sharp and confident' },
+        { name: 'Curly Caesar', why: 'Classic cut adapted for curls. Sharp and confident' },
       ],
-      avoid: 'Messy, undefined frizz — define those curls with product',
+      avoid: 'Messy, undefined frizz. Define those curls with product',
     },
   },
 
@@ -317,21 +317,21 @@ const HAIRSTYLE_RECS = {
       label: 'Round Face · Coily/Afro Hair',
       advice: 'Stack all height upward. Taper the sides tight to elongate and define.',
       cuts: [
-        { name: 'High Top Fade', why: 'Adds dramatic height — elongates the face significantly' },
-        { name: 'Afro with Tapered Sides', why: 'Volume on top, tight sides — the ideal round-face afro' },
+        { name: 'High Top Fade', why: 'Adds dramatic height. Elongates the face significantly' },
+        { name: 'Afro with Tapered Sides', why: 'Volume on top, tight sides. The ideal round-face afro' },
         { name: 'Twist Out with Fade', why: 'Structured definition adds length and reduces width perception' },
       ],
-      avoid: 'Full rounded afro with no tapering — it mirrors the round face and doubles the width',
+      avoid: 'Full rounded afro with no tapering. It mirrors the round face and doubles the width',
     },
     average: {
       label: 'Average Face · Coily/Afro Hair',
       advice: 'Almost anything works. Shadow fade with afro or locs is a signature look.',
       cuts: [
         { name: 'Shadow Fade with Afro', why: 'Clean gradient keeps the look sharp and balanced' },
-        { name: 'Tapered Afro', why: 'Natural volume with clean edges — timeless' },
+        { name: 'Tapered Afro', why: 'Natural volume with clean edges. Timeless' },
         { name: 'Twist Out', why: 'Definition and texture, suits the balanced proportions' },
       ],
-      avoid: 'Neglected edges — line-ups make or break the afro look',
+      avoid: 'Neglected edges. Line-ups make or break the afro look',
     },
     defined: {
       label: 'Defined Face · Coily/Afro Hair',
@@ -341,7 +341,7 @@ const HAIRSTYLE_RECS = {
         { name: 'Mid Fade with Afro Top', why: 'Structure on the sides highlights the jawline' },
         { name: 'Twist Out Natural', why: 'Texture adds softness without hiding structure' },
       ],
-      avoid: 'Flat tops or extremely angular cuts — competes with the face, not complements it',
+      avoid: 'Flat tops or extremely angular cuts. Competes with the face, not complements it',
     },
     strong: {
       label: 'Strong Structure · Coily/Afro Hair',
@@ -351,7 +351,7 @@ const HAIRSTYLE_RECS = {
         { name: 'High Top Fade', why: 'Dramatic height amplifies the bone structure' },
         { name: 'Tapered Sides with Volume Top', why: 'Maximizes contrast and showcases structure' },
       ],
-      avoid: 'Unkempt or neglected texture — moisture and definition are non-negotiable',
+      avoid: 'Unkempt or neglected texture. Moisture and definition are non-negotiable',
     },
   },
 
@@ -365,7 +365,7 @@ const HAIRSTYLE_RECS = {
         { name: 'Mid-Length Locs Worn Up', why: 'Height adds length to a round face' },
         { name: 'Loc Mohawk', why: 'Volume in the center creates angularity and height' },
       ],
-      avoid: 'Locs worn fully down and loose — adds width at jaw level',
+      avoid: 'Locs worn fully down and loose. Adds width at jaw level',
     },
     average: {
       label: 'Average Face · Locs',
@@ -373,9 +373,9 @@ const HAIRSTYLE_RECS = {
       cuts: [
         { name: 'Mid-Length Locs Any Style', why: 'Balanced face handles any loc length or style' },
         { name: 'Long Locs Worn Back', why: 'Elongates face and looks polished' },
-        { name: 'Short Locs with Line-Up', why: 'Clean and structured — sharp presentation' },
+        { name: 'Short Locs with Line-Up', why: 'Clean and structured. Sharp presentation' },
       ],
-      avoid: 'Neglected, frizzy locs without moisture or retwisting — upkeep is everything',
+      avoid: 'Neglected, frizzy locs without moisture or retwisting. Upkeep is everything',
     },
     defined: {
       label: 'Defined Face · Locs',
@@ -385,17 +385,17 @@ const HAIRSTYLE_RECS = {
         { name: 'Short Locs Fade', why: 'Precision edges match the precision of the face' },
         { name: 'Mid-Length Locs Worn Up', why: 'Height enhances vertical length of a defined face' },
       ],
-      avoid: 'Flat, fully down locs that cover the jawline — show it off',
+      avoid: 'Flat, fully down locs that cover the jawline. Show it off',
     },
     strong: {
       label: 'Strong Structure · Locs',
       advice: 'Strong bone structure wears every loc style with authority.',
       cuts: [
         { name: 'Long Locs Worn Down', why: 'Elongates and frames elite structure' },
-        { name: 'Long Locs Worn Back', why: 'Full exposure of the structure — nothing to hide' },
+        { name: 'Long Locs Worn Back', why: 'Full exposure of the structure. Nothing to hide' },
         { name: 'Mid-Length Locs Any Style', why: 'Structure carries any length effortlessly' },
       ],
-      avoid: 'Over-accessorizing locs — the face and locs speak for themselves',
+      avoid: 'Over-accessorizing locs. The face and locs speak for themselves',
     },
   },
 
@@ -409,37 +409,37 @@ const HAIRSTYLE_RECS = {
         { name: 'Goatee / Chin Beard', why: 'Lengthens the chin, reduces apparent roundness' },
         { name: 'Stubble', why: 'Even light stubble adds jaw definition' },
       ],
-      avoid: 'Clean-shaven bald — removes all structure from the face at once',
+      avoid: 'Clean-shaven bald. Removes all structure from the face at once',
     },
     average: {
       label: 'Average Face · Bald/Shaved',
       advice: 'Bald works on a balanced face. Maintain skin and beard sharp.',
       cuts: [
-        { name: 'Clean Bald with Beard', why: 'Classic combination — confident and sharp' },
+        { name: 'Clean Bald with Beard', why: 'Classic combination. Confident and sharp' },
         { name: 'Stubble Bald', why: 'Low maintenance, always looks intentional' },
         { name: 'Shadow Fade to Bald', why: 'Gradual transition looks deliberate not receding' },
       ],
-      avoid: 'Patchy or ungroomed beard — if you go bald, the beard must be sharp',
+      avoid: 'Patchy or ungroomed beard. If you go bald, the beard must be sharp',
     },
     defined: {
       label: 'Defined Face · Bald/Shaved',
       advice: 'Strong structure is amplified bald. This is the power move.',
       cuts: [
-        { name: 'Clean Shaved Bald', why: 'Maximum structure exposure — the Vin Diesel effect' },
+        { name: 'Clean Shaved Bald', why: 'Maximum structure exposure. The Vin Diesel effect' },
         { name: 'Bald with Sharp Beard', why: 'Defines the jaw even further' },
         { name: 'Shadow Fade to Skin', why: 'Polished look that highlights structure' },
       ],
-      avoid: 'Anything that looks accidental — commit fully to the look',
+      avoid: 'Anything that looks accidental. Commit fully to the look',
     },
     strong: {
       label: 'Strong Structure · Bald/Shaved',
-      advice: 'Elite structure bald is the highest tier aesthetic — no hair needed.',
+      advice: 'Elite structure bald is the highest tier aesthetic. No hair needed.',
       cuts: [
         { name: 'Clean Bald', why: 'Nothing can compete with elite bald structure' },
-        { name: 'Bald with Full Beard', why: 'The full power look — dominant and intentional' },
+        { name: 'Bald with Full Beard', why: 'The full power look. Dominant and intentional' },
         { name: 'Polished Bald', why: 'Moisturized, shining scalp signals discipline' },
       ],
-      avoid: 'Neglected scalp — moisturize daily and keep the look deliberate',
+      avoid: 'Neglected scalp. Moisturize daily and keep the look deliberate',
     },
   },
 }
@@ -621,7 +621,7 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
               <>
                 {/* Intro blurb — Pro */}
                 <p className="text-[10px] text-secondary font-body mb-3 leading-snug">
-                  Products matched to your scan — selected based on your improvement areas and skin analysis.
+                  Products matched to your scan. Selected based on your improvement areas and skin analysis.
                 </p>
 
                 {/* Loading skeleton */}
@@ -647,7 +647,7 @@ function ProductStack({ isPremium, weaknesses, skinIssues, groomingScore, pillar
                 {/* No results */}
                 {!loading && fetched && products.length === 0 && (
                   <p className="text-[11px] text-secondary font-body text-center py-4">
-                    No recommendations available right now — try again after your next scan.
+                    No recommendations available right now. Try again after your next scan.
                   </p>
                 )}
 
@@ -845,7 +845,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const gap       = ((Number(potential) - (glowScore ?? 5)).toFixed(1))
 
   const hookHeadline = worstLabel && worstScore != null && worstScore < 6.5
-    ? `Your ${worstLabel} has the most room to grow — and it's your fastest path to +${scoreDrag} pts.`
+    ? `Your ${worstLabel} has the most room to grow, and it's your fastest path to +${scoreDrag} pts.`
     : `You're ${gap} points below your potential.`
 
   const hookSub = worstLabel && worstScore != null && worstScore < 6.5
@@ -924,7 +924,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         <div className="flex items-center justify-center gap-4 mb-4">
           <div className="text-center">
             <p className="font-mono font-bold leading-none mb-1" style={{ fontSize: 36, color: '#E07A5F' }}>
-              {glowScore?.toFixed(1) ?? '—'}
+              {glowScore?.toFixed(1) ?? 'N/A'}
             </p>
             <p className="text-[9px] font-body uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>Current</p>
           </div>
@@ -1101,7 +1101,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           className="w-full py-3 font-body text-[13px] text-center"
           style={{ color: 'rgba(255,255,255,0.30)' }}
         >
-          No thanks, I'll stay at {glowScore?.toFixed(1) ?? '—'}
+          No thanks, I'll stay at {glowScore?.toFixed(1) ?? 'N/A'}
         </button>
       </div>
 
@@ -1125,15 +1125,15 @@ const SKIN_INGREDIENTS = {
     name: 'Benzoyl Peroxide 2.5%',
     why: 'Kills acne-causing bacteria (C. acnes) at the source. 2.5% is as effective as 10% with far less irritation.',
     how: 'Apply thin layer to affected areas after cleansing. Start 3×/week, increase to daily as tolerated.',
-    when: 'PM only — causes photosensitivity.',
+    when: 'PM only. Causes photosensitivity.',
     timeline: '2–4 weeks for reduction. 8–12 weeks for significant clearing.',
     warning: 'Can bleach fabric. Patch test first. Do not use with tretinoin on same night.',
-    pillar: 'Clears skin texture — directly raises your Features score.',
+    pillar: 'Clears skin texture. Directly raises your Features score.',
   }],
   scarring: [
-    { name: 'Vitamin C (L-Ascorbic Acid 15%)', why: 'Inhibits melanin production — fades hyperpigmentation and post-acne marks.', how: 'Apply 3–4 drops to clean dry face. Let absorb 3 min before next step.', when: 'AM — boosts SPF protection and brightens through the day.', timeline: '4–8 weeks visible fading. Full effect in 12 weeks.', warning: 'Unstable — use within 3 months of opening. Store away from light.', pillar: 'Even skin tone reads as more symmetric — improves Harmony score.' },
-    { name: 'Alpha Arbutin 2%', why: 'Inhibits tyrosinase (the enzyme that makes dark spots) — gentler than kojic acid.', how: 'Apply 2 drops after toner, before moisturizer.', when: 'AM and PM.', timeline: '6–8 weeks for measurable lightening.', warning: 'Stack with Vitamin C for 2× effect.', pillar: 'Reduces the visual evidence of past breakouts — raises Features score.' },
-    { name: 'Retinol 0.3% → 0.5%', why: 'Speeds cell turnover — pushes scarred cells out and builds collagen beneath.', how: 'Rice-grain amount on full face. Start 1×/week, increase to 3× over 6 weeks.', when: 'PM only. Always use SPF next morning.', timeline: 'Visible texture change in 8–16 weeks. Best results at 6+ months.', warning: 'Purging is normal weeks 2–6. Do not combine with AHAs on same night.', pillar: 'Strongest OTC texture intervention — improves Features score long-term.' },
+    { name: 'Vitamin C (L-Ascorbic Acid 15%)', why: 'Inhibits melanin production. Fades hyperpigmentation and post-acne marks.', how: 'Apply 3–4 drops to clean dry face. Let absorb 3 min before next step.', when: 'AM. Boosts SPF protection and brightens through the day.', timeline: '4–8 weeks visible fading. Full effect in 12 weeks.', warning: 'Unstable. Use within 3 months of opening. Store away from light.', pillar: 'Even skin tone reads as more symmetric. Improves Harmony score.' },
+    { name: 'Alpha Arbutin 2%', why: 'Inhibits tyrosinase (the enzyme that makes dark spots). Gentler than kojic acid.', how: 'Apply 2 drops after toner, before moisturizer.', when: 'AM and PM.', timeline: '6–8 weeks for measurable lightening.', warning: 'Stack with Vitamin C for 2× effect.', pillar: 'Reduces the visual evidence of past breakouts. Raises Features score.' },
+    { name: 'Retinol 0.3% → 0.5%', why: 'Speeds cell turnover. Pushes scarred cells out and builds collagen beneath.', how: 'Rice-grain amount on full face. Start 1×/week, increase to 3× over 6 weeks.', when: 'PM only. Always use SPF next morning.', timeline: 'Visible texture change in 8–16 weeks. Best results at 6+ months.', warning: 'Purging is normal weeks 2–6. Do not combine with AHAs on same night.', pillar: 'Strongest OTC texture intervention. Improves Features score long-term.' },
   ],
   oiliness: [{
     name: 'Niacinamide 10%',
@@ -1141,21 +1141,21 @@ const SKIN_INGREDIENTS = {
     how: 'Apply 2–3 drops after cleansing, before moisturizer.',
     when: 'AM and PM.',
     timeline: '4–6 weeks for visible pore and oil reduction.',
-    warning: 'Do not layer with Vitamin C in the same routine — split AM/PM.',
-    pillar: 'Controls shine and pore size — improves skin texture score.',
+    warning: 'Do not layer with Vitamin C in the same routine. Split AM/PM.',
+    pillar: 'Controls shine and pore size. Improves skin texture score.',
   }],
   dark_circles: [
-    { name: 'Caffeine Eye Cream', why: 'Vasoconstrictor — constricts blood vessels under-eye to reduce dark circles and puffiness.', how: 'Tap gently with ring finger around orbital bone. Never pull the skin.', when: 'AM primarily. Can use PM too.', timeline: 'Immediate de-puffing. Consistent darkening reduction in 6–8 weeks.', warning: 'Will not fix structural dark circles (bone-related) — works on vascular/pigment type.', pillar: 'Improves Eye Area score — directly raises facial attractiveness.' },
-    { name: 'Sleep Consistency', why: '7–9 hours reduces cortisol-driven inflammation and blood vessel dilation that causes under-eye darkness.', how: 'Same bedtime and wake time daily including weekends.', when: 'Ongoing.', timeline: 'Visible within 5–7 days of consistent sleep.', warning: 'No product replaces sleep. This is the root fix.', pillar: 'Sleep affects every score — Eye Area, skin clarity, and jawline definition all improve.' },
+    { name: 'Caffeine Eye Cream', why: 'Vasoconstrictor. Constricts blood vessels under-eye to reduce dark circles and puffiness.', how: 'Tap gently with ring finger around orbital bone. Never pull the skin.', when: 'AM primarily. Can use PM too.', timeline: 'Immediate de-puffing. Consistent darkening reduction in 6–8 weeks.', warning: 'Will not fix structural dark circles (bone-related). Works on vascular/pigment type.', pillar: 'Improves Eye Area score. Directly raises facial attractiveness.' },
+    { name: 'Sleep Consistency', why: '7–9 hours reduces cortisol-driven inflammation and blood vessel dilation that causes under-eye darkness.', how: 'Same bedtime and wake time daily including weekends.', when: 'Ongoing.', timeline: 'Visible within 5–7 days of consistent sleep.', warning: 'No product replaces sleep. This is the root fix.', pillar: 'Sleep affects every score. Eye Area, skin clarity, and jawline definition all improve.' },
   ],
   dullness: [{
     name: 'AHA (Glycolic Acid 8% or Lactic Acid 10%)',
-    why: 'Exfoliates dead cell layer — reveals brighter, smoother skin underneath.',
+    why: 'Exfoliates dead cell layer. Reveals brighter, smoother skin underneath.',
     how: 'Apply to dry face after cleansing. Leave 20 min then rinse or leave overnight.',
     when: 'PM 2–3×/week. Never on same night as retinol.',
     timeline: '2 weeks to notice glow. 6 weeks for significant brightness.',
-    warning: 'Mandatory SPF next morning — AHAs increase photosensitivity. Start 1×/week.',
-    pillar: 'Brightness directly improves perceived skin health — raises overall facial impression.',
+    warning: 'Mandatory SPF next morning. AHAs increase photosensitivity. Start 1×/week.',
+    pillar: 'Brightness directly improves perceived skin health. Raises overall facial impression.',
   }],
 }
 
@@ -1276,19 +1276,19 @@ export default function Results() {
     'Gentle cleanser (CeraVe Hydrating or La Roche-Posay Toleriane)',
     'Vitamin C serum 10–15% (maintains brightness and defends against sun damage)',
     'Lightweight moisturizer',
-    'SPF 50 (your #1 long-term anti-aging tool — non-negotiable)',
+    'SPF 50 (your #1 long-term anti-aging tool, non-negotiable)',
   ] : [
     'Gentle cleanser (CeraVe or La Roche-Posay)',
     skinIssues.includes('scarring')    ? 'Vitamin C serum 15%'           : null,
     skinIssues.includes('oiliness')    ? 'Niacinamide 10%'               : null,
     skinIssues.includes('dark_circles')? 'Caffeine eye cream'            : null,
     'Lightweight moisturizer',
-    'SPF 50 (non-negotiable — all actives require sun protection)',
+    'SPF 50 (non-negotiable: all actives require sun protection)',
   ].filter(Boolean)
 
   const skinPMRoutine = skinIsClear ? [
     'Gentle cleanser',
-    'Retinol 0.025–0.05% 2×/week (preventative — maintains smooth texture long-term)',
+    'Retinol 0.025–0.05% 2×/week (preventative, maintains smooth texture long-term)',
     'Peptide moisturizer (builds collagen, supports skin firmness)',
   ] : [
     'Gentle cleanser',
@@ -1306,7 +1306,7 @@ export default function Results() {
   return (
     <>
     <Helmet>
-      <title>Your AI Appearance Score &amp; Looksmax Results — Ascendus</title>
+      <title>Your AI Appearance Score &amp; Looksmax Results | Ascendus</title>
       <meta name="description" content="See your AI face rating, body composition score, celebrity lookalike matches, and a personalized 12-week looksmax plan built around your results." />
       <meta name="keywords" content="face rating results, AI appearance score, looksmax results, celebrity lookalike, glow up plan, facial analysis" />
     </Helmet>
@@ -1339,7 +1339,7 @@ export default function Results() {
         style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.25)' }}>
         <span className="text-[11px] flex-shrink-0" style={{ color: '#C6A85C' }}>ℹ</span>
         <p className="text-[10px] font-body leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          For informational purposes only — not medical or clinical advice.
+          For informational purposes only, not medical or clinical advice.
           Analysis is AI-generated and draws on published guidelines from{' '}
           <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: '#C6A85C', textDecoration: 'underline' }}>AAD</a>
           ,{' '}
@@ -1380,20 +1380,20 @@ export default function Results() {
         const bestLabel = PILLAR_LABELS_MOT[best[0]] ?? best[0]
         const bestScore = best[1]
         const MOTIV_LINES = {
-          harmony:    'Your facial balance is already working for you — maximize it with targeted symmetry and posture work.',
-          angularity: 'Your bone structure is already working for you — lean out to reveal its full potential.',
-          features:   'Your individual features are already working for you — refine the details for maximum impact.',
+          harmony:    'Your facial balance is already working for you. Maximize it with targeted symmetry and posture work.',
+          angularity: 'Your bone structure is already working for you. Lean out to reveal its full potential.',
+          features:   'Your individual features are already working for you. Refine the details for maximum impact.',
           dimorphism: gender === 'female'
-            ? 'Your femininity score is already working for you — skincare and grooming will amplify it further.'
-            : 'Your masculine presence is already working for you — build on this foundation consistently.',
+            ? 'Your femininity score is already working for you. Skincare and grooming will amplify it further.'
+            : 'Your masculine presence is already working for you. Build on this foundation consistently.',
         }
-        const motivLine = MOTIV_LINES[best[0]] ?? `Your ${bestLabel} is already working for you — here's how to maximize it.`
+        const motivLine = MOTIV_LINES[best[0]] ?? `Your ${bestLabel} is already working for you. Here's how to maximize it.`
         return (
           <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2.5"
             style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.2)' }}>
             <Star size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#C6A85C', fill: '#C6A85C' }} />
             <p className="font-body text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              <span className="font-bold" style={{ color: '#C6A85C' }}>{bestLabel} {bestScore.toFixed(1)}</span>{' '}— {motivLine}
+              <span className="font-bold" style={{ color: '#C6A85C' }}>{bestLabel} {bestScore.toFixed(1)}</span>{': '}{motivLine}
             </p>
           </div>
         )
@@ -1417,7 +1417,7 @@ export default function Results() {
             <AlertTriangle size={15} className="flex-shrink-0" style={{ color: '#E07A5F' }} />
             <p className="font-body text-[11px] leading-relaxed flex-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
               Your <span className="font-bold" style={{ color: '#C6A85C' }}>{label} ({score.toFixed(1)})</span> is your biggest growth opportunity
-              {' — '}<span className="font-bold" style={{ color: '#34C759' }}>targeting it adds ~+{impact} pts</span>
+              {'. '}<span className="font-bold" style={{ color: '#34C759' }}>Targeting it adds ~+{impact} pts</span>
               <span style={{ color: '#C6A85C' }}> · See how →</span>
             </p>
           </button>
@@ -1434,7 +1434,7 @@ export default function Results() {
               : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }
           }
         >
-          {hasSideProfile ? 'Full Scan — Profile Analysis Included' : 'Basic Scan — Side Profile Not Included'}
+          {hasSideProfile ? 'Full Scan: Profile Analysis Included' : 'Basic Scan: Side Profile Not Included'}
         </div>
       </div>
 
@@ -1453,7 +1453,7 @@ export default function Results() {
                 { label: 'Appeal', val: aiScore?.groomingScore, color: '#34C759' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="text-center">
-                  <p className="font-mono font-bold text-base" style={{ color }}>{val?.toFixed(1) ?? '—'}</p>
+                  <p className="font-mono font-bold text-base" style={{ color }}>{val?.toFixed(1) ?? 'N/A'}</p>
                   <p className="text-[9px] text-secondary font-body">{label}</p>
                 </div>
               ))}
@@ -1492,7 +1492,7 @@ export default function Results() {
             <div className="mt-2 text-[10px] text-secondary font-body leading-relaxed">
               {facialStructure === 'average'
                 ? <>Overall facial structure sits in a solid baseline range with real upside to unlock.</>
-                : <>Facial structure is <span className="font-bold capitalize text-primary">{facialStructure}</span> — a genuine asset to build on.</>
+                : <>Facial structure is <span className="font-bold capitalize text-primary">{facialStructure}</span>, a genuine asset to build on.</>
               }
             </div>
           )}
@@ -1503,7 +1503,7 @@ export default function Results() {
       {pillars && (
         <Section title="The 4 Pillars" icon={<Columns size={16} style={{ color: '#C6A85C' }} />} defaultOpen={true}>
           <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
-            Your aesthetic score is built on 4 core pillars — each worth 25% of your overall face rating.
+            Your aesthetic score is built on 4 core pillars, each worth 25% of your overall face rating.
           </p>
           <div className="space-y-0">
             {[
@@ -1631,7 +1631,7 @@ export default function Results() {
               <>
                 <p className="text-[10px] text-secondary font-body mb-3 leading-relaxed">
                   AI-scored breakdown of your individual facial features.
-                  {!isPremium && locked4Count > 0 && <span style={{ color: '#C6A85C' }}> {locked4Count} metrics locked — upgrade to Pro to unlock.</span>}
+                  {!isPremium && locked4Count > 0 && <span style={{ color: '#C6A85C' }}> {locked4Count} metrics locked. Upgrade to Pro to unlock.</span>}
                 </p>
                 {metrics.map(({ key, label, data, pro }) =>
                   data ? (
@@ -1677,9 +1677,9 @@ export default function Results() {
               { label: 'Facial Symmetry',    score: faceData?.symmetry,           note: 'Sleeping on your back, correcting dominant chewing side, and fixing posture all improve symmetry over time.' },
               { label: 'Jawline Definition', score: faceData?.jawlineDefinition,  note: 'Correlates directly with body fat %. Reducing body fat dramatically reveals the jawline. Mewing for long-term structural improvement.' },
               { label: 'Skin Clarity',       score: faceData?.skinClarity,        note: 'Consistent cleanser → treatment → moisturizer → SPF routine produces visible change in 4–8 weeks. Retinol or tretinoin accelerates results.' },
-              { label: 'Facial Proportions', score: faceData?.facialProportions,  note: 'Ideal face has equal facial thirds. Structural — address via mewing, hairstyle, beard length.' },
+              { label: 'Facial Proportions', score: faceData?.facialProportions,  note: 'Ideal face has equal facial thirds. Structural. Address via mewing, hairstyle, beard length.' },
               { label: 'Eye Area',           score: faceData?.eyeArea,            note: 'Addressed via sleep, hydration, targeted eye cream, and strategic brow grooming. Sleep consistency is #1.' },
-              { label: 'Overall Harmony',    score: faceData?.facialHarmony,      note: 'How all facial features read together. Improves as individual metrics improve — grooming and skincare have the fastest ROI.' },
+              { label: 'Overall Harmony',    score: faceData?.facialHarmony,      note: 'How all facial features read together. Improves as individual metrics improve. Grooming and skincare have the fastest ROI.' },
             ].filter(m => m.score != null)
             if (rows.length === 0) {
               return (
@@ -1705,7 +1705,7 @@ export default function Results() {
                 className="text-2xl font-mono font-bold"
                 style={{ color: profileScore >= 7 ? '#34C759' : profileScore >= 5 ? '#F5A623' : '#E07A5F' }}
               >
-                {profileScore != null ? profileScore.toFixed(1) : '—'}
+                {profileScore != null ? profileScore.toFixed(1) : 'N/A'}
               </div>
               <div className="text-[9px] font-body text-secondary">/ 10</div>
             </div>
@@ -1725,10 +1725,10 @@ export default function Results() {
                 label: 'Nose Bridge',
                 value: profileData.nose_bridge,
                 descriptions: {
-                  'soft':     'Low/flat nose bridge — sits closer to the face; rhinoplasty or contouring can add vertical definition.',
-                  'medium':   'Average nose bridge height — proportional and balanced with your other features.',
-                  'strong':   'High, straight nose bridge — adds strong vertical definition and perceived structure to the mid-face.',
-                  'aquiline': 'Aquiline (Roman/curved) nose bridge — adds character and masculine distinction from the profile.',
+                  'soft':     'A low, flat nose bridge sits closer to the face; rhinoplasty or contouring can add vertical definition.',
+                  'medium':   'Average nose bridge height. Proportional and balanced with your other features.',
+                  'strong':   'High, straight nose bridge. Adds strong vertical definition and perceived structure to the mid-face.',
+                  'aquiline': 'Aquiline (Roman/curved) nose bridge. Adds character and masculine distinction from the profile.',
                 },
                 color: '#A29BFE',
               },
@@ -1737,10 +1737,10 @@ export default function Results() {
                 label: 'Jawline Projection',
                 value: profileData.jawline_projection,
                 descriptions: {
-                  'strong':    'Strong jaw projection — highly attractive from the side. One of the top structural traits in profile aesthetics.',
-                  'projected': 'Good jaw projection — forward-sitting jaw adds strength to the profile. Mewing and chewing hard foods can maintain and improve this.',
-                  'average':   'Average jaw projection — solid structural base. Mewing consistently and keeping body fat low can push this higher over time.',
-                  'recessed':  'Recessed jaw (retrognathia) — the chin and jaw sit back significantly. Orthognathic surgery is the definitive fix; mewing addresses mild cases.',
+                  'strong':    'Strong jaw projection. Highly attractive from the side. One of the top structural traits in profile aesthetics.',
+                  'projected': 'Good jaw projection. Forward-sitting jaw adds strength to the profile. Mewing and chewing hard foods can maintain and improve this.',
+                  'average':   'Average jaw projection. Solid structural base. Mewing consistently and keeping body fat low can push this higher over time.',
+                  'recessed':  'Recessed jaw (retrognathia). The chin and jaw sit back significantly. Orthognathic surgery is the definitive fix; mewing addresses mild cases.',
                 },
                 color: '#F5A623',
               },
@@ -1749,10 +1749,10 @@ export default function Results() {
                 label: 'Chin Projection',
                 value: profileData.chin_projection,
                 descriptions: {
-                  'prominent': 'Prominent chin projection — well ahead of the E-line. A highly attractive masculine trait from the side.',
-                  'projected': 'Good chin projection — chin sits forward of the lower lip, giving a strong profile. One of the top masculine structural traits.',
-                  'average':   'Average chin projection — on or near the Ricketts E-line. Mewing and chin exercises can marginally improve this over time.',
-                  'recessed':  'Chin has significant improvement potential — sits back from ideal profile position. Chin filler is the fastest solution; chin implant for permanent change.',
+                  'prominent': 'Prominent chin projection. Well ahead of the E-line. A highly attractive masculine trait from the side.',
+                  'projected': 'Good chin projection. Chin sits forward of the lower lip, giving a strong profile. One of the top masculine structural traits.',
+                  'average':   'Average chin projection. On or near the Ricketts E-line. Mewing and chin exercises can marginally improve this over time.',
+                  'recessed':  'Chin has significant improvement potential. Sits back from ideal profile position. Chin filler is the fastest solution; chin implant for permanent change.',
                 },
                 color: '#34C759',
               },
@@ -1762,7 +1762,7 @@ export default function Results() {
                 : `${label} assessment not available.`
               const valueLabel = value
                 ? value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')
-                : '—'
+                : 'N/A'
               const scoreVal = profileData[`${key}_score`] ?? null
               return (
                 <div key={key} className="py-3 border-b border-default last:border-0">
@@ -1904,7 +1904,7 @@ export default function Results() {
                 <div className="p-3 rounded-xl" style={{ background: 'rgba(52,199,89,0.07)', border: '1px solid rgba(52,199,89,0.2)' }}>
                   <p className="text-[11px] font-heading font-bold mb-1" style={{ color: '#34C759' }}>✓ Clear Skin Maintenance Protocol</p>
                   <p className="text-[10px] text-secondary font-body leading-relaxed">
-                    Your skin is clear — the goal now is preservation, not treatment. Daily SPF 50 prevents photoaging (the #1 cause of visible skin decline). A low-dose retinol 2×/week maintains smooth texture over time. Vitamin C each morning fights oxidative damage and keeps tone even.
+                    Your skin is clear. The goal now is preservation, not treatment. Daily SPF 50 prevents photoaging (the #1 cause of visible skin decline). A low-dose retinol 2×/week maintains smooth texture over time. Vitamin C each morning fights oxidative damage and keeps tone even.
                   </p>
                 </div>
               )}
@@ -1955,7 +1955,7 @@ export default function Results() {
           ) : (
             <div className="relative rounded-2xl overflow-hidden">
               <div className="blur-sm pointer-events-none select-none opacity-35 space-y-2">
-                {['Benzoyl Peroxide 2.5% — PM only, kills acne bacteria at source', 'Niacinamide 10% — AM + PM, regulates sebum and pore size', 'AHA Exfoliant — 2×/week PM, removes dead cells revealing brightness', 'AM Routine: Cleanser → Vit C → Moisturizer → SPF 50', 'PM Routine: Cleanser → BHA → Niacinamide → Moisturizer'].map((line, i) => (
+                {['Benzoyl Peroxide 2.5%: PM only, kills acne bacteria at source', 'Niacinamide 10%: AM + PM, regulates sebum and pore size', 'AHA Exfoliant: 2×/week PM, removes dead cells revealing brightness', 'AM Routine: Cleanser → Vit C → Moisturizer → SPF 50', 'PM Routine: Cleanser → BHA → Niacinamide → Moisturizer'].map((line, i) => (
                   <div key={i} className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
                     <p className="text-[10px] font-body text-primary">{line}</p>
                   </div>
@@ -1996,7 +1996,7 @@ export default function Results() {
         {/* AI disclosure */}
         <div className="px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[11px] font-body leading-relaxed text-secondary">
-            <Bot size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> <span className="font-semibold text-primary">AI Analysis:</span> Scores are generated by AI and are estimates only — not medical or clinical assessments. Results may vary.
+            <Bot size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> <span className="font-semibold text-primary">AI Analysis:</span> Scores are generated by AI and are estimates only, not medical or clinical assessments. Results may vary.
           </p>
         </div>
       </div>

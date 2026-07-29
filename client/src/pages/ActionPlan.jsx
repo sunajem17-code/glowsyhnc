@@ -311,7 +311,7 @@ export default function ActionPlan() {
           <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }}
             className="text-xs font-heading font-bold mt-2" style={{ color: phaseStyle.color }}>
             ✓ Week {selectedWeek} complete
-            {selectedWeek < 12 ? ' — advance to next week' : ' — time to rescan!'}
+            {selectedWeek < 12 ? '. Advance to next week' : '. Time to rescan!'}
           </motion.p>
         )}
       </div>
@@ -347,7 +347,7 @@ export default function ActionPlan() {
         {weekContentLocked ? (
           <ProLock
             onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-            label="Your plan continues here — unlock weeks 2–12"
+            label="Your plan continues here: unlock weeks 2–12"
             blurAmount="7px"
             className="mb-3"
           >
@@ -449,7 +449,7 @@ export default function ActionPlan() {
               </div>
             </div>
             <p className="text-xs text-secondary font-body mb-3 leading-relaxed">
-              Take your rescan in the same conditions as week 1 — same lighting, same distance, same pose.
+            Take your rescan in the same conditions as week 1: same lighting, same distance, same pose.
               12 weeks of compounding habits will show a measurably higher score.
             </p>
             <button

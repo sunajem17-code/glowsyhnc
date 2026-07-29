@@ -220,7 +220,7 @@ export default function DevRankCard({ scan, onClose }) {
       </div>
 
       <p className="px-5 text-[11px] font-body leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.35)' }}>
-        Not visible to real users, not connected to any real scan. Edit freely below — nothing here ever touches your Progress or Results data.
+        Not visible to real users, not connected to any real scan. Edit freely below. Nothing here ever touches your Progress or Results data.
       </p>
 
       {/* ── Editable card preview — flat black, no gradient/glow background ── */}

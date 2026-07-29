@@ -138,7 +138,7 @@ function PhotoStep({ gender, onPhotoSelected, error, loading }) {
             Add a photo of your body
           </p>
           <p className="font-body text-[13px] leading-relaxed" style={{ color: DIM }}>
-            That's the only thing needed — take or upload one body photo and your plan is built from it.
+            That's the only thing needed: take or upload one body photo and your plan is built from it.
           </p>
         </div>
       </div>

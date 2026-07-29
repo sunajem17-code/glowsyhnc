@@ -120,7 +120,7 @@ function ModeSelector({ onAI, onManual }) {
             </span>
           </div>
           <p className="text-xs font-body" style={{ color: TEXT_SEC }}>
-            Take or upload a photo — AI detects your head shape and picks your best cuts
+            Take or upload a photo. AI detects your head shape and picks your best cuts
           </p>
         </div>
         <ChevronRight size={18} style={{ color: GOLD }} />
@@ -430,7 +430,7 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
         style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}
       >
         <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>
-          What to avoid — and why
+          What to avoid, and why
         </p>
         <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>
           {result.whatToAvoid}
@@ -687,7 +687,7 @@ export function ManualResultsView({ faceShape, density, hairline, savedCuts, onS
         <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_SEC }}>{profile.summary}</p>
       </div>
       <div className="mb-5 rounded-xl px-4 py-3" style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}>
-        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid — and why</p>
+        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid, and why</p>
         <p className="text-[11px] font-body leading-relaxed mb-2" style={{ color: `${RED}90` }}>{profile.avoid.reason}</p>
         <div className="flex flex-wrap gap-1.5">
           {profile.avoid.cuts.map(cut => (
@@ -805,7 +805,7 @@ export default function HairMaxx() {
     <>
     <MotionPage style={{ background: SURFACE }}>
       <Helmet>
-        <title>AI Hair Analysis &amp; Hairmaxx Guide — Ascendus</title>
+        <title>AI Hair Analysis &amp; Hairmaxx Guide | Ascendus</title>
         <meta name="description" content="Scan your hair type with AI and get a personalized hairmaxx routine. Identify your curl pattern, porosity, and the exact products to maximize your hair's potential." />
         <meta name="keywords" content="hairmaxx, hair analysis, AI hair type scanner, looksmax hair, hair glow up, curl type identifier, hair routine" />
       </Helmet>

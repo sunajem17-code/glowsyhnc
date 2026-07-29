@@ -80,7 +80,7 @@ export default function PrivacyPolicy() {
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li><strong style={{ color: TEXT }}>Delete scan data:</strong> Profile → Privacy Settings → Delete All Scan Data</li>
             <li><strong style={{ color: TEXT }}>Delete account:</strong> Profile → Delete Account & Data</li>
-            <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com — we will delete within 30 days</li>
+            <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com, we will delete within 30 days</li>
           </ul>
           <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law. Deletion may take up to 30 days to propagate through all systems including automated backups.</p>
         </Section>
@@ -88,12 +88,12 @@ export default function PrivacyPolicy() {
         <Section title="6. Third-Party Services">
           <p>We use the following third-party services, each with their own privacy policies:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
-            <li><strong style={{ color: TEXT }}>Anthropic Claude API</strong> — AI photo analysis (anthropic.com/privacy)</li>
-            <li><strong style={{ color: TEXT }}>Supabase</strong> — Database and file storage (supabase.com/privacy)</li>
-            <li><strong style={{ color: TEXT }}>Apple App Store / StoreKit</strong> — In-app purchase processing on iOS (apple.com/legal/privacy)</li>
-            <li><strong style={{ color: TEXT }}>RevenueCat</strong> — Subscription management on iOS (revenuecat.com/privacy)</li>
-            <li><strong style={{ color: TEXT }}>Stripe</strong> — Payment processing on web (stripe.com/privacy)</li>
-            <li><strong style={{ color: TEXT }}>Railway</strong> — Server hosting (railway.app/legal/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Anthropic Claude API</strong>: AI photo analysis (anthropic.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Supabase</strong>: Database and file storage (supabase.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Apple App Store / StoreKit</strong>: In-app purchase processing on iOS (apple.com/legal/privacy)</li>
+            <li><strong style={{ color: TEXT }}>RevenueCat</strong>: Subscription management on iOS (revenuecat.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Stripe</strong>: Payment processing on web (stripe.com/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Railway</strong>: Server hosting (railway.app/legal/privacy)</li>
           </ul>
         </Section>
 

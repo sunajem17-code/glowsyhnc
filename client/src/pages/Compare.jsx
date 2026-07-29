@@ -329,8 +329,8 @@ async function drawCompareCard({ canvas, beforeScan, afterScan, beforePhoto, aft
 
   // ── Tier change ───────────────────────────────────────────────────────────
   const tierY = scoreY + 56
-  const bTier = beforeScan?.tier ?? '—'
-  const aTier = afterScan?.tier ?? '—'
+  const bTier = beforeScan?.tier ?? 'N/A'
+  const aTier = afterScan?.tier ?? 'N/A'
 
   ctx.textAlign = 'center'
   ctx.font = '500 32px "Plus Jakarta Sans", Arial'
@@ -453,7 +453,7 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
       const blob = await res.blob()
       const file = new File([blob], 'ascendus-glow-up.jpg', { type: 'image/jpeg' })
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: 'My Glow Up — Ascendus', files: [file] })
+        await navigator.share({ title: 'My Glow Up | Ascendus', files: [file] })
       } else {
         const a = document.createElement('a')
         a.href = preview; a.download = 'ascendus-glow-up.jpg'; a.click()
@@ -653,7 +653,7 @@ export default function Compare() {
               <p className="font-heading font-bold text-3xl text-white/50">
                 {(firstScan.glowScore ?? 0).toFixed(1)}
               </p>
-              <p className="font-body text-[11px] text-white/30 mt-0.5">{firstScan.tier ?? '—'}</p>
+              <p className="font-body text-[11px] text-white/30 mt-0.5">{firstScan.tier ?? 'N/A'}</p>
             </div>
 
             {/* Delta */}
@@ -686,7 +686,7 @@ export default function Compare() {
               >
                 {(latestScan.glowScore ?? 0).toFixed(1)}
               </p>
-              <p className="font-body text-[11px] text-white/30 mt-0.5">{latestScan.tier ?? '—'}</p>
+              <p className="font-body text-[11px] text-white/30 mt-0.5">{latestScan.tier ?? 'N/A'}</p>
             </div>
           </motion.div>
 
