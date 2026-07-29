@@ -239,7 +239,7 @@ export default function Premium() {
     <MotionPage baseClassName="page-scroll-full" style={{ background: SURFACE }}>
       <Helmet>
         <title>Ascendus Pro | Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
-        <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, celebrity lookalikes, body composition scores, and a personalized looksmax plan. Start your glow up today." />
+        <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, body composition scores, and a personalized looksmax plan. Start your glow up today." />
         <meta name="keywords" content="looksmax pro, face rating app, glow up tracker, AI appearance score, looksmaxxing app, unlimited scans" />
       </Helmet>
 

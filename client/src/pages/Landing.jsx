@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import {
-  ArrowRight, Camera, TrendingUp, Star, Zap,
+  ArrowRight, Camera, TrendingUp, Zap,
   ShieldCheck, Users, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { GOLD } from '../utils/theme'
@@ -14,7 +14,6 @@ const GOLD_DARK  = '#A8893A'
 const GOLD_BORDER = 'rgba(198,168,92,0.22)'
 const SURFACE    = '#0A0A0A'
 const SURFACE_2  = '#111111'
-const SURFACE_3  = '#1A1A1A'
 const BORDER     = 'rgba(255,255,255,0.07)'
 const TEXT       = '#F0EDE8'
 const TEXT_MID   = '#8A8580'
@@ -26,11 +25,6 @@ const FEATURES = [
     icon: Camera,
     title: 'AI Face Rating',
     desc: 'Scored across 4 structural pillars: Harmony, Angularity, Features, Dimorphism. Jawline, symmetry, skin quality, facial thirds analyzed in 60 seconds.',
-  },
-  {
-    icon: Star,
-    title: 'Celebrity Lookalike',
-    desc: 'See which models, athletes, and celebrities share your facial structure. Three closest matches with percentage similarity.',
   },
   {
     icon: TrendingUp,
@@ -58,7 +52,7 @@ const FEATURES = [
 const FAQ_ITEMS = [
   {
     q: 'How does the AI face rating work?',
-    a: 'Ascendus analyzes your photo using advanced AI vision models trained on facial structure, symmetry, skin quality, and golden-ratio proportions. You receive a score from 1–10 across four key pillars: Harmony, Angularity, Features, and Dimorphism, plus a celebrity lookalike match.',
+    a: 'Ascendus analyzes your photo using advanced AI vision models trained on facial structure, symmetry, skin quality, and golden-ratio proportions. You receive a score from 1–10 across four key pillars: Harmony, Angularity, Features, and Dimorphism.',
   },
   {
     q: 'Is Ascendus free to use?',
@@ -103,7 +97,7 @@ export default function Landing() {
     name: 'Ascendus',
     url: 'https://ascendus.store',
     description:
-      'AI face rating, looksmax score, celebrity lookalike, and personalized 12-week glow-up action plan.',
+      'AI face rating, looksmax score, and personalized 12-week glow-up action plan.',
     applicationCategory: 'HealthApplication',
     operatingSystem: 'Web, iOS, Android',
     offers: {
@@ -127,11 +121,11 @@ export default function Landing() {
         <title>Ascendus | Free AI Face Rating &amp; Looksmax Score</title>
         <meta
           name="description"
-          content="Get your free AI face rating, celebrity lookalike match, and personalized looksmax action plan. Scores your jawline, symmetry, skin quality, and more in 60 seconds."
+          content="Get your free AI face rating and personalized looksmax action plan. Scores your jawline, symmetry, skin quality, and more in 60 seconds."
         />
         <meta
           name="keywords"
-          content="face rating app, AI face rating, looksmax app, looksmaxxing, facial appearance score, celebrity lookalike, face analyzer, glow up app, jawline score, looksmax"
+          content="face rating app, AI face rating, looksmax app, looksmaxxing, facial appearance score, face analyzer, glow up app, jawline score, looksmax"
         />
         <link rel="canonical" href="https://ascendus.store/" />
         <meta property="og:title" content="Ascendus | Free AI Face Rating &amp; Looksmax Score" />
@@ -148,7 +142,7 @@ export default function Landing() {
         <meta name="twitter:title" content="Ascendus | Free AI Face Rating &amp; Looksmax Score" />
         <meta
           name="twitter:description"
-          content="AI face rating, celebrity lookalike, and your personalized glow-up plan. Free in 60 seconds."
+          content="AI face rating and your personalized glow-up plan. Free in 60 seconds."
         />
         <meta name="twitter:image" content="https://ascendus.store/og-image.png" />
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
@@ -318,7 +312,7 @@ export default function Landing() {
               margin: '0 auto 28px',
             }}
           >
-            Upload a photo. Get your Glow Score, celebrity lookalike, and a personalized looksmax plan, powered by AI.
+            Upload a photo. Get your Glow Score and a personalized looksmax plan, powered by AI.
           </p>
 
           {/* Primary CTA */}
@@ -425,46 +419,19 @@ export default function Landing() {
             ))}
           </div>
 
-          {/* Celebrity row */}
+          {/* Potential row */}
           <div
             style={{
               padding: '0 20px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
               borderTop: `1px solid ${BORDER}`,
               paddingTop: 14,
             }}
           >
-            <div style={{ display: 'flex', gap: 6 }}>
-              {['Z', 'H', 'R'].map((initial, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: SURFACE_3,
-                    border: `1px solid ${BORDER}`,
-                    color: GOLD,
-                    ...heading,
-                  }}
-                >
-                  {initial}
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, color: TEXT_DIM, ...heading }}>Potential</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: GOLD, ...mono }}>8.8/10</span>
             </div>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: TEXT, margin: 0 }}>
-                Zac Efron <span style={{ color: TEXT_DIM, fontWeight: 400 }}>· 71%</span>
-              </p>
-              <p style={{ fontSize: 10, color: TEXT_DIM, margin: 0 }}>Celebrity match</p>
-            </div>
+            <p style={{ fontSize: 10, color: TEXT_DIM, margin: '4px 0 0' }}>With your personalized 12-week plan</p>
           </div>
         </motion.div>
       </section>
@@ -808,7 +775,7 @@ export default function Landing() {
             Find out where<br />you really stand.
           </h2>
           <p style={{ fontSize: 14, color: TEXT_MID, marginBottom: 28, lineHeight: 1.6 }}>
-            Your free AI face rating and celebrity lookalike is one photo away.
+            Your free AI face rating is one photo away.
           </p>
           <motion.button
             whileTap={{ scale: 0.97 }}

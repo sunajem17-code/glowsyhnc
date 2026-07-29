@@ -986,7 +986,7 @@ const REVIEWS = [
   {
     initials: 'M',
     name: 'Mekhi',
-    text: "the celeb lookalike got me dead 😭 but fr the breakdown of my features was actually eye opening. fixed my grooming based on what it said and i been getting way more compliments. simple changes hit different when you know exactly what to fix",
+    text: "wasn't expecting the breakdown of my features to be that accurate ngl 😭 fixed my grooming based on what it said and i been getting way more compliments. simple changes hit different when you know exactly what to fix",
   },
   {
     initials: 'AT',

@@ -148,7 +148,7 @@ async function setScanCache(imageHash, result) {
 /**
  * Persist one scan result row.  Fire-and-forget safe — call with .catch().
  */
-async function saveScanHistory(userId, { overallScore, faceScore, groomingScore, tier, celebrityMatch }) {
+async function saveScanHistory(userId, { overallScore, faceScore, groomingScore, tier }) {
   const sb = getSupabase()
   if (!sb) return
   try {
@@ -158,7 +158,6 @@ async function saveScanHistory(userId, { overallScore, faceScore, groomingScore,
       face_score:     faceScore     ?? null,
       grooming_score: groomingScore ?? null,
       tier:           tier          ?? null,
-      celebrity_match: celebrityMatch ?? null,
     })
     if (error) console.warn('[Supabase] scan_history insert error:', error.message)
   } catch (err) {
@@ -176,7 +175,7 @@ async function getScanHistory(userId, limit = 12) {
   try {
     const { data, error } = await sb
       .from('scan_history')
-      .select('id, overall_score, face_score, grooming_score, tier, celebrity_match, created_at')
+      .select('id, overall_score, face_score, grooming_score, tier, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit)

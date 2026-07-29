@@ -63,11 +63,7 @@ export default function Terms() {
           <p className="mt-2">We reserve the right to suspend or permanently delete accounts that violate these terms without refund.</p>
         </Section>
 
-        <Section title="6. Celebrity Comparisons">
-          <p>Celebrity lookalike comparisons are AI-generated estimates based on facial feature analysis. They do not imply any connection to, endorsement by, or relationship with the named individuals. All celebrity names are used for reference purposes only.</p>
-        </Section>
-
-        <Section title="7. Subscriptions & Payments">
+        <Section title="6. Subscriptions & Payments">
           <p><strong style={{ color: TEXT }}>Billing:</strong> Ascendus Premium is billed at $7.99/month or $49.99/year (prices shown at checkout). You will be clearly informed of the exact charge before confirming your subscription.</p>
           <p className="mt-2"><strong style={{ color: TEXT }}>Free trial:</strong> If a free trial is offered, you will not be charged until the trial period ends. You may cancel at any time before the trial ends to avoid charges.</p>
           <p className="mt-2"><strong style={{ color: TEXT }}>Cancellation:</strong> You may cancel your subscription at any time through the Subscription settings in your Profile. Cancellation takes effect at the end of the current billing period. No partial refunds are issued for unused time.</p>
@@ -75,11 +71,11 @@ export default function Terms() {
           <p className="mt-2">All payments are processed by Stripe. We do not store your payment card details.</p>
         </Section>
 
-        <Section title="8. Intellectual Property">
+        <Section title="7. Intellectual Property">
           <p>Ascendus, its logo, design, code, and content are the intellectual property of Ascendus Inc. You may not reproduce, distribute, or create derivative works without our written permission.</p>
         </Section>
 
-        <Section title="9. Disclaimer of Warranties">
+        <Section title="8. Disclaimer of Warranties">
           <p>Ascendus is provided "as is" without warranties of any kind, express or implied. We do not guarantee that:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>The service will be uninterrupted or error-free</li>
@@ -88,24 +84,24 @@ export default function Terms() {
           </ul>
         </Section>
 
-        <Section title="10. Limitation of Liability">
+        <Section title="9. Limitation of Liability">
           <p>To the maximum extent permitted by applicable law, Ascendus Inc. shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the service. Our total liability to you shall not exceed the amount you paid to us in the 12 months preceding the claim.</p>
         </Section>
 
-        <Section title="11. Mental Health">
+        <Section title="10. Mental Health">
           <p>Ascendus is designed as a self-improvement tool, not a validation platform. If you experience distress related to appearance, body image, or self-esteem while using Ascendus, we encourage you to stop using the app and speak with a qualified mental health professional.</p>
           <p className="mt-2">Canada crisis line: 1-866-APPELLE (277-3553) · Crisis Text Line: Text HOME to 741741</p>
         </Section>
 
-        <Section title="12. Governing Law">
+        <Section title="11. Governing Law">
           <p>These Terms are governed by the laws of the Province of Ontario and the federal laws of Canada applicable therein. Any disputes shall be resolved in the courts of Ontario, Canada.</p>
         </Section>
 
-        <Section title="13. Changes to These Terms">
+        <Section title="12. Changes to These Terms">
           <p>We may update these Terms from time to time. We will notify you of material changes via email or in-app notification. Continued use of Ascendus after changes constitutes acceptance of the updated Terms.</p>
         </Section>
 
-        <Section title="14. Contact">
+        <Section title="13. Contact">
           <p><strong style={{ color: TEXT }}>Support:</strong> support@ascendus.com</p>
           <p><strong style={{ color: TEXT }}>Company:</strong> Ascendus Inc., Ontario, Canada</p>
         </Section>

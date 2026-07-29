@@ -1307,8 +1307,8 @@ export default function Results() {
     <>
     <Helmet>
       <title>Your AI Appearance Score &amp; Looksmax Results | Ascendus</title>
-      <meta name="description" content="See your AI face rating, body composition score, celebrity lookalike matches, and a personalized 12-week looksmax plan built around your results." />
-      <meta name="keywords" content="face rating results, AI appearance score, looksmax results, celebrity lookalike, glow up plan, facial analysis" />
+      <meta name="description" content="See your AI face rating, body composition score, and a personalized 12-week looksmax plan built around your results." />
+      <meta name="keywords" content="face rating results, AI appearance score, looksmax results, glow up plan, facial analysis" />
     </Helmet>
     {/* Score reveal overlay — shown once for fresh scans */}
     {showReveal && !revealDone && (

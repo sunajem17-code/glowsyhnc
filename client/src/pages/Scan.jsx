@@ -1387,8 +1387,8 @@ export default function Scan() {
     <div className="flex flex-col h-full bg-page">
       <Helmet>
         <title>AI Face Rating &amp; Looksmax Scan | Ascendus</title>
-        <meta name="description" content="Upload your photo for an instant AI face rating, celebrity lookalike match, and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
-        <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, celebrity lookalike, face analyzer, glow up scan" />
+        <meta name="description" content="Upload your photo for an instant AI face rating and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
+        <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, face analyzer, glow up scan" />
       </Helmet>
 
       {/* Header — steps 1 and 2 (Face Photo, Side Profile) render the exact

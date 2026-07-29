@@ -32,7 +32,7 @@ const CANCEL_REASONS = [
 
 const LOSES = [
   { icon: <Ruler size={16} style={{ color: GOLD }} />, label: 'Detailed face metrics (6 pillars + profile)' },
-  { icon: <Star size={16} style={{ color: GOLD, fill: GOLD }} />, label: 'Celebrity lookalike matching' },
+  { icon: <Sparkles size={16} style={{ color: GOLD }} />, label: 'AI hairstyle simulator (HairMaxx)' },
   { icon: <Map size={16} style={{ color: GOLD }} />, label: 'Your 12-week transformation plan' },
   { icon: <TrendingUp size={16} style={{ color: GOLD }} />, label: 'Progress tracking & before/after' },
   { icon: <RefreshCw size={16} style={{ color: GOLD }} />, label: 'Unlimited monthly scans' },
