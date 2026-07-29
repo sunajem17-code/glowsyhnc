@@ -68,7 +68,16 @@ router.delete('/account', authMiddleware, async (req, res) => {
 
   // ── Fetch user (need stripe_subscription_id) — non-fatal if not found ───────
   let user = await getUserById(userId).catch(() => null)
-  if (!user) user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
+  if (!user) {
+    // Express 4 doesn't auto-catch a synchronous throw inside an async
+    // handler — unlike every other step below, this one wasn't wrapped, so a
+    // SQLite error here would hang the request instead of failing loudly.
+    try {
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
+    } catch (err) {
+      console.error('[deleteAccount] SQLite user lookup error:', err.message)
+    }
+  }
   // Don't 404 — proceed with deletion even if we can't find the row (e.g. user
   // already partially deleted, or primary record is in the profiles table).
 

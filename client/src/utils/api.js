@@ -32,7 +32,13 @@ async function request(path, options = {}) {
     res = await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal })
   } catch (networkErr) {
     clearTimeout(timeoutId)
-    // fetch() itself threw — server is unreachable or timed out
+    // fetch() itself threw — server is unreachable, timed out, or blocked before
+    // a response was ever received (DNS failure, TLS error, offline, a CORS
+    // rejection by the WebView, etc). The user-facing message is intentionally
+    // generic ("Server unavailable"), but that used to also discard the real
+    // reason — logging the actual error name/message here is the only way to
+    // tell those apart after the fact instead of guessing.
+    console.error(`[api] fetch failed for ${options.method || 'GET'} ${path}:`, networkErr.name, networkErr.message)
     if (networkErr.name === 'AbortError') throw new Error('Request timed out. Please check your connection.')
     throw new Error('Server unavailable')
   }
@@ -43,6 +49,7 @@ async function request(path, options = {}) {
     // 502/504 are proxy/gateway errors that return HTML — bail early.
     // 503 from our own API returns JSON (rate-limit payload) — let it fall through.
     if (contentType.includes('text/html') || res.status === 502 || res.status === 504) {
+      console.error(`[api] gateway-level failure for ${options.method || 'GET'} ${path}: HTTP ${res.status}, content-type=${contentType}`)
       throw new Error('Server unavailable')
     }
     const errBody = await res.json().catch(() => ({}))

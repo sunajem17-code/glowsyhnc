@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { isNative } from '../utils/iap'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -297,6 +298,16 @@ export default function Profile() {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteAccountError, setDeleteAccountError] = useState('')
   const deleteBackdropRef = useRef(null)
+
+  // Real native version/build, not a hardcoded string — lets a real device
+  // confirm exactly what's installed instead of guessing from a static label
+  // that was never wired up (was permanently "v1.0.0" regardless of the
+  // actual build). isNative()/CapApp.getInfo() resolve nothing on web.
+  const [appVersion, setAppVersion] = useState('(web)')
+  useEffect(() => {
+    if (!isNative()) return
+    CapApp.getInfo().then(info => setAppVersion(`v${info.version} (${info.build})`)).catch(() => {})
+  }, [])
 
   // Lock scroll on the page behind the modal. On iOS WebView, overflow:hidden
   // alone doesn't stop momentum scroll — we also intercept touchmove at the
@@ -768,7 +779,7 @@ export default function Profile() {
 
       {/* ── Version ──────────────────────────────────────────────── */}
       <p className="text-center text-[10px] font-body pb-8" style={{ color: TEXT_DIM }}>
-        Ascendus v1.0.0
+        Ascendus {appVersion}
       </p>
 
       {/* ── Share Modal ──────────────────────────────────────────── */}

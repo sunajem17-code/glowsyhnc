@@ -14,6 +14,7 @@ if (!JWT_SECRET) {
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization
   if (!header || !header.startsWith('Bearer ')) {
+    console.warn(`[auth] rejected ${req.method} ${req.originalUrl} — no Authorization header`)
     return res.status(401).json({ error: 'No token provided' })
   }
   const token = header.slice(7)
@@ -22,7 +23,11 @@ function authMiddleware(req, res, next) {
     req.userId = payload.userId
     req.userEmail = payload.email || null
     next()
-  } catch {
+  } catch (err) {
+    // err.name distinguishes an actually-expired token (TokenExpiredError) from
+    // a malformed/forged one (JsonWebTokenError) — logging it is the only way
+    // to confirm which one a real rejection was instead of assuming.
+    console.warn(`[auth] rejected ${req.method} ${req.originalUrl} — ${err.name}: ${err.message}`)
     res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
