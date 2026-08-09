@@ -677,7 +677,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
       <div className="flex-1 flex flex-col pt-20 overflow-y-auto">
-        <h1 className="font-heading font-bold text-[26px] mb-1 pl-10" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+        <h1 className="font-heading font-bold text-[26px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Before you begin.
         </h1>
         <p className="font-body text-[13px] mb-5" style={{ color: DIM }}>
@@ -1036,7 +1036,7 @@ function StepSocialProof({ onNext, onBack }) {
               className="font-heading font-bold text-[13px] px-3 py-1 rounded-full"
               style={{ background: 'rgba(198,168,92,0.12)', color: G, border: `1px solid ${G_BORDER}` }}
             >
-              1,522+ users leveling up
+              1,200+ users leveling up
             </span>
             <GoldStars />
           </div>
