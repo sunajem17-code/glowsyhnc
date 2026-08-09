@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion'
@@ -1188,7 +1188,7 @@ export default function Results() {
 
   // Show paywall after a short delay — let free users see their scores first
   const [showPaywall, setShowPaywall] = useState(false)
-  const paywallDismissed = useRef(false)
+  const paywallDismissed = useRef(!!sessionStorage.getItem('asc_paywall_dismissed'))
   const ffbOpen          = useRef(false)   // true while Face Feature Breakdown is expanded
   const paywallTimer     = useRef(null)    // pending setTimeout handle
 
@@ -1200,6 +1200,20 @@ export default function Results() {
       paywallTimer.current = null
     }
   }
+
+  // Ask for review after the user has seen their results — compliant timing
+  // (post-engagement, not during onboarding). Fires once per session for
+  // premium users viewing a fresh scan result.
+  useEffect(() => {
+    if (!isPremium || !isNewScan || !revealDone) return
+    const t = setTimeout(async () => {
+      try {
+        const { InAppReview } = await import('@capacitor-community/in-app-review')
+        await InAppReview.requestReview()
+      } catch { /* Apple throttles this — best effort */ }
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [isPremium, isNewScan, revealDone])
 
   useEffect(() => {
     if (isPremium || !currentScan || paywallDismissed.current) return
@@ -1230,8 +1244,7 @@ export default function Results() {
 
   const { faceData, umaxScore, tier, gender, aiScore, pillars: scanPillars } = currentScan
   const glowScore = currentScan.glowScore != null ? (currentScan.glowScore > 10 ? Math.round(currentScan.glowScore) / 10 : currentScan.glowScore) : null
-  // TEMP TRACE — remove after tier-consistency verification is done.
-  console.log('[TIER-TRACE] Results.jsx currentScan fields:', { umaxScore, glowScore, tierUsedByReveal: tier, gender })
+
   const pillars = scanPillars ?? aiScore?.pillars ?? null
 
   // Potential: face ceiling is +1.4. Physique scoring no longer happens as
@@ -2120,7 +2133,7 @@ export default function Results() {
           glowScore={glowScore}
           pillars={pillars}
           gender={gender ?? 'male'}
-          onClose={() => { paywallDismissed.current = true; setShowPaywall(false) }}
+          onClose={() => { sessionStorage.setItem('asc_paywall_dismissed', '1'); paywallDismissed.current = true; setShowPaywall(false) }}
         />
       )}
     </AnimatePresence>

@@ -306,7 +306,7 @@ export default function Profile() {
   const [appVersion, setAppVersion] = useState('(web)')
   useEffect(() => {
     if (!isNative()) return
-    CapApp.getInfo().then(info => setAppVersion(`v${info.version} (${info.build})`)).catch(() => {})
+    CapApp.getInfo().then(info => setAppVersion(`v${info.version} (${info.build})`)).catch(err => console.warn('[Profile] CapApp.getInfo failed:', err?.message))
   }, [])
 
   // Lock scroll on the page behind the modal. On iOS WebView, overflow:hidden
@@ -335,7 +335,6 @@ export default function Profile() {
   }
 
   async function handleDeleteAccount() {
-    console.log('[DELETE] button tapped')
     setDeletingAccount(true)
     setDeleteAccountError('')
 
@@ -345,9 +344,7 @@ export default function Profile() {
     window.addEventListener('auth:session-expired', suppressRedirect, true)
 
     try {
-      console.log('[DELETE] calling API DELETE /user/account')
       const result = await api.user.deleteAccount()
-      console.log('[DELETE] result:', JSON.stringify(result))
       logout()
       navigate('/', { replace: true })
     } catch (err) {

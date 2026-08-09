@@ -5,6 +5,7 @@
  */
 
 const express = require('express')
+const crypto  = require('crypto')
 const router  = express.Router()
 const { createLimiter } = require('../middleware/ratelimit')
 const { sendUpgradeNudge, sendWeeklyRecap, trackAffiliateClick } = require('../../ascendus-mailer')
@@ -20,10 +21,16 @@ const supabase = supabaseKey
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function requireSecret(req, res, next) {
-  const secret = req.headers['x-webhook-secret']
-  if (!secret || secret !== process.env.WEBHOOK_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  const expected = process.env.WEBHOOK_SECRET || ''
+  const provided = req.headers['x-webhook-secret'] || ''
+  if (!expected || !provided) return res.status(401).json({ error: 'Unauthorized' })
+  const expBuf = Buffer.from(expected)
+  const provBuf = Buffer.from(provided)
+  // Always run timingSafeEqual with equal-length buffers to prevent timing leaks
+  const safe = expBuf.length === provBuf.length
+    ? crypto.timingSafeEqual(expBuf, provBuf)
+    : (crypto.timingSafeEqual(expBuf, expBuf), false)
+  if (!safe) return res.status(401).json({ error: 'Unauthorized' })
   next()
 }
 

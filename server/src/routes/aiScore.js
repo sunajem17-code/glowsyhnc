@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
 const { getTier } = require('../lib/tier')
+const { updateLeaderboard } = require('./leaderboard')
 
 const router = express.Router()
 
@@ -950,6 +951,10 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
       } catch (e) {
         console.warn('[aiScore] scan_history call error (non-fatal):', e.message)
+      }
+      // Update leaderboard server-side with Claude's verified score — never from client
+      try { updateLeaderboard(req.userId, result.overallScore) } catch (e) {
+        console.warn('[aiScore] leaderboard update failed (non-fatal):', e.message)
       }
     }
 

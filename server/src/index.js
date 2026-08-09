@@ -1,5 +1,19 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
 
+// ── Boot-time security checks — crash fast if critical config is missing ──────
+if (process.env.NODE_ENV === 'production') {
+  const required = [
+    ['UPSTASH_REDIS_REST_URL',   'Rate limiting requires Redis in production'],
+    ['UPSTASH_REDIS_REST_TOKEN', 'Rate limiting requires Redis in production'],
+    ['JWT_SECRET',               'Auth requires JWT_SECRET in production'],
+    ['PROMO_CODE',               'Promo code must be set in Railway, never hardcoded'],
+  ]
+  for (const [key, msg] of required) {
+    if (!process.env[key]) throw new Error(`[boot] ${key} is not set — ${msg}`)
+  }
+  console.log('✅ All required production env vars present')
+}
+
 // Validate Stripe key at startup (warn only — don't crash server)
 if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_')) {
   console.warn('⚠️  STRIPE_SECRET_KEY is missing or invalid — set it in Railway environment variables')
@@ -121,7 +135,7 @@ app.use(cors({
   },
   credentials: true,
 }))
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded photos
@@ -131,7 +145,7 @@ app.use('/uploads', express.static(UPLOADS_DIR))
 // Routes
 app.use('/api/auth',        require('./routes/auth'))
 app.use('/api/user',        require('./routes/user'))
-app.use('/api/scan',        require('./routes/scan'))
+app.use('/api/scan',        require('./routes/scan').router)
 app.use('/api/plan',        require('./routes/plan'))
 app.use('/api/tasks',       require('./routes/tasks'))
 app.use('/api/checkin',     require('./routes/checkin'))
@@ -139,7 +153,7 @@ app.use('/api/progress',    require('./routes/progress'))
 app.use('/api/products',    require('./routes/products'))
 app.use('/api/payments',    paymentsRouter)
 app.use('/api/ai',          require('./routes/aiScore'))
-app.use('/api/leaderboard', require('./routes/leaderboard'))
+app.use('/api/leaderboard', require('./routes/leaderboard').router)
 app.use('/api/supabase',    require('./routes/supabaseRoutes'))
 app.use('/api/coach',       require('./routes/coach'))
 app.use('/api/hair',        require('./routes/hair'))

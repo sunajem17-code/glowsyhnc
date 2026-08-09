@@ -136,7 +136,7 @@ function MessageBubble({ msg, isNew }) {
   )
 }
 
-const FREE_COACH_LIMIT = 7
+const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()

@@ -11,6 +11,7 @@ import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
+import { startFaceScan } from '../utils/faceScan'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -348,7 +349,7 @@ function StepIntro({ onNext }) {
   )
 }
 
-function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
+function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn, onDemo, appleError }) {
   const navigate = useNavigate()
   return (
     <div className="flex flex-col h-full px-6 overflow-y-auto">
@@ -418,6 +419,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
 
       <div className="pb-10 pt-4 space-y-3">
         <GoldBtn label="Create Account →" onClick={onCreateAccount} />
+        {appleError ? <p className="text-center font-body text-[12px]" style={{ color: '#FF6B6B' }}>{appleError}</p> : null}
         {Capacitor.getPlatform() === 'ios' && (
           <button
             onClick={onAppleSignIn}
@@ -443,6 +445,15 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn }) {
           {' '}and{' '}
           <button onClick={() => navigate('/privacy')} className="underline" style={{ color: 'rgba(198,168,92,0.65)' }}>Privacy Policy</button>
         </p>
+        {onDemo && (
+          <button
+            onClick={onDemo}
+            className="w-full py-2 font-body text-[11px]"
+            style={{ color: 'rgba(255,255,255,0.18)', background: 'transparent', border: 'none' }}
+          >
+            App Review Demo Access
+          </button>
+        )}
       </div>
     </div>
   )
@@ -666,7 +677,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
       <div className="flex-1 flex flex-col pt-20 overflow-y-auto">
-        <h1 className="font-heading font-bold text-[26px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+        <h1 className="font-heading font-bold text-[26px] mb-1 pl-10" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Before you begin.
         </h1>
         <p className="font-body text-[13px] mb-5" style={{ color: DIM }}>
@@ -721,7 +732,10 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
 }
 
 // ── STEP: Name ────────────────────────────────────────────────────────────────
-function StepName({ data, onChange, onNext, onBack }) {
+function StepName({ data, onChange, onNext, onBack, skipForApple }) {
+  // Apple already provided identity — advance immediately without showing the form
+  useEffect(() => { if (skipForApple) onNext() }, [skipForApple])
+  if (skipForApple) return null
   const inputStyle = {
     color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
     borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
@@ -1093,8 +1107,9 @@ function StepHeight({ data, onChange, onNext, onBack, units }) {
 
         <Slider
           label="Height"
-          unit={units === 'imperial' ? `ft ${feet}'${inches}"` : 'cm'}
+          unit={units === 'imperial' ? '' : 'cm'}
           value={cm}
+          displayValue={units === 'imperial' ? `${feet}'${inches}"` : cm}
           min={140}
           max={220}
           onChange={v => onChange('height', v)}
@@ -1316,6 +1331,31 @@ function StepScanCapture({ gender, onDone, onBack }) {
   const [rateLimited, setRateLimited]   = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
+  const [arScanDone, setArScanDone]         = useState(false)
+  const [arScanSkipped, setArScanSkipped]   = useState(false)
+  const [faceScanBusy, setFaceScanBusy]     = useState(false)
+  const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
+
+  async function handleLiveScan() {
+    const result = await startFaceScan()
+    if (!result.supported) {
+      if (result.nativeError) {
+        console.error('[PremiumOnboarding] FaceScanPlugin failed:', result.message)
+        setError('Live face scan couldn\'t start due to an app error. Try closing and reopening the app.')
+      } else {
+        setError('Live face scan requires a device with a TrueDepth camera (iPhone X or later).')
+      }
+      return
+    }
+    if (result.cancelled) return
+    const { capturedImage, landmarks2D, ...metricsOnly } = result
+    setArScanDone(true)
+    setArScanSkipped(false)
+    setError('')
+    if (capturedImage && landmarks2D) {
+      setLastFaceScanCapture(capturedImage, landmarks2D)
+    }
+  }
 
   // Countdown → auto-retry with the same photos
   useEffect(() => {
@@ -1414,7 +1454,6 @@ function StepScanCapture({ gender, onDone, onBack }) {
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
       }
 
-      console.log('[SCAN DONE] calling onDone with scanRecord id:', scanRecord.id)
       onDone(scanRecord)
     } catch (err) {
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status)
@@ -1573,8 +1612,13 @@ function StepScanCapture({ gender, onDone, onBack }) {
           stepNum={1}
           guide={null}
           photo={facePhoto}
-          onPhoto={(url) => setFacePhoto(url)}
+          onPhoto={(url) => { setFacePhoto(url); setError('') }}
           gender={gender || 'male'}
+          arScanDone={arScanDone}
+          onLiveScan={handleLiveScan}
+          arScanSkipped={arScanSkipped}
+          onSkipScan={() => setArScanSkipped(true)}
+          onScanningChange={setFaceScanBusy}
         />
       </div>
 
@@ -1587,7 +1631,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
         <div className="pb-10 pt-2">
           <GoldBtn
             label="Continue →"
-            onClick={() => { setPhase('side'); setError('') }}
+            onClick={() => { arScanDone ? runAnalysisWithData(facePhoto, null) : (setPhase('side'), setError('')) }}
           />
         </div>
       )}
@@ -1902,6 +1946,8 @@ export default function PremiumOnboarding() {
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
+  const [appleSignedIn, setAppleSignedIn] = useState(false)
+  const [appleError, setAppleError] = useState('')
 
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', confirmPassword: '',
@@ -1935,12 +1981,25 @@ export default function PremiumOnboarding() {
     setChecks(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  function goNext() { setDir(1); setStep(s => s + 1) }
+  function goNext() {
+    setDir(1)
+    setStep(s => {
+      const next = s + 1
+      // Step 4 is the name screen — skip it when Apple already provided the name
+      if (next === 4 && appleSignedIn) return 5
+      return next
+    })
+  }
   function goBack() {
     if (step === 0) return
     if (step === 1 && authData) return
     setDir(-1)
-    setStep(s => s - 1)
+    setStep(s => {
+      const prev = s - 1
+      // Skip step 4 (name) going backwards too when Apple provided identity
+      if (prev === 4 && appleSignedIn) return 3
+      return prev
+    })
   }
 
   // Called by StepScanCapture when analysis completes — saves the scan record
@@ -1956,13 +2015,10 @@ export default function PremiumOnboarding() {
   // TRANSFORM/REFINE), not the separate BMI-based CUT/BULK/RECOMP/MAINTENANCE
   // result WorkoutPlan.jsx's body-stats screen shows.
   function handleScanDone(scanRecord) {
-    console.log('[SCAN DONE] handleScanDone fired', JSON.stringify({ id: scanRecord?.id, score: scanRecord?.umaxScore, tier: scanRecord?.tier }))
     try {
       const g = formData.gender || 'male'
       const phase = assignPhase(scanRecord.faceData?.aestheticScore, formData.goal)
-      console.log('[SCAN DONE] calling generatePlanTasks')
       const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, phase, g)
-      console.log('[SCAN DONE] generatePlanTasks done, tasks count:', tasks?.length)
 
       setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
       setPendingFacePhoto(scanRecord.facePhotoUrl)
@@ -2003,9 +2059,7 @@ export default function PremiumOnboarding() {
         tasks,
       }).catch(() => {})
 
-      console.log('[SCAN DONE] calling goNext')
       goNext()
-      console.log('[SCAN DONE] goNext called')
     } catch (err) {
       console.error('[SCAN DONE] ERROR in handleScanDone:', err?.message, err?.stack)
     }
@@ -2131,6 +2185,14 @@ export default function PremiumOnboarding() {
     )
   }
 
+  function handleDemo() {
+    setAuth({ id: 'demo', name: 'Demo User', email: 'demo@ascendus.app' }, 'demo-token')
+    updateField('name', 'Demo User')
+    setLegalConsented(true)
+    setAgeConfirmed(true)
+    setStep(5) // skip straight to gender
+  }
+
   async function handleAppleSignIn() {
     if (!Capacitor.isNativePlatform()) return
     try {
@@ -2160,11 +2222,17 @@ export default function PremiumOnboarding() {
       if (!res.ok) throw new Error(data.error || 'Authentication failed')
 
       setAuth(data.user, data.token)
+      const givenName = result.response.fullName?.givenName || ''
+      const familyName = result.response.fullName?.familyName || ''
+      const appleName = [givenName, familyName].filter(Boolean).join(' ')
+      if (appleName) updateField('name', appleName)
+      setAppleSignedIn(true)
       // Apple already provides identity — skip SignUp(2), go straight to Consent(3)
       setStep(3)
     } catch (err) {
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
       console.error('[APPLE AUTH] PremiumOnboarding error:', err)
+      setAppleError('Sign in with Apple failed. Please try again.')
     }
   }
 
@@ -2182,6 +2250,8 @@ export default function PremiumOnboarding() {
       onCreateAccount={goNext}
       onSignIn={() => setSigningIn(true)}
       onAppleSignIn={handleAppleSignIn}
+      onDemo={handleDemo}
+      appleError={appleError}
     />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}
@@ -2190,7 +2260,7 @@ export default function PremiumOnboarding() {
       onNext={goNext} onBack={goBack}
     />,
     <StepName key="name" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack}
+      onNext={goNext} onBack={goBack} skipForApple={appleSignedIn}
     />,
     <StepGender key="gender" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack}
@@ -2204,7 +2274,6 @@ export default function PremiumOnboarding() {
       onBack={goBack}
     />,
     <TransformationScreen key="transformation" onNext={goNext} />,
-    <StepRating key="rating" onNext={goNext} />,
     <StepScoresWaiting key="scores-waiting" scan={currentScan} onAscend={handleAscend} onPromoSuccess={handlePromoSuccess} isPurchasing={isPurchasing} error={purchaseError} />,
   ]
 
@@ -2227,12 +2296,6 @@ export default function PremiumOnboarding() {
         </div>
       )}
 
-      {/* Logo — centered so it never collides with BackBtn (left-5) or the step counter (right-5) */}
-      {showProgress && (
-        <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-          <img src={logo} alt="Ascendus" style={{ width: 20, height: 20, mixBlendMode: 'lighten', opacity: 0.65 }} />
-        </div>
-      )}
 
       {/* Step counter */}
       {showProgress && (

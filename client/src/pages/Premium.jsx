@@ -36,9 +36,9 @@ const FEATURES = [
 ]
 
 const TESTIMONIALS = [
-  { name: 'Marcus T.', handle: '@marcust', score: '+18 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
-  { name: 'Sarah K.', handle: '@sarahk', score: '+22 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
-  { name: 'Jordan L.', handle: '@jordanl', score: '+14 pts', quote: 'Best $7.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
+  { name: 'Marcus T.', handle: '@marcust', score: '+1.8 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
+  { name: 'Sarah K.', handle: '@sarahk', score: '+2.2 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
+  { name: 'Jordan L.', handle: '@jordanl', score: '+1.4 pts', quote: 'Best $7.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
 ]
 
 export default function Premium() {

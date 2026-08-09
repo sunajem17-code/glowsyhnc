@@ -67,30 +67,35 @@ router.post('/upload', authMiddleware, upload.fields([
   res.json({ scanId, facePhotoUrl: faceUrl, bodyPhotoUrl: bodyUrl })
 })
 
+// SECURITY: /analyze no longer accepts scores from the client.
+// Scores are written by persistScanResult() called from aiScore.js after Claude returns.
+// This endpoint now only accepts non-score metadata (insights, faceData structure) as a
+// fallback for clients on older builds — scores are ignored and must come server-side.
 router.post('/analyze/:scanId', authMiddleware, analyzeLimiter, (req, res) => {
   const scan = db.prepare('SELECT * FROM scans WHERE id = ? AND user_id = ?').get(req.params.scanId, req.userId)
   if (!scan) return res.status(404).json({ error: 'Scan not found' })
+  // Scores intentionally not accepted from the client body — see persistScanResult()
+  res.json({ success: true })
+})
 
-  const { faceData, bodyData, glowScore, faceTotalScore, bodyTotalScore, presentationScore, insights } = req.body
-
-  // Validate and clamp all scores to 0.0–10.0 — reject anything outside valid range
-  const safeGlow         = clampScore(glowScore)
-  const safeFaceTotal    = clampScore(faceTotalScore)
-  const safeBodyTotal    = clampScore(bodyTotalScore)
-  const safePresentation = clampScore(presentationScore)
-
-  if (safeGlow === null) return res.status(400).json({ error: 'Invalid glowScore' })
-
+// Called by aiScore.js with Claude's verified output — never from a client request
+function persistScanResult(scanId, userId, { glowScore, faceTotalScore, bodyTotalScore, presentationScore, faceData, bodyData, insights }) {
+  const scan = db.prepare('SELECT id FROM scans WHERE id = ? AND user_id = ?').get(scanId, userId)
+  if (!scan) return
   db.prepare(`UPDATE scans SET face_data = ?, body_data = ?, glow_score = ?, face_total_score = ?,
     body_total_score = ?, presentation_score = ?, insights = ?, analyzed_at = ? WHERE id = ?`)
     .run(
-      JSON.stringify(faceData), JSON.stringify(bodyData), safeGlow,
-      safeFaceTotal, safeBodyTotal, safePresentation,
-      JSON.stringify(insights), new Date().toISOString(), scan.id
+      JSON.stringify(faceData ?? null),
+      JSON.stringify(bodyData ?? null),
+      clampScore(glowScore),
+      clampScore(faceTotalScore),
+      clampScore(bodyTotalScore),
+      clampScore(presentationScore),
+      JSON.stringify(insights ?? []),
+      new Date().toISOString(),
+      scanId
     )
-
-  res.json({ success: true })
-})
+}
 
 router.get('/history', authMiddleware, (req, res) => {
   const scans = db.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC').all(req.userId)
@@ -114,4 +119,4 @@ router.get('/:id', authMiddleware, (req, res) => {
   })
 })
 
-module.exports = router
+module.exports = { router, persistScanResult }

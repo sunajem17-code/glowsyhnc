@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
+import { checkAchievements } from '../utils/achievements'
 
 const useStore = create(
   persist(
@@ -50,7 +51,17 @@ const useStore = create(
 
       // Capped at 100 to bound localStorage growth over time — history beyond
       // that lives server-side (scan_history / Supabase) if it's ever needed.
-      addScan: (scan) => set(state => ({ scans: [scan, ...state.scans].slice(0, 100) })),
+      addScan: (scan) => set(state => {
+        const newScans = [scan, ...state.scans].slice(0, 100)
+        const newState = { ...state, scans: newScans }
+        const toUnlock = checkAchievements(newState)
+        const newAchievements = [...state.achievements]
+        let pendingAchievement = state.pendingAchievement
+        for (const key of toUnlock) {
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+        }
+        return { scans: newScans, achievements: newAchievements, pendingAchievement }
+      }),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
 
@@ -93,15 +104,31 @@ const useStore = create(
       // Daily Check-in
       checkins: [],
       todayCheckin: null,
-      addCheckin: (checkin) => set(state => ({
-        checkins: [checkin, ...state.checkins],
-        todayCheckin: checkin,
-      })),
+      addCheckin: (checkin) => set(state => {
+        const newCheckins = [checkin, ...state.checkins]
+        const newState = { ...state, checkins: newCheckins }
+        const toUnlock = checkAchievements(newState)
+        const newAchievements = [...state.achievements]
+        let pendingAchievement = state.pendingAchievement
+        for (const key of toUnlock) {
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+        }
+        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement }
+      }),
       setTodayCheckin: (checkin) => set({ todayCheckin: checkin }),
 
       // Streaks
       streak: { current: 0, longest: 0, lastDate: null },
-      updateStreak: (streak) => set({ streak }),
+      updateStreak: (streak) => set(state => {
+        const newState = { ...state, streak }
+        const toUnlock = checkAchievements(newState)
+        const newAchievements = [...state.achievements]
+        let pendingAchievement = state.pendingAchievement
+        for (const key of toUnlock) {
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+        }
+        return { streak, achievements: newAchievements, pendingAchievement }
+      }),
 
       // Settings
       theme: 'dark',

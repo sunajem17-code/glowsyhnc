@@ -24,30 +24,9 @@ router.get('/', authMiddleware, (req, res) => {
 })
 
 // Submit/update score — requires auth; identity comes from JWT, not request body
-router.post('/submit', authMiddleware, (req, res) => {
-  try {
-    const { score } = req.body
-    if (score === undefined || score === null) {
-      return res.status(400).json({ error: 'score required' })
-    }
-    if (typeof score !== 'number' || score < 0 || score > 100) {
-      return res.status(400).json({ error: 'score must be a number between 0 and 100' })
-    }
-    // Use the authenticated userId as the username — users cannot spoof other users
-    const username = req.userId
-    const weekStart = getWeekStart()
-    const existing = db.prepare('SELECT * FROM leaderboard WHERE username = ? AND week_start = ?').get(username, weekStart)
-    if (existing) {
-      db.prepare('UPDATE leaderboard SET current_score = ?, updated_at = datetime("now") WHERE username = ? AND week_start = ?').run(score, username, weekStart)
-    } else {
-      db.prepare('INSERT INTO leaderboard (id, username, initial_score, current_score, week_start) VALUES (?, ?, ?, ?, ?)').run(uuidv4(), username, score, score, weekStart)
-    }
-    res.json({ success: true })
-  } catch (err) {
-    console.error('[Leaderboard] POST error:', err.message)
-    res.status(500).json({ error: 'internal_error' })
-  }
-})
+// SECURITY: client-submit endpoint removed.
+// Scores are written server-side only via updateLeaderboard() called from
+// aiScore.js after Claude returns a verified result. Never accept a score from the client.
 
 function getWeekStart() {
   const now = new Date()
@@ -57,4 +36,24 @@ function getWeekStart() {
   return monday.toISOString().split('T')[0]
 }
 
-module.exports = router
+// Called by aiScore.js after a verified Claude result — never from a client request
+function updateLeaderboard(userId, glowScore) {
+  try {
+    if (typeof glowScore !== 'number' || glowScore < 0 || glowScore > 10) return
+    const clamped = Math.min(10, Math.max(0, Math.round(glowScore * 10) / 10))
+    const weekStart = getWeekStart()
+    const existing = db.prepare('SELECT * FROM leaderboard WHERE username = ? AND week_start = ?').get(userId, weekStart)
+    if (existing) {
+      const improvement = Math.max(0, clamped - existing.initial_score)
+      db.prepare('UPDATE leaderboard SET current_score = ?, improvement = ?, updated_at = datetime("now") WHERE username = ? AND week_start = ?')
+        .run(clamped, improvement, userId, weekStart)
+    } else {
+      db.prepare('INSERT INTO leaderboard (id, username, initial_score, current_score, improvement, week_start) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uuidv4(), userId, clamped, clamped, 0, weekStart)
+    }
+  } catch (err) {
+    console.error('[Leaderboard] updateLeaderboard error:', err.message)
+  }
+}
+
+module.exports = { router, updateLeaderboard }

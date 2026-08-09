@@ -9,7 +9,8 @@ const db = require('../db')
 
 const router = express.Router()
 
-const VALID_CODE      = process.env.PROMO_CODE         || 'SOHAIL'
+if (!process.env.PROMO_CODE) throw new Error('[boot] PROMO_CODE env var is required — set it in Railway, never in code')
+const VALID_CODE      = process.env.PROMO_CODE
 const MAX_REDEMPTIONS = parseInt(process.env.PROMO_MAX_REDEMPTIONS || '10', 10)
 
 router.post('/redeem', authMiddleware, async (req, res) => {

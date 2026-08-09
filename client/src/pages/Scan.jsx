@@ -574,12 +574,6 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               <PhotoActionSheet
                 onClose={() => setShowActionSheet(false)}
                 options={[
-                  ...(isNative() && onLiveScan ? [{
-                    label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
-                    icon: Star,
-                    highlight: true,
-                    onSelect: () => { setShowActionSheet(false); onLiveScan() },
-                  }] : []),
                   { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
                   { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
                 ]}
@@ -622,15 +616,6 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               <PhotoActionSheet
                 onClose={() => setShowActionSheet(false)}
                 options={[
-                  // Live Face Scan explicitly gated to step 1 — ARKit can't
-                  // reliably track a real 90° turn, so step 2 never offers
-                  // it, regardless of what onLiveScan/isNative() resolve to.
-                  ...(stepNum === 1 && isNative() && onLiveScan ? [{
-                    label: arScanDone ? '✓ Rescan (Live Face Scan)' : 'Live Face Scan',
-                    icon: Star,
-                    highlight: true,
-                    onSelect: () => { setShowActionSheet(false); onLiveScan() },
-                  }] : []),
                   { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
                   { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
                 ]}
@@ -675,10 +660,13 @@ function useRotatingIndex(length, intervalMs) {
 // the face and needs to stay in the region it's naming. Overall lands last as
 // a summary beat rather than a specific position.
 const SWEEP_FEATURE_ROWS = [16, 30, 45, 59, 74, 88]
-const SWEEP_FEATURE_LABELS = ['Scanning upper third', 'Scanning eyes', 'Scanning midface', 'Scanning lower third', 'Scanning miscellaneous', 'Scanning overall']
-// Midpoints between adjacent rows above — the band boundaries the sweep
-// line's live percentage position is tested against.
-const SWEEP_BAND_THRESHOLDS = [23, 38, 52, 67, 81]
+const SCAN_ALL_METRICS = [
+  'Norwood Stage', 'Forehead Proportion', 'Hairline Recession', 'Hair Thinning', 'Hairline Density', 'Forehead Slope',
+  'Orbital Depth', 'Canthal Tilt', 'Brow Density', 'Lash Density', 'Eyelid Exposure', 'Under-Eye Health',
+  'Cheekbones', 'Maxilla', 'Nose', 'IPD', 'FWHR', 'Compactness',
+  'Lips', 'Mandible', 'Gonial Angle', 'Ramus', 'Hyoid Tightness', 'Jaw Width',
+  'Skin', 'Harmony', 'Symmetry', 'Neck Width', 'Bloat', 'Bone Mass',
+]
 // One-way top-to-bottom pass; the line bounces (reverses), so a full cycle
 // is 2x this. Was 2800ms — too slow to guarantee even one full pass through
 // all 6 labels before a fast (~1-2s) backend response ends the analyzing
@@ -688,40 +676,6 @@ const SWEEP_BAND_THRESHOLDS = [23, 38, 52, 67, 81]
 // enough to read (168-276ms each) while guaranteeing a full one-way pass —
 // hitting all 6 labels once, in order — completes within that ~1-2s window.
 const SWEEP_ONE_WAY_MS = 1200
-
-function bandForSweepPct(pct) {
-  for (let i = 0; i < SWEEP_BAND_THRESHOLDS.length; i++) {
-    if (pct < SWEEP_BAND_THRESHOLDS[i]) return i
-  }
-  return SWEEP_FEATURE_ROWS.length - 1
-}
-
-// Derives which feature band the sweep line currently occupies from the same
-// elapsed-time/duration math driving the line's own animation below (not an
-// independent guess at timing) — polled at a coarse interval since the label
-// only needs to update on a band change, not every frame.
-function useSweepBand() {
-  const [band, setBand] = useState(0)
-  const bandRef = useRef(0)
-  useEffect(() => {
-    const start = performance.now()
-    const id = setInterval(() => {
-      const elapsed = performance.now() - start
-      const cycle = SWEEP_ONE_WAY_MS * 2
-      const t = elapsed % cycle
-      const pct = t < SWEEP_ONE_WAY_MS
-        ? (t / SWEEP_ONE_WAY_MS) * 100
-        : 100 - ((t - SWEEP_ONE_WAY_MS) / SWEEP_ONE_WAY_MS) * 100
-      const next = bandForSweepPct(pct)
-      if (next !== bandRef.current) {
-        bandRef.current = next
-        setBand(next)
-      }
-    }, 120)
-    return () => clearInterval(id)
-  }, [])
-  return band
-}
 
 // Dot positions computed once at module scope, each tagged with its row
 // index so it can reference that row's keyframe (below) by name.
@@ -802,7 +756,7 @@ function SweepLine() {
 // spot at the bottom of the photo as the line's position crosses each
 // feature's band, derived from the same duration as the line itself.
 function AnalyzingSweepOverlay({ photo }) {
-  const band = useSweepBand()
+  const metricIdx = useRotatingIndex(SCAN_ALL_METRICS.length, 400)
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ aspectRatio: '4/5', background: '#0a0a0a' }}>
@@ -826,15 +780,15 @@ function AnalyzingSweepOverlay({ photo }) {
       <div className="absolute left-0 right-0 bottom-3 flex justify-center px-3">
         <AnimatePresence mode="wait">
           <motion.span
-            key={band}
+            key={metricIdx}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.2 }}
             className="font-heading font-bold text-[11px] tracking-wide px-2.5 py-1 rounded-md"
             style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${GOLD}55`, color: GOLD }}
           >
-            {SWEEP_FEATURE_LABELS[band]}
+            Scanning {SCAN_ALL_METRICS[metricIdx]}
           </motion.span>
         </AnimatePresence>
       </div>
@@ -1086,7 +1040,7 @@ export default function Scan() {
   // that staleness would auto-advance to step 2 mid-rescan.
   useEffect(() => {
     if (step !== 1 || !facePhoto || !geometrySatisfied || faceScanBusy) return
-    const t = setTimeout(() => { setStep(2); setError('') }, 900)
+    const t = setTimeout(() => { arScanDone ? startAnalysisRef.current?.(true) : (setStep(2), setError('')) }, 900)
     return () => clearTimeout(t)
   }, [step, facePhoto, geometrySatisfied, faceScanBusy])
 
@@ -1195,12 +1149,7 @@ export default function Scan() {
             setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
           )
           aiResult = await Promise.race([scoreCall, timeoutCall])
-          // TEMP TRACE — remove after tier-consistency verification is done.
-          console.log('[TIER-TRACE] scan result from server:', {
-            previousScore: lastGlowScore,
-            overallScore:  aiResult?.overallScore,
-            tier:          aiResult?.tier,
-          })
+
         } finally {
           clearInterval(stageTimer)
           clearTimeout(slowTimer)

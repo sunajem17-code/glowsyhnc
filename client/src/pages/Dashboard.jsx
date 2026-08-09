@@ -35,7 +35,7 @@ export default function Dashboard() {
   const isPremium     = useStore(s => s.isPremium)
   const referralCount = useStore(s => s.referralCount)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 5
+  const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 3
 
   const latestScan = scans[0]
   const rawGlowScore = latestScan?.glowScore ?? 0
@@ -119,7 +119,7 @@ export default function Dashboard() {
                   Get 3 days Pro free
                 </p>
                 <p className="font-body text-[11px] text-secondary leading-snug">
-                  Refer {5 - (referralCount ?? 0)} more friend{5 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock
+                  Refer {3 - (referralCount ?? 0)} more friend{3 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock
                 </p>
               </div>
               <button
