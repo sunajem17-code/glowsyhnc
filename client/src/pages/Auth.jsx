@@ -10,7 +10,7 @@ import logo from '../assets/ascendus-icon.png'
 export default function Auth() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { setAuth } = useStore()
+  const { setAuth, setHasOnboarded } = useStore()
 
   const [mode, setMode] = useState(() => searchParams.get('mode') === 'signup' ? 'signup' : 'login')
   const [form, setForm] = useState({ name: '', email: '', password: '' })
@@ -36,6 +36,7 @@ export default function Auth() {
         data = await api.auth.login({ email: form.email, password: form.password })
       }
       setAuth(data.user, data.token)
+      setHasOnboarded()
     } catch (err) {
       const isNetworkError =
         err.message === 'Failed to fetch' ||
@@ -92,6 +93,7 @@ export default function Auth() {
       if (!res.ok) throw new Error(data.error || 'Authentication failed')
 
       setAuth(data.user, data.token)
+      setHasOnboarded()
     } catch (err) {
       console.error('[APPLE AUTH] Error:', err)
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.message?.includes('cancel') || err?.code === 1001) {
