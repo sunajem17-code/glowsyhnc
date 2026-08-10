@@ -2223,13 +2223,20 @@ export default function PremiumOnboarding() {
       if (!res.ok) throw new Error(data.error || 'Authentication failed')
 
       setAuth(data.user, data.token)
-      const givenName = result.response.fullName?.givenName || ''
-      const familyName = result.response.fullName?.familyName || ''
-      const appleName = [givenName, familyName].filter(Boolean).join(' ')
-      if (appleName) updateField('name', appleName)
-      setAppleSignedIn(true)
-      // Apple already provides identity — skip SignUp(2), go straight to Consent(3)
-      setStep(3)
+      if (signingIn) {
+        // Returning user signing back in — go directly to dashboard
+        clearDraft()
+        setHasOnboarded()
+        setSigningIn(false)
+      } else {
+        // New user — populate name and continue through onboarding
+        const givenName = result.response.fullName?.givenName || ''
+        const familyName = result.response.fullName?.familyName || ''
+        const appleName = [givenName, familyName].filter(Boolean).join(' ')
+        if (appleName) updateField('name', appleName)
+        setAppleSignedIn(true)
+        setStep(3)
+      }
     } catch (err) {
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
       console.error('[APPLE AUTH] PremiumOnboarding error:', err)
