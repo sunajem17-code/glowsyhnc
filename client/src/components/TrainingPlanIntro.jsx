@@ -6,7 +6,6 @@ import { triggerHaptic } from '../utils/haptics'
 import { api } from '../utils/api'
 import { fileToResizedBase64 } from '../pages/WorkoutPlan'
 import BodyStatsFlow from './BodyStatsStep'
-import logo from '../assets/ascendus-icon.png'
 import bodyGuideMale from '../assets/body-guide-male.jpg'
 import bodyGuideFemale from '../assets/body-guide-female.jpg'
 
@@ -37,11 +36,8 @@ function StepChrome({ step, showStepLabel = true, children }) {
           transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       </div>
-      <div className="absolute left-1/2 -translate-x-1/2 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-        <img src={logo} alt="Ascendus" style={{ width: 20, height: 20, mixBlendMode: 'lighten', opacity: 0.65 }} />
-      </div>
       {showStepLabel && (
-        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}>
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
             Step {step} of {STEP_TOTAL}
           </span>

@@ -105,7 +105,7 @@ function BackBtn({ onBack }) {
       onClick={onBack}
       aria-label="Go back"
       className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
     >
       <ChevronLeft size={18} style={{ color: DIM }} />
     </button>
@@ -1834,7 +1834,7 @@ function IntroSlides({ onDone }) {
       <button
         onClick={onDone}
         className="absolute right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 44px)', color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
       >
         Skip
       </button>
@@ -1928,10 +1928,10 @@ export default function PremiumOnboarding() {
       .catch(() => {})
   }, [])
 
-  // Restore an in-progress draft (unauthenticated only — an authenticated user
-  // always starts fresh at Consent) so a refresh/backgrounding mid-quiz doesn't
-  // silently discard answers already entered.
-  const draft = isAuthenticated ? null : loadDraft()
+  // Restore an in-progress draft so a refresh/backgrounding mid-quiz doesn't
+  // silently discard answers already entered. Authenticated users clamp to
+  // step ≥ 3 so they never see Welcome/SignUp again.
+  const draft = loadDraft()
 
   // Dormant again — the Welcome screen (steps[1], "Brutally honest. Built
   // to improve you.") must always be the literal first thing a never-signed-up
@@ -1942,7 +1942,7 @@ export default function PremiumOnboarding() {
   // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
   // same reason — new unauthenticated sessions start straight at Welcome(1).
   // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
-  const [step, setStep] = useState(isAuthenticated ? 3 : (draft?.step ?? 1))
+  const [step, setStep] = useState(isAuthenticated ? Math.max(3, draft?.step ?? 3) : (draft?.step ?? 1))
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
@@ -1964,7 +1964,6 @@ export default function PremiumOnboarding() {
 
   // Persist a draft on every change (password fields excluded on purpose).
   useEffect(() => {
-    if (isAuthenticated) return
     const { password, confirmPassword, ...safeFormData } = formData
     saveDraft({ step, formData: safeFormData, checks })
   }, [step, formData, checks, isAuthenticated])
@@ -2299,7 +2298,7 @@ export default function PremiumOnboarding() {
 
       {/* Step counter */}
       {showProgress && (
-        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+        <div className="absolute right-5 z-20" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}>
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>
             Step {stepCounter} of {stepTotal}
           </span>

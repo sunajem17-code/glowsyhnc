@@ -514,7 +514,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
         onClick={handleCloseAttempt}
         aria-label="Close"
         className="absolute right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: SURFACE, border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 44px)', background: SURFACE, border: '1px solid rgba(255,255,255,0.08)' }}
       >
         <X size={17} style={{ color: TEXT }} />
       </button>
