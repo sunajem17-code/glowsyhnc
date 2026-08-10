@@ -24,25 +24,30 @@ const useStore = create(
           false,
       }),
       setPremium: (val) => set({ isPremium: val }),
-      logout: () => set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        scans: [],
-        currentPlan: null,
-        currentScan: null,
-        checkins: [],
-        todayCheckin: null,
-        streak: { current: 0, longest: 0, lastDate: null },
-        isPremium: false,
-        pendingFacePhoto: null,
-        pendingBodyPhoto: null,
-        hasOnboarded: false,
-        gender: null,
-        userProfile: null,
-        legalConsented: false,
-        // age gate is device-level, intentionally NOT reset on logout
-      }),
+      logout: () => {
+        // Clear the onboarding draft so a subsequent user on this device/session
+        // doesn't inherit a previous user's step position and formData.
+        try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          scans: [],
+          currentPlan: null,
+          currentScan: null,
+          checkins: [],
+          todayCheckin: null,
+          streak: { current: 0, longest: 0, lastDate: null },
+          isPremium: false,
+          pendingFacePhoto: null,
+          pendingBodyPhoto: null,
+          hasOnboarded: false,
+          gender: null,
+          userProfile: null,
+          legalConsented: false,
+          // age gate is device-level, intentionally NOT reset on logout
+        })
+      },
       updateUser: (updates) => set(state => ({ user: { ...state.user, ...updates } })),
 
       // Scans

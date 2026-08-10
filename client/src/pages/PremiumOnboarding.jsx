@@ -481,6 +481,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
       setReferralCode(String(data.user.id).substring(0, 8).toUpperCase())
       setLegalConsented()
       setAgeConfirmed()
+      clearDraft()
       setHasOnboarded()
       onSuccess()
     } catch (err) {
@@ -2152,6 +2153,7 @@ export default function PremiumOnboarding() {
   // stops routing back here) and moving on to results, same as a successful
   // purchase above.
   function handlePromoSuccess() {
+    clearDraft()
     sessionStorage.setItem('asc_pro_splash_shown', '1')
     setHasOnboarded()
     logAnalyticsEvent('promo_redeemed', { source: 'onboarding' })
