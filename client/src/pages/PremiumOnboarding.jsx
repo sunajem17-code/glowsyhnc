@@ -1540,7 +1540,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
     return (
       <div className="flex flex-col h-full px-6" style={{ background: BG }}>
         <BackBtn onBack={() => { setPhase('face'); setError('') }} />
-        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
+        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 104px)' }}>
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
             STEP 2 OF 2
           </p>
@@ -2163,7 +2163,7 @@ export default function PremiumOnboarding() {
   // Progress bar: only during data-collection steps (2–7); post-scan celebration screens (8–10) get no counter
   const QUIZ_START = isAuthenticated ? 3 : 2
   const QUIZ_END = 7
-  const showProgress = step >= QUIZ_START && step <= QUIZ_END
+  const showProgress = step >= QUIZ_START && step < QUIZ_END
   const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
   const stepCounter = step - QUIZ_START + 1
   const stepTotal = QUIZ_END - QUIZ_START + 1
