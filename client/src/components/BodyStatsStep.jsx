@@ -222,7 +222,7 @@ export default function BodyStatsFlow({ initialHeight, initialWeight, goal, onSa
         </div>
       )}
 
-      <div className="flex items-center justify-between px-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+      <div className="flex items-center justify-between px-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}>
         {stepLabel ? (
           <span className="text-[10px] font-mono" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>{stepLabel}</span>
         ) : <span />}

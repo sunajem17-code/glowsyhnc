@@ -202,7 +202,7 @@ export default function DevRankCard({ scan, onClose }) {
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 pb-3 flex-shrink-0"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
       >
         <div className="flex items-center gap-2">
           <FlaskConical size={16} style={{ color: GOLD }} />

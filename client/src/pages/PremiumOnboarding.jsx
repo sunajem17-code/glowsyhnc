@@ -1540,7 +1540,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
     return (
       <div className="flex flex-col h-full px-6" style={{ background: BG }}>
         <BackBtn onBack={() => { setPhase('face'); setError('') }} />
-        <div className="pt-12 pb-4">
+        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
             STEP 2 OF 2
           </p>
@@ -1590,7 +1590,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
   return (
     <div className="flex flex-col h-full px-6" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
-      <div className="pt-12 pb-4">
+      <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
           STEP 1 OF 2
         </p>

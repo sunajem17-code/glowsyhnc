@@ -1349,7 +1349,7 @@ export default function Scan() {
         (step === 1 || step === 2) ? (
           <div
             className="flex items-center gap-3 px-4 pb-4 flex-shrink-0"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
           >
             <button
               onClick={() => { triggerHaptic(); navigate(-1) }}

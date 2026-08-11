@@ -472,7 +472,7 @@ export default function ShareCardModal({ scan, facePhotoUrl, phase, onClose }) {
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 pb-3 flex-shrink-0"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
       >
         <p className="font-heading font-bold text-[15px] text-white">Share Your Card</p>
         <button
