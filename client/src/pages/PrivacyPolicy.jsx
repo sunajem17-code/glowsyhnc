@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
   return (
     <div className="page-scroll-full" style={{ background: '#080808' }}>
       <div style={{ borderBottom: `1px solid ${BORDER}` }}>
-        <PageHeader title="Privacy Policy" subtitle="Last updated: April 2025" back />
+        <PageHeader title="Privacy Policy" subtitle="Last updated: August 2026" back />
       </div>
 
       <div className="px-5 py-6 pb-20 max-w-2xl mx-auto">
@@ -60,11 +60,22 @@ export default function PrivacyPolicy() {
         </Section>
 
         <Section title="3. Face Data">
-          <p>When you submit a photo for analysis, it is transmitted securely to our server and sent to Anthropic's Claude AI API for processing. Your photos are stored in Supabase Storage (scan-images bucket) and are retained until you delete your account or scan data. See Section 5 for deletion options.</p>
+          <p>When you submit a photo for analysis, it is transmitted securely to our server and sent to Anthropic's Claude AI API for processing. Your photos are stored in Supabase Storage (scan-images bucket) and are retained until you delete your account. See Section 6 for deletion options.</p>
         </Section>
 
-        <Section title="4. AI & Biometric Data">
-          <p>When you perform a scan, your photos are:</p>
+        <Section title="4. TrueDepth Camera &amp; On-Device Face Scanning">
+          <p>For fuller transparency: on supported iPhone models, Ascendus uses Apple's TrueDepth camera system (ARKit) to perform live face scanning. Here is what this means for your privacy:</p>
+          <ul className="list-disc pl-4 space-y-1 mt-1">
+            <li><strong style={{ color: TEXT }}>What the TrueDepth camera does:</strong> ARKit projects infrared dots onto your face and reads the reflection to construct a 3D face mesh (approximately 1,220 vertex points). This runs entirely on your device and is never recorded as a video or depth map.</li>
+            <li><strong style={{ color: TEXT }}>What leaves your device:</strong> Only 18 computed numeric measurements (e.g. face width, jaw width, symmetry score) are extracted from the mesh and used to calculate your Glow Score. The raw depth data and 3D mesh are never transmitted to our servers or any third party.</li>
+            <li><strong style={{ color: TEXT }}>Your photo (optional):</strong> If you use photo-based scanning, a JPEG of your face is captured and sent to our server for AI analysis (see Section 5). The TrueDepth geometric measurements and the photo upload are independent — raw depth data is never included in the upload.</li>
+            <li><strong style={{ color: TEXT }}>Body and side-profile analysis:</strong> Body pose estimation and side-profile landmark detection use Apple's Vision framework, which runs entirely on-device. No image data leaves your phone as part of this analysis.</li>
+            <li><strong style={{ color: TEXT }}>What we store:</strong> Only computed numeric scores and the optional JPEG. We never store raw depth maps, face meshes, or infrared sensor data.</li>
+          </ul>
+        </Section>
+
+        <Section title="5. AI &amp; Biometric Data">
+          <p>When you perform a photo-based scan, your photos are:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>Transmitted securely (HTTPS/TLS) to our server</li>
             <li>Sent to <strong style={{ color: TEXT }}>Anthropic Claude API</strong> for AI analysis</li>
@@ -75,17 +86,17 @@ export default function PrivacyPolicy() {
           <p className="mt-2">Anthropic's privacy policy governs their processing of data sent to their API. Anthropic does not train models on API inputs. See: anthropic.com/privacy</p>
         </Section>
 
-        <Section title="5. Data Retention & Deletion">
+        <Section title="6. Data Retention &amp; Deletion">
           <p>You can delete your data at any time:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
-            <li><strong style={{ color: TEXT }}>Delete scan data:</strong> Profile → Privacy Settings → Delete All Scan Data</li>
-            <li><strong style={{ color: TEXT }}>Delete account:</strong> Profile → Delete Account & Data</li>
-            <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com, we will delete within 30 days</li>
+            <li><strong style={{ color: TEXT }}>Delete All Scan Data</strong> (Profile → Privacy Settings → Delete All Scan Data): removes your scan history, scores, and photos from your device only. Photos and scan records stored on our servers are <em>not</em> removed by this action — use Delete Account & Data below to remove server-side data.</li>
+            <li><strong style={{ color: TEXT }}>Delete Account &amp; Data</strong> (Profile → Delete Account & Data): permanently and immediately deletes your account, all scan records, and all photos stored on our servers. This action cannot be undone. You will be signed out upon confirmation.</li>
+            <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com — we will process deletion requests within 30 days as required by applicable law.</li>
           </ul>
-          <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law. Deletion may take up to 30 days to propagate through all systems including automated backups.</p>
+          <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law.</p>
         </Section>
 
-        <Section title="6. Third-Party Services">
+        <Section title="7. Third-Party Services">
           <p>We use the following third-party services, each with their own privacy policies:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li><strong style={{ color: TEXT }}>Anthropic Claude API</strong>: AI photo analysis (anthropic.com/privacy)</li>
@@ -97,7 +108,7 @@ export default function PrivacyPolicy() {
           </ul>
         </Section>
 
-        <Section title="7. Your Rights (PIPEDA / GDPR / CCPA)">
+        <Section title="8. Your Rights (PIPEDA / GDPR / CCPA)">
           <p>Depending on your jurisdiction, you have the right to:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>Access the personal data we hold about you</li>
@@ -110,11 +121,11 @@ export default function PrivacyPolicy() {
           <p className="mt-2">To exercise any of these rights, contact: <strong style={{ color: TEXT }}>support@ascendus.com</strong></p>
         </Section>
 
-        <Section title="8. Children & Minors">
+        <Section title="9. Children &amp; Minors">
           <p>Ascendus is not intended for users under 17 years of age. We do not knowingly collect personal information from minors. If you believe a minor has created an account, contact us immediately at support@ascendus.com and we will delete the data.</p>
         </Section>
 
-        <Section title="9. Security">
+        <Section title="10. Security">
           <p>We protect your data using industry-standard security practices:</p>
           <ul className="list-disc pl-4 space-y-1 mt-1">
             <li>All data transmitted over HTTPS/TLS</li>
@@ -126,18 +137,18 @@ export default function PrivacyPolicy() {
           </ul>
         </Section>
 
-        <Section title="10. Governing Law">
+        <Section title="11. Governing Law">
           <p>This Privacy Policy is governed by the laws of Ontario, Canada, and the federal Personal Information Protection and Electronic Documents Act (PIPEDA). Disputes shall be resolved in the courts of Ontario.</p>
         </Section>
 
-        <Section title="11. Contact Us">
+        <Section title="12. Contact Us">
           <p>Privacy enquiries:</p>
           <p className="mt-1"><strong style={{ color: TEXT }}>Email:</strong> support@ascendus.com</p>
           <p><strong style={{ color: TEXT }}>Company:</strong> Ascendus Inc., Ontario, Canada</p>
         </Section>
 
         <p className="text-center font-body text-[11px] mt-6" style={{ color: TEXT_DIM }}>
-          Ascendus v1.0 · © 2025 Ascendus Inc. · Ontario, Canada
+          Ascendus v1.7.5 · © 2026 Ascendus Inc. · Ontario, Canada
         </p>
       </div>
     </div>

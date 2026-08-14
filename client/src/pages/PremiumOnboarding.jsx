@@ -1914,6 +1914,7 @@ export default function PremiumOnboarding() {
   const setLastScanDate    = useStore(s => s.setLastScanDate)
   const incrementScanCount = useStore(s => s.incrementScanCount)
   const setIsPremium       = useStore(s => s.setIsPremium)
+  const user               = useStore(s => s.user)
 
   // Purchase state for StepScoresWaiting's "Unlock Results Now" button — moved
   // here from ScanUnlockGate.jsx's handleAscend (Step 1 of retiring that
@@ -1947,7 +1948,7 @@ export default function PremiumOnboarding() {
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [authData, setAuthData] = useState(null)
-  const [appleSignedIn, setAppleSignedIn] = useState(false)
+  const [appleSignedIn, setAppleSignedIn] = useState(draft?.appleSignedIn ?? false)
   const [appleError, setAppleError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -1966,7 +1967,7 @@ export default function PremiumOnboarding() {
   // Persist a draft on every change (password fields excluded on purpose).
   useEffect(() => {
     const { password, confirmPassword, ...safeFormData } = formData
-    saveDraft({ step, formData: safeFormData, checks })
+    saveDraft({ step, formData: safeFormData, checks, appleSignedIn })
   }, [step, formData, checks, isAuthenticated])
 
   function updateField(key, value) {
@@ -2268,7 +2269,7 @@ export default function PremiumOnboarding() {
       onNext={goNext} onBack={goBack}
     />,
     <StepName key="name" data={formData} onChange={updateField}
-      onNext={goNext} onBack={goBack} skipForApple={appleSignedIn}
+      onNext={goNext} onBack={goBack} skipForApple={appleSignedIn || !!user?.isAppleUser}
     />,
     <StepGender key="gender" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack}

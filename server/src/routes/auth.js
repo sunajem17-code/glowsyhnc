@@ -172,7 +172,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         if (!existing.apple_sub) {
           await sb.from('users').update({ apple_sub: appleSub }).eq('id', existing.id)
         }
-        const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at }
+        const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at, isAppleUser: true }
         return res.json({ user: safe, token: signToken(existing.id, existing.email) })
       }
 
@@ -186,7 +186,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         referral_code: ownCode, referral_count: 0,
         subscription_tier: 'free', created_at: new Date().toISOString(),
       })
-      const safe = { id: newUser.id, name: newUser.name, email: newUser.email, subscriptionTier: 'free', createdAt: newUser.created_at }
+      const safe = { id: newUser.id, name: newUser.name, email: newUser.email, subscriptionTier: 'free', createdAt: newUser.created_at, isAppleUser: true }
       return res.json({ user: safe, token: signToken(newUser.id, newUser.email) })
     }
 
