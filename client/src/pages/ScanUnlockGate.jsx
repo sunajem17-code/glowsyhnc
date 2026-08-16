@@ -9,7 +9,6 @@ import {
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
 import { triggerHaptic } from '../utils/haptics'
@@ -132,14 +131,6 @@ function Card1Score({ scan }) {
       }} />
 
       <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
-
-        {/* Header — centered logo + wordmark */}
-        <div className="flex items-center justify-center gap-2.5 mb-7">
-          <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
-          <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
-            ASCENDUS
-          </span>
-        </div>
 
         {/* Hero score */}
         <div className="mb-5">
