@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Check, Loader2, ChevronDown, Lock, X, Tag } from 'lucide-react'
+import { Star, Check, Loader2, Lock, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
@@ -177,8 +177,6 @@ function OverallCard({ scan }) {
     return v != null ? Math.min(100, (v / 10) * 100) : 0
   }
 
-  const ascendByLabel = new Date(Date.now() + 12 * 7 * 24 * 60 * 60 * 1000)
-    .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   // Six real fields — same as Card1Score, not fabricated categories.
   const lockedMetrics = [
@@ -217,37 +215,6 @@ function OverallCard({ scan }) {
           <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
             ASCENDUS ANALYSIS
           </span>
-        </motion.div>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.04 }}
-          className="font-heading font-bold text-[22px] leading-tight mb-3 text-center"
-          style={{ color: TEXT, letterSpacing: '-0.01em' }}
-        >
-          You will ascend by
-        </motion.h1>
-
-        {/* ── Ascend-date pill ──────────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className="mb-6 flex justify-center"
-        >
-          <div
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full"
-            style={{
-              background: 'rgba(198,168,92,0.12)',
-              border: '1px solid rgba(198,168,92,0.35)',
-            }}
-          >
-            <span className="font-heading font-bold text-[19px]" style={{ color: G }}>
-              {ascendByLabel}
-            </span>
-            <ChevronDown size={16} style={{ color: G }} />
-          </div>
         </motion.div>
 
         {/* ── Overall label ─────────────────────────────────────────────────── */}
@@ -290,7 +257,9 @@ function OverallCard({ scan }) {
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </BlurLock>
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                </span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
@@ -540,11 +509,19 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
         </AnimatePresence>
       </div>
 
-      {/* Step counter */}
-      <div className="flex items-center justify-center py-3 flex-shrink-0">
-        <span className="font-heading font-bold text-[11px] tracking-[0.1em]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {cardIdx + 1} OF {cards.length}
-        </span>
+      {/* Dot pagination */}
+      <div className="flex items-center justify-center gap-1.5 py-3 flex-shrink-0">
+        {cards.map((_, i) => (
+          <div
+            key={i}
+            onClick={() => goTo(i)}
+            style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: i === cardIdx ? 'rgba(198,168,92,1)' : 'rgba(255,255,255,0.25)',
+              cursor: 'pointer',
+            }}
+          />
+        ))}
       </div>
 
       <div className="px-6 pb-10 pt-2 flex-shrink-0">
@@ -588,10 +565,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
               transition={{ duration: 0.15, ease: EASE_STANDARD }}
               className="flex items-center justify-center gap-2.5"
             >
-              {isPurchasing
-                ? <Loader2 size={20} className="animate-spin" />
-                : <Sparkles size={20} style={{ color: 'white' }} />
-              }
+              {isPurchasing && <Loader2 size={20} className="animate-spin" />}
               {isPurchasing ? 'Processing…' : 'Unlock Results Now'}
             </motion.span>
           </AnimatePresence>

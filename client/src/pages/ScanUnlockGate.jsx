@@ -207,7 +207,9 @@ function Card1Score({ scan }) {
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </BlurLock>
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                </span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
@@ -268,7 +270,9 @@ function Card3FaceMetrics({ scan }) {
             >
               <div className="flex items-center justify-between mb-2.5">
                 <Icon size={12} style={{ color: G }} />
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                </span>
               </div>
               <p
                 className="font-heading font-bold text-[9px] tracking-[0.12em] mb-3"
@@ -302,7 +306,9 @@ function Card3FaceMetrics({ scan }) {
                 <BlurLock size="sm">
                   <span className="font-heading font-bold text-[13px]" style={{ color: TEXT }}>{value.toFixed(1)}</span>
                 </BlurLock>
-                <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                </span>
               </div>
             </div>
           ))}
@@ -442,11 +448,19 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
         </AnimatePresence>
       </div>
 
-      {/* Step counter */}
-      <div className="flex items-center justify-center py-3 flex-shrink-0">
-        <span className="font-heading font-bold text-[11px] tracking-[0.1em]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {cardIdx + 1} OF {cards.length}
-        </span>
+      {/* Dot pagination */}
+      <div className="flex items-center justify-center gap-1.5 py-3 flex-shrink-0">
+        {cards.map((_, i) => (
+          <div
+            key={i}
+            onClick={() => goTo(i)}
+            style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: i === cardIdx ? 'rgba(198,168,92,1)' : 'rgba(255,255,255,0.25)',
+              cursor: 'pointer',
+            }}
+          />
+        ))}
       </div>
 
       {/* Fixed CTA */}

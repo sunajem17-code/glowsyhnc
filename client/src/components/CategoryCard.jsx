@@ -185,7 +185,9 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
                   </div>
                 </BlurLock>
               )}
-              <Lock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+              </span>
             </div>
             <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
               {isPending && pct === 0 ? (

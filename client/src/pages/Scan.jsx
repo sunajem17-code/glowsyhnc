@@ -269,7 +269,7 @@ function PhotoActionSheet({ options, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null, onScanningChange = null }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null, onScanningChange = null, heroLayout = false }) {
   const uploadRef = useRef()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
@@ -357,6 +357,130 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
       uploadRef.current?.click()
     }
   }
+
+  // ── Hero / full-bleed layout (step 1, PremiumOnboarding only) ───────────────
+  if (heroLayout && stepNum === 1) {
+    return (
+      <div className="flex flex-col h-full">
+        {cameraOpen && (
+          <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
+        )}
+        <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
+
+        {/* Full-bleed card — no border, no glow, rounded corners only */}
+        <div
+          className="relative flex-1 min-h-0 rounded-3xl overflow-hidden pointer-events-none"
+          style={{ background: '#0A0A0A' }}
+        >
+          {/* Photo state */}
+          {photo ? (
+            <>
+              <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-contain" />
+              <div className="absolute inset-0 bg-black/20" />
+              <AnimatePresence>
+                {showScanOverlay && (
+                  <>
+                    <FaceScanOverlay />
+                    {canAutoLiveScan && (
+                      <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3, ease: EASE_STANDARD }}
+                        className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-6 pointer-events-auto"
+                      >
+                        <p className="font-heading font-bold text-[13px] text-center" style={{ color: 'white', textShadow: '0 1px 6px rgba(0,0,0,0.85)' }}>
+                          Now scanning your facial structure…
+                        </p>
+                        <button onClick={handleSkipDuringScan} className="text-[11px] font-body underline active:opacity-60 transition-opacity" style={{ color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
+                          Skip: use photo only
+                        </button>
+                      </motion.div>
+                    )}
+                  </>
+                )}
+              </AnimatePresence>
+            </>
+          ) : arScanDone ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
+                <CheckCircle2 size={32} style={{ color: 'cyan' }} />
+              </div>
+              <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
+              <p className="text-white/50 text-[11px] font-body text-center">Geometry captured · Take a photo too, both are required</p>
+            </div>
+          ) : (
+            <img
+              src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
+              alt="" aria-hidden="true"
+              className="absolute inset-0 w-full h-full"
+              style={{ objectFit: 'cover', objectPosition: 'center 20%' }}
+            />
+          )}
+
+          {/* Bottom gradient — subtext + CTA overlaid inside card */}
+          {!showScanOverlay && (
+            <div
+              className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-8 pt-24 pointer-events-none"
+              style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.93) 55%)' }}
+            >
+              <p className="font-body text-[13px] text-center mb-5" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                Front-facing · Neutral expression · Good lighting · No hat or glasses
+              </p>
+              {!photo && !arScanDone ? (
+                <button
+                  onClick={() => setShowActionSheet(true)}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform pointer-events-auto"
+                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+                >
+                  <Camera size={18} style={{ color: '#0A0A0A' }} />
+                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>Upload or Take a Selfie</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowActionSheet(true)}
+                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
+                >
+                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
+                </button>
+              )}
+              {photo && !arScanDone && !arScanSkipped && onSkipScan && (
+                <button
+                  onClick={onSkipScan}
+                  className="mt-2 text-[11px] font-body underline active:opacity-60 transition-opacity pointer-events-auto"
+                  style={{ color: 'rgba(255,255,255,0.35)' }}
+                >
+                  Skip Live Face Scan: use photo only
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-2 flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
+            <AlertCircle size={15} className="text-warning flex-shrink-0" />
+            <p className="text-sm text-warning font-body flex-1">{error}</p>
+            <button onClick={() => setError('')} aria-label="Dismiss error" className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100">
+              <X size={14} className="text-warning" />
+            </button>
+          </div>
+        )}
+
+        <AnimatePresence>
+          {showActionSheet && (
+            <PhotoActionSheet
+              onClose={() => setShowActionSheet(false)}
+              options={[
+                { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+              ]}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+  // ── End hero layout ───────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full px-3">
