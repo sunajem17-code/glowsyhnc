@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
-import { api } from '../utils/api'
+import { api, setScanInFlight } from '../utils/api'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
@@ -367,10 +367,10 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
         )}
         <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
-        {/* Full-bleed card — no border, no glow, rounded corners only */}
+        {/* Full-bleed card — subtle gold border, rounded corners */}
         <div
-          className="relative flex-1 min-h-0 rounded-3xl overflow-hidden pointer-events-none"
-          style={{ background: '#0A0A0A' }}
+          className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden pointer-events-none"
+          style={{ background: '#080808', border: '1px solid rgba(198,168,92,0.2)' }}
         >
           {/* Photo state */}
           {photo ? (
@@ -398,6 +398,30 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
                   </>
                 )}
               </AnimatePresence>
+              {/* Retake stays overlaid on photo — face is hidden at this point anyway */}
+              {!showScanOverlay && (
+                <div
+                  className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 pt-16 pointer-events-none"
+                  style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.85) 60%)' }}
+                >
+                  <button
+                    onClick={() => setShowActionSheet(true)}
+                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
+                  >
+                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
+                  </button>
+                  {!arScanDone && !arScanSkipped && onSkipScan && (
+                    <button
+                      onClick={onSkipScan}
+                      className="mt-1 text-[11px] font-body underline active:opacity-60 transition-opacity pointer-events-auto"
+                      style={{ color: 'rgba(255,255,255,0.35)' }}
+                    >
+                      Skip Live Face Scan: use photo only
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           ) : arScanDone ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8">
@@ -408,53 +432,27 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
               <p className="text-white/50 text-[11px] font-body text-center">Geometry captured · Take a photo too, both are required</p>
             </div>
           ) : (
+            /* Guide image — no overlay, full face visible */
             <img
               src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
               alt="" aria-hidden="true"
-              className="absolute inset-0 w-full h-full"
-              style={{ objectFit: 'cover', objectPosition: 'center 20%' }}
+              className="absolute inset-0 w-full h-full object-cover"
             />
           )}
-
-          {/* Bottom gradient — subtext + CTA overlaid inside card */}
-          {!showScanOverlay && (
-            <div
-              className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-8 pt-24 pointer-events-none"
-              style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.93) 55%)' }}
-            >
-              <p className="font-body text-[13px] text-center mb-5" style={{ color: 'rgba(255,255,255,0.65)' }}>
-                Front-facing · Neutral expression · Good lighting · No hat or glasses
-              </p>
-              {!photo && !arScanDone ? (
-                <button
-                  onClick={() => setShowActionSheet(true)}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform pointer-events-auto"
-                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-                >
-                  <Camera size={18} style={{ color: '#0A0A0A' }} />
-                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>Upload or Take a Selfie</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowActionSheet(true)}
-                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
-                >
-                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
-                </button>
-              )}
-              {photo && !arScanDone && !arScanSkipped && onSkipScan && (
-                <button
-                  onClick={onSkipScan}
-                  className="mt-2 text-[11px] font-body underline active:opacity-60 transition-opacity pointer-events-auto"
-                  style={{ color: 'rgba(255,255,255,0.35)' }}
-                >
-                  Skip Live Face Scan: use photo only
-                </button>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Begin Scan button — below card so it never overlaps the face */}
+        {!photo && !arScanDone && !showScanOverlay && (
+          <div className="mt-5">
+            <button
+              onClick={() => setShowActionSheet(true)}
+              className="w-full flex items-center justify-center py-4 rounded-full active:scale-95 transition-transform"
+              style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+            >
+              <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>Begin Scan</span>
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mt-2 flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
@@ -486,16 +484,6 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
     <div className="flex flex-col h-full px-3">
       {cameraOpen && (
         <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
-      )}
-
-      {/* Instruction caption — side-profile-specific content, the one thing
-          that's intentionally NOT shared with step 1 (which shows no
-          caption at all). Kept minimal (one line, no box/padding section)
-          so it doesn't disrupt the otherwise-identical layout below it. */}
-      {stepNum === 2 && (
-        <p className="text-xs text-secondary font-body pt-2 pb-1">
-          Turn 90° right · Relax jaw · Natural light · 3–6 ft from camera
-        </p>
       )}
 
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below.
@@ -586,16 +574,12 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             </p>
           </div>
         ) : stepNum === 2 ? (
-          // object-contain (not cover) so the full reference photo shows —
-          // cover was cropping it to fill the box. Inline style too, not just
-          // the Tailwind class — belt-and-suspenders against any build/purge
-          // weirdness silently dropping the utility class.
           <img
             src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'contain' }}
+            style={{ objectFit: 'cover', objectPosition: 'center top' }}
           />
         ) : stepNum === 1 ? (
           // object-fit: cover + object-position: bottom (not contain) — this
@@ -648,105 +632,93 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
           Profile step just invited people to turn 90° before tapping it,
           which broke tracking — so step 2 only ever needs a photo now, no
           separate scan action. */}
-      {canAutoLiveScan ? (
-        <div className="mb-1">
-          {/* Hidden entirely while the "Now scanning…" transition/overlay is up —
-              that state has its own inline skip link, so nothing duplicates it here. */}
-          {!showScanOverlay && (
-            !photo && !arScanDone ? (
-              <button
-                onClick={() => setShowActionSheet(true)}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-                style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-              >
-                <Camera size={18} style={{ color: '#0A0A0A' }} />
-                <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-                  Upload or Take a Selfie
-                </span>
-              </button>
-            ) : (
-              // Settled (scan succeeded, was skipped, or the native modal was
-              // cancelled) — a lightweight retake control, not a full pill.
-              // Reopening the action sheet still offers "Live Face Scan" as a
-              // manual option, so this doubles as the recovery path if the
-              // native modal was dismissed without using the skip link above.
-              <div className="flex flex-col items-center gap-1.5">
+      {stepNum !== 2 && (
+        canAutoLiveScan ? (
+          <div className="mb-1">
+            {!showScanOverlay && (
+              !photo && !arScanDone ? (
                 <button
                   onClick={() => setShowActionSheet(true)}
-                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
                 >
-                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Retake Photo
+                  <Camera size={18} style={{ color: '#0A0A0A' }} />
+                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+                    Upload or Take a Selfie
                   </span>
                 </button>
-                {!arScanDone && !arScanSkipped && onSkipScan && (
+              ) : (
+                <div className="flex flex-col items-center gap-1.5">
                   <button
-                    onClick={onSkipScan}
-                    className="text-[11px] font-body underline active:opacity-60 transition-opacity"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}
+                    onClick={() => setShowActionSheet(true)}
+                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
                   >
-                    Skip Live Face Scan: use photo only
+                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      Retake Photo
+                    </span>
                   </button>
-                )}
-              </div>
-            )
-          )}
-
-          <AnimatePresence>
-            {showActionSheet && (
-              <PhotoActionSheet
-                onClose={() => setShowActionSheet(false)}
-                options={[
-                  { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                  { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-                ]}
-              />
+                  {!arScanDone && !arScanSkipped && onSkipScan && (
+                    <button
+                      onClick={onSkipScan}
+                      className="text-[11px] font-body underline active:opacity-60 transition-opacity"
+                      style={{ color: 'rgba(255,255,255,0.35)' }}
+                    >
+                      Skip Live Face Scan: use photo only
+                    </button>
+                  )}
+                </div>
+              )
             )}
-          </AnimatePresence>
-        </div>
-      ) : (
-        <div className="mb-1">
-          {/* Same pill button on both steps — label swaps "Selfie" for "Photo"
-              on step 2 since it's a profile shot, not a front-facing selfie. */}
-          <button
-            onClick={() => setShowActionSheet(true)}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-            style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-          >
-            <Camera size={18} style={{ color: '#0A0A0A' }} />
-            <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-              {photo || arScanDone
-                ? (stepNum === 1 ? 'Retake Selfie' : 'Retake Photo')
-                : (stepNum === 1 ? 'Upload or Take a Selfie' : 'Upload or Take a Photo')}
-            </span>
-          </button>
-
-          {photo && !arScanDone && !arScanSkipped && onSkipScan && (
+            <AnimatePresence>
+              {showActionSheet && (
+                <PhotoActionSheet
+                  onClose={() => setShowActionSheet(false)}
+                  options={[
+                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+                  ]}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="mb-1">
             <button
-              onClick={onSkipScan}
-              className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
-              style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', borderRadius: 10, padding: '10px 14px' }}
+              onClick={() => setShowActionSheet(true)}
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+              style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >
-              <SkipForward size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
-              <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                Skip Live Face Scan: use photo only
+              <Camera size={18} style={{ color: '#0A0A0A' }} />
+              <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+                {photo || arScanDone ? 'Retake Selfie' : 'Upload or Take a Selfie'}
               </span>
             </button>
-          )}
-
-          <AnimatePresence>
-            {showActionSheet && (
-              <PhotoActionSheet
-                onClose={() => setShowActionSheet(false)}
-                options={[
-                  { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                  { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-                ]}
-              />
+            {photo && !arScanDone && !arScanSkipped && onSkipScan && (
+              <button
+                onClick={onSkipScan}
+                className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
+                style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', borderRadius: 10, padding: '10px 14px' }}
+              >
+                <SkipForward size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
+                <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Skip Live Face Scan: use photo only
+                </span>
+              </button>
             )}
-          </AnimatePresence>
-        </div>
+            <AnimatePresence>
+              {showActionSheet && (
+                <PhotoActionSheet
+                  onClose={() => setShowActionSheet(false)}
+                  options={[
+                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+                  ]}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        )
       )}
     </div>
   )
@@ -880,10 +852,8 @@ function SweepLine() {
 // spot at the bottom of the photo as the line's position crosses each
 // feature's band, derived from the same duration as the line itself.
 function AnalyzingSweepOverlay({ photo }) {
-  const metricIdx = useRotatingIndex(SCAN_ALL_METRICS.length, 400)
-
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ aspectRatio: '4/5', background: '#0a0a0a' }}>
+    <div className="relative w-full rounded-2xl overflow-hidden mb-5" style={{ aspectRatio: '2/3', background: '#0a0a0a' }}>
       <style>{SWEEP_KEYFRAMES_CSS}</style>
       {photo && (
         <img
@@ -901,47 +871,25 @@ function AnalyzingSweepOverlay({ photo }) {
         {SWEEP_DOTS.map((d, i) => <SweepFeatureDot key={i} cx={d.cx} cy={d.cy} row={d.row} />)}
       </svg>
       <SweepLine />
-      <div className="absolute left-0 right-0 bottom-3 flex justify-center px-3">
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={metricIdx}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2 }}
-            className="font-heading font-bold text-[11px] tracking-wide px-2.5 py-1 rounded-md"
-            style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${GOLD}55`, color: GOLD }}
-          >
-            Scanning {SCAN_ALL_METRICS[metricIdx]}
-          </motion.span>
-        </AnimatePresence>
-      </div>
     </div>
   )
 }
 
+// Maps currentStep (0–4) to a fill percentage for the progress bar.
+// Steps 1–3 are timer-driven (setInterval every 1800ms) — simulated progress.
+// Step 3 is set when the API call actually completes — the only real signal.
+const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
+
 export function AnalyzingScreen({ currentStep, slow, photo }) {
   const msgIndex = useRotatingIndex(ANALYZING_MESSAGES.length, 2800)
+  const progressPct = STEP_PROGRESS_PCT[Math.min(currentStep, 4)]
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
       <AnalyzingSweepOverlay photo={photo} />
 
-      <AnimatePresence mode="wait">
-        {slow ? (
-          <motion.h2 key="slow" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="font-heading font-bold text-xl text-primary mb-1">
-            Almost there…
-          </motion.h2>
-        ) : (
-          <motion.h2 key="normal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="font-heading font-bold text-xl text-primary mb-1">
-            Analyzing…
-          </motion.h2>
-        )}
-      </AnimatePresence>
-
-      <div className="h-5 mb-6 flex items-center justify-center">
+      {/* Status subtext — timer-driven rotation, not tied to backend state */}
+      <div className="h-5 mb-4 flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.p key={msgIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.3 }}
@@ -953,10 +901,28 @@ export function AnalyzingScreen({ currentStep, slow, photo }) {
         </AnimatePresence>
       </div>
 
-      <div className="w-full space-y-2.5">
-        {ANALYSIS_STEPS.map((s, i) => (
-          <ChecklistRow key={i} step={s} i={i} currentStep={currentStep} />
-        ))}
+      {/* Progress bar — pill outline with inset gold fill.
+          Fill amount is simulated (timer-driven steps); step 3 fill is tied
+          to the actual API call completing. No percentage shown. */}
+      <div className="w-full" style={{
+        height: 36,
+        borderRadius: 999,
+        border: `2px solid ${GOLD}`,
+        padding: 4,
+        background: 'transparent',
+        boxSizing: 'border-box',
+      }}>
+        <motion.div
+          style={{
+            height: '100%',
+            borderRadius: 999,
+            background: GOLD,
+            originX: 0,
+          }}
+          initial={{ width: '5%' }}
+          animate={{ width: `${progressPct}%` }}
+          transition={{ duration: 0.9, ease: 'easeOut' }}
+        />
       </div>
     </div>
   )
@@ -1081,7 +1047,7 @@ export default function Scan() {
           {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.
         </p>
         <p className="text-secondary text-sm font-body mb-6">Upgrade to Pro for unlimited scans.</p>
-        <button onClick={() => navigate('/premium')} className="btn-primary mb-3 max-w-xs">Unlock Unlimited Scans →</button>
+        <button onClick={() => navigate('/premium')} className="btn-primary mb-3 max-w-xs">Unlock Unlimited Scans</button>
         <button onClick={() => navigate('/referral')} className="text-sm font-heading font-bold" style={{ color: '#C6A85C' }}>
           <span className="flex items-center gap-1.5"><Gift size={14} /> Or share with 5 friends for 3 days free</span>
         </button>
@@ -1261,6 +1227,7 @@ export default function Scan() {
         }
       } else {
         try {
+          setScanInFlight(true)
           const lastGlowScore = scans?.[0]?.glowScore ?? null
           const scoreCall = api.ai.score({
             faceImage: faceB64,
@@ -1275,6 +1242,7 @@ export default function Scan() {
           aiResult = await Promise.race([scoreCall, timeoutCall])
 
         } finally {
+          setScanInFlight(false)
           clearInterval(stageTimer)
           clearTimeout(slowTimer)
           setSlowAnalysis(false)
@@ -1558,7 +1526,7 @@ export default function Scan() {
                     : "You've used your free scan for this month. Upgrade to Pro for unlimited scans."}
                 </p>
               </div>
-              <button onClick={() => { setScanCapReached(false); navigate('/premium') }} className="btn-amber w-full">Upgrade to Pro →</button>
+              <button onClick={() => { setScanCapReached(false); navigate('/premium') }} className="btn-amber w-full">Upgrade to Pro</button>
               <button
                 onClick={() => setScanCapReached(false)}
                 className="w-full py-3 text-sm font-heading font-bold text-secondary active:opacity-60 transition-opacity"
