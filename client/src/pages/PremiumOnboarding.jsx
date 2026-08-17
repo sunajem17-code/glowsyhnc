@@ -906,7 +906,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
         </div>
       </div>
 
-      <div className="pb-10 pt-2">
+      <div className="px-6 pb-10 pt-2">
         <GoldBtn label="I Agree, Continue" onClick={handleAgree} disabled={!allChecked} />
       </div>
     </div>

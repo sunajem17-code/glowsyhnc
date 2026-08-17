@@ -569,7 +569,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
           <p className="text-center text-[12px] font-body font-semibold mt-2" style={{ color: TEXT }}>{error}</p>
         )}
 
-        <p className="text-center font-body mt-2" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, lineHeight: 1.5 }}>
+        <p className="text-center font-body mt-2" style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, lineHeight: 1.5 }}>
           Pro: $7.99/month or $49.99/year · Auto-renews unless cancelled 24h before renewal · Cancel anytime in Settings
           {' · '}
           <a href="https://ascendus.store/privacy" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'underline' }}>Privacy Policy</a>
