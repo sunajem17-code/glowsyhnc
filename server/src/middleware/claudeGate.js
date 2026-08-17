@@ -53,7 +53,8 @@ function verifyToken(req, res, next) {
     req.userId = payload.userId
     req.isDemo = false
     next()
-  } catch {
+  } catch (jwtErr) {
+    console.error('[claudeGate] verifyToken rejected:', jwtErr.name, jwtErr.message)
     res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
@@ -140,7 +141,8 @@ async function resolvePro(req, res, next) {
   try {
     const { isPro } = await getSubscriptionTier(req.userId)
     req.isPro = isPro
-  } catch {
+  } catch (err) {
+    console.error('[claudeGate] resolvePro error (non-fatal, defaulting to free):', err.message)
     req.isPro = false
   }
   next()

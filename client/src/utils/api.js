@@ -1,12 +1,20 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
 const BASE = `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
 
+// Set to true while an AI scan is actively in-flight. Background polls that
+// get a 401 during this window won't wipe the token — the scan has its own
+// token and the poll failing mid-scan is expected noise, not a real logout.
+// Cleared as soon as the scan settles (success or error).
+let _scanInFlight = false
+export function setScanInFlight(v) { _scanInFlight = v }
+
 // Several server routes' generic catch-alls return machine-readable codes
 // (not sentences) as `error` — safe for logs, never safe to render as-is.
 // Map known ones to a human message; anything else falls through unchanged
 // since most routes already send a proper sentence.
 const RAW_ERROR_CODES = {
   internal_error: 'Something went wrong on our end. Please try again.',
+  server_error:   'Something went wrong on our end. Please try again.',
 }
 function friendlyError(raw, fallback) {
   if (raw && RAW_ERROR_CODES[raw]) return RAW_ERROR_CODES[raw]
@@ -56,16 +64,22 @@ async function request(path, options = {}) {
     if (res.status === 401) {
       const isAuthEndpoint = path.startsWith('/auth/')
       if (!isAuthEndpoint) {
-        try {
-          const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-          if (stored?.state?.token && stored.state.token !== 'demo-token') {
-            stored.state.token = null
-            stored.state.isAuthenticated = false
-            localStorage.setItem('ascendus-storage', JSON.stringify(stored))
-            // Fire a global event so the app can redirect to /auth
-            window.dispatchEvent(new CustomEvent('auth:session-expired'))
-          }
-        } catch {}
+        // Background polls that 401 during an active scan are expected noise —
+        // the scan itself is still running with a valid token. Only skip the
+        // wipe during that narrow window. Once the scan settles, any 401
+        // (even from a background poll) clears the broken session.
+        const isBackgroundPoll = path === '/user/profile' || path === '/payments/status'
+        if (!(isBackgroundPoll && _scanInFlight)) {
+          try {
+            const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+            if (stored?.state?.token && stored.state.token !== 'demo-token') {
+              stored.state.token = null
+              stored.state.isAuthenticated = false
+              localStorage.setItem('ascendus-storage', JSON.stringify(stored))
+              window.dispatchEvent(new CustomEvent('auth:session-expired'))
+            }
+          } catch {}
+        }
         const sessionErr = new Error(friendlyError(errBody.error, 'Session expired. Please sign in again.'))
         sessionErr.status = 401
         sessionErr.isSessionExpired = true

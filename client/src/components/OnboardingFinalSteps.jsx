@@ -122,7 +122,7 @@ export function StepRating({ onNext }) {
           className="w-full py-2 font-body text-[13px] text-center transition-opacity hover:opacity-70"
           style={{ color: rated ? G : DIM }}
         >
-          {rated ? 'Continue →' : 'Maybe later'}
+          {rated ? 'Continue' : 'Maybe later'}
         </button>
       </div>
     </div>
@@ -199,41 +199,36 @@ function OverallCard({ scan }) {
         pointerEvents: 'none',
       }} />
 
-      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
+      <div className="flex flex-col px-6 overflow-y-auto"
+           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
 
-        {/* Header — centered as a unit (logo badge, heading, date pill), distinct
-            from the OVERALL section/cards below which stay left-aligned. Centering
-            just the heading+pill and leaving the badge left would zigzag
-            left/center/center/left; grouping the whole hero block reads as one
-            intentional centered moment instead. */}
+        {/* ── Overall badge row — matches CardShell's icon+label pattern ─── */}
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center gap-3 mb-5"
-        >
-          <img src={logo} alt="" style={{ width: 26, height: 26, mixBlendMode: 'lighten', opacity: 0.85 }} />
-          <span className="font-heading font-bold text-[11px] tracking-[0.2em]" style={{ color: G }}>
-            ASCENDUS ANALYSIS
-          </span>
-        </motion.div>
-
-        {/* ── Overall label ─────────────────────────────────────────────────── */}
-        <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.14 }}
-          className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2 uppercase"
-          style={{ color: G }}
+          className="flex items-center gap-2.5 mb-6 flex-shrink-0"
         >
-          Overall
-        </motion.p>
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
+          >
+            <Star size={16} style={{ color: G }} />
+          </div>
+          <span
+            className="font-heading font-bold text-[10px] tracking-[0.22em]"
+            style={{ color: 'rgba(198,168,92,0.75)' }}
+          >
+            OVERALL
+          </span>
+        </motion.div>
 
         {/* ── Six locked metric cards — 2×3 grid, matching Card1Score ───────── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="grid grid-cols-2 gap-2.5 mb-5"
+          className="grid grid-cols-2 gap-2.5 mb-6"
         >
           {lockedMetrics.map(({ label, value, unit, pct }, i) => (
             <motion.div

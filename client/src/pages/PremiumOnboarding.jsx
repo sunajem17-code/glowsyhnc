@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Briefcase, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
-import { api } from '../utils/api'
+import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import TransformationScreen from '../components/TransformationScreen'
 import { StepRating, StepScoresWaiting } from '../components/OnboardingFinalSteps'
@@ -105,7 +105,7 @@ function BackBtn({ onBack }) {
       onClick={onBack}
       aria-label="Go back"
       className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
+      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
       <ChevronLeft size={18} style={{ color: DIM }} />
     </button>
@@ -343,7 +343,7 @@ function StepIntro({ onNext }) {
         transition={{ delay: 0.3, duration: 0.4 }}
         className="pb-10 pt-4"
       >
-        <GoldBtn label="Next →" onClick={onNext} />
+        <GoldBtn label="Next" onClick={onNext} />
       </motion.div>
     </div>
   )
@@ -418,7 +418,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onAppleSignIn, onDemo, appleEr
       </div>
 
       <div className="pb-10 pt-4 space-y-3">
-        <GoldBtn label="Create Account →" onClick={onCreateAccount} />
+        <GoldBtn label="Create Account" onClick={onCreateAccount} />
         {appleError ? <p className="text-center font-body text-[12px]" style={{ color: '#FF6B6B' }}>{appleError}</p> : null}
         {Capacitor.getPlatform() === 'ios' && (
           <button
@@ -563,29 +563,49 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
 }
 
 // ── STEP 1: Sign Up ───────────────────────────────────────────────────────────
-function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
-  const [showPw, setShowPw] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const setAuth = useStore(s => s.setAuth)
+function StepSignUp({ data, onChange, onNext, onBack, setAuthData, onAppleSignIn, appleSignedIn }) {
+  const navigate = useNavigate()
+  const [showPw, setShowPw]       = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
+  const [error, setError]         = useState('')
+  const setAuth        = useStore(s => s.setAuth)
   const setReferralCode = useStore(s => s.setReferralCode)
 
-  const valid = data.email?.trim() && data.password?.trim().length >= 8
+  const pw       = data.password || ''
+  const has8     = pw.length >= 8
+  const hasNum   = /\d/.test(pw)
+  const valid    = appleSignedIn
+    ? !!data.email?.trim()
+    : (!!data.email?.trim() && has8 && hasNum)
 
-  async function handleRegister() {
+  async function handleApple() {
+    if (!onAppleSignIn) return
+    setAppleLoading(true)
+    setError('')
+    try {
+      await onAppleSignIn()
+    } catch (err) {
+      setError(err.message || 'Apple Sign In failed. Please try again.')
+    } finally {
+      setAppleLoading(false)
+    }
+  }
+
+  async function handleContinue() {
     if (!valid) return
+    if (appleSignedIn) { onNext(); return }
     setError('')
     setLoading(true)
     try {
-      // Pass referral code if user arrived via a referral link (?ref=ASCXXXXX)
       const urlParams = new URLSearchParams(window.location.search)
-      const refCode = urlParams.get('ref')
+      const refCode  = urlParams.get('ref')
       const deviceId = await getDeviceId().catch(() => null)
       const res = await api.auth.register({
         email: data.email.trim(),
         password: data.password.trim(),
-        ...(refCode   ? { refCode }   : {}),
-        ...(deviceId  ? { deviceId }  : {}),
+        ...(refCode  ? { refCode }  : {}),
+        ...(deviceId ? { deviceId } : {}),
       })
       setAuth(res.user, res.token)
       setReferralCode(String(res.user.id).substring(0, 8).toUpperCase())
@@ -598,53 +618,214 @@ function StepSignUp({ data, onChange, onNext, onBack, setAuthData }) {
     }
   }
 
-  const inputStyle = {
+  const inputBase = {
     color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
-    borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
-    width: '100%', fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
+    borderWidth: 1, borderStyle: 'solid', borderRadius: 12,
+    padding: '14px 16px', width: '100%',
+    fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
   }
 
-  return (
-    <div className="flex flex-col h-full px-6">
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20 overflow-y-auto">
-        <h1 className="font-heading font-bold text-[28px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Create your account.
-        </h1>
-        <p className="font-body text-[13px] mb-6" style={{ color: DIM }}>Your journey starts here.</p>
+  const DOTS = 6
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Email</label>
-            <input type="email" placeholder="you@example.com" value={data.email || ''}
-              onChange={e => onChange('email', e.target.value)} style={inputStyle} />
+  return (
+    <div
+      className="px-5 overflow-y-auto"
+      style={{ background: BG, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 32 }}
+    >
+      {/* ── Top row: back btn + step dots ── */}
+      <div className="flex items-center justify-between mb-6">
+        {/* Back button — inline circle, not absolute */}
+        <button
+          onClick={onBack}
+          aria-label="Go back"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.06)' }}
+        >
+          <ChevronLeft size={18} style={{ color: DIM }} />
+        </button>
+
+        {/* Step dots */}
+        <div className="flex items-center gap-2">
+          {Array.from({ length: DOTS }).map((_, i) => (
+            <div key={i} style={{
+              width: i === 0 ? 20 : 6,
+              height: 6,
+              borderRadius: 999,
+              background: i === 0 ? G : 'rgba(255,255,255,0.2)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        {/* Right spacer to keep dots centered */}
+        <div style={{ width: 36 }} />
+      </div>
+
+      {/* ── Wordmark ── */}
+      <p
+        className="text-center font-heading font-bold tracking-[0.2em] mb-5"
+        style={{ color: G, fontSize: 11 }}
+      >
+        ASCENDUS
+      </p>
+
+      {/* ── Trust row ── */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        {[
+          { icon: <Shield size={12} />, label: 'Secure' },
+          { icon: <Zap size={12} />, label: '60 sec setup' },
+        ].map(({ icon, label }) => (
+          <div
+            key={label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+            style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <span style={{ color: G, display: 'flex' }}>{icon}</span>
+            <span className="font-body" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{label}</span>
           </div>
+        ))}
+      </div>
+
+      {/* ── Headline ── */}
+      <h1 className="font-heading font-bold mb-1" style={{ color: TEXT, fontSize: 28, letterSpacing: '-0.02em' }}>
+        Create your account.
+      </h1>
+      <p className="font-body mb-5" style={{ color: DIM, fontSize: 13 }}>Your journey starts here.</p>
+
+      {/* ── Form card ── */}
+      <div
+        className="rounded-2xl p-4 mb-4"
+        style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {/* Continue with Apple (iOS only) */}
+        {Capacitor.getPlatform() === 'ios' && (
+          <>
+            <button
+              onClick={handleApple}
+              disabled={appleLoading || appleSignedIn}
+              className="w-full rounded-xl font-heading font-bold flex items-center justify-center gap-2 mb-4"
+              style={{
+                background: appleSignedIn ? 'rgba(255,255,255,0.85)' : '#FFFFFF',
+                color: '#000000',
+                padding: '14px 16px',
+                fontSize: 15,
+                opacity: appleLoading ? 0.75 : 1,
+              }}
+            >
+              {appleLoading ? (
+                <Loader2 size={18} className="animate-spin" style={{ color: '#000' }} />
+              ) : appleSignedIn ? (
+                <Check size={16} style={{ color: '#000' }} />
+              ) : (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="black">
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.29.07 2.19.79 3.03.81.96-.04 1.87-.78 3.09-.83 1.42-.07 2.72.54 3.69 1.78a5.12 5.12 0 0 0-2.14 4.28c.07 2.04 1.22 3.87 3.23 4.82-.4 1.08-.94 2.13-1.9 3zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+              )}
+              {appleSignedIn ? 'Connected with Apple' : 'Continue with Apple'}
+            </button>
+
+            {/* OR divider */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+              <span className="font-body" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>OR</span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            </div>
+          </>
+        )}
+
+        {/* Email field */}
+        <div className="mb-3">
+          <label className="font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM, fontSize: 11 }}>
+            Email
+          </label>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={data.email || ''}
+            onChange={e => onChange('email', e.target.value)}
+            readOnly={appleSignedIn}
+            style={{
+              ...inputBase,
+              background: appleSignedIn ? 'rgba(255,255,255,0.04)' : SURFACE,
+              opacity: appleSignedIn ? 0.65 : 1,
+            }}
+          />
+        </div>
+
+        {/* Password field — hidden after Apple sign in */}
+        {!appleSignedIn && (
           <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Password</label>
-            <div className="relative">
-              <input type={showPw ? 'text' : 'password'} placeholder="Min. 8 characters"
-                value={data.password || ''} onChange={e => onChange('password', e.target.value)}
-                style={{ ...inputStyle, paddingRight: 48 }} />
-              <button type="button" onClick={() => setShowPw(v => !v)}
-                aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
-                className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
+            <label className="font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM, fontSize: 11 }}>
+              Password
+            </label>
+            <div className="relative mb-2">
+              <input
+                type={showPw ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                value={pw}
+                onChange={e => onChange('password', e.target.value)}
+                style={{ ...inputBase, paddingRight: 48 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(v => !v)}
+                aria-label={showPw ? 'Hide password' : 'Show password'}
+                className="absolute right-4 top-1/2 -translate-y-1/2"
+                style={{ color: DIM }}
+              >
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
+
+            {/* Live password requirements — only shown once user starts typing */}
+            {pw.length > 0 && (
+              <div className="space-y-1.5 mt-1">
+                {[
+                  { met: has8,   label: '8+ characters' },
+                  { met: hasNum, label: '1 number' },
+                ].map(({ met, label }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div style={{
+                      width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                      background: met ? 'rgba(52,199,89,0.15)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${met ? 'rgba(52,199,89,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {met && <Check size={8} style={{ color: '#34C759' }} />}
+                    </div>
+                    <span className="font-body" style={{ color: met ? '#34C759' : 'rgba(255,255,255,0.35)', fontSize: 11 }}>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        )}
 
-          {error && (
-            <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <p className="text-sm font-body" style={{ color: '#EF4444' }}>{error}</p>
-            </div>
-          )}
-        </div>
+        {/* Error */}
+        {error && (
+          <div className="mt-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <p className="font-body text-sm" style={{ color: '#EF4444' }}>{error}</p>
+          </div>
+        )}
       </div>
 
-      <div className="pb-10 pt-4">
-        <GoldBtn label={loading ? 'Creating account…' : 'Continue →'} onClick={handleRegister}
-          disabled={!valid} loading={loading} />
-      </div>
+      {/* ── Continue button ── */}
+      <GoldBtn
+        label={loading ? 'Creating account…' : 'Continue'}
+        onClick={handleContinue}
+        disabled={!valid}
+        loading={loading}
+      />
+
+      {/* ── Legal text ── */}
+      <p className="text-center font-body mt-4" style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11 }}>
+        By continuing you agree to our{' '}
+        <button onClick={() => navigate('/terms')} className="underline" style={{ color: 'rgba(198,168,92,0.65)' }}>Terms</button>
+        {' '}and{' '}
+        <button onClick={() => navigate('/privacy')} className="underline" style={{ color: 'rgba(198,168,92,0.65)' }}>Privacy Policy</button>
+      </p>
     </div>
   )
 }
@@ -675,9 +856,9 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
   ]
 
   return (
-    <div className="flex flex-col h-full px-6">
+    <div className="flex flex-col h-full">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col pt-20 overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
         <h1 className="font-heading font-bold text-[26px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Before you begin.
         </h1>
@@ -726,7 +907,7 @@ function StepConsent({ checks, onToggle, onNext, onBack }) {
       </div>
 
       <div className="pb-10 pt-2">
-        <GoldBtn label="I Agree, Continue →" onClick={handleAgree} disabled={!allChecked} />
+        <GoldBtn label="I Agree, Continue" onClick={handleAgree} disabled={!allChecked} />
       </div>
     </div>
   )
@@ -737,11 +918,6 @@ function StepName({ data, onChange, onNext, onBack, skipForApple }) {
   // Apple already provided identity — advance immediately without showing the form
   useEffect(() => { if (skipForApple) onNext() }, [skipForApple])
   if (skipForApple) return null
-  const inputStyle = {
-    color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
-    borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
-    width: '100%', fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
-  }
 
   // Best-effort — the name isn't critical-path, so a network hiccup here
   // should never block onboarding. Advance regardless of outcome.
@@ -756,25 +932,83 @@ function StepName({ data, onChange, onNext, onBack, skipForApple }) {
   }
 
   return (
-    <div className="flex flex-col h-full px-6">
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
-        <h1 className="font-heading font-bold text-[28px] mb-2 text-center" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+    <div className="flex flex-col h-full" style={{ background: BG }}>
+      {/* ── Top row: back btn + step dots ── */}
+      <div
+        className="flex items-center justify-between px-5 flex-shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 12 }}
+      >
+        <button
+          onClick={onBack}
+          aria-label="Go back"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.06)' }}
+        >
+          <ChevronLeft size={18} style={{ color: DIM }} />
+        </button>
+
+        {/* Step dots — 5 dots, dot 2 active (gold pill) */}
+        <div className="flex items-center gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{
+              width: i === 1 ? 20 : 6,
+              height: 6,
+              borderRadius: 999,
+              background: i === 1 ? G : 'rgba(255,255,255,0.2)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        <div style={{ width: 36 }} />
+      </div>
+
+      {/* ── Content ── */}
+      <div className="flex flex-col px-6 overflow-y-auto"
+           style={{ paddingTop: 40 }}>
+        {/* Step tag */}
+        <p className="font-heading font-bold text-[10px] tracking-[0.22em] text-center mb-4"
+           style={{ color: G }}>
+          STEP 2 OF 5
+        </p>
+
+        <h1 className="font-heading font-bold text-[28px] mb-2 text-center"
+            style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           What's your name?
         </h1>
         <p className="font-body text-[13px] mb-8 text-center" style={{ color: DIM }}>
           We'll use this to personalize your results.
         </p>
-        <input
-          type="text"
-          placeholder="Your name"
-          value={data.name || ''}
-          onChange={e => onChange('name', e.target.value)}
-          style={inputStyle}
-        />
-      </div>
-      <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={handleContinue} disabled={!data.name?.trim()} />
+
+        {/* Input with person icon */}
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+            <User size={16} style={{ color: 'rgba(198,168,92,0.55)' }} />
+          </div>
+          <input
+            type="text"
+            placeholder="Your name"
+            value={data.name || ''}
+            onChange={e => onChange('name', e.target.value)}
+            style={{
+              color: TEXT,
+              borderColor: 'rgba(255,255,255,0.12)',
+              background: SURFACE,
+              borderWidth: 1,
+              borderStyle: 'solid',
+              borderRadius: 12,
+              padding: '14px 16px 14px 42px',
+              width: '100%',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 14,
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        <div className="mt-5">
+          <GoldBtn label="Continue" onClick={handleContinue} disabled={!data.name?.trim()} />
+        </div>
       </div>
     </div>
   )
@@ -829,7 +1063,7 @@ function StepGender({ data, onChange, onNext, onBack }) {
         </div>
       </div>
       <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} disabled={!data.gender} />
+        <GoldBtn label="Continue" onClick={onNext} disabled={!data.gender} />
       </div>
     </div>
   )
@@ -898,7 +1132,7 @@ function StepGoal({ data, onChange, onNext, onBack }) {
         })}
       </div>
       <div className="pb-10 pt-4">
-        <GoldBtn label="Continue →" onClick={onNext} disabled={!data.goal} />
+        <GoldBtn label="Continue" onClick={onNext} disabled={!data.goal} />
       </div>
     </div>
   )
@@ -985,7 +1219,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
       </div>
 
       <div className="pb-10 pt-4">
-        <GoldBtn label="Continue →" onClick={onNext} disabled={selected.length === 0} />
+        <GoldBtn label="Continue" onClick={onNext} disabled={selected.length === 0} />
       </div>
     </div>
   )
@@ -1084,7 +1318,7 @@ function StepSocialProof({ onNext, onBack }) {
 
       {/* CTA */}
       <div className="px-6 pb-10 pt-3 flex-shrink-0">
-        <GoldBtn label="Continue →" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -1132,7 +1366,7 @@ function StepHeight({ data, onChange, onNext, onBack, units }) {
         </div>
       </div>
       <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -1178,7 +1412,7 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
         </div>
       </div>
       <div className="pb-10">
-        <GoldBtn label="Continue →" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -1315,7 +1549,7 @@ function StepBMI({ data, onNext, onBack }) {
             NIH Body Mass Index tables
           </a>.
         </p>
-        <GoldBtn label="Continue →" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -1330,6 +1564,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
+  const [quotaExhausted, setQuotaExhausted] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
   const [arScanDone, setArScanDone]         = useState(false)
@@ -1414,11 +1649,13 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       let aiResult
       try {
+        setScanInFlight(true)
         aiResult = await Promise.race([
           api.ai.score({ faceImage: faceB64, sideImage: sideB64, gender: gender || 'male' }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)),
         ])
       } finally {
+        setScanInFlight(false)
         clearInterval(stageTimer)
         clearTimeout(slowTimer)
         setSlowAnalysis(false)
@@ -1457,18 +1694,23 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
       onDone(scanRecord)
     } catch (err) {
-      console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status)
-      const m = (err.message || '').toLowerCase()
-      const isRateLimit = err.message === 'rate_limited' || err.status === 429
-        || m.includes('quota') || m.includes('exceeded') || m.includes('rate limit')
-        || m.includes('rate_limit') || m.includes('too many') || m.includes('overloaded')
-        || m.includes('capacity') || m.includes('credit') || m.includes('high demand')
-      if (isRateLimit) {
-        retrySideRef.current = side
+      console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
+      retrySideRef.current = side
+      const code = err.errorCode || ''
+      if (code === 'hourly_cap_reached') {
+        // Per-user daily/hourly quota exhausted — retrying in 30s won't help.
+        setQuotaExhausted(true)
+        setRateLimited(false)
+        setPhase('retry_error')
+      } else if (code === 'claude_rate_limited' || err.status === 429) {
+        // True server-side load — auto-retry after the indicated window.
+        setQuotaExhausted(false)
         setRateLimited(true)
         setRetryCountdown(err.retryAfter || 30)
         setPhase('retry_error')
       } else {
+        setQuotaExhausted(false)
+        setRateLimited(false)
         setError(err.message || 'Something went wrong, please try again.')
         setPhase('retry_error')
       }
@@ -1479,7 +1721,18 @@ function StepScanCapture({ gender, onDone, onBack }) {
     return (
       <div className="flex flex-col h-full items-center justify-center px-8" style={{ background: BG }}>
         <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-          {rateLimited ? (
+          {quotaExhausted ? (
+            <>
+              <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Daily scan limit reached</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day. Upgrade to Ascendus Pro for unlimited scans.</p>
+              <button
+                onClick={onAscend}
+                className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
+                style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}>
+                Upgrade to Pro
+              </button>
+            </>
+          ) : rateLimited ? (
             <>
               <div className="relative w-20 h-20">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
@@ -1508,7 +1761,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
           ) : (
             <>
               <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Something went wrong</p>
-              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>{error || "We're experiencing high demand. Please try again in 30 seconds."}</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>{error || 'Please try again.'}</p>
               <button
                 onClick={() => { setError(''); runAnalysisWithData(facePhoto, retrySideRef.current) }}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
@@ -1540,16 +1793,13 @@ function StepScanCapture({ gender, onDone, onBack }) {
     return (
       <div className="flex flex-col h-full px-6" style={{ background: BG }}>
         <BackBtn onBack={() => { setPhase('face'); setError('') }} />
-        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 104px)' }}>
+        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
             STEP 2 OF 2
           </p>
-          <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
             Now, your side profile.
           </h1>
-          <p className="font-body text-[13px]" style={{ color: DIM }}>
-            Turn 90° to your right · Chin level · Same lighting
-          </p>
         </div>
 
         {error && (
@@ -1570,7 +1820,7 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
         <div className="pb-10 pt-2 flex flex-col gap-3">
           <GoldBtn
-            label={sidePhoto ? 'Analyze My Results →' : 'Upload or Take a Side Photo'}
+            label={sidePhoto ? 'Analyze My Results' : 'Begin Scan'}
             onClick={() => runAnalysisWithData(facePhoto, sidePhoto)}
             disabled={!sidePhoto}
           />
@@ -1588,29 +1838,28 @@ function StepScanCapture({ gender, onDone, onBack }) {
 
   // phase === 'face'
   return (
-    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+    <div className="flex flex-col h-full" style={{ background: '#080808' }}>
       <BackBtn onBack={onBack} />
-      <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
+      <div className="px-6 pb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
           STEP 1 OF 2
         </p>
-        <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Take your front photo.
         </h1>
-        <p className="font-body text-[13px]" style={{ color: DIM }}>
-          Front-facing · Neutral expression · Good lighting · No hat or glasses
-        </p>
+        {/* subtext lives inside the card gradient */}
       </div>
 
       {error && (
-        <div className="mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+        <div className="mx-6 mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
           <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{error}</p>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 px-3 pb-3">
         <PhotoUploadStep
           stepNum={1}
+          heroLayout
           guide={null}
           photo={facePhoto}
           onPhoto={(url) => { setFacePhoto(url); setError('') }}
@@ -1623,15 +1872,11 @@ function StepScanCapture({ gender, onDone, onBack }) {
         />
       </div>
 
-      {/* Only rendered once a photo exists — PhotoUploadStep's own "Upload or
-          Take a Selfie" pill already prompts for the photo itself, so a
-          second disabled prompt here was a redundant duplicate. This button's
-          real job is advancing to the side-profile phase, which nothing else
-          on this screen does. */}
+      {/* Continue — only appears after photo is captured; advances to side-profile phase */}
       {facePhoto && (
-        <div className="pb-10 pt-2">
+        <div className="px-6 pb-10 pt-2">
           <GoldBtn
-            label="Continue →"
+            label="Continue"
             onClick={() => { arScanDone ? runAnalysisWithData(facePhoto, null) : (setPhase('side'), setError('')) }}
           />
         </div>
@@ -2245,6 +2490,50 @@ export default function PremiumOnboarding() {
     }
   }
 
+  // Variant used by StepSignUp: does auth + pre-fills email but does NOT advance
+  // the step. Continue button in StepSignUp calls onNext() directly once auth is done.
+  async function handleAppleSignInForSignup() {
+    if (!Capacitor.isNativePlatform()) return
+    const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+    const result = await SignInWithApple.authorize({
+      clientId: 'com.ascendus.app',
+      redirectURI: 'https://ascendus.store/auth/apple/callback',
+      scopes: 'email name',
+      state: Date.now().toString(),
+      nonce: Math.random().toString(36).substring(2, 15),
+    })
+    const token = result?.response?.identityToken
+    if (!token) throw new Error('No identity token returned')
+
+    const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+    const res = await fetch(`${API_BASE}/api/auth/apple`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identityToken: token,
+        user: result.response.user,
+        email: result.response.email,
+        fullName: result.response.fullName,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Authentication failed')
+
+    setAuth(data.user, data.token)
+    setAuthData({ userId: data.user.id, token: data.token })
+
+    const givenName  = result.response.fullName?.givenName  || ''
+    const familyName = result.response.fullName?.familyName || ''
+    const appleName  = [givenName, familyName].filter(Boolean).join(' ')
+    if (appleName) updateField('name', appleName)
+
+    const email = data.user.email || result.response.email || ''
+    if (email) updateField('email', email)
+
+    setAppleSignedIn(true)
+    // Does NOT call goNext() — StepSignUp's Continue button does that
+  }
+
   // Flow: 0=intro, 1=welcome, 2=signup, 3=consent, 4=name, 5=gender, 6=goal,
   //       7=scan(face+side), 8=transformation, 9=rating,
   //       10=scores-waiting (real score + tier + growth area + celeb match + locked
@@ -2264,6 +2553,8 @@ export default function PremiumOnboarding() {
     />,
     <StepSignUp key="signup" data={formData} onChange={updateField}
       onNext={goNext} onBack={goBack} setAuthData={setAuthData}
+      onAppleSignIn={handleAppleSignInForSignup}
+      appleSignedIn={appleSignedIn}
     />,
     <StepConsent key="consent" checks={checks} onToggle={toggleCheck}
       onNext={goNext} onBack={goBack}

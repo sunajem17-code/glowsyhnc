@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import { Lock, Eye, Smile, ScanFace, Scissors, Layers } from 'lucide-react'
-import logo from '../assets/ascendus-icon.png'
 import { GOLD, EASE_STANDARD } from '../utils/theme'
 
 // Extracted out of ScanUnlockGate.jsx so this can be statically imported by
@@ -18,18 +17,9 @@ const DIM  = 'var(--text-secondary)'
 
 export function CardShell({ badge, icon: Icon, children }) {
   return (
-    // Outer: full height, clips overflow for scroll, applies safe-area at top
     <div className="h-full flex flex-col overflow-y-auto"
-         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0px)' }}>
-      {/* Single centered block — branding + badge + content all centered together */}
-      <div className="flex-1 flex flex-col justify-center px-6 pb-2">
-        {/* Branding — in the middle of the card, not pinned to top */}
-        <div className="flex items-center justify-center gap-2 mb-5 flex-shrink-0">
-          <img src={logo} alt="" style={{ width: 18, height: 18, mixBlendMode: 'lighten', opacity: 0.65 }} />
-          <span className="font-heading font-bold text-[9px] tracking-[0.24em]" style={{ color: 'rgba(198,168,92,0.45)' }}>
-            ASCENDUS
-          </span>
-        </div>
+         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
+      <div className="flex flex-col px-6 pb-2">
         {/* Badge row */}
         <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
           <div
