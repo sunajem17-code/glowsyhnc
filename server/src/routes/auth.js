@@ -135,7 +135,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // ── POST /api/auth/apple ──────────────────────────────────────────────────────
 router.post('/apple', authLimiter, async (req, res) => {
-  const { identityToken, name, email } = req.body
+  const { identityToken, name, email, guestUserId } = req.body
   if (!identityToken) return res.status(400).json({ error: 'identityToken required' })
 
   let payload
@@ -172,14 +172,29 @@ router.post('/apple', authLimiter, async (req, res) => {
         if (!existing.apple_sub) {
           await sb.from('users').update({ apple_sub: appleSub }).eq('id', existing.id)
         }
+        // Migrate any scan history from the guest session to the real account
+        if (guestUserId && guestUserId !== existing.id) {
+          await sb.from('scan_history').update({ user_id: existing.id }).eq('user_id', guestUserId).catch(() => {})
+          await sb.from('users').delete().eq('id', guestUserId).eq('is_guest', true).catch(() => {})
+        }
         const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at, isAppleUser: true }
         return res.json({ user: safe, token: signToken(existing.id, existing.email) })
       }
 
-      // Create new user
-      const id = uuid()
+      // Create new user — if a guest session exists, reuse its ID so all scan
+      // records written under that ID automatically belong to the real account.
+      const id = guestUserId || uuid()
       const userName = name || 'Ascendus User'
       const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      if (guestUserId) {
+        // Upgrade the guest row in-place rather than creating a new one
+        await sb.from('users').update({
+          email: appleEmail, name: userName, apple_sub: appleSub,
+          is_guest: false, referral_code: ownCode,
+        }).eq('id', guestUserId).eq('is_guest', true)
+        const safe = { id: guestUserId, name: userName, email: appleEmail, subscriptionTier: 'free', createdAt: new Date().toISOString(), isAppleUser: true }
+        return res.json({ user: safe, token: signToken(guestUserId, appleEmail) })
+      }
       const newUser = await createUser({
         id, email: appleEmail, name: userName,
         password_hash: null, apple_sub: appleSub,
@@ -203,6 +218,58 @@ router.post('/apple', authLimiter, async (req, res) => {
     return res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
     console.error('[Auth] Apple sign in error:', err.message)
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// ── POST /api/auth/guest ──────────────────────────────────────────────────────
+// Creates an anonymous guest identity so the scan/AI-score step has a valid
+// JWT before the user authenticates with Apple at the paywall.
+// The guest row is marked is_guest=true and has no email or password.
+// Rate-limited to 20/hour per IP to prevent spam account creation.
+const checkGuestLimit = createLimiter('guest', 20, '1 h', 60 * 60 * 1000)
+router.post('/guest', async (req, res) => {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+  const allowed = await checkGuestLimit(ip)
+  if (!allowed) return res.status(429).json({ error: 'Too many requests' })
+
+  try {
+    const id = uuid()
+    const sb = getSupabase()
+
+    if (sb) {
+      const { error: insertErr } = await sb.from('users').insert({
+        id,
+        email:             `guest-${id}@ascendus.internal`,
+        name:              'Guest',
+        password_hash:     null,
+        apple_sub:         null,
+        referral_code:     `GST${id.substring(0, 5).toUpperCase()}`,
+        referral_count:    0,
+        subscription_tier: 'free',
+        is_guest:          true,
+        created_at:        new Date().toISOString(),
+      })
+      if (insertErr) {
+        console.error('[Auth] Guest insert failed:', insertErr.message)
+        return res.status(500).json({ error: 'internal_error' })
+      }
+    } else {
+      // SQLite fallback — is_guest column may not exist in local schema; use name sentinel
+      try {
+        db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)')
+          .run(id, '__guest__', null, null, '', `GST${id.substring(0, 5).toUpperCase()}`, 'free', new Date().toISOString())
+      } catch {
+        // If email column has NOT NULL constraint in local SQLite, use placeholder
+        db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)')
+          .run(id, '__guest__', `guest-${id}@ascendus.internal`, null, '', `GST${id.substring(0, 5).toUpperCase()}`, 'free', new Date().toISOString())
+      }
+    }
+
+    const token = signToken(id, null)
+    res.json({ userId: id, token, isGuest: true })
+  } catch (err) {
+    console.error('[Auth] Guest session error:', err.message)
     res.status(500).json({ error: 'internal_error' })
   }
 })

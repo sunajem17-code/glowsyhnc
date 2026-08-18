@@ -16,7 +16,6 @@ import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
 import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
-import { startFaceScan } from '../utils/faceScan'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -269,92 +268,52 @@ function PhotoActionSheet({ options, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScanDone = false, onLiveScan = null, arScanSkipped = false, onSkipScan = null, onScanningChange = null, heroLayout = false }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLayout = false, autoOpen = false, triggerRef }) {
   const uploadRef = useRef()
+  const cameraInFlight = useRef(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
-  const [showActionSheet, setShowActionSheet] = useState(false)
-  const [showScanOverlay, setShowScanOverlay] = useState(false)
-  const prevPhotoRef = useRef(photo)
-  const skipRequestedRef = useRef(false)
+  const [showActionSheet, setShowActionSheet] = useState(autoOpen)
 
-  // TrueDepth-capable devices chain straight into the live scan after capture
-  // instead of requiring a separate manual "Live Face Scan" tap. Web and
-  // non-TrueDepth devices are untouched — onLiveScan is only ever passed
-  // truthy where the native scan can actually run, and isNative() gates out
-  // the web build regardless.
-  const canAutoLiveScan = stepNum === 1 && isNative() && !!onLiveScan
-
-  // Decorative-only on non-auto-scan devices — plays once every time a new
-  // face photo (step 1) lands, including retakes. No real face detection
-  // involved. On TrueDepth-capable devices, this same overlay/state now also
-  // carries the "Now scanning…" transition into the actual live scan below.
   useEffect(() => {
-    const justCaptured = stepNum === 1 && photo && photo !== prevPhotoRef.current
-    prevPhotoRef.current = photo
-    if (!justCaptured) return
-
-    setShowScanOverlay(true)
-
-    if (!canAutoLiveScan) {
-      const t = setTimeout(() => setShowScanOverlay(false), 1800)
-      return () => clearTimeout(t)
-    }
-
-    // Short lead-in so "Now scanning your facial structure…" is actually
-    // readable before the native fullscreen modal takes over — the modal
-    // itself covers the whole screen, so nothing web-rendered needs to keep
-    // pace with it once it's open. onScanningChange tells the parent a scan
-    // is genuinely in flight — arScanDone alone can't be used for this,
-    // since a retake leaves the *previous* scan's arScanDone=true stale
-    // until this new one resolves (retaking a photo intentionally doesn't
-    // clear an already-completed scan).
-    skipRequestedRef.current = false
-    onScanningChange?.(true)
-    ;(async () => {
-      await new Promise(r => setTimeout(r, 700))
-      if (skipRequestedRef.current) return
-      await onLiveScan()
-      setShowScanOverlay(false)
-      onScanningChange?.(false)
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photo, stepNum])
-
-  function handleSkipDuringScan() {
-    skipRequestedRef.current = true
-    setShowScanOverlay(false)
-    onScanningChange?.(false)
-    onSkipScan?.()
-  }
+    if (triggerRef) triggerRef.current = () => setShowActionSheet(true)
+  }, [triggerRef])
 
   async function handleCameraClick() {
-    if (isNative()) {
-      try {
+    if (cameraInFlight.current) return
+    cameraInFlight.current = true
+    try {
+      if (isNative()) {
         const dataUrl = await takePhoto()
         if (dataUrl) onPhoto(dataUrl, dataUrl)
-      } catch (err) {
-        if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-          setError('Camera error: ' + (err?.message || 'Unknown error'))
-        }
+      } else {
+        setCameraOpen(true)
       }
-    } else {
-      setCameraOpen(true)
+    } catch (err) {
+      if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
+        setError('Camera error: ' + (err?.message || 'Unknown error'))
+      }
+    } finally {
+      cameraInFlight.current = false
     }
   }
 
   async function handleUploadClick() {
-    if (isNative()) {
-      try {
+    if (cameraInFlight.current) return
+    cameraInFlight.current = true
+    try {
+      if (isNative()) {
         const dataUrl = await pickPhoto()
         if (dataUrl) onPhoto(dataUrl, dataUrl)
-      } catch (err) {
-        if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-          setError('Photo error: ' + (err?.message || 'Unknown error'))
-        }
+      } else {
+        uploadRef.current?.click()
       }
-    } else {
-      uploadRef.current?.click()
+    } catch (err) {
+      if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
+        setError('Photo error: ' + (err?.message || 'Unknown error'))
+      }
+    } finally {
+      cameraInFlight.current = false
     }
   }
 
@@ -377,60 +336,20 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
             <>
               <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-contain" />
               <div className="absolute inset-0 bg-black/20" />
-              <AnimatePresence>
-                {showScanOverlay && (
-                  <>
-                    <FaceScanOverlay />
-                    {canAutoLiveScan && (
-                      <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3, ease: EASE_STANDARD }}
-                        className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-6 pointer-events-auto"
-                      >
-                        <p className="font-heading font-bold text-[13px] text-center" style={{ color: 'white', textShadow: '0 1px 6px rgba(0,0,0,0.85)' }}>
-                          Now scanning your facial structure…
-                        </p>
-                        <button onClick={handleSkipDuringScan} className="text-[11px] font-body underline active:opacity-60 transition-opacity" style={{ color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
-                          Skip: use photo only
-                        </button>
-                      </motion.div>
-                    )}
-                  </>
-                )}
-              </AnimatePresence>
-              {/* Retake stays overlaid on photo — face is hidden at this point anyway */}
-              {!showScanOverlay && (
-                <div
-                  className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 pt-16 pointer-events-none"
-                  style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.85) 60%)' }}
+              {/* Retake overlaid on photo */}
+              <div
+                className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 pt-16 pointer-events-none"
+                style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.85) 60%)' }}
+              >
+                <button
+                  onClick={() => setShowActionSheet(true)}
+                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
                 >
-                  <button
-                    onClick={() => setShowActionSheet(true)}
-                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
-                  >
-                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
-                  </button>
-                  {!arScanDone && !arScanSkipped && onSkipScan && (
-                    <button
-                      onClick={onSkipScan}
-                      className="mt-1 text-[11px] font-body underline active:opacity-60 transition-opacity pointer-events-auto"
-                      style={{ color: 'rgba(255,255,255,0.35)' }}
-                    >
-                      Skip Live Face Scan: use photo only
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          ) : arScanDone ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
-                <CheckCircle2 size={32} style={{ color: 'cyan' }} />
+                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
+                </button>
               </div>
-              <p className="text-cyan-400 text-sm font-heading font-bold text-center">Live Face Scan Complete</p>
-              <p className="text-white/50 text-[11px] font-body text-center">Geometry captured · Take a photo too, both are required</p>
-            </div>
+            </>
           ) : (
             /* Guide image — no overlay, full face visible */
             <img
@@ -442,7 +361,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
         </div>
 
         {/* Begin Scan button — below card so it never overlaps the face */}
-        {!photo && !arScanDone && !showScanOverlay && (
+        {!photo && (
           <div className="mt-5">
             <button
               onClick={() => setShowActionSheet(true)}
@@ -526,53 +445,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
                 <CheckCircle2 size={30} className="text-white" />
               </div>
             </div>
-            {stepNum === 1 && (
-              <AnimatePresence>
-                {showScanOverlay && (
-                  <>
-                    <FaceScanOverlay />
-                    {canAutoLiveScan && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3, ease: EASE_STANDARD }}
-                        className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-6 pointer-events-auto"
-                      >
-                        <p
-                          className="font-heading font-bold text-[13px] text-center"
-                          style={{ color: 'white', textShadow: '0 1px 6px rgba(0,0,0,0.85)' }}
-                        >
-                          Now scanning your facial structure…
-                        </p>
-                        <button
-                          onClick={handleSkipDuringScan}
-                          className="text-[11px] font-body underline active:opacity-60 transition-opacity"
-                          style={{ color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}
-                        >
-                          Skip: use photo only
-                        </button>
-                      </motion.div>
-                    )}
-                  </>
-                )}
-              </AnimatePresence>
-            )}
           </>
-        ) : (stepNum === 1 || stepNum === 2) && arScanDone ? (
-          <div className="flex flex-col items-center gap-3 p-8">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,255,255,0.12)', border: '2px solid cyan' }}>
-              <CheckCircle2 size={32} style={{ color: 'cyan' }} />
-            </div>
-            <p className="text-cyan-400 text-sm font-heading font-bold text-center">
-              {stepNum === 1 ? 'Live Face Scan Complete' : 'Carried Over From Face Photo Step'}
-            </p>
-            <p className="text-white/50 text-[11px] font-body text-center">
-              {stepNum === 1
-                ? 'Geometry captured · Take a photo too, both are required'
-                : "This is your scan from the Face Photo step, not a new one. ARKit can't track a real 90° turn, so one scan covers both. Just add a photo below."}
-            </p>
-          </div>
         ) : stepNum === 2 ? (
           <img
             src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
@@ -624,102 +497,31 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, arScan
 
       <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
-      {/* Live Face Scan is the standard/primary capture method on the face
-          step (1) only — a TrueDepth capture there already covers profile
-          geometry too (ARKit can't reliably track a real 90° head turn, so
-          facial angle/gonial angle/etc. are derived from this same
-          front-facing capture). Offering the button again on the Side
-          Profile step just invited people to turn 90° before tapping it,
-          which broke tracking — so step 2 only ever needs a photo now, no
-          separate scan action. */}
       {stepNum !== 2 && (
-        canAutoLiveScan ? (
-          <div className="mb-1">
-            {!showScanOverlay && (
-              !photo && !arScanDone ? (
-                <button
-                  onClick={() => setShowActionSheet(true)}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-                  style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-                >
-                  <Camera size={18} style={{ color: '#0A0A0A' }} />
-                  <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-                    Upload or Take a Selfie
-                  </span>
-                </button>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5">
-                  <button
-                    onClick={() => setShowActionSheet(true)}
-                    className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity"
-                  >
-                    <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                    <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      Retake Photo
-                    </span>
-                  </button>
-                  {!arScanDone && !arScanSkipped && onSkipScan && (
-                    <button
-                      onClick={onSkipScan}
-                      className="text-[11px] font-body underline active:opacity-60 transition-opacity"
-                      style={{ color: 'rgba(255,255,255,0.35)' }}
-                    >
-                      Skip Live Face Scan: use photo only
-                    </button>
-                  )}
-                </div>
-              )
-            )}
-            <AnimatePresence>
-              {showActionSheet && (
-                <PhotoActionSheet
-                  onClose={() => setShowActionSheet(false)}
-                  options={[
-                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-                  ]}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="mb-1">
-            <button
-              onClick={() => setShowActionSheet(true)}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-              style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-            >
-              <Camera size={18} style={{ color: '#0A0A0A' }} />
-              <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-                {photo || arScanDone ? 'Retake Selfie' : 'Upload or Take a Selfie'}
-              </span>
-            </button>
-            {photo && !arScanDone && !arScanSkipped && onSkipScan && (
-              <button
-                onClick={onSkipScan}
-                className="w-full mt-2.5 flex items-center justify-center gap-2 active:opacity-70 transition-opacity"
-                style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', borderRadius: 10, padding: '10px 14px' }}
-              >
-                <SkipForward size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
-                <span className="font-heading text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Skip Live Face Scan: use photo only
-                </span>
-              </button>
-            )}
-            <AnimatePresence>
-              {showActionSheet && (
-                <PhotoActionSheet
-                  onClose={() => setShowActionSheet(false)}
-                  options={[
-                    { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                    { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-                  ]}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        )
+        <div className="mb-1">
+          <button
+            onClick={() => setShowActionSheet(true)}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
+            style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+          >
+            <Camera size={18} style={{ color: '#0A0A0A' }} />
+            <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
+              {photo ? 'Retake Selfie' : 'Upload or Take a Selfie'}
+            </span>
+          </button>
+        </div>
       )}
+      <AnimatePresence>
+        {showActionSheet && (
+          <PhotoActionSheet
+            onClose={() => setShowActionSheet(false)}
+            options={[
+              { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
+              { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
+            ]}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -994,8 +796,6 @@ export default function Scan() {
   const incrementScanCount = useStore(s => s.incrementScanCount)
   const setAssignedPhase  = useStore(s => s.setAssignedPhase)
   const setLastScanDate   = useStore(s => s.setLastScanDate)
-  const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
-  const lastFaceScanImage = useStore(s => s.lastFaceScanImage)
   const logout            = useStore(s => s.logout)
 
   // Monthly scan gate for free users
@@ -1011,11 +811,6 @@ export default function Scan() {
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
-  const [faceMetrics, setFaceMetrics]     = useState(null)   // ARKit geometry results
-  const [arScanDone, setArScanDone]       = useState(false)  // true when ARKit replaced photo
-  const [arScanSkipped, setArScanSkipped] = useState(false)  // user opted out of Live Face Scan after uploading/taking a static photo
-  const [faceScanBusy, setFaceScanBusy]   = useState(false)  // PhotoUploadStep's auto-live-scan chain is genuinely in flight
-  const geometrySatisfied = arScanDone || arScanSkipped
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
   const [error, setError]                 = useState('')
@@ -1084,55 +879,12 @@ export default function Scan() {
     return Promise.race([convert, timeout])
   }
 
-  async function handleLiveScan() {
-    const result = await startFaceScan()
-    if (!result.supported) {
-      if (result.nativeError) {
-        // The native plugin call itself failed — this is a build/wiring issue,
-        // not a hardware limitation. Don't tell the user their phone is unsupported.
-        console.error('[Scan] FaceScanPlugin call failed (not a hardware issue):', result.message)
-        setError('Live face scan couldn’t start due to an app error. Try closing and reopening the app, or reinstalling it.')
-      } else {
-        setError('Live face scan requires a device with a TrueDepth camera (iPhone X or later).')
-      }
-      return
-    }
-    if (result.cancelled) return
-
-    // IMPORTANT: strip the large capturedImage/landmarks2D fields out before
-    // this goes anywhere near faceMetrics state — faceMetrics ends up on
-    // scanRecord.faceMetrics, which ends up in currentScan, which IS
-    // persisted to localStorage (see useStore.js partialize). Embedding the
-    // photo there would reintroduce the exact quota bug we already fixed
-    // once this session, just through a different path. Numbers only here.
-    const { capturedImage, landmarks2D, ...metricsOnly } = result
-    setFaceMetrics(metricsOnly)
-    setArScanDone(true)
-    setArScanSkipped(false) // a real scan just happened, any earlier skip no longer applies
-    setError('')
-
-    // Photo + 2D landmark positions go to session-only store state instead
-    // (NOT persisted — see setLastFaceScanCapture's comment in useStore.js)
-    // so the interactive "tap a stat, see it on your face" UI in Progress
-    // can use them without touching localStorage at all.
-    if (capturedImage && landmarks2D) {
-      setLastFaceScanCapture(capturedImage, landmarks2D)
-    }
-  }
-
-  // Step 1 has no separate "Continue" button anymore — PhotoUploadStep's own
-  // capture + auto-live-scan chain already gets facePhoto/geometrySatisfied
-  // to true on its own, so this just advances once both are set. Gated on
-  // !faceScanBusy specifically because arScanDone is deliberately NOT reset
-  // on a retake (an already-completed scan stays valid until a fresh one
-  // actually resolves) — so geometrySatisfied can read stale-true for the
-  // whole span of a retake's own auto-triggered rescan. Without this gate,
-  // that staleness would auto-advance to step 2 mid-rescan.
+  // Auto-advance from face photo step to side profile once facePhoto is set
   useEffect(() => {
-    if (step !== 1 || !facePhoto || !geometrySatisfied || faceScanBusy) return
-    const t = setTimeout(() => { arScanDone ? startAnalysisRef.current?.(true) : (setStep(2), setError('')) }, 900)
+    if (step !== 1 || !facePhoto) return
+    const t = setTimeout(() => { setStep(2); setError('') }, 600)
     return () => clearTimeout(t)
-  }, [step, facePhoto, geometrySatisfied, faceScanBusy])
+  }, [step, facePhoto])
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false) {
@@ -1146,8 +898,7 @@ export default function Scan() {
     setAnalysisStep(0)
 
     try {
-      const usingARKit = arScanDone && !facePhoto
-      const faceB64    = usingARKit ? null : await toBase64(facePhoto)
+      const faceB64    = await toBase64(facePhoto)
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
@@ -1170,26 +921,7 @@ export default function Scan() {
       const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       let aiResult
-      if (usingARKit) {
-        // ARKit-only path: derive score from live symmetry geometry (0-100 → 0-10)
-        clearInterval(stageTimer)
-        clearTimeout(slowTimer)
-        setSlowAnalysis(false)
-        const sym   = (faceMetrics?.symmetryScore ?? 50) / 10
-        const score = Math.round(Math.min(9.5, Math.max(1.0, sym)) * 10) / 10
-        const tier  = getTier(score, g)
-        aiResult = {
-          overallScore:    score,
-          faceScore:       score,
-          faceOnlyScore:   score,
-          groomingScore:   null,
-          tier:            tier.label,
-          hasSideProfile:  false,
-          faceSubScores:   { symmetry: score, jawlineDefinition: null, skinClarity: null, facialProportions: null, eyeArea: null, facialHarmony: null },
-          pillars:         null,
-          insights:        ['Score derived from live TrueDepth face geometry. Take a photo scan for full AI analysis.'],
-        }
-      } else if (token === 'demo-token') {
+      if (token === 'demo-token') {
         // Demo users: return mock results instead of hitting the backend
         await new Promise(r => setTimeout(r, 2500))
         clearInterval(stageTimer)
@@ -1281,8 +1013,6 @@ export default function Scan() {
         // follow-up request (see below); absent/undefined for demo/ARKit
         // scans, which never produce extended metrics at all.
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
-        // ARKit live scan geometry — present when user used TrueDepth face scan
-        faceMetrics:      faceMetrics ?? undefined,
         // Real, on-device Vision-framework geometry (side-profile landmarks)
         // — present only when detection actually succeeded with adequate
         // confidence. Same "measure, don't guess" principle as faceMetrics
@@ -1329,7 +1059,7 @@ export default function Scan() {
       // get a real thumbnail.
       ;(async () => {
         let faceImageUrl = null
-        const photoForUpload = faceB64 || (usingARKit ? lastFaceScanImage : null)
+        const photoForUpload = faceB64
         if (photoForUpload) {
           try {
             const commaIdx = photoForUpload.indexOf(',')
@@ -1477,7 +1207,7 @@ export default function Scan() {
               {/* Photo and Live Face Scan are now both required, so taking a
                   photo must NOT clear an already-completed scan (or vice
                   versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting. No harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} arScanDone={arScanDone} onLiveScan={handleLiveScan} gender={gender} arScanSkipped={arScanSkipped} onSkipScan={() => setArScanSkipped(true)} onScanningChange={setFaceScanBusy} />
+              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting. No harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} gender={gender} />
             </motion.div>
           )}
           {step === 2 && (
@@ -1485,15 +1215,13 @@ export default function Scan() {
               <PhotoUploadStep stepNum={2}
                 guide="Turn 90° to the right. Stand straight, arms relaxed at sides. 3–6 feet from camera. Natural lighting."
                 photo={sidePhoto}
-                arScanDone={arScanDone}
-                onLiveScan={handleLiveScan}
                 gender={gender}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
             </motion.div>
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto || lastFaceScanImage} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} />
             </motion.div>
           )}
         </AnimatePresence>

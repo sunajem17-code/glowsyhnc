@@ -103,6 +103,7 @@ export const api = {
     register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
     appleSignIn: (data) => request('/auth/apple', { method: 'POST', body: JSON.stringify(data) }),
+    guest: () => request('/auth/guest', { method: 'POST' }),
   },
   user: {
     profile: () => request('/user/profile'),

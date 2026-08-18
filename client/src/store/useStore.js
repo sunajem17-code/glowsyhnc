@@ -10,11 +10,13 @@ const useStore = create(
       user: null,
       token: null,
       isAuthenticated: false,
+      isGuest: false,
 
       setAuth: (user, token) => set({
         user,
         token,
         isAuthenticated: true,
+        isGuest: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
         // while the async RevenueCat / server check completes.
         isPremium:
@@ -22,6 +24,13 @@ const useStore = create(
           user?.subscription_tier === 'premium' ||
           user?.is_pro === true ||
           false,
+      }),
+      setGuestSession: (userId, token) => set({
+        user: { id: userId },
+        token,
+        isAuthenticated: true,
+        isGuest: true,
+        isPremium: false,
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
@@ -32,6 +41,7 @@ const useStore = create(
           user: null,
           token: null,
           isAuthenticated: false,
+          isGuest: false,
           scans: [],
           currentPlan: null,
           currentScan: null,
