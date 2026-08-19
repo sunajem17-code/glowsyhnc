@@ -101,9 +101,13 @@ async function withRetry(fn, label = 'api') {
       const lower   = fullMsg.toLowerCase()
       const is429   = status === 429 || lower.includes('rate limit') || lower.includes('rate_limit') || lower.includes('too many') || lower.includes('quota') || lower.includes('exceeded')
       const is529   = status === 529 || lower.includes('overloaded') || lower.includes('capacity')
-      const isRetryable = is429 || is529
+      // Claude occasionally returns a non-JSON preamble ("Here is the analysis:") or plain refusal.
+      // parseJSON() throws Error("... returned non-JSON: ...") and JSON.parse throws SyntaxError.
+      // Neither has a status code, so they fell through to the user before this fix.
+      const isParseError = err instanceof SyntaxError || lower.includes('returned non-json') || lower.includes('non-json')
+      const isRetryable = is429 || is529 || isParseError
 
-      const typeTag = is429 ? '429_RATE_LIMIT' : is529 ? '529_OVERLOADED' : `${status}_ERROR`
+      const typeTag = is429 ? '429_RATE_LIMIT' : is529 ? '529_OVERLOADED' : isParseError ? 'PARSE_ERROR_RETRY' : `${status}_ERROR`
 
       // Always log exact status + message so Railway shows the real cause
       console.error(`[aiScore:${label}] attempt=${attempt} status=${status} type=${typeTag} msg="${fullMsg.slice(0, 300)}"`)
@@ -376,10 +380,12 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
         { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face and grooming. Return ONLY the JSON.` },
       ],
-    }],
+    }, { role: 'assistant', content: '{' }],
   })
 
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Core scorer')
+  // Prefill '{' forces Claude to begin directly with JSON — prepend it back before parsing.
+  const coreRaw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
+  return parseJSON(coreRaw, 'Core scorer')
 }
 
 // ── CALL: Extended Metrics — 30-metric breakdown, split out of the core call ──
@@ -497,10 +503,11 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
         { type: 'text',  text: `Give the 30-metric extended breakdown for this ${gender === 'female' ? 'woman' : 'man'}'s face. Return ONLY the JSON.` },
       ],
-    }],
+    }, { role: 'assistant', content: '{' }],
   })
 
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Extended metrics scorer')
+  const extRaw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
+  return parseJSON(extRaw, 'Extended metrics scorer')
 }
 
 // Shapes a raw extended_metrics object (snake_case keys, as returned by
@@ -636,10 +643,10 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
         { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique. Return ONLY the JSON.` },
       ],
-    }],
+    }, { role: 'assistant', content: '{' }],
   })
 
-  const raw = response.content[0]?.text?.trim() || ''
+  const raw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
   const parsed = parseJSON(raw, 'Physique scorer')
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
   const overall = (clamp(parsed.proportions) + clamp(parsed.leanness) + clamp(parsed.frame) + clamp(parsed.posture) + clamp(parsed.overall_presentation)) / 5
