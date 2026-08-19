@@ -380,12 +380,10 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
         { type: 'text',  text: `Score this ${gender === 'female' ? 'woman' : 'man'}'s face and grooming. Return ONLY the JSON.` },
       ],
-    }, { role: 'assistant', content: '{' }],
+    }],
   })
 
-  // Prefill '{' forces Claude to begin directly with JSON — prepend it back before parsing.
-  const coreRaw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
-  return parseJSON(coreRaw, 'Core scorer')
+  return parseJSON(response.content[0]?.text?.trim() || '', 'Core scorer')
 }
 
 // ── CALL: Extended Metrics — 30-metric breakdown, split out of the core call ──
@@ -503,11 +501,10 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: faceMediaType, data: faceBase64 } },
         { type: 'text',  text: `Give the 30-metric extended breakdown for this ${gender === 'female' ? 'woman' : 'man'}'s face. Return ONLY the JSON.` },
       ],
-    }, { role: 'assistant', content: '{' }],
+    }],
   })
 
-  const extRaw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
-  return parseJSON(extRaw, 'Extended metrics scorer')
+  return parseJSON(response.content[0]?.text?.trim() || '', 'Extended metrics scorer')
 }
 
 // Shapes a raw extended_metrics object (snake_case keys, as returned by
@@ -643,10 +640,10 @@ Return ONLY this JSON — no markdown, nothing else:
         { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
         { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique. Return ONLY the JSON.` },
       ],
-    }, { role: 'assistant', content: '{' }],
+    }],
   })
 
-  const raw = ('{' + (response.content[0]?.text?.trim() || '')).trim()
+  const raw = response.content[0]?.text?.trim() || ''
   const parsed = parseJSON(raw, 'Physique scorer')
   const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
   const overall = (clamp(parsed.proportions) + clamp(parsed.leanness) + clamp(parsed.frame) + clamp(parsed.posture) + clamp(parsed.overall_presentation)) / 5
