@@ -1902,11 +1902,16 @@ export default function PremiumOnboarding() {
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
+          // Both flags must be set together before App.jsx re-renders.
+          // setIsPremium alone triggers Gate 2 (PremiumSplash) which unmounts
+          // this component — finishOnboarding/setHasOnboarded would never run.
+          console.log('[ASCEND] Purchase success: setting isPremium + hasOnboarded together')
           setIsPremium(true)
+          setHasOnboarded()
           logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
-          // Show "Welcome to Ascendus" before flipping hasOnboarded
           setIsPurchasing(false)
-          setPurchaseSuccess(true)
+          // PremiumSplash (App.jsx Gate 2) now handles the "welcome" moment.
+          // We don't need setPurchaseSuccess — this component is about to unmount.
           return
         }
         if (result?.reason !== 'cancelled') {
