@@ -628,22 +628,41 @@ function StepGender({ data, onChange, onNext }) {
       <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 48px)', left: 24, color: '#C6A85C', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.18em' }}>
         STEP 1 OF 3
       </div>
-      <div style={{ padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
+      <motion.div
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        style={{ padding: '0 24px', width: '100%', boxSizing: 'border-box' }}
+      >
         <div style={{ height: 18 }} />
         <h1 style={{ color: '#ffffff', fontWeight: 700, fontSize: 26, lineHeight: 1.15, letterSpacing: '-0.5px', margin: 0, whiteSpace: 'nowrap', textAlign: 'left' }}>
           Are you male or female?
         </h1>
-      </div>
+      </motion.div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <motion.div whileTap={{ scale: 0.97 }} onClick={() => pick('male')} style={cardStyle('male')}>
+        <motion.div
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.06 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => pick('male')}
+          style={cardStyle('male')}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <MarsIcon color={MALE_BLUE} />
             <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
           </div>
         </motion.div>
 
-        <motion.div whileTap={{ scale: 0.97 }} onClick={() => pick('female')} style={cardStyle('female')}>
+        <motion.div
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.12 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => pick('female')}
+          style={cardStyle('female')}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <VenusIcon color={FEMALE_PINK} />
             <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
