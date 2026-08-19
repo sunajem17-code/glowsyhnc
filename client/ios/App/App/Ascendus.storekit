@@ -1,0 +1,101 @@
+{
+  "identifier" : "AscendusStoreKit",
+  "nonConsumableProducts" : [
+
+  ],
+  "nonRenewingSubscriptionProducts" : [
+
+  ],
+  "products" : [
+
+  ],
+  "subscriptionGroups" : [
+    {
+      "id" : "AscendusPro",
+      "localizations" : [
+
+      ],
+      "name" : "Ascendus Pro",
+      "subscriptions" : [
+        {
+          "adHocOfferCodeRedemptionURL" : "https://apps.apple.com/redeem",
+          "debugDescription" : "Monthly subscription",
+          "displayPrice" : "7.99",
+          "familySharable" : false,
+          "groupNumber" : 1,
+          "internalID" : "ascendus_monthly_001",
+          "introductoryOffer" : {
+            "displayPrice" : "0.00",
+            "duration" : 1,
+            "durationUnit" : "WEEK",
+            "mode" : "FREE_TRIAL",
+            "offerID" : "monthly_trial"
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to Ascendus Pro",
+              "displayName" : "Ascendus Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.ascendus.app.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ascendus Pro Monthly",
+          "subscriptionGroupID" : "AscendusPro",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOfferCodeRedemptionURL" : "https://apps.apple.com/redeem",
+          "debugDescription" : "Annual subscription",
+          "displayPrice" : "49.99",
+          "familySharable" : false,
+          "groupNumber" : 2,
+          "internalID" : "ascendus_yearly_001",
+          "introductoryOffer" : {
+            "displayPrice" : "0.00",
+            "duration" : 1,
+            "durationUnit" : "WEEK",
+            "mode" : "FREE_TRIAL",
+            "offerID" : "yearly_trial"
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to Ascendus Pro",
+              "displayName" : "Ascendus Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.ascendus.app.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Ascendus Pro Annual",
+          "subscriptionGroupID" : "AscendusPro",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOfferCodeRedemptionURL" : "https://apps.apple.com/redeem",
+          "debugDescription" : "Discounted annual offer",
+          "displayPrice" : "29.99",
+          "familySharable" : false,
+          "groupNumber" : 3,
+          "internalID" : "ascendus_yearly_discount_001",
+          "localizations" : [
+            {
+              "description" : "Discounted annual access to Ascendus Pro",
+              "displayName" : "Ascendus Pro Annual (Offer)",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.ascendus.app.yearly.discount",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Ascendus Pro Annual Discount",
+          "subscriptionGroupID" : "AscendusPro",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

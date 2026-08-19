@@ -25,8 +25,8 @@ export async function initRevenueCat(userId) {
     if (userId) {
       await Purchases.logIn({ appUserID: userId })
     }
-  } catch {
-    // RevenueCat init failure is non-fatal — purchases will still work on retry
+  } catch (e) {
+    console.error('[RC] initRevenueCat failed:', e?.code, e?.message, e)
   }
 }
 
@@ -87,7 +87,8 @@ export async function purchasePro(plan = 'monthly') {
     if (isCancelError(e)) {
       return { success: false, reason: 'cancelled' }
     }
-    // Never surface raw RevenueCat / StoreKit internals to users
+    // Log full RC/StoreKit error for diagnostics — code, message, and raw object
+    console.error('[RC] purchasePro failed — code:', e?.code, '| msg:', e?.message, '| full:', e)
     throw new Error('Unable to complete purchase. Please try again.')
   }
 }

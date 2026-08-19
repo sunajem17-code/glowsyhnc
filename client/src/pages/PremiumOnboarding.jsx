@@ -10,7 +10,7 @@ import { StepRating, StepScoresWaiting } from '../components/OnboardingFinalStep
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
-import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
+import { checkTrialEligibility, isNative, purchasePro, initRevenueCat } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -574,49 +574,81 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
 
 
 // ── STEP 4: Gender ────────────────────────────────────────────────────────────
+// Mars symbol (♂) — stroke-based SVG
+// Icons rebuilt from design handoff (Gender Onboarding.dc.html).
+// Male: translate(9,0) from the original dc.html inlined into coordinates so cx=55
+// (centered in 110-wide viewBox). Rendered at square 110×110 — this was the root
+// cause of all prior centering issues (original had non-square 220×125 rendering).
+// Female: already centered at cx=55 in the original file, unchanged.
+function MarsIcon({ color }) {
+  return (
+    <svg width="144" height="144" viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
+      <circle cx="55" cy="64" r="26" stroke={color} strokeWidth="7" />
+      <line x1="73" y1="46" x2="101" y2="18" stroke={color} strokeWidth="7" strokeLinecap="round" />
+      <polyline points="77,18 101,18 101,42" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function VenusIcon({ color }) {
+  return (
+    <svg width="144" height="144" viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
+      <circle cx="55" cy="38" r="26" stroke={color} strokeWidth="7" />
+      <line x1="55" y1="64" x2="55" y2="98" stroke={color} strokeWidth="7" strokeLinecap="round" />
+      <line x1="39" y1="82" x2="71" y2="82" stroke={color} strokeWidth="7" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function StepGender({ data, onChange, onNext }) {
-  const isMale   = data.gender === 'male'
-  const isFemale = data.gender === 'female'
+  const [selected, setSelected] = useState(null)
+
+  function pick(gender) {
+    setSelected(gender)
+    onChange('gender', gender)
+    setTimeout(onNext, 300)
+  }
+
+  const MALE_BLUE   = '#4A90E2'
+  const FEMALE_PINK = '#E85D9E'
+
+  const cardStyle = (gender) => ({
+    width: 288, height: 288,
+    borderRadius: 22,
+    border: '1.5px solid #262626',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+    background: selected === gender
+      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
+      : '#141414',
+  })
 
   return (
-    <div className="flex flex-col h-full px-6 pt-16">
-      <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-        Are you male or female?
-      </h1>
-      <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>
-        Calibrates your score, tier labels, and recommendations.
-      </p>
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 48px)', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 48px)', left: 24, color: '#C6A85C', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.18em' }}>
+        STEP 1 OF 3
+      </div>
+      <div style={{ padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ height: 18 }} />
+        <h1 style={{ color: '#ffffff', fontWeight: 700, fontSize: 26, lineHeight: 1.15, letterSpacing: '-0.5px', margin: 0, whiteSpace: 'nowrap', textAlign: 'left' }}>
+          Are you male or female?
+        </h1>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Male */}
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={() => { onChange('gender', 'male'); onNext() }}
-          className="flex flex-col items-center py-10 rounded-2xl transition-all duration-150"
-          style={{
-            background: isMale ? 'rgba(37,99,235,0.12)' : SURFACE,
-            border: `2px solid ${isMale ? '#3B82F6' : BORDER}`,
-            boxShadow: isMale ? '0 0 24px rgba(59,130,246,0.18)' : 'none',
-          }}
-        >
-          <User size={40} className="mb-3" style={{ color: isMale ? '#60A5FA' : TEXT }} />
-          <p className="font-heading font-bold text-[18px]" style={{ color: isMale ? '#60A5FA' : TEXT }}>Male</p>
-        </motion.button>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <motion.div whileTap={{ scale: 0.97 }} onClick={() => pick('male')} style={cardStyle('male')}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <MarsIcon color={MALE_BLUE} />
+            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
+          </div>
+        </motion.div>
 
-        {/* Female */}
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={() => { onChange('gender', 'female'); onNext() }}
-          className="flex flex-col items-center py-10 rounded-2xl transition-all duration-150"
-          style={{
-            background: isFemale ? 'rgba(236,72,153,0.10)' : SURFACE,
-            border: `2px solid ${isFemale ? '#EC4899' : BORDER}`,
-            boxShadow: isFemale ? '0 0 24px rgba(236,72,153,0.15)' : 'none',
-          }}
-        >
-          <UserRound size={40} className="mb-3" style={{ color: isFemale ? '#F472B6' : TEXT }} />
-          <p className="font-heading font-bold text-[18px]" style={{ color: isFemale ? '#F472B6' : TEXT }}>Female</p>
-        </motion.button>
+        <motion.div whileTap={{ scale: 0.97 }} onClick={() => pick('female')} style={cardStyle('female')}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <VenusIcon color={FEMALE_PINK} />
+            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
+          </div>
+        </motion.div>
       </div>
     </div>
   )
@@ -1040,6 +1072,49 @@ function StepBMI({ data, onNext, onBack }) {
   )
 }
 
+// ── Shared layout for face and side photo steps ───────────────────────────────
+// Must be defined at module level — never inside a render function — so React
+// sees a stable component type across re-renders.
+function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, triggerRef, onPhoto, onBack, error: screenError, buttonLabel, onButton, extra }) {
+  return (
+    <div className="flex flex-col h-full" style={{ background: '#080808' }}>
+      <BackBtn onBack={onBack} />
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
+          {stepLabel}
+        </p>
+        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+          {headline}
+        </h1>
+      </div>
+
+      {screenError && (
+        <div className="mx-6 mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{screenError}</p>
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 px-3 pb-3">
+        <PhotoUploadStep
+          stepNum={1}
+          heroLayout
+          photoType={photoType}
+          guide={null}
+          photo={photo}
+          onPhoto={onPhoto}
+          gender={gender || 'male'}
+          triggerRef={triggerRef}
+        />
+      </div>
+
+      <div className="px-6 pb-10 pt-2">
+        <GoldBtn label={buttonLabel} onClick={onButton} />
+        {extra}
+      </div>
+    </div>
+  )
+}
+
 // ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing' | 'retry_error'
@@ -1053,6 +1128,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
   const sideTriggerRef = useRef(null)
+  const faceTriggerRef = useRef(null)
   // Countdown → auto-retry with the same photos
   useEffect(() => {
     if (!rateLimited) return
@@ -1083,7 +1159,11 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           const canvas = document.createElement('canvas')
           canvas.width = w; canvas.height = h
           canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-          resolve(canvas.toDataURL('image/jpeg', 0.85))
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+          const outKB = Math.round(dataUrl.length * 0.75 / 1024)
+          const inKB  = Math.round(blob.size / 1024)
+          console.log(`[toBase64] ${img.width}x${img.height} → ${w}x${h} | ${inKB}KB → ${outKB}KB (${Math.round(outKB/inKB*100)}% of original)`)
+          resolve(dataUrl)
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Image load failed')) }
         img.src = blobUrl
@@ -1097,15 +1177,18 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setError('')
     setAnalysisStep(0)
 
+    // Start the visual progress timer immediately so the bar advances as soon as
+    // the analyzing screen appears — not after toBase64 finishes (which can take
+    // several seconds for large camera photos, leaving the bar stuck at 5%).
+    const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
+    const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
+
     try {
       const faceB64 = await toBase64(face)
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
       if (sideB64) setSidePhoto(sideB64)
-      setAnalysisStep(1)
       setSlowAnalysis(false)
-      const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
-      const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
       // Wait for the silent guest session to resolve before calling the
       // authenticated API. If the user reaches analysis faster than the
@@ -1191,7 +1274,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
               <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Daily scan limit reached</p>
               <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day. Upgrade to Ascendus Pro for unlimited scans.</p>
               <button
-                onClick={onAscend}
+                onClick={onDone}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
                 style={{ background: 'rgba(198,168,92,0.18)', color: '#C6A85C' }}>
                 Upgrade to Pro
@@ -1259,93 +1342,44 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
 
   if (phase === 'side') {
     return (
-      <div className="flex flex-col h-full px-6" style={{ background: BG }}>
-        <BackBtn onBack={() => { setPhase('face'); setError('') }} />
-        <div className="pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}>
-          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
-            STEP 2 OF 2
-          </p>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-            Now, your side profile.
-          </h1>
-        </div>
-
-        {error && (
-          <div className="mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{error}</p>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
-          <PhotoUploadStep
-            stepNum={2}
-            guide={null}
-            photo={sidePhoto}
-            onPhoto={setSidePhoto}
-            gender={gender || 'male'}
-            triggerRef={sideTriggerRef}
-          />
-        </div>
-
-        <div className="pb-10 pt-2 flex flex-col gap-3">
-          <GoldBtn
-            label={sidePhoto ? 'Analyze My Results' : 'Begin Scan'}
-            onClick={() => {
-              if (!sidePhoto) sideTriggerRef.current?.()
-              else runAnalysisWithData(facePhoto, sidePhoto)
-            }}
-          />
-          <button
-            onClick={() => runAnalysisWithData(facePhoto, null)}
-            className="w-full py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70"
-            style={{ color: 'rgba(255,255,255,0.28)' }}
-          >
-            Skip side profile
-          </button>
-        </div>
-      </div>
+      <PhotoStepScreen
+        stepLabel="STEP 3 OF 3"
+        headline="Now, your side profile."
+        photo={sidePhoto}
+        photoType="side"
+        gender={gender}
+        triggerRef={sideTriggerRef}
+        onPhoto={setSidePhoto}
+        onBack={() => { setPhase('face'); setError('') }}
+        error={error}
+        buttonLabel={sidePhoto ? 'Analyze My Results' : 'Begin Scan'}
+        onButton={() => {
+          if (!sidePhoto) sideTriggerRef.current?.()
+          else runAnalysisWithData(facePhoto, sidePhoto)
+        }}
+      />
     )
   }
 
   // phase === 'face'
   return (
-    <div className="flex flex-col h-full" style={{ background: '#080808' }}>
-      <BackBtn onBack={onBack} />
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
-          STEP 1 OF 2
-        </p>
-      </div>
-
-      {error && (
-        <div className="mx-6 mb-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <p className="font-body text-[13px] text-center" style={{ color: '#EF4444' }}>{error}</p>
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 px-3 pb-3">
-        <PhotoUploadStep
-          stepNum={1}
-          heroLayout
-          autoOpen={!facePhoto}
-          guide={null}
-          photo={facePhoto}
-          onPhoto={(url) => { setFacePhoto(url); setError('') }}
-          gender={gender || 'male'}
-        />
-      </div>
-
-      {/* Continue — only appears after photo is captured; advances to side-profile phase */}
-      {facePhoto && (
-        <div className="px-6 pb-10 pt-2">
-          <GoldBtn
-            label="Continue"
-            onClick={() => { enableAnalytics(); setPhase('side'); setError('') }}
-          />
-          <ConsentMicroText />
-        </div>
-      )}
-    </div>
+    <PhotoStepScreen
+      stepLabel="STEP 2 OF 3"
+      headline="Take your front photo"
+      photo={facePhoto}
+      photoType="face"
+      gender={gender}
+      triggerRef={faceTriggerRef}
+      onPhoto={(url) => { setFacePhoto(url); setError('') }}
+      onBack={onBack}
+      error={error}
+      buttonLabel={facePhoto ? 'Continue' : 'Begin Scan'}
+      onButton={() => {
+        if (!facePhoto) faceTriggerRef.current?.()
+        else { enableAnalytics(); setPhase('side'); setError('') }
+      }}
+      extra={facePhoto ? <ConsentMicroText /> : null}
+    />
   )
 }
 
@@ -1670,7 +1704,9 @@ export default function PremiumOnboarding() {
   // Unauthenticated users start at Welcome (step 1). With the new flow, auth
   // happens at the paywall, so users are always unauthenticated during onboarding.
   // Interrupted sessions (isAuthenticated=true but hasOnboarded=false) resume at gender (step 2).
-  const [step, setStep] = useState(isAuthenticated ? Math.max(2, draft?.step ?? 2) : (draft?.step ?? 1))
+  // Gender (step 2) is the first screen on a fresh launch. Welcome/Intro are
+  // still in the steps array but skipped by default — start at 2 for everyone.
+  const [step, setStep] = useState(isAuthenticated ? Math.max(2, draft?.step ?? 2) : (draft?.step ?? 2))
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
   const [purchaseSuccess, setPurchaseSuccess] = useState(false)
@@ -1807,20 +1843,25 @@ export default function PremiumOnboarding() {
         // on reinstall or device change, regardless of whether email came back.
         let appleStableId = null
         if (!isAuthenticated || isGuest) {
+          console.log('[ASCEND] Step 1: initiating Apple Sign In (native flow)')
           const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+          // redirectURI must be omitted for native iOS — it triggers the web-based
+          // SFSafariViewController flow which requires a signed-in App Store account
+          // and produces a "Sign in to Apple Account in Settings" system alert instead
+          // of the native ASAuthorizationAppleIDProvider sheet.
           const appleResult = await SignInWithApple.authorize({
             clientId: 'com.ascendus.app',
-            redirectURI: 'https://ascendus.store/auth/apple/callback',
             scopes: 'email name',
-            state: Date.now().toString(),
             nonce: Math.random().toString(36).substring(2, 15),
           })
+          console.log('[ASCEND] Step 1 complete: Apple Sign In returned — user:', appleResult?.response?.user, 'hasToken:', !!appleResult?.response?.identityToken, 'hasEmail:', !!appleResult?.response?.email)
           const identityToken = appleResult?.response?.identityToken
           if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
 
           // Stable Apple user identifier — present on every auth, not just first
           appleStableId = appleResult.response.user
 
+          console.log('[ASCEND] Step 2: posting identity token to /api/auth/apple (guestUserId:', isGuest ? user?.id : 'none', ')')
           const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
           const authRes = await fetch(`${API_BASE}/api/auth/apple`, {
             method: 'POST',
@@ -1835,21 +1876,29 @@ export default function PremiumOnboarding() {
             }),
           })
           const authData = await authRes.json()
-          if (!authRes.ok) throw new Error(authData.error || 'Authentication failed')
+          if (!authRes.ok) {
+            console.error('[ASCEND] Step 2 failed: /api/auth/apple returned', authRes.status, authData)
+            throw new Error(authData.error || 'Authentication failed')
+          }
+          console.log('[ASCEND] Step 2 complete: auth token stored, userId:', authData.user?.id)
           setAuth(authData.user, authData.token)
           api.user.update({ gender: formData.gender }).catch(() => {})
           api.supabase.updateUser({ ai_consent: true, consent_at: new Date().toISOString() }).catch(() => {})
 
-          // ── Step 2: Tie RevenueCat to the stable Apple ID (not Supabase UUID) ──
+          // ── Step 3: Tie RevenueCat to the stable Apple ID (not Supabase UUID) ──
           // Using the Apple stable identifier ensures purchase restoration works
           // on reinstall/device change — RC looks up the same ID Apple returns.
+          console.log('[ASCEND] Step 3: initialising RevenueCat with Apple stable ID')
           await initRevenueCat(appleStableId)
+          console.log('[ASCEND] Step 3 complete: RevenueCat initialised')
         }
 
-        // ── Step 3: Purchase ──────────────────────────────────────────────────
+        // ── Step 4: Purchase ──────────────────────────────────────────────────
         const plan = trialEligibility.monthly === 'eligible' ? 'monthly'
           : trialEligibility.yearly === 'eligible' ? 'yearly' : 'monthly'
+        console.log('[ASCEND] Step 4: calling purchasePro, plan:', plan)
         const result = await purchasePro(plan)
+        console.log('[ASCEND] Step 4 result:', result?.success ? 'SUCCESS' : 'FAILED', 'reason:', result?.reason)
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
@@ -1877,7 +1926,10 @@ export default function PremiumOnboarding() {
       const msg = (err?.message || '').toLowerCase()
       if (!msg.includes('cancel')) {
         console.error('[ASCEND] Purchase/auth error:', err)
-        setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
+        // Never expose raw JS error messages (ReferenceError, TypeError, etc.) to users —
+        // those are programming errors, not user-facing copy. Always show the generic fallback.
+        const isUserFacingMsg = err?.userFacing === true
+        setPurchaseError(isUserFacingMsg ? err.message : 'Unable to complete purchase. Please try again.')
       }
       setIsPurchasing(false)
     }
