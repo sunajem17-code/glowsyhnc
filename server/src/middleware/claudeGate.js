@@ -26,8 +26,16 @@ const checkClaude = {
   demo: createLimiter('claude:demo', 5,   '1 h',  60 * 60 * 1000),
 }
 
+// DEV_SCAN_LIMIT: raises the free-tier daily cap for local/simulator testing.
+// Strictly gated by NODE_ENV !== 'production' — Railway always sets NODE_ENV=production,
+// so this bypass is unreachable in production regardless of env var presence.
+const _devScanCap = process.env.NODE_ENV !== 'production' && Number(process.env.DEV_SCAN_LIMIT)
+if (_devScanCap) {
+  console.warn(`[claudeGate] DEV_SCAN_LIMIT active — free scan cap raised to ${_devScanCap}/day (non-production only)`)
+}
+
 const checkScan = {
-  free: createLimiter('scan:free', 3, '24 h', 24 * 60 * 60 * 1000),
+  free: createLimiter('scan:free', _devScanCap || 3, '24 h', 24 * 60 * 60 * 1000),
   demo: createLimiter('scan:demo', 1, '1 h',   1 * 60 * 60 * 1000),
 }
 
