@@ -1,6 +1,29 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Lock, Eye, Smile, ScanFace, Scissors, Layers } from 'lucide-react'
 import { GOLD, EASE_STANDARD } from '../utils/theme'
+
+// Animates from 0 → pct once on mount via CSS transition.
+// Immune to re-renders and prop changes — the effect has no deps so it fires
+// exactly once per mount, and subsequent pct changes just transition smoothly
+// from the current width rather than resetting to 0.
+function ProgressBarFill({ pct }) {
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setW(pct))
+    return () => cancelAnimationFrame(t)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div
+      className="h-full rounded-full"
+      style={{
+        background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+        width: `${w}%`,
+        transition: 'width 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
+      }}
+    />
+  )
+}
 
 // Extracted out of ScanUnlockGate.jsx so this can be statically imported by
 // OnboardingFinalSteps.jsx (StepScoresWaiting's carousel) without pulling the
@@ -188,13 +211,7 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
                   transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
                 />
               ) : (
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
-                />
+                <ProgressBarFill pct={pct} />
               )}
             </div>
           </div>
