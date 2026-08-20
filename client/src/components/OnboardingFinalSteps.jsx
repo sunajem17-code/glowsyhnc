@@ -282,11 +282,6 @@ function OverallCard({ scan }) {
 // mechanics (index state, velocity-aware drag commit, spring transition, "X OF
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Unlock Results Now" CTA below is untouched, still a flat call to onAscend.
-const CAROUSEL_SLIDE_VARIANTS = {
-  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
-}
 
 // ── Exit-intent: annual-discount offer ──────────────────────────────────────
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
@@ -387,7 +382,6 @@ function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error =
 
 export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing = false, error = '' }) {
   const [cardIdx, setCardIdx] = useState(0)
-  const [direction, setDirection] = useState(1)
   const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
   const [claimLoading, setClaimLoading] = useState(false)
@@ -453,7 +447,6 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
 
   function goTo(idx) {
     if (idx === cardIdx) return
-    setDirection(idx > cardIdx ? 1 : -1)
     setCardIdx(idx)
   }
 
@@ -484,24 +477,22 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
       </button>
 
       <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={cardIdx}
-            custom={direction}
-            variants={CAROUSEL_SLIDE_VARIANTS}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
-            className="absolute inset-0"
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
-            onDragEnd={handleDragEnd}
-          >
-            {cards[cardIdx].el}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          className="absolute inset-0 flex"
+          style={{ width: `${cards.length * 100}%` }}
+          animate={{ x: `-${(cardIdx / cards.length) * 100}%` }}
+          transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.18}
+          onDragEnd={handleDragEnd}
+        >
+          {cards.map((card) => (
+            <div key={card.id} className="h-full flex-shrink-0" style={{ width: `${100 / cards.length}%` }}>
+              {card.el}
+            </div>
+          ))}
+        </motion.div>
       </div>
 
       {/* Dot pagination */}

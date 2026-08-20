@@ -374,15 +374,9 @@ function Card6AIAnalysis({ scan }) {
 
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
-const SLIDE_VARIANTS = {
-  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit:  (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
-}
 
 function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {} }) {
-  const [cardIdx, setCardIdx]   = useState(0)
-  const [direction, setDirection] = useState(1)
+  const [cardIdx, setCardIdx] = useState(0)
 
   // Three high-value cards, not seven. Growth area and PSL tier/potential
   // are already teased inside Card1Score itself — repeating them as
@@ -399,7 +393,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
 
   function goTo(idx) {
     if (idx === cardIdx) return
-    setDirection(idx > cardIdx ? 1 : -1)
     setCardIdx(idx)
   }
 
@@ -426,26 +419,25 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
         pointerEvents: 'none',
       }} />
 
-      {/* Swipeable area */}
+      {/* Swipeable area — sliding rail keeps all cards mounted so progress bars
+          animate once on first appearance and never reset on swipe-back */}
       <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={cardIdx}
-            custom={direction}
-            variants={SLIDE_VARIANTS}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
-            className="absolute inset-0"
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
-            onDragEnd={handleDragEnd}
-          >
-            {cards[cardIdx].el}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          className="absolute inset-0 flex"
+          style={{ width: `${cards.length * 100}%` }}
+          animate={{ x: `-${(cardIdx / cards.length) * 100}%` }}
+          transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.18}
+          onDragEnd={handleDragEnd}
+        >
+          {cards.map((card) => (
+            <div key={card.id} className="h-full flex-shrink-0" style={{ width: `${100 / cards.length}%` }}>
+              {card.el}
+            </div>
+          ))}
+        </motion.div>
       </div>
 
       {/* Dot pagination */}
