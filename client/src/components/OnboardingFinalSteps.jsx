@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Star, Check, Loader2, Lock, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
@@ -382,6 +382,15 @@ function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error =
 
 export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing = false, error = '' }) {
   const [cardIdx, setCardIdx] = useState(0)
+  const containerRef = useRef(null)
+  const [containerW, setContainerW] = useState(0)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(([e]) => setContainerW(e.contentRect.width))
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
   const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
   const [claimLoading, setClaimLoading] = useState(false)
@@ -476,19 +485,19 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
         <X size={17} style={{ color: TEXT }} />
       </button>
 
-      <div className="flex-1 relative overflow-hidden">
+      <div ref={containerRef} className="flex-1 relative overflow-hidden">
         <motion.div
-          className="absolute inset-0 flex"
-          style={{ width: `${cards.length * 100}%` }}
-          animate={{ x: `-${(cardIdx / cards.length) * 100}%` }}
-          transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
+          className="absolute inset-y-0 left-0 flex"
+          style={{ width: containerW * cards.length }}
+          animate={{ x: -cardIdx * containerW }}
+          transition={{ type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
           drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.18}
+          dragConstraints={{ left: -(cards.length - 1) * containerW, right: 0 }}
+          dragElastic={0}
           onDragEnd={handleDragEnd}
         >
           {cards.map((card) => (
-            <div key={card.id} className="h-full flex-shrink-0" style={{ width: `${100 / cards.length}%` }}>
+            <div key={card.id} className="h-full flex-shrink-0" style={{ width: containerW || '100vw' }}>
               {card.el}
             </div>
           ))}

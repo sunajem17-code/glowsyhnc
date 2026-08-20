@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
@@ -377,10 +377,18 @@ function Card6AIAnalysis({ scan }) {
 
 function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {} }) {
   const [cardIdx, setCardIdx] = useState(0)
+  const containerRef = useRef(null)
+  const [containerW, setContainerW] = useState(0)
 
-  // Three high-value cards, not seven. Growth area and PSL tier/potential
-  // are already teased inside Card1Score itself — repeating them as
-  // separate near-identical locked cards was pure padding.
+  // Measure the viewport width so we can set real pixel-based dragConstraints.
+  // This gives true 1:1 finger tracking with dragElastic={0}.
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(([e]) => setContainerW(e.contentRect.width))
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
   const cards = [
     { id: 'score', el: <Card1Score scan={scan} /> },
     ...EXTENDED_CATEGORIES.map(cat => ({
@@ -396,9 +404,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
     setCardIdx(idx)
   }
 
-  // Velocity-aware, not just distance-aware — a fast flick commits even on a
-  // short drag, matching how the rest of the app's card gestures behave
-  // (PremiumOnboarding's slide cards, the Feature Tour's Photo Ranker).
   function handleDragEnd(_, info) {
     const DISTANCE = 60
     const VELOCITY = 400
@@ -419,21 +424,22 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
         pointerEvents: 'none',
       }} />
 
-      {/* Swipeable area — sliding rail keeps all cards mounted so progress bars
-          animate once on first appearance and never reset on swipe-back */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* Sliding rail — all cards stay mounted (progress bars never reset).
+          Pixel-based constraints + dragElastic=0 → true 1:1 finger tracking.
+          Tween settle (no spring) → symmetric, predictable snap in both directions. */}
+      <div ref={containerRef} className="flex-1 relative overflow-hidden">
         <motion.div
-          className="absolute inset-0 flex"
-          style={{ width: `${cards.length * 100}%` }}
-          animate={{ x: `-${(cardIdx / cards.length) * 100}%` }}
-          transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.9 }}
+          className="absolute inset-y-0 left-0 flex"
+          style={{ width: containerW * cards.length }}
+          animate={{ x: -cardIdx * containerW }}
+          transition={{ type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
           drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.18}
+          dragConstraints={{ left: -(cards.length - 1) * containerW, right: 0 }}
+          dragElastic={0}
           onDragEnd={handleDragEnd}
         >
           {cards.map((card) => (
-            <div key={card.id} className="h-full flex-shrink-0" style={{ width: `${100 / cards.length}%` }}>
+            <div key={card.id} className="h-full flex-shrink-0" style={{ width: containerW || '100vw' }}>
               {card.el}
             </div>
           ))}
