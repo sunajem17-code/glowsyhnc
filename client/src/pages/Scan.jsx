@@ -254,13 +254,6 @@ function PhotoActionSheet({ options, onClose }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={onClose}
-          className="w-full rounded-2xl py-4 font-heading font-bold text-[16px] active:opacity-60 transition-opacity"
-          style={{ background: '#1C1C1E', color: GOLD }}
-        >
-          Cancel
-        </button>
       </motion.div>
     </>
   )
@@ -268,7 +261,7 @@ function PhotoActionSheet({ options, onClose }) {
 
 // ─── Photo Upload Step ────────────────────────────────────────────────────────
 
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLayout = false, autoOpen = false, triggerRef }) {
+export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLayout = false, photoType = 'face', autoOpen = false, triggerRef }) {
   const uploadRef = useRef()
   const cameraInFlight = useRef(false)
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -318,9 +311,13 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
   }
 
   // ── Hero / full-bleed layout (step 1, PremiumOnboarding only) ───────────────
-  if (heroLayout && stepNum === 1) {
+  if (heroLayout) {
+    const guideImg = photoType === 'side'
+      ? (gender === 'female' ? sideProfileGuideFemale : sideProfileGuide)
+      : (gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto)
+
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full" style={{ paddingTop: 12 }}>
         {cameraOpen && (
           <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
         )}
@@ -331,12 +328,10 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
           className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden pointer-events-none"
           style={{ background: '#080808', border: '1px solid rgba(198,168,92,0.2)' }}
         >
-          {/* Photo state */}
           {photo ? (
             <>
               <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-contain" />
               <div className="absolute inset-0 bg-black/20" />
-              {/* Retake overlaid on photo */}
               <div
                 className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 pt-16 pointer-events-none"
                 style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.85) 60%)' }}
@@ -351,27 +346,9 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
               </div>
             </>
           ) : (
-            /* Guide image — no overlay, full face visible */
-            <img
-              src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
-              alt="" aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
           )}
         </div>
-
-        {/* Begin Scan button — below card so it never overlaps the face */}
-        {!photo && (
-          <div className="mt-5">
-            <button
-              onClick={() => setShowActionSheet(true)}
-              className="w-full flex items-center justify-center py-4 rounded-full active:scale-95 transition-transform"
-              style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-            >
-              <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>Begin Scan</span>
-            </button>
-          </div>
-        )}
 
         {error && (
           <div className="mt-2 flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
@@ -414,15 +391,11 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
         className={`relative w-full ${stepNum === 1 ? 'aspect-[4/5]' : 'aspect-[3/4]'} rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none`}
         style={{
           background: '#000000',
-          // Gold frame — steps 1 and 2 (Face Photo, Side Profile) share it,
-          // same weight/opacity idiom as the rest of the app's gold accents
-          // (solid GOLD for the border itself, the equivalent
-          // rgba(198,168,92,X) for the soft outer glow, since there's no
-          // alpha-variant helper for the hex token elsewhere in this
-          // codebase either — see Premium.jsx's GOLD_BORDER/${GOLD}NN
-          // pattern, ScanUnlockGate's badge borders).
-          border: `1.5px solid ${GOLD}`,
-          boxShadow: '0 0 16px rgba(198,168,92,0.25)',
+          // Step 1 (face photo) keeps the gold frame; step 2 (side profile) is borderless.
+          ...(stepNum === 1 && {
+            border: `1.5px solid ${GOLD}`,
+            boxShadow: '0 0 16px rgba(198,168,92,0.25)',
+          }),
         }}
       >
         {photo ? (
@@ -669,9 +642,6 @@ function AnalyzingSweepOverlay({ photo }) {
         className="absolute inset-0"
         style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
       />
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {SWEEP_DOTS.map((d, i) => <SweepFeatureDot key={i} cx={d.cx} cy={d.cy} row={d.row} />)}
-      </svg>
       <SweepLine />
     </div>
   )

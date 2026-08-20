@@ -624,23 +624,23 @@ function StepGender({ data, onChange, onNext }) {
   })
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 48px)', position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 48px)', left: 24, color: '#C6A85C', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.18em' }}>
-        STEP 1 OF 3
-      </div>
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
       <motion.div
         initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
-        style={{ padding: '0 24px', width: '100%', boxSizing: 'border-box' }}
+        className="px-6"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}
       >
-        <div style={{ height: 18 }} />
-        <h1 style={{ color: '#ffffff', fontWeight: 700, fontSize: 26, lineHeight: 1.15, letterSpacing: '-0.5px', margin: 0, whiteSpace: 'nowrap', textAlign: 'left' }}>
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: '#C6A85C' }}>
+          STEP 1 OF 3
+        </p>
+        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>
           Are you male or female?
         </h1>
       </motion.div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, paddingBottom: 40 }}>
         <motion.div
           initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1113,7 +1113,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
         </div>
       )}
 
-      <div className="flex-1 min-h-0 px-3 pb-3">
+      <div className="px-3 pb-3">
         <PhotoUploadStep
           stepNum={1}
           heroLayout
@@ -1126,7 +1126,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
         />
       </div>
 
-      <div className="px-6 pb-10 pt-2">
+      <div className="px-6 pb-2 pt-4">
         <GoldBtn label={buttonLabel} onClick={onButton} />
         {extra}
       </div>
@@ -1376,6 +1376,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           if (!sidePhoto) sideTriggerRef.current?.()
           else runAnalysisWithData(facePhoto, sidePhoto)
         }}
+        extra={<ConsentMicroText />}
       />
     )
   }
@@ -1397,7 +1398,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         if (!facePhoto) faceTriggerRef.current?.()
         else { enableAnalytics(); setPhase('side'); setError('') }
       }}
-      extra={facePhoto ? <ConsentMicroText /> : null}
+      extra={<ConsentMicroText />}
     />
   )
 }
@@ -1942,7 +1943,7 @@ export default function PremiumOnboarding() {
       // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
       const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
       const token  = stored?.state?.token
-      if (!token || token === 'demo-token') { setIsPurchasing(false); navigate('/auth'); return }
+      if (!token || token === 'demo-token') { setIsPurchasing(false); setSigningIn(true); return }
       const { url } = await api.payments.createCheckout('monthly', false)
       window.location.href = url
       // Leave isPurchasing=true — the page is about to navigate away.

@@ -9,7 +9,6 @@ import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
-import Auth from './pages/Auth'
 import PremiumSplash from './pages/PremiumSplash'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
@@ -141,10 +140,8 @@ export default function App() {
 
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
-          {/* Auth always accessible — must be outside hasOnboarded gate */}
-          <Route path="/auth" element={
-            isAuthenticated ? <Navigate to="/" replace /> : <Auth />
-          } />
+          {/* /auth no longer used — redirect everything to root (onboarding or app) */}
+          <Route path="/auth" element={<Navigate to="/" replace />} />
 
           {!hasOnboarded ? (
             <Route path="*" element={<PremiumOnboarding />} />
