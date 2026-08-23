@@ -99,9 +99,11 @@ const useStore = create(
       // current app session, cleared on a fresh scan or app relaunch.
       lastFaceScanImage: null,
       lastFaceScanLandmarks2D: null,
-      setLastFaceScanCapture: (image, landmarks2D) => set({
+      lastFaceScanFaceMetrics: null,
+      setLastFaceScanCapture: (image, landmarks2D, faceMetrics) => set({
         lastFaceScanImage: image,
         lastFaceScanLandmarks2D: landmarks2D,
+        lastFaceScanFaceMetrics: faceMetrics ?? null,
       }),
 
       // Action Plan
@@ -172,6 +174,18 @@ const useStore = create(
       // Scan limiting (free tier: 1 scan/month)
       lastScanDate: null,
       setLastScanDate: (d) => set({ lastScanDate: d }),
+
+      // Pro Scan daily cap: 3 scans per calendar day (local device time)
+      proScanCount: 0,
+      proScanDate: null,
+      recordProScan: () => set(state => {
+        const today = new Date().toDateString()
+        const sameDay = state.proScanDate === today
+        return {
+          proScanCount: sameDay ? state.proScanCount + 1 : 1,
+          proScanDate: today,
+        }
+      }),
 
       // Referral
       referralCode: null,

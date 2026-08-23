@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
@@ -12,47 +12,56 @@ import demoFaceImageFemale from '../assets/face-metrics-demo-female.jpg'
 // Metric values here are illustrative placeholders, not measurements of
 // anyone real. Everything demo-related is labeled as an example in the UI
 // so it's never mistaken for the user's own data.
+// Real MediaPipe Face Mesh coordinates extracted from demoFaceImage at dev time.
+// These are the actual normalized [x, y] positions of each landmark index on
+// the demo photo — not hand-placed. Derived by running FaceMesh on
+// face-metrics-demo.jpg and rounding to 5 decimal places.
 const DEMO_LANDMARKS_2D = {
-  browPoint:      [0.50, 0.178],
-  noseTip:        [0.50, 0.454],
-  chinTip:        [0.50, 0.629],
-  templeLeft:     [0.13, 0.347],
-  templeRight:    [0.87, 0.347],
-  cheekboneLeft:  [0.19, 0.447],
-  cheekboneRight: [0.81, 0.447],
-  jawCornerLeft:  [0.18, 0.546],
-  jawCornerRight: [0.82, 0.546],
+  browPoint:      [0.50484, 0.26654],  // lm 10
+  noseTip:        [0.50111, 0.62128],  // lm 1
+  chinTip:        [0.50021, 0.90634],  // lm 152
+  templeLeft:     [0.15754, 0.48205],  // lm 127
+  templeRight:    [0.84792, 0.48325],  // lm 356
+  cheekboneLeft:  [0.16063, 0.5364],   // lm 234
+  cheekboneRight: [0.84272, 0.53732],  // lm 454
+  jawBodyLeft:    [0.19558, 0.71412],  // lm 58  — pre-gonion ramus (Jaw Width cm)
+  jawBodyRight:   [0.80327, 0.71433],  // lm 288
+  jawCornerLeft:  [0.22602, 0.76523],  // lm 172 — gonion (Bigonial Width %)
+  jawCornerRight: [0.77185, 0.76528],  // lm 397
 }
 
+// Values computed by running computeExplorerMetrics against the real MediaPipe
+// coordinates above (male scale reference: cheekboneWidthCM = 13.5 cm anchor).
 const DEMO_METRICS = {
-  jawWidthCM: 12.8,
-  cheekboneWidthCM: 14.1,
-  bitemporalWidthCM: 13.6,
-  bigonialWidthPercent: 78.4,
-  midfaceRatio: 1.05,
+  jawWidthCM: 12.0,
+  cheekboneWidthCM: 13.5,
+  bitemporalWidthCM: 13.7,
+  bigonialWidthPercent: 80.0,
+  midfaceRatio: 0.12,
   facialAngleDegrees: 88.2,
   facialConvexityDegrees: 169.5,
-  gonialAngleDegrees: 122.0,
   foreheadSlopeDegrees: 7.5,
   noseProjectionMM: 18.2,
   chinProjectionMM: 9.6,
-  jawAsymmetryScore: 3.1,
-  cheekboneAsymmetryScore: 2.4,
-  templeAsymmetryScore: 1.8,
+  jawAsymmetryScore: 0.3,
+  cheekboneAsymmetryScore: 0.1,
+  templeAsymmetryScore: 0.2,
 }
 
 // Maps each metric to the landmark point(s) it's anchored to on the photo.
 // Two landmark keys = draw a line between them (width-type measurements).
 // One landmark key = single marker (angle/projection-type measurements).
 const METRIC_DEFS = [
-  { key: 'jawWidthCM',        label: 'Jaw Width',        unit: 'cm', landmarks: ['jawCornerLeft', 'jawCornerRight'] },
+  // jawWidthCM uses pre-gonion ramus points (lm 58/288) — one level above bigonial.
+  // bigonialWidthPercent uses gonion points (lm 172/397) — the true bigonial.
+  // These are distinct anatomical points; the cm vs % is NOT the only difference.
+  { key: 'jawWidthCM',        label: 'Jaw Width',        unit: 'cm', landmarks: ['jawBodyLeft',  'jawBodyRight']  },
   { key: 'cheekboneWidthCM',  label: 'Cheekbone Width',  unit: 'cm', landmarks: ['cheekboneLeft', 'cheekboneRight'] },
   { key: 'bitemporalWidthCM', label: 'Bitemporal Width', unit: 'cm', landmarks: ['templeLeft', 'templeRight'] },
   { key: 'bigonialWidthPercent', label: 'Bigonial Width', unit: '%', landmarks: ['jawCornerLeft', 'jawCornerRight'] },
   { key: 'midfaceRatio',      label: 'Midface Ratio',    unit: 'x', landmarks: ['cheekboneLeft', 'cheekboneRight'] },
   { key: 'facialAngleDegrees', label: 'Facial Angle',      unit: '°', landmarks: ['browPoint'] },
   { key: 'facialConvexityDegrees', label: 'Facial Convexity', unit: '°', landmarks: ['noseTip'] },
-  { key: 'gonialAngleDegrees', label: 'Gonial Angle',      unit: '°', landmarks: ['jawCornerRight'] },
   { key: 'foreheadSlopeDegrees', label: 'Forehead Slope',  unit: '°', landmarks: ['browPoint'] },
   { key: 'noseProjectionMM',  label: 'Nose Projection',  unit: 'mm', landmarks: ['noseTip'] },
   { key: 'chinProjectionMM',  label: 'Chin Projection',  unit: 'mm', landmarks: ['chinTip'] },
@@ -73,38 +82,79 @@ function formatValue(value, unit) {
 
 /**
  * Interactive "tap a stat, see it pointed out on your face" view.
- * Reads the most recent Live Face Scan photo + 2D landmark positions from
- * session-only store state (see setLastFaceScanCapture in useStore.js —
- * this data is intentionally never persisted to localStorage since it's a
- * full-size photo). Before the user has ever run a real scan, falls back to
- * a labeled example (demoFaceImage + DEMO_LANDMARKS_2D/DEMO_METRICS) so this
- * section isn't just blank — the example is visually flagged throughout and
- * links to the real scan flow.
+ *
+ * Data sources (in priority order):
+ * 1. In-memory Zustand state (lastFaceScan*) — populated by the scan flow
+ *    calling setLastFaceScanCapture right after MediaPipe runs. Lives only
+ *    for the current session.
+ * 2. IndexedDB (loadScanMedia) — photo + landmarks persisted across restarts
+ *    by the same scan flow. Loaded async on mount if store is empty.
+ * 3. Demo fallback — only shown if scans[] is truly empty (user has never
+ *    completed a scan). Visually labeled so it's never confused for real data.
  */
 export default function FaceMetricsExplorer() {
   const navigate = useNavigate()
-  const realImage       = useStore(s => s.lastFaceScanImage)
-  const realLandmarks2D = useStore(s => s.lastFaceScanLandmarks2D)
-  const currentScan     = useStore(s => s.currentScan)
-  const storeGender     = useStore(s => s.gender)
-  const realFaceMetrics = currentScan?.faceMetrics
-  // Prefer the current/most recent scan's own gender over the app-wide
-  // saved preference, so the demo photo matches whichever gender the user
-  // most recently scanned as.
-  const demoGender = currentScan?.gender ?? storeGender
+
+  // Session-memory data (set immediately after each scan)
+  const storeImage       = useStore(s => s.lastFaceScanImage)
+  const storeLandmarks2D = useStore(s => s.lastFaceScanLandmarks2D)
+  const storeFaceMetrics = useStore(s => s.lastFaceScanFaceMetrics)
+  const setCapture       = useStore(s => s.setLastFaceScanCapture)
+
+  // Scan history (lightweight metadata only — photos stripped from localStorage)
+  const scans        = useStore(s => s.scans)
+  const currentScan  = useStore(s => s.currentScan)
+  const storeGender  = useStore(s => s.gender)
+  const demoGender   = currentScan?.gender ?? storeGender
+
+  // IndexedDB-loaded data (filled async on mount when store is empty)
+  const [dbImage,       setDbImage]       = useState(null)
+  const [dbLandmarks2D, setDbLandmarks2D] = useState(null)
+  const [dbFaceMetrics, setDbFaceMetrics] = useState(null)
+  const [dbLoading,     setDbLoading]     = useState(false)
+
+  const mostRecentScanId = scans[0]?.id ?? null
+
+  // When the store is empty but we have a scan on record, try to load from IndexedDB.
+  useEffect(() => {
+    if (storeImage || !mostRecentScanId) return
+    setDbLoading(true)
+    import('../utils/scanPhotoDb.js')
+      .then(({ loadScanMedia }) => loadScanMedia(mostRecentScanId))
+      .then(row => {
+        if (!row) return
+        setDbImage(row.photo ?? null)
+        setDbLandmarks2D(row.landmarks2D ?? null)
+        setDbFaceMetrics(row.faceMetrics ?? null)
+        // Populate the store so subsequent renders are instant
+        if (row.photo) {
+          setCapture(row.photo, row.landmarks2D ?? null, row.faceMetrics ?? null)
+        }
+      })
+      .catch(err => console.warn('[FaceExplorer] IndexedDB load:', err.message))
+      .finally(() => setDbLoading(false))
+  }, [mostRecentScanId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [activeKey, setActiveKey] = useState(null)
 
-  const hasRealScan = Boolean(realImage && realLandmarks2D && realFaceMetrics)
-  const isDemo       = !hasRealScan
-  const image        = hasRealScan ? realImage : (demoGender === 'female' ? demoFaceImageFemale : demoFaceImage)
-  const landmarks2D  = hasRealScan ? realLandmarks2D : DEMO_LANDMARKS_2D
-  const faceMetrics  = hasRealScan ? realFaceMetrics : DEMO_METRICS
+  // Resolve which data to use (store wins over DB)
+  const image        = storeImage       ?? dbImage
+  const landmarks2D  = storeLandmarks2D ?? dbLandmarks2D
+  const faceMetrics  = storeFaceMetrics ?? dbFaceMetrics
+
+  // True "no scan ever" — not just "photo missing from current session"
+  const neverScanned = scans.length === 0
+  const hasRealData  = Boolean(image && landmarks2D && faceMetrics)
+  const isDemo       = neverScanned || (!hasRealData && !dbLoading)
+
+  const activeImage      = isDemo ? (demoGender === 'female' ? demoFaceImageFemale : demoFaceImage) : image
+  const activeLandmarks  = isDemo ? DEMO_LANDMARKS_2D : (landmarks2D ?? DEMO_LANDMARKS_2D)
+  const activeFaceMetrics = isDemo ? DEMO_METRICS : (faceMetrics ?? DEMO_METRICS)
 
   const availableMetrics = METRIC_DEFS.filter(def =>
-    faceMetrics[def.key] != null && def.landmarks.every(lm => landmarks2D[lm])
+    activeFaceMetrics[def.key] != null && def.landmarks.every(lm => activeLandmarks[lm])
   )
-  if (availableMetrics.length === 0) return null
+  if (availableMetrics.length === 0 && !dbLoading) return null
 
   const active = availableMetrics.find(m => m.key === activeKey) ?? null
 
@@ -127,7 +177,7 @@ export default function FaceMetricsExplorer() {
             This is a sample face, not you. Run a Live Face Scan to see your own numbers here.
           </span>
           <span className="text-[11px] font-heading font-bold flex-shrink-0" style={{ color: '#C6A85C' }}>
-            Scan →
+            Scan
           </span>
         </button>
       )}
@@ -136,16 +186,19 @@ export default function FaceMetricsExplorer() {
           dots below are positioned as % of this box's width/height, which
           only lines up with where they actually are on the photo if this
           box IS the photo's real aspect ratio. Forcing a fixed 3:4 box with
-          object-cover was cropping differently-shaped captures (e.g. a
-          near-square ARKit frame) and silently shifting every dot off the
-          face. Letting the <img> size itself naturally (w-full h-auto) keeps
-          the box and the coordinate system in sync no matter what shape the
-          source photo is. */}
+          object-cover was cropping differently-shaped captures and silently
+          shifting every dot off the face. */}
       <div
         className="relative w-full rounded-2xl overflow-hidden mb-3"
         style={{ background: '#0a0a0a', border: `1px solid ${isDemo ? 'rgba(198,168,92,0.35)' : 'rgba(0,255,255,0.2)'}` }}
       >
-        <img src={image} alt={isDemo ? 'Example face scan' : 'Your face scan'} className="block w-full h-auto" />
+        {dbLoading && !activeImage ? (
+          <div className="flex items-center justify-center h-48">
+            <span className="text-[12px] font-body" style={{ color: 'rgba(198,168,92,0.5)' }}>Loading your scan…</span>
+          </div>
+        ) : (
+          <img src={activeImage} alt={isDemo ? 'Example face scan' : 'Your face scan'} className="block w-full h-auto" />
+        )}
 
         {isDemo && (
           <div
@@ -162,10 +215,10 @@ export default function FaceMetricsExplorer() {
               <motion.line
                 key={`line-${active.key}`}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                x1={landmarks2D[active.landmarks[0]][0] * 100}
-                y1={landmarks2D[active.landmarks[0]][1] * 100}
-                x2={landmarks2D[active.landmarks[1]][0] * 100}
-                y2={landmarks2D[active.landmarks[1]][1] * 100}
+                x1={activeLandmarks[active.landmarks[0]][0] * 100}
+                y1={activeLandmarks[active.landmarks[0]][1] * 100}
+                x2={activeLandmarks[active.landmarks[1]][0] * 100}
+                y2={activeLandmarks[active.landmarks[1]][1] * 100}
                 stroke="cyan" strokeWidth="0.4" strokeDasharray="1.5 1"
               />
             )}
@@ -180,8 +233,8 @@ export default function FaceMetricsExplorer() {
             exit={{ scale: 0, opacity: 0 }}
             className="absolute w-3 h-3 rounded-full -translate-x-1/2 -translate-y-1/2"
             style={{
-              left: `${landmarks2D[lm][0] * 100}%`,
-              top: `${landmarks2D[lm][1] * 100}%`,
+              left: `${activeLandmarks[lm][0] * 100}%`,
+              top:  `${activeLandmarks[lm][1] * 100}%`,
               background: 'cyan',
               boxShadow: '0 0 10px cyan, 0 0 4px white',
             }}
@@ -196,7 +249,7 @@ export default function FaceMetricsExplorer() {
           >
             <span className="text-xs font-heading font-semibold text-white">{active.label}</span>
             <span className="text-sm font-heading font-bold" style={{ color: isDemo ? '#C6A85C' : 'cyan' }}>
-              {formatValue(faceMetrics[active.key], active.unit)}
+              {formatValue(activeFaceMetrics[active.key], active.unit)}
             </span>
           </motion.div>
         )}
@@ -215,7 +268,7 @@ export default function FaceMetricsExplorer() {
           >
             <span className="text-[11px] font-body text-secondary text-left leading-tight">{def.label}</span>
             <span className="text-xs font-heading font-bold text-primary ml-1.5 flex-shrink-0">
-              {formatValue(faceMetrics[def.key], def.unit)}
+              {formatValue(activeFaceMetrics[def.key], def.unit)}
             </span>
           </button>
         ))}
@@ -224,7 +277,7 @@ export default function FaceMetricsExplorer() {
       <p className="text-[10px] text-secondary font-body mt-2 text-center opacity-70">
         {isDemo
           ? 'Example numbers on a sample face · Run a Live Face Scan to see your own'
-          : 'From your most recent Live Face Scan this session · Estimates, not medical measurements'}
+          : 'From your most recent Live Face Scan · Width estimates use population-average face scale'}
       </p>
     </div>
   )

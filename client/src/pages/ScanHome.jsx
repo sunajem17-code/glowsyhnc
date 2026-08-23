@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Sparkles } from 'lucide-react'
+import { Camera, ChevronRight, Dumbbell, Sparkles, Moon } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+
+const DAILY_SCAN_LIMIT = 3
 
 // Same slide/drag gesture pattern as ScanUnlockGate's SwipeableResultCards
 // (direction-aware enter/exit, velocity-aware drag commit) — reused here for
@@ -65,7 +67,26 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, vi
   )
 }
 
-function BeginScanCard({ onBegin }) {
+function BeginScanCard({ onBegin, limitMessage }) {
+  if (limitMessage) {
+    return (
+      <CardShell
+        eyebrow="DAILY LIMIT REACHED"
+        title="3 Scans Done"
+        body={limitMessage}
+        cta="Got It"
+        icon={Moon}
+        onAction={() => triggerHaptic()}
+        visualClassName="aspect-[4/5] flex-shrink-0"
+        visual={
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
+            <Moon size={56} style={{ color: `${GOLD}55` }} />
+          </div>
+        }
+      />
+    )
+  }
+
   return (
     <CardShell
       eyebrow="NEW SCAN"
@@ -196,15 +217,29 @@ export default function ScanHome() {
   const scans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)
   const setCurrentScan = useStore(s => s.setCurrentScan)
+  const streak = useStore(s => s.streak)
+  const proScanCount = useStore(s => s.proScanCount)
+  const proScanDate = useStore(s => s.proScanDate)
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
 
   const latestScan = scans?.[0] ?? null
 
+  // Daily limit: 3 scans per calendar day (local device time), matching the
+  // streak reset logic which also uses toDateString() as the day boundary.
+  const today = new Date().toDateString()
+  const atLimit = proScanDate === today && proScanCount >= DAILY_SCAN_LIMIT
+
+  const limitMessage = atLimit
+    ? (streak.current > 0
+        ? `Come back tomorrow to continue your ${streak.current} day streak!`
+        : 'Come back tomorrow to start a streak!')
+    : null
+
   // "Past Result" only appears once a scan actually exists — a first-time
   // user never sees a card built from placeholder/fake data.
   const cards = [
-    { id: 'begin', el: <BeginScanCard onBegin={() => navigate('/scan/capture')} /> },
+    { id: 'begin', el: <BeginScanCard onBegin={() => navigate('/scan/capture')} limitMessage={limitMessage} /> },
     ...(latestScan ? [{
       id: 'past',
       el: <PastResultCard scan={latestScan} onView={() => { setCurrentScan(latestScan); navigate('/results') }} />,

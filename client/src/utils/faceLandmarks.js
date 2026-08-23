@@ -263,3 +263,77 @@ function neutralMetrics() {
     _error: 'degenerate landmarks',
   }
 }
+
+// ─── FaceMetricsExplorer data from raw landmarks ──────────────────────────────
+//
+// toExplorerLandmarks2D maps the 468-point MediaPipe array to the 9 named
+// [x, y] pairs that FaceMetricsExplorer uses for overlay dot placement.
+// computeExplorerMetrics derives the metric values shown in the stat cards.
+//
+// Landmark index references (MediaPipe canonical face mesh):
+//  10  forehead center  ·  1  nose tip  ·  152  chin
+//  127 left temple      · 356 right temple
+//  234 left cheekbone   · 454 right cheekbone
+//  172 left jaw corner  · 397 right jaw corner
+export function toExplorerLandmarks2D(lm) {
+  const p = (i) => [lm[i].x, lm[i].y]
+  return {
+    browPoint:      p(10),
+    noseTip:        p(1),
+    chinTip:        p(152),
+    templeLeft:     p(127),
+    templeRight:    p(356),
+    cheekboneLeft:  p(234),
+    cheekboneRight: p(454),
+    // jawBody = pre-gonion ramus (lm 58/288), used for jawWidthCM
+    jawBodyLeft:    p(58),
+    jawBodyRight:   p(288),
+    // jawCorner = gonion angle (lm 172/397), used for bigonialWidthPercent
+    jawCornerLeft:  p(172),
+    jawCornerRight: p(397),
+  }
+}
+
+// Average bizygomatic (cheekbone-to-cheekbone) width used as the cm reference.
+// We don't have a physical ruler in the photo so we anchor to population mean
+// then scale every other distance proportionally. Deliberately labeled as
+// "estimates" in the UI — accurate enough for a looksmaxxing reference, not
+// for medical use.
+const CHEEK_REF_CM = { male: 13.5, female: 12.5, default: 13.0 }
+
+export function computeExplorerMetrics(lm, gender) {
+  const p = (i) => lm[i]
+  const d = (a, b) => Math.sqrt((p(a).x - p(b).x) ** 2 + (p(a).y - p(b).y) ** 2)
+
+  const cheekDist = d(234, 454)
+  if (cheekDist < 0.01) return null  // degenerate — caller should fall back to demo
+
+  const refCm = CHEEK_REF_CM[gender] ?? CHEEK_REF_CM.default
+  const scale = refCm / cheekDist  // normalized units → cm
+
+  // jawBodyDist = pre-gonion ramus (lm 58/288) — used for Jaw Width cm
+  // bigonialDist = gonion-to-gonion (lm 172/397) — used for Bigonial Width %
+  // Keeping them separate ensures the two metrics measure distinct anatomy.
+  const jawBodyDist   = d(58, 288)
+  const bigonialDist  = d(172, 397)
+  const tempDist      = d(127, 356)
+  const midfaceH   = Math.abs(p(1).y - p(234).y)  // nose tip to cheekbone level
+
+  // Asymmetry: how far each pair's midpoint deviates from the nose-tip center
+  const cx = p(1).x
+  const asymScore = (iL, iR) => {
+    const mid = (p(iL).x + p(iR).x) / 2
+    return Math.round(Math.abs(mid - cx) / cheekDist * 1000) / 10  // % of face width
+  }
+
+  return {
+    jawWidthCM:              Math.round(jawBodyDist  * scale * 10) / 10,
+    cheekboneWidthCM:        Math.round(cheekDist    * scale * 10) / 10,
+    bitemporalWidthCM:       Math.round(tempDist     * scale * 10) / 10,
+    bigonialWidthPercent:    Math.round(bigonialDist / cheekDist * 1000) / 10,
+    midfaceRatio:            Math.round(midfaceH / cheekDist * 100) / 100,
+    jawAsymmetryScore:       asymScore(172, 397),
+    cheekboneAsymmetryScore: asymScore(234, 454),
+    templeAsymmetryScore:    asymScore(127, 356),
+  }
+}

@@ -758,12 +758,14 @@ export default function Scan() {
   const lastScanDate      = useStore(s => s.lastScanDate)
   const token             = useStore(s => s.token)
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
-  const addScan           = useStore(s => s.addScan)
-  const setCurrentScan    = useStore(s => s.setCurrentScan)
+  const addScan                = useStore(s => s.addScan)
+  const setCurrentScan         = useStore(s => s.setCurrentScan)
+  const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
   const patchScanExtendedMetrics = useStore(s => s.patchScanExtendedMetrics)
   const setCurrentPlan    = useStore(s => s.setCurrentPlan)
   const setGender         = useStore(s => s.setGender)
   const incrementScanCount = useStore(s => s.incrementScanCount)
+  const recordProScan     = useStore(s => s.recordProScan)
   const setAssignedPhase  = useStore(s => s.setAssignedPhase)
   const setLastScanDate   = useStore(s => s.setLastScanDate)
   const logout            = useStore(s => s.logout)
@@ -998,6 +1000,27 @@ export default function Scan() {
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
+      recordProScan()
+
+      // Fire-and-forget: run MediaPipe client-side to extract named landmarks
+      // and explorer metrics for FaceMetricsExplorer on the Progress screen.
+      // Non-blocking — scan completion is not gated on this.
+      if (faceB64) {
+        import('../utils/faceLandmarks.js')
+          .then(({ getLandmarks, toExplorerLandmarks2D, computeExplorerMetrics }) =>
+            getLandmarks(faceB64).then(lm => {
+              const named2D   = toExplorerLandmarks2D(lm)
+              const explorerM = computeExplorerMetrics(lm, g)
+              if (explorerM) {
+                setLastFaceScanCapture(faceB64, named2D, explorerM)
+                import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+                  saveScanMedia(scanRecord.id, { photo: faceB64, landmarks2D: named2D, faceMetrics: explorerM })
+                ).catch(() => {})
+              }
+            })
+          )
+          .catch(err => console.warn('[FaceExplorer] Landmark detection:', err.message))
+      }
 
       // Extended metrics (30-metric breakdown) fill in a few seconds after
       // the core result — split out server-side purely for latency (core
