@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Gift } from 'lucide-react'
-import useStore from '../store/useStore'
 import { api } from '../utils/api'
 
 // ─── PromoModal ───────────────────────────────────────────────────────────────
 // Accepts a promo code, redeems it against /api/promo/redeem, and on success
-// immediately flips isPremium in the global store so the UI updates without
-// a page reload.  Parent controls visibility via AnimatePresence.
+// shows a confirmation message then calls onSuccess — the parent owns all
+// store mutations (isPremium, updateUser) to avoid race conditions.
 
 export default function PromoModal({ onClose, onSuccess }) {
   const [code, setCode]       = useState('')
@@ -15,8 +14,6 @@ export default function PromoModal({ onClose, onSuccess }) {
   const [error, setError]     = useState('')
   const [success, setSuccess] = useState(false)
   const inputRef              = useRef(null)
-
-  const { setIsPremium, updateUser } = useStore()
 
   // Auto-focus the input when the modal mounts
   useEffect(() => {
@@ -31,10 +28,6 @@ export default function PromoModal({ onClose, onSuccess }) {
     setError('')
     try {
       await api.promo.redeem(trimmed)
-
-      // Immediately reflect Pro status in the UI — no page reload needed
-      setIsPremium(true)
-      updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
 
       setSuccess(true)
       // Close after showing the success message

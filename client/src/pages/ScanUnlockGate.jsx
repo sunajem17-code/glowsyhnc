@@ -935,7 +935,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 
 export default function ScanUnlockGate() {
   const navigate = useNavigate()
-  const { currentScan, isPremium, setIsPremium } = useStore()
+  const { currentScan, isPremium, setIsPremium, updateUser } = useStore()
 
   const [showInvite, setShowInvite]         = useState(false)
   const [showPromo, setShowPromo]           = useState(false)
@@ -948,9 +948,6 @@ export default function ScanUnlockGate() {
   const [purchaseError, setPurchaseError] = useState('')
 
   useEffect(() => {
-    // Only auto-redirect if the user was ALREADY Pro when they landed here.
-    // Guard showSlideshow: PromoModal sets isPremium before onSuccess fires,
-    // so without this guard the navigate fires before the slideshow can render.
     if (isPremium && !justUnlocked && !showSlideshow) navigate('/results', { replace: true })
   }, [isPremium, showSlideshow]) // justUnlocked intentionally omitted — set simultaneously
 
@@ -987,12 +984,11 @@ export default function ScanUnlockGate() {
   // Shared handler — called by both the native purchase path and the promo
   // path so both transitions are identical going forward.
   function handleUnlockSuccess() {
-    // justUnlocked must be set BEFORE isPremium — each setState triggers its
-    // own render in async context. Setting isPremium first causes an
-    // intermediate render where isPremium=true, justUnlocked=false, which
-    // immediately redirects to /results before the slideshow can mount.
     setJustUnlocked(true)
     setIsPremium(true)
+    updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
+    // Set this key BEFORE React commits the batch — App.jsx reads it in the same
+    // render and skips GATE 2 (PremiumSplash), letting the slideshow mount instead.
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
     setShowSlideshow(true)
@@ -1064,9 +1060,6 @@ export default function ScanUnlockGate() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30">
             <PromoModal onClose={() => setShowPromo(false)} onSuccess={() => {
               setShowPromo(false)
-              // PromoModal already called setIsPremium(true) internally before
-              // invoking onSuccess. handleUnlockSuccess sets justUnlocked FIRST
-              // so the auto-redirect useEffect doesn't fire before the slideshow mounts.
               handleUnlockSuccess()
             }} />
           </motion.div>

@@ -120,7 +120,11 @@ export default function App() {
   }
 
   // ── GATE 2: PremiumSplash ────────────────────────────────────────
-  if (isAuthenticated && isPremium && !proSplashDone) {
+  // Also check sessionStorage directly: handleUnlockSuccess sets this key
+  // synchronously before React commits the isPremium=true batch, so reading
+  // it here during the same render correctly suppresses PremiumSplash when
+  // the user just unlocked in-session (UnlockRevealSlideshow is their celebration).
+  if (isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
     return (
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
