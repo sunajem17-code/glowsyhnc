@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Camera, Grid2x2, TrendingUp, Users, Settings } from 'lucide-react'
+import { Camera, Grid2x2, TrendingUp, Users } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GOLD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -9,7 +9,6 @@ const navItems = [
   { to: '/extras',   icon: Grid2x2,   label: 'Extras' },
   { to: '/progress', icon: TrendingUp, label: 'Progress' },
   { to: '/community',icon: Users,     label: 'Community' },
-  { to: '/settings', icon: Settings,  label: 'Settings' },
 ]
 
 // Single source of truth for which routes are tab roots (lateral destinations
@@ -40,11 +39,11 @@ export default function BottomNav() {
               key={to}
               to={to}
               onClick={triggerHaptic}
-              className="relative flex flex-col items-center gap-1 px-2 py-2"
+              className="relative flex flex-col items-center gap-1 px-4 py-2"
             >
               <div className="relative">
                 <Icon
-                  size={19}
+                  size={21}
                   strokeWidth={isActive ? 2.5 : 1.7}
                   style={{
                     color: isActive ? GOLD : 'var(--text-secondary)',

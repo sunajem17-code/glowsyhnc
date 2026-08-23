@@ -11,6 +11,7 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { isNative } from '../utils/iap'
+import { clearAllScanMedia } from '../utils/scanPhotoDb'
 import { triggerHaptic } from '../utils/haptics'
 import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
@@ -113,9 +114,13 @@ export default function Settings() {
   // Delete-account flow
   const [deleteStep, setDeleteStep] = useState('idle') // 'idle' | 'confirm' | 'loading' | 'error'
   const [deleteError, setDeleteError] = useState('')
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Clear scan history flow
   const [clearConfirm, setClearConfirm] = useState(false)
+
+  // Sign-out confirmation
+  const [signOutConfirm, setSignOutConfirm] = useState(false)
 
   useEffect(() => {
     if (!isNative()) { setAppVersion('web'); return }
@@ -159,6 +164,8 @@ export default function Settings() {
         setDeleteStep('error')
         return
       }
+      // Clear local IndexedDB photos in addition to what logout() clears from Zustand
+      await clearAllScanMedia().catch(err => console.warn('[Settings] clearAllScanMedia on delete failed:', err))
       logout()
       navigate('/', { replace: true })
     } catch (err) {
@@ -167,8 +174,16 @@ export default function Settings() {
     }
   }
 
-  function handleClearScans() {
+  function openMailto(address, subject) {
+    const url = `mailto:${address}?subject=${encodeURIComponent(subject)}${appVersion ? `&body=${encodeURIComponent(`App version: ${appVersion}\n\n`)}` : ''}`
+    // window.open / window.location both work in WKWebView and route to Mail.app
+    // Capacitor Browser.open cannot handle mailto: schemes
+    window.open(url, '_blank')
+  }
+
+  async function handleClearScans() {
     clearAllScanData()
+    await clearAllScanMedia().catch(err => console.warn('[Settings] clearAllScanMedia failed:', err))
     setClearConfirm(false)
   }
 
@@ -186,6 +201,7 @@ export default function Settings() {
 
   // ── Delete account confirmation sheet ──────────────────────────────────────
   if (deleteStep === 'confirm' || deleteStep === 'loading' || deleteStep === 'error') {
+    const canDelete = deleteConfirmText.trim().toUpperCase() === 'DELETE'
     return (
       <MotionPage className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
@@ -195,26 +211,76 @@ export default function Settings() {
           </div>
           <h2 className="font-heading font-bold text-[22px] text-primary mb-3">Delete Account?</h2>
           <p className="font-body text-[14px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-            This permanently deletes your account, all scan history, and your Glow Score. This cannot be undone.
+            This permanently deletes your account, all scans, your Glow Score history, and any active subscription reference. This cannot be undone.
           </p>
           {isPremium && (
-            <p className="font-body text-[13px] mb-6" style={{ color: '#E07A5F' }}>
-              Cancel your subscription first in {isNative() ? 'iOS Settings → Subscriptions' : 'your billing portal'} before deleting, or you may continue to be charged.
+            <p className="font-body text-[13px] mb-4" style={{ color: '#E07A5F' }}>
+              Cancel your subscription first in {isNative() ? 'iOS Settings → Subscriptions' : 'your billing portal'} to avoid further charges.
             </p>
           )}
+          <p className="font-body text-[13px] mb-2 text-left w-full" style={{ color: 'var(--text-secondary)' }}>
+            Type <span className="font-heading font-bold" style={{ color: '#E07A5F' }}>DELETE</span> to confirm:
+          </p>
+          <input
+            type="text"
+            value={deleteConfirmText}
+            onChange={e => setDeleteConfirmText(e.target.value)}
+            placeholder="DELETE"
+            autoCapitalize="characters"
+            disabled={deleteStep === 'loading'}
+            className="w-full px-4 py-3 rounded-xl font-heading font-bold text-[15px] mb-4 text-center outline-none"
+            style={{
+              background: 'var(--card)',
+              border: `1px solid ${canDelete ? '#E07A5F' : 'var(--border)'}`,
+              color: 'var(--text-primary)',
+              letterSpacing: '0.1em',
+            }}
+          />
           {deleteError && (
             <p className="font-body text-[13px] mb-4" style={{ color: '#E07A5F' }}>{deleteError}</p>
           )}
           <button
             onClick={handleDeleteAccount}
-            disabled={deleteStep === 'loading'}
+            disabled={!canDelete || deleteStep === 'loading'}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-3 transition-opacity"
-            style={{ background: '#E07A5F', color: '#fff', opacity: deleteStep === 'loading' ? 0.6 : 1 }}
+            style={{ background: '#E07A5F', color: '#fff', opacity: (!canDelete || deleteStep === 'loading') ? 0.4 : 1 }}
           >
-            {deleteStep === 'loading' ? 'Deleting…' : 'Yes, Delete My Account'}
+            {deleteStep === 'loading' ? 'Deleting…' : 'Delete My Account'}
           </button>
           <button
-            onClick={() => { setDeleteStep('idle'); setDeleteError('') }}
+            onClick={() => { setDeleteStep('idle'); setDeleteError(''); setDeleteConfirmText('') }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          >
+            Cancel
+          </button>
+        </div>
+      </MotionPage>
+    )
+  }
+
+  // ── Sign-out confirmation ──────────────────────────────────────────────────
+  if (signOutConfirm) {
+    return (
+      <MotionPage className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+               style={{ background: 'rgba(198,168,92,0.1)' }}>
+            <LogOut size={26} style={{ color: GOLD }} />
+          </div>
+          <h2 className="font-heading font-bold text-[22px] text-primary mb-3">Sign Out?</h2>
+          <p className="font-body text-[14px] mb-8" style={{ color: 'var(--text-secondary)' }}>
+            Your scan history and settings are saved locally. You'll need to sign back in to access your account.
+          </p>
+          <button
+            onClick={() => { logout(); navigate('/', { replace: true }) }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-3"
+            style={{ background: GOLD, color: '#0A0A0A' }}
+          >
+            Sign Out
+          </button>
+          <button
+            onClick={() => setSignOutConfirm(false)}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
             style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
           >
@@ -279,6 +345,7 @@ export default function Settings() {
             icon={User}
             label={displayName}
             value={displayEmail}
+            onPress={() => navigate('/profile')}
           />
           <SettingsRow
             icon={Crown}
@@ -354,7 +421,7 @@ export default function Settings() {
           <SettingsRow
             icon={Shield}
             label="Privacy Policy"
-            onPress={() => openLink('https://ascendus.store/privacy')}
+            onPress={() => navigate('/privacy')}
           />
         </div>
 
@@ -364,7 +431,7 @@ export default function Settings() {
           <SettingsRow
             icon={LogOut}
             label="Sign Out"
-            onPress={() => { logout(); navigate('/', { replace: true }) }}
+            onPress={() => setSignOutConfirm(true)}
           />
           {!isGuest && (
             <SettingsRow
@@ -383,13 +450,13 @@ export default function Settings() {
           <SettingsRow
             icon={FileText}
             label="Terms of Service"
-            onPress={() => openLink('https://ascendus.store/terms')}
+            onPress={() => navigate('/terms')}
           />
           <SettingsRow
             icon={Mail}
             label="Contact Support"
             value="support@ascendus.com"
-            onPress={() => openLink('mailto:support@ascendus.com')}
+            onPress={() => openMailto('support@ascendus.com', 'Support Request')}
           />
         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag, Settings } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -1132,6 +1133,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Community() {
+  const navigate = useNavigate()
   const { user, scans } = useStore()
 
   const [posts, setPosts]           = useState([])
@@ -1209,14 +1211,24 @@ export default function Community() {
             Feed
           </h1>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => { triggerHaptic(); setShowShare(true) }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
-          style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
-        >
-          <Plus size={14} /> Post
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { triggerHaptic(); setShowShare(true) }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
+            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
+          >
+            <Plus size={14} /> Post
+          </motion.button>
+          <button
+            onClick={() => { triggerHaptic(); navigate('/settings') }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            aria-label="Settings"
+          >
+            <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+        </div>
       </div>
 
       {loading ? (

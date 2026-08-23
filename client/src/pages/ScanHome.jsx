@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Sparkles, Moon } from 'lucide-react'
+import { Camera, ChevronRight, Dumbbell, Sparkles, Moon, Settings } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
@@ -277,6 +277,21 @@ export default function ScanHome() {
 
   return (
     <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+      {/* Gear icon: absolute so it floats over the full-bleed card carousel */}
+      <button
+        onClick={() => { triggerHaptic(); navigate('/settings') }}
+        className="absolute z-10 flex items-center justify-center w-9 h-9 rounded-xl active:scale-95 transition-transform"
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+          right: 16,
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}
+        aria-label="Settings"
+      >
+        <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
+      </button>
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div

@@ -70,13 +70,17 @@ const METRIC_DEFS = [
   { key: 'templeAsymmetryScore', label: 'Temple Asymmetry', unit: '%', landmarks: ['templeLeft', 'templeRight'] },
 ]
 
-function formatValue(value, unit) {
+function formatValue(value, unit, units = 'metric') {
   if (value == null) return 'N/A'
   if (unit === '°') return `${value.toFixed(1)}°`
-  if (unit === 'mm') return `${value.toFixed(1)} mm`
-  if (unit === 'cm') return `${value.toFixed(1)} cm`
   if (unit === '%') return `${value.toFixed(1)}%`
   if (unit === 'x') return `${value.toFixed(2)}x`
+  if (units === 'imperial') {
+    if (unit === 'cm') return `${(value * 0.3937).toFixed(1)} in`
+    if (unit === 'mm') return `${(value * 0.03937).toFixed(2)} in`
+  }
+  if (unit === 'mm') return `${value.toFixed(1)} mm`
+  if (unit === 'cm') return `${value.toFixed(1)} cm`
   return String(value)
 }
 
@@ -105,6 +109,7 @@ export default function FaceMetricsExplorer() {
   const scans        = useStore(s => s.scans)
   const currentScan  = useStore(s => s.currentScan)
   const storeGender  = useStore(s => s.gender)
+  const units        = useStore(s => s.units)
   const demoGender   = currentScan?.gender ?? storeGender
 
   // IndexedDB-loaded data (filled async on mount when store is empty)
@@ -249,7 +254,7 @@ export default function FaceMetricsExplorer() {
           >
             <span className="text-xs font-heading font-semibold text-white">{active.label}</span>
             <span className="text-sm font-heading font-bold" style={{ color: isDemo ? '#C6A85C' : 'cyan' }}>
-              {formatValue(activeFaceMetrics[active.key], active.unit)}
+              {formatValue(activeFaceMetrics[active.key], active.unit, units)}
             </span>
           </motion.div>
         )}
@@ -268,7 +273,7 @@ export default function FaceMetricsExplorer() {
           >
             <span className="text-[11px] font-body text-secondary text-left leading-tight">{def.label}</span>
             <span className="text-xs font-heading font-bold text-primary ml-1.5 flex-shrink-0">
-              {formatValue(activeFaceMetrics[def.key], def.unit)}
+              {formatValue(activeFaceMetrics[def.key], def.unit, units)}
             </span>
           </button>
         ))}

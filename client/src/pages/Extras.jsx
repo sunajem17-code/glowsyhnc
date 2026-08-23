@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Heart, Scissors, CheckSquare, CalendarCheck } from 'lucide-react'
+import { Heart, Scissors, CheckSquare, CalendarCheck, Settings } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -46,19 +46,29 @@ export default function Extras() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}
       >
         {/* Header */}
-        <div className="mb-8">
-          <h1
-            className="font-heading font-bold text-[28px] leading-tight"
-            style={{ color: 'var(--text-primary)' }}
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1
+              className="font-heading font-bold text-[28px] leading-tight"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Extras
+            </h1>
+            <p
+              className="font-body text-[14px] mt-1"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Tools to accelerate your ascent
+            </p>
+          </div>
+          <button
+            onClick={() => { triggerHaptic(); navigate('/settings') }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform flex-shrink-0 mt-1"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            aria-label="Settings"
           >
-            Extras
-          </h1>
-          <p
-            className="font-body text-[14px] mt-1"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Tools to accelerate your ascent
-          </p>
+            <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
+          </button>
         </div>
 
         {/* Stacked full-width feature cards */}

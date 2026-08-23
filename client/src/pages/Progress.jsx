@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown } from 'lucide-react'
+import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown, Settings } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -270,7 +270,20 @@ export default function Progress() {
       {/* Hidden canvas used only to generate the share image */}
       <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
-      <PageHeader title="Your Progress" subtitle="Track your glow-up journey" />
+      <PageHeader
+        title="Your Progress"
+        subtitle="Track your glow-up journey"
+        action={
+          <button
+            onClick={() => { triggerHaptic(); navigate('/settings') }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            aria-label="Settings"
+          >
+            <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+        }
+      />
 
       <FaceMetricsExplorer />
 
