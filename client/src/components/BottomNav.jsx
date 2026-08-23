@@ -27,7 +27,7 @@ export default function BottomNav() {
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
         background: 'var(--bg)',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderTop: 'none',
       }}
     >
       <div className="flex items-center justify-around h-[74px]">
