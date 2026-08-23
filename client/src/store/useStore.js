@@ -34,9 +34,11 @@ const useStore = create(
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
-        // Clear the onboarding draft so a subsequent user on this device/session
-        // doesn't inherit a previous user's step position and formData.
+        // Clear session keys so a subsequent login on the same device doesn't
+        // inherit stale onboarding state or the pro-splash suppression flag.
         try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
+        try { sessionStorage.removeItem('asc_pro_splash_shown') } catch { /* ignore */ }
+        try { sessionStorage.removeItem('asc_reveal_shown') } catch { /* ignore */ }
         set({
           user: null,
           token: null,
@@ -49,6 +51,8 @@ const useStore = create(
           todayCheckin: null,
           streak: { current: 0, longest: 0, lastDate: null },
           isPremium: false,
+          proTrialActive: false,
+          proTrialExpiresAt: null,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
           hasOnboarded: false,

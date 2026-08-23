@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Shield, CreditCard, Share2, Trash2,
   ChevronRight, LogOut, Star, Award, Camera, X, Copy, Check, Eye, BarChart2, Database, Sparkles, ChevronDown,
-  User, Heart, Ruler, Map, TrendingUp, RefreshCw, Bot, MessageCircle, ArrowRight,
+  User, Heart, Ruler, Map, TrendingUp, RefreshCw, Bot, MessageCircle, ArrowRight, AlertTriangle, CheckSquare, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -20,6 +20,7 @@ import { ACHIEVEMENTS } from '../utils/achievements'
 import { api } from '../utils/api'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { useDeleteAccount } from '../utils/useDeleteAccount'
 
 // ─── Cancel Subscription Modal ────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function CancelModal({ onClose }) {
                 className="w-full py-3 rounded-xl font-heading font-bold text-[13px] text-black"
                 style={{ background: GOLD_GRADIENT }}
               >
-                Keep Premium at 50% Off →
+                Keep Premium at 50% Off
               </button>
             </div>
 
@@ -294,10 +295,10 @@ export default function Profile() {
   const [rated, setRated] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [dataDeleted, setDataDeleted] = useState(false)
-  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
-  const [deleteAccountError, setDeleteAccountError] = useState('')
   const deleteBackdropRef = useRef(null)
+  // Shared delete-account hook — single source of truth
+  const del = useDeleteAccount()
+  const [subAttested, setSubAttested] = useState(false)
 
   // Real native version/build, not a hardcoded string — lets a real device
   // confirm exactly what's installed instead of guessing from a static label
@@ -309,11 +310,11 @@ export default function Profile() {
     CapApp.getInfo().then(info => setAppVersion(`v${info.version} (${info.build})`)).catch(err => console.warn('[Profile] CapApp.getInfo failed:', err?.message))
   }, [])
 
-  // Lock scroll on the page behind the modal. On iOS WebView, overflow:hidden
-  // alone doesn't stop momentum scroll — we also intercept touchmove at the
-  // document level with { passive: false } so preventDefault() actually works.
+  // Lock scroll behind the delete modal on iOS WebView (overflow:hidden alone
+  // doesn't stop momentum scroll; intercept touchmove with { passive: false }).
+  const deleteModalOpen = del.step !== 'idle'
   useEffect(() => {
-    if (!deleteAccountOpen) return
+    if (!deleteModalOpen) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.documentElement.style.overflow = 'hidden'
@@ -324,7 +325,7 @@ export default function Profile() {
       document.documentElement.style.overflow = ''
       document.removeEventListener('touchmove', prevent)
     }
-  }, [deleteAccountOpen])
+  }, [deleteModalOpen])
 
   const bestScore = scans.length > 0 ? Math.max(...scans.map(s => s.glowScore)) : 0
   const latestScan = scans[0]
@@ -332,34 +333,6 @@ export default function Profile() {
   function handleLogout() {
     logout()
     navigate('/auth')
-  }
-
-  async function handleDeleteAccount() {
-    setDeletingAccount(true)
-    setDeleteAccountError('')
-
-    // Block the global session-expired redirect while deletion is in-flight so
-    // the user sees a meaningful error instead of being silently bounced to /auth.
-    const suppressRedirect = (e) => e.stopImmediatePropagation()
-    window.addEventListener('auth:session-expired', suppressRedirect, true)
-
-    try {
-      const result = await api.user.deleteAccount()
-      logout()
-      navigate('/', { replace: true })
-    } catch (err) {
-      console.error('[DELETE] error:', err?.message, err?.status, err?.stack)
-      const msg = err.message || ''
-      const isExpired = msg.toLowerCase().includes('session') || msg.toLowerCase().includes('expired')
-      setDeleteAccountError(
-        isExpired
-          ? 'Your session expired. Sign out and sign back in, then delete your account.'
-          : msg || 'Deletion failed. Try again or email support@ascendus.com.'
-      )
-      setDeletingAccount(false)
-    } finally {
-      window.removeEventListener('auth:session-expired', suppressRedirect, true)
-    }
   }
 
   async function handleCancelDirect() {
@@ -769,7 +742,7 @@ export default function Profile() {
         <SettingsRow
           icon={Trash2}
           label="Delete Account & Data"
-          onClick={() => { setDeleteAccountOpen(true); setDeleteAccountError('') }}
+          onClick={() => { triggerHaptic(); del.start() }}
           danger
         />
       </motion.div>
@@ -1166,12 +1139,10 @@ export default function Profile() {
         document.body
       )}
 
-      {/* ── Delete Account Modal — rendered in a portal so MotionPage's
-           CSS transform doesn't create a new stacking context that traps
-           position:fixed, causing the backdrop to be clipped. ─────────── */}
+      {/* ── Delete Account Modal — portal escapes MotionPage transform ─────── */}
       {createPortal(
         <AnimatePresence>
-          {deleteAccountOpen && (
+          {del.step !== 'idle' && (
             <motion.div
               ref={deleteBackdropRef}
               initial={{ opacity: 0 }}
@@ -1183,7 +1154,7 @@ export default function Profile() {
                 background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(10px)',
                 touchAction: 'none',
               }}
-              onClick={(e) => { if (e.target === deleteBackdropRef.current && !deletingAccount) setDeleteAccountOpen(false) }}
+              onClick={(e) => { if (e.target === deleteBackdropRef.current && del.step !== 'loading') { setSubAttested(false); del.cancel() } }}
             >
               <motion.div
                 initial={{ y: '100%' }}
@@ -1212,69 +1183,119 @@ export default function Profile() {
                       <div style={{ width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', flexShrink: 0 }}>
                         <Trash2 size={16} style={{ color: '#EF4444' }} />
                       </div>
-                      <h3 className="font-heading font-bold text-[18px] text-white">Delete Account</h3>
+                      <h3 className="font-heading font-bold text-[18px] text-white">
+                        {del.step === 'sub-gate' ? 'Cancel Subscription First' : 'Delete Account'}
+                      </h3>
                     </div>
-                    <button
-                      onClick={() => !deletingAccount && setDeleteAccountOpen(false)}
-                      style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer' }}
-                    >
-                      <X size={15} className="text-white" />
-                    </button>
+                    {del.step !== 'loading' && (
+                      <button
+                        onClick={() => { setSubAttested(false); del.cancel() }}
+                        style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer' }}
+                      >
+                        <X size={15} className="text-white" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Warning box */}
-                  <div style={{ borderRadius: 16, padding: '16px', marginBottom: 20, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                    <p className="font-heading font-bold text-[13px]" style={{ color: '#EF4444', marginBottom: 8 }}>
-                      This is permanent and cannot be undone.
-                    </p>
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {[
-                        'Your account and login will be deleted',
-                        'All scans, scores, and progress history',
-                        'Your 12-week plan and check-in streak',
-                        'Your active subscription will be cancelled',
-                      ].map(line => (
-                        <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          <span style={{ marginTop: 2, fontSize: 10, color: 'rgba(239,68,68,0.7)', flexShrink: 0 }}>✕</span>
-                          <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Error */}
-                  {deleteAccountError && (
-                    <p className="font-body text-[11px] text-center" style={{ color: '#EF4444', marginBottom: 12 }}>
-                      {deleteAccountError}
-                    </p>
+                  {/* ── Sub-gate step ── */}
+                  {del.step === 'sub-gate' && (
+                    <>
+                      <p className="font-body text-[13px] mb-3" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                        You have an active {isPremium ? 'Ascendus subscription' : 'free trial'}. Deleting your account removes all your data but does <span style={{ color: '#EF4444', fontWeight: 700 }}>not</span> cancel App Store billing.
+                      </p>
+                      <div style={{ borderRadius: 14, padding: '14px', marginBottom: 16, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                        <p className="font-heading font-bold text-[11px] tracking-[0.12em]" style={{ color: '#EF4444', marginBottom: 8 }}>HOW TO CANCEL ON iOS</p>
+                        <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {['Open iPhone Settings', 'Tap your Apple ID at the top', 'Tap Subscriptions', 'Tap Ascendus → Cancel Subscription'].map((s, i) => (
+                            <li key={i} className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{i + 1}. {s}</li>
+                          ))}
+                        </ol>
+                      </div>
+                      <button
+                        onClick={async () => { triggerHaptic(); await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' }).catch(() => {}) }}
+                        className="font-heading font-bold text-[13px]"
+                        style={{ width: '100%', padding: '12px', borderRadius: 14, background: 'rgba(198,168,92,0.08)', border: `1px solid ${GOLD}`, color: GOLD, marginBottom: 14 }}
+                      >
+                        Open Subscriptions in Settings
+                      </button>
+                      <button
+                        onClick={() => { triggerHaptic(); setSubAttested(v => !v) }}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 14, textAlign: 'left', padding: 0 }}
+                      >
+                        {subAttested
+                          ? <CheckSquare size={18} style={{ color: '#EF4444', flexShrink: 0, marginTop: 1 }} />
+                          : <Square size={18} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0, marginTop: 1 }} />
+                        }
+                        <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                          I've cancelled my subscription (or I understand I may still be billed)
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => { triggerHaptic(); del.attestedAndContinue() }}
+                        disabled={!subAttested}
+                        className="font-heading font-bold text-[14px]"
+                        style={{ width: '100%', padding: '15px', borderRadius: 16, background: '#EF4444', color: 'white', border: 'none', marginBottom: 10, opacity: subAttested ? 1 : 0.3, cursor: subAttested ? 'pointer' : 'not-allowed' }}
+                      >
+                        Continue to Delete Account
+                      </button>
+                      <button
+                        onClick={() => { setSubAttested(false); del.cancel() }}
+                        className="font-heading font-bold text-[14px]"
+                        style={{ width: '100%', padding: '14px', borderRadius: 16, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </>
                   )}
 
-                  {/* Buttons */}
-                  <button
-                    onClick={() => { triggerHaptic(); handleDeleteAccount() }}
-                    disabled={deletingAccount}
-                    className="font-heading font-bold text-[14px]"
-                    style={{ width: '100%', padding: '16px', borderRadius: 16, background: '#EF4444', color: 'white', border: 'none', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: deletingAccount ? 0.5 : 1, cursor: deletingAccount ? 'not-allowed' : 'pointer' }}
-                  >
-                    {deletingAccount ? (
-                      <>
-                        <motion.span
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                          style={{ display: 'inline-block', width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
-                        />
-                        Deleting…
-                      </>
-                    ) : 'Yes, Delete Everything'}
-                  </button>
-                  <button
-                    onClick={() => setDeleteAccountOpen(false)}
-                    disabled={deletingAccount}
-                    className="font-heading font-bold text-[14px]"
-                    style={{ width: '100%', padding: '14px', borderRadius: 16, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
+                  {/* ── Confirm / loading / error step ── */}
+                  {(del.step === 'confirm' || del.step === 'loading' || del.step === 'error') && (
+                    <>
+                      <div style={{ borderRadius: 16, padding: '16px', marginBottom: 20, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                        <p className="font-heading font-bold text-[13px]" style={{ color: '#EF4444', marginBottom: 8 }}>
+                          This is permanent and cannot be undone.
+                        </p>
+                        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {['Your account and login will be deleted', 'All scans, scores, and progress history', 'Your 12-week plan and check-in streak'].map(line => (
+                            <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                              <span style={{ marginTop: 2, fontSize: 10, color: 'rgba(239,68,68,0.7)', flexShrink: 0 }}>✕</span>
+                              <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      {del.deleteError && (
+                        <p className="font-body text-[11px] text-center" style={{ color: '#EF4444', marginBottom: 12 }}>
+                          {del.deleteError}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => { triggerHaptic(); del.confirm() }}
+                        disabled={del.step === 'loading'}
+                        className="font-heading font-bold text-[14px]"
+                        style={{ width: '100%', padding: '16px', borderRadius: 16, background: '#EF4444', color: 'white', border: 'none', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: del.step === 'loading' ? 0.5 : 1, cursor: del.step === 'loading' ? 'not-allowed' : 'pointer' }}
+                      >
+                        {del.step === 'loading' ? (
+                          <>
+                            <motion.span
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                              style={{ display: 'inline-block', width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
+                            />
+                            Deleting…
+                          </>
+                        ) : 'Yes, Delete Everything'}
+                      </button>
+                      <button
+                        onClick={() => { setSubAttested(false); del.cancel() }}
+                        disabled={del.step === 'loading'}
+                        className="font-heading font-bold text-[14px]"
+                        style={{ width: '100%', padding: '14px', borderRadius: 16, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </motion.div>

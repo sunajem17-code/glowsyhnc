@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
@@ -9,6 +9,7 @@ import {
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
+import UnlockRevealSlideshow from '../components/UnlockRevealSlideshow'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
 import { triggerHaptic } from '../utils/haptics'
@@ -89,9 +90,15 @@ function toTopPct(score) {
   return 'Bot 40%'
 }
 
+// ── Shared unlock helper ──────────────────────────────────────────────────────
+// When isPremium is true, renders children directly; otherwise wraps in BlurLock.
+function MaybeBlur({ children, isPremium, size = 'sm' }) {
+  return isPremium ? children : <BlurLock size={size}>{children}</BlurLock>
+}
+
 // ── Card 1: Original StepScoresWaiting layout ────────────────────────────────
 
-function Card1Score({ scan }) {
+function Card1Score({ scan, isPremium = false }) {
   const glowScore      = scan?.glowScore ?? scan?.umaxScore ?? null
   const tier           = scan?.tier ?? null
   const topPct         = toTopPct(glowScore)
@@ -137,79 +144,81 @@ function Card1Score({ scan }) {
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
             GLOW SCORE
           </p>
-          <BlurLock size="lg">
+          <MaybeBlur isPremium={isPremium} size="lg">
             <div className="flex items-end gap-1.5 mb-3">
               <span className="font-heading font-bold leading-none" style={{ fontSize: 62, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {glowScore != null ? glowScore.toFixed(1) : 'N/A'}
               </span>
               <span className="font-heading font-bold text-[19px] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
             </div>
-          </BlurLock>
+          </MaybeBlur>
           <div className="flex items-center gap-2.5 flex-wrap">
             {tier && (
               <div className="inline-flex items-center px-3 py-1.5 rounded-xl" style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.30)' }}>
-                <BlurLock size="sm">
+                <MaybeBlur isPremium={isPremium} size="sm">
                   <span className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: G }}>{tier.toUpperCase()}</span>
-                </BlurLock>
+                </MaybeBlur>
               </div>
             )}
             {topPct && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>
                 <BarChart2 size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                <BlurLock size="sm">
+                <MaybeBlur isPremium={isPremium} size="sm">
                   <span className="font-heading font-bold text-[11px] tracking-[0.10em]" style={{ color: 'rgba(255,255,255,0.75)' }}>{topPct}</span>
-                </BlurLock>
+                </MaybeBlur>
               </div>
             )}
           </div>
         </div>
 
-        {/* Top strength — label stays visible, the actual observation is locked */}
+        {/* Top strength */}
         {topStrength && (
           <div className="flex items-start gap-3 rounded-2xl px-3.5 py-3 mb-5" style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.18)' }}>
             <div className="flex-shrink-0 mt-0.5" style={{ color: G, fontSize: 13 }}>✦</div>
             <div className="min-w-0">
               <p className="font-body text-[10px] tracking-[0.14em] mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>YOUR TOP STRENGTH</p>
-              <BlurLock size="sm">
+              <MaybeBlur isPremium={isPremium} size="sm">
                 <p className="font-heading font-semibold text-[13px] leading-snug" style={{ color: TEXT }}>{topStrength}</p>
-              </BlurLock>
+              </MaybeBlur>
             </div>
           </div>
         )}
 
-        {/* Biggest growth area teaser */}
+        {/* Biggest growth area */}
         {growthArea && (
           <div className="flex items-start gap-3 rounded-2xl px-3.5 py-3 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />
+            {!isPremium && <Lock size={13} style={{ color: G, marginTop: 2, flexShrink: 0 }} />}
             <div className="min-w-0">
               <p className="font-body text-[11px] mb-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Biggest growth area</p>
-              <BlurLock size="sm">
+              <MaybeBlur isPremium={isPremium} size="sm">
                 <p className="font-heading font-bold text-[13px] mb-1" style={{ color: TEXT }}>{growthArea.label}</p>
-              </BlurLock>
-              <BlurLock size="sm">
+              </MaybeBlur>
+              <MaybeBlur isPremium={isPremium} size="sm">
                 <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   {growthArea.detail}
                 </p>
-              </BlurLock>
+              </MaybeBlur>
             </div>
           </div>
         )}
 
-        {/* Locked metric cards */}
+        {/* Metric cards */}
         <div className="grid grid-cols-2 gap-2.5 mb-4">
           {lockedMetrics.map(({ label, value, unit, pct }) => (
             <div key={label} className="rounded-2xl p-3.5 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
               <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
               <div className="flex items-center justify-between mb-2">
-                <BlurLock size="sm">
+                <MaybeBlur isPremium={isPremium} size="sm">
                   <div className="flex items-end gap-0.5">
                     <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
-                </BlurLock>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                </span>
+                </MaybeBlur>
+                {!isPremium && (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                    <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                  </span>
+                )}
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
@@ -235,7 +244,7 @@ function Card1Score({ scan }) {
 
 // ── Card 3: Face Metrics ──────────────────────────────────────────────────────
 
-function Card3FaceMetrics({ scan }) {
+function Card3FaceMetrics({ scan, isPremium = false }) {
   const p  = scan?.pillars   ?? {}
   const fd = scan?.faceData  ?? {}
 
@@ -270,9 +279,11 @@ function Card3FaceMetrics({ scan }) {
             >
               <div className="flex items-center justify-between mb-2.5">
                 <Icon size={12} style={{ color: G }} />
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                </span>
+                {!isPremium && (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                    <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                  </span>
+                )}
               </div>
               <p
                 className="font-heading font-bold text-[9px] tracking-[0.12em] mb-3"
@@ -280,14 +291,14 @@ function Card3FaceMetrics({ scan }) {
               >
                 {label}
               </p>
-              <BlurLock>
+              <MaybeBlur isPremium={isPremium}>
                 <div className="flex items-end gap-0.5">
                   <span className="font-heading font-bold text-[24px] leading-none" style={{ color: TEXT }}>
                     {value.toFixed(1)}
                   </span>
                   <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>/10</span>
                 </div>
-              </BlurLock>
+              </MaybeBlur>
             </div>
           ))}
         </div>
@@ -303,12 +314,14 @@ function Card3FaceMetrics({ scan }) {
             >
               <p className="font-body text-[11px] tracking-wide" style={{ color: DIM }}>{label}</p>
               <div className="flex items-center gap-1.5">
-                <BlurLock size="sm">
+                <MaybeBlur isPremium={isPremium} size="sm">
                   <span className="font-heading font-bold text-[13px]" style={{ color: TEXT }}>{value.toFixed(1)}</span>
-                </BlurLock>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                </span>
+                </MaybeBlur>
+                {!isPremium && (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                    <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -320,7 +333,7 @@ function Card3FaceMetrics({ scan }) {
 
 // ── Card 6: AI Analysis Preview ───────────────────────────────────────────────
 
-function Card6AIAnalysis({ scan }) {
+function Card6AIAnalysis({ scan, isPremium = false }) {
   const insights = scan?.aiScore?.insights
     ?? scan?.aiScore?.recommendations
     ?? []
@@ -358,13 +371,13 @@ function Card6AIAnalysis({ scan }) {
               >
                 <span className="font-heading font-bold text-[9px]" style={{ color: G }}>{i + 1}</span>
               </div>
-              <Lock size={10} style={{ color: G }} />
+              {!isPremium && <Lock size={10} style={{ color: G }} />}
             </div>
-            <BlurLock size="sm">
+            <MaybeBlur isPremium={isPremium} size="sm">
               <p className="font-body text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
                 {line}
               </p>
-            </BlurLock>
+            </MaybeBlur>
           </div>
         ))}
       </div>
@@ -372,10 +385,267 @@ function Card6AIAnalysis({ scan }) {
   )
 }
 
+// ── Card: Percentile Distribution ────────────────────────────────────────────
+// Shown only after unlock. Percentile is derived from score thresholds
+// calibrated to a normal distribution — no real per-user distribution is
+// tracked server-side yet, so this is an estimate, not a live data point.
+function CardPercentile({ scan }) {
+  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
+  const photo     = scan?.facePhotoUrl ?? null
+
+  function scoreToBetterThan(s) {
+    if (s >= 9.0) return 99
+    if (s >= 8.5) return 97
+    if (s >= 8.0) return 94
+    if (s >= 7.5) return 88
+    if (s >= 7.0) return 82
+    if (s >= 6.5) return 72
+    if (s >= 6.0) return 62
+    if (s >= 5.5) return 50
+    if (s >= 5.0) return 40
+    if (s >= 4.5) return 30
+    if (s >= 4.0) return 22
+    return 10
+  }
+
+  const betterThan = glowScore != null ? scoreToBetterThan(glowScore) : null
+
+  // Bell curve SVG — Gaussian with mean=5.5, sigma=1.8
+  const MEAN = 5.5, SD = 1.8
+  const pdf = (x) => Math.exp(-0.5 * ((x - MEAN) / SD) ** 2) / (SD * Math.sqrt(2 * Math.PI))
+  const SVG_W = 300, SVG_H = 108, PAD = 10
+  const USABLE = SVG_W - PAD * 2
+  const toX = (score) => PAD + (Math.min(10, Math.max(0, score)) / 10) * USABLE
+  const maxP = pdf(MEAN)
+  const toY = (p) => (SVG_H - 12) - (p / maxP) * (SVG_H - 28)
+
+  const N = 120
+  const pts = Array.from({ length: N + 1 }, (_, i) => ({ score: (i / N) * 10, p: pdf((i / N) * 10) }))
+
+  const curvePath = 'M ' + pts.map(pt => `${toX(pt.score).toFixed(1)},${toY(pt.p).toFixed(1)}`).join(' L ')
+
+  const userX  = glowScore != null ? toX(glowScore) : null
+  const userY  = glowScore != null ? toY(pdf(Math.min(10, Math.max(0, glowScore)))) : null
+  const fillPts = pts.filter(pt => toX(pt.score) <= (userX ?? 0) + 0.5)
+  const fillPath = fillPts.length > 1
+    ? `M ${toX(0).toFixed(1)},${(SVG_H - 12).toFixed(1)} ` +
+      fillPts.map(pt => `L ${toX(pt.score).toFixed(1)},${toY(pt.p).toFixed(1)}`).join(' ') +
+      ` L ${(userX ?? 0).toFixed(1)},${(SVG_H - 12).toFixed(1)} Z`
+    : ''
+
+  const PURPLE = '#8B5CF6'
+  const PURPLE_MID = '#A78BFA'
+
+  return (
+    <CardShell badge="YOUR RANKING" icon={BarChart2}>
+      {/* Photo + score row */}
+      <div className="flex items-center gap-4 mb-5">
+        <div
+          className="w-[60px] h-[60px] rounded-2xl overflow-hidden flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.06)' }}
+        >
+          {photo
+            ? <img src={photo} alt="Your scan" className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center"><BarChart2 size={22} style={{ color: 'rgba(255,255,255,0.25)' }} /></div>
+          }
+        </div>
+        <div>
+          <p className="font-body text-[10px] tracking-[0.14em] mb-0.5" style={{ color: 'rgba(139,92,246,0.7)' }}>GLOW SCORE</p>
+          <div className="flex items-end gap-1">
+            <span className="font-heading font-bold leading-none" style={{ fontSize: 46, color: TEXT, letterSpacing: '-0.03em' }}>
+              {glowScore != null ? glowScore.toFixed(1) : '—'}
+            </span>
+            <span className="font-heading font-bold text-[16px] mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bell curve */}
+      <div
+        className="rounded-2xl overflow-hidden mb-3"
+        style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}
+      >
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%" style={{ display: 'block' }}>
+          <defs>
+            <linearGradient id="pctFill" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={PURPLE} stopOpacity="0.1" />
+              <stop offset="100%" stopColor={PURPLE} stopOpacity="0.5" />
+            </linearGradient>
+          </defs>
+          {fillPath && <path d={fillPath} fill="url(#pctFill)" />}
+          <path d={curvePath} fill="none" stroke={PURPLE_MID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {userX != null && userY != null && (
+            <>
+              <line x1={userX} y1={userY + 4} x2={userX} y2={SVG_H - 12} stroke={PURPLE} strokeWidth="1.5" strokeDasharray="3,3" />
+              <circle cx={userX} cy={userY} r="4.5" fill={PURPLE} />
+              <circle cx={userX} cy={userY} r="7" fill="none" stroke={PURPLE} strokeWidth="1" strokeOpacity="0.4" />
+              <text
+                x={Math.min(Math.max(userX - 28, 4), SVG_W - 64)}
+                y={userY - 10}
+                fill={PURPLE_MID}
+                fontSize="9"
+                fontFamily="Inter, sans-serif"
+                fontWeight="700"
+                letterSpacing="0.02em"
+              >
+                You&apos;re here
+              </text>
+            </>
+          )}
+          <line x1={PAD} y1={SVG_H - 12} x2={SVG_W - PAD} y2={SVG_H - 12} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+        </svg>
+      </div>
+
+      {/* Percentile copy */}
+      {betterThan != null && (
+        <p className="font-body text-[14px] text-center mb-1" style={{ color: TEXT }}>
+          Your score is better than{' '}
+          <span className="font-heading font-bold" style={{ color: PURPLE_MID }}>{betterThan}%</span>
+          {' '}of people
+        </p>
+      )}
+      <p className="font-body text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
+        Estimate based on score benchmarks · updates as more users join
+      </p>
+    </CardShell>
+  )
+}
+
+// ── Card: Score Progress Graph ────────────────────────────────────────────────
+// Pro-gated. Reads scan history from Zustand (already persisted).
+// Uses a simple SVG area+line chart — no external charting dep.
+function CardProgress({ isPremium = false }) {
+  const scans = useStore(s => s.scans)
+
+  // Build data points: most-recent scan first in store, so reverse for chart
+  const pts = [...scans]
+    .reverse()
+    .filter(s => s.glowScore != null)
+    .map((s, i) => ({
+      idx: i,
+      score: s.glowScore,
+      label: s.scanDate
+        ? new Date(s.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : `#${i + 1}`,
+    }))
+
+  const CHART_H = 110
+  const PT_W    = 72  // px per data point — makes it scrollable with many scans
+  const CHART_W = Math.max(280, pts.length * PT_W)
+  const PAD_V   = 14
+  const MIN_S   = 0, MAX_S = 10
+
+  const toY = (score) =>
+    PAD_V + ((MAX_S - score) / (MAX_S - MIN_S)) * (CHART_H - PAD_V * 2)
+  const toX = (i) =>
+    pts.length === 1 ? CHART_W / 2 : (i / (pts.length - 1)) * (CHART_W - 24) + 12
+
+  const linePath = pts.length > 1
+    ? 'M ' + pts.map(p => `${toX(p.idx).toFixed(1)},${toY(p.score).toFixed(1)}`).join(' L ')
+    : ''
+
+  const areaPath = pts.length > 1
+    ? `M ${toX(0).toFixed(1)},${CHART_H} ` +
+      pts.map(p => `L ${toX(p.idx).toFixed(1)},${toY(p.score).toFixed(1)}`).join(' ') +
+      ` L ${toX(pts.length - 1).toFixed(1)},${CHART_H} Z`
+    : ''
+
+  const content = (
+    <CardShell badge="PROGRESS" icon={Activity}>
+      {pts.length < 2 ? (
+        <div className="flex flex-col items-center justify-center py-10 gap-3">
+          <Activity size={28} style={{ color: 'rgba(198,168,92,0.3)' }} />
+          <p className="font-body text-[13px] text-center" style={{ color: DIM }}>
+            Scan again to start tracking your progress
+          </p>
+          <p className="font-body text-[11px] text-center" style={{ color: 'rgba(255,255,255,0.22)' }}>
+            {pts.length === 0 ? 'No scans yet' : 'You need at least 2 scans to see a trend'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="font-body text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.38)' }}>
+            Glow Score across {pts.length} scan{pts.length !== 1 ? 's' : ''}
+          </p>
+          <div className="overflow-x-auto rounded-2xl" style={{ border: '1px solid rgba(198,168,92,0.12)', background: 'rgba(198,168,92,0.03)' }}>
+            <svg
+              width={CHART_W}
+              height={CHART_H + 24}
+              style={{ display: 'block', minWidth: CHART_W }}
+            >
+              <defs>
+                <linearGradient id="progFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={G} stopOpacity="0.35" />
+                  <stop offset="100%" stopColor={G} stopOpacity="0.03" />
+                </linearGradient>
+              </defs>
+              {/* Horizontal grid lines at 2.5, 5, 7.5 */}
+              {[2.5, 5, 7.5].map(v => (
+                <line
+                  key={v}
+                  x1={0} y1={toY(v).toFixed(1)}
+                  x2={CHART_W} y2={toY(v).toFixed(1)}
+                  stroke="rgba(255,255,255,0.05)" strokeWidth="1"
+                />
+              ))}
+              {/* Area fill */}
+              {areaPath && <path d={areaPath} fill="url(#progFill)" />}
+              {/* Line */}
+              {linePath && (
+                <path d={linePath} fill="none" stroke={G} strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {/* Dots + labels */}
+              {pts.map(p => (
+                <g key={p.idx}>
+                  <circle cx={toX(p.idx)} cy={toY(p.score)} r="4" fill={G} />
+                  <text
+                    x={toX(p.idx)} y={CHART_H + 16}
+                    fill="rgba(255,255,255,0.38)"
+                    fontSize="8" textAnchor="middle"
+                    fontFamily="Inter, sans-serif"
+                  >
+                    {p.label}
+                  </text>
+                  <text
+                    x={toX(p.idx)}
+                    y={Math.max(toY(p.score) - 8, PAD_V + 2)}
+                    fill={G} fontSize="8.5" textAnchor="middle"
+                    fontFamily="Inter, sans-serif" fontWeight="700"
+                  >
+                    {p.score.toFixed(1)}
+                  </text>
+                </g>
+              ))}
+            </svg>
+          </div>
+        </>
+      )}
+    </CardShell>
+  )
+
+  if (!isPremium) {
+    return (
+      <CardShell badge="PROGRESS" icon={Activity}>
+        <BlurLock size="lg">
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <Activity size={28} style={{ color: 'rgba(198,168,92,0.3)' }} />
+            <p className="font-body text-[13px] text-center" style={{ color: DIM }}>
+              Track your Glow Score over time
+            </p>
+          </div>
+        </BlurLock>
+      </CardShell>
+    )
+  }
+
+  return content
+}
+
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
 
-function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {} }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {}, isPremium = false }) {
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -389,14 +659,17 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
     return () => obs.disconnect()
   }, [])
 
+  const facePhoto = scan?.facePhotoUrl ?? null
   const cards = [
-    { id: 'score', el: <Card1Score scan={scan} /> },
+    ...(isPremium ? [{ id: 'percentile', el: <CardPercentile scan={scan} /> }] : []),
+    { id: 'score', el: <Card1Score scan={scan} isPremium={isPremium} /> },
     ...EXTENDED_CATEGORIES.map(cat => ({
       id: cat.key,
-      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} />,
+      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} isPremium={isPremium} facePhotoUrl={facePhoto} />,
     })),
-    { id: 'face', el: <Card3FaceMetrics scan={scan} /> },
-    { id: 'ai',   el: <Card6AIAnalysis scan={scan} /> },
+    { id: 'face', el: <Card3FaceMetrics scan={scan} isPremium={isPremium} /> },
+    { id: 'ai',   el: <Card6AIAnalysis scan={scan} isPremium={isPremium} /> },
+    { id: 'progress', el: <CardProgress isPremium={isPremium} /> },
   ]
 
   function goTo(idx) {
@@ -532,99 +805,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
   )
 }
 
-// ── Unlock Reveal Animation ───────────────────────────────────────────────────
-
-function UnlockReveal({ score, onContinue }) {
-  const reducedMotion = useReducedMotion()
-  const [revealed, setRevealed] = useState(false)
-
-  useEffect(() => {
-    const t = setTimeout(() => setRevealed(true), reducedMotion ? 300 : 1400)
-    return () => clearTimeout(t)
-  }, [reducedMotion])
-
-  const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
-    angle: (i / 22) * 360,
-    radius: 90 + (i % 3) * 55,
-    size: 3 + (i % 4),
-    delay: (i % 7) * 0.06,
-  }))
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="fixed inset-0 flex flex-col items-center justify-center z-50"
-      style={{ background: '#000' }}
-    >
-      {!reducedMotion && (
-        <>
-          <motion.div
-            initial={{ scale: 0.2, opacity: 0.9 }}
-            animate={{ scale: revealed ? 3.5 : 0.2, opacity: revealed ? 0 : 0.9 }}
-            transition={{ duration: 1.2, ease: EASE_STANDARD }}
-            style={{ position: 'absolute', width: 240, height: 240, borderRadius: '50%', border: `2px solid ${G}`, pointerEvents: 'none' }}
-          />
-          {PARTICLES.map((p, i) => (
-            <motion.div
-              key={i}
-              initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
-              animate={revealed ? { x: Math.cos((p.angle * Math.PI) / 180) * p.radius, y: Math.sin((p.angle * Math.PI) / 180) * p.radius, opacity: 0, scale: 0 } : {}}
-              transition={{ duration: 0.85, delay: p.delay, ease: EASE_STANDARD }}
-              style={{ position: 'absolute', width: p.size, height: p.size, borderRadius: '50%', background: G, pointerEvents: 'none' }}
-            />
-          ))}
-        </>
-      )}
-      <motion.div
-        animate={{ opacity: revealed ? 0.25 : 0 }}
-        transition={{ duration: 1.0, delay: reducedMotion ? 0 : 0.4 }}
-        style={{ position: 'absolute', width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(198,168,92,0.5) 0%, transparent 65%)', filter: 'blur(20px)', pointerEvents: 'none' }}
-      />
-      <div className="relative z-10 text-center">
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: reducedMotion ? 0 : 0.2 }}
-          className="font-heading font-bold text-[11px] tracking-[0.22em] mb-6"
-          style={{ color: 'rgba(198,168,92,0.65)' }}
-        >
-          YOUR ASCENDUS SCORE
-        </motion.p>
-        <motion.div
-          initial={reducedMotion ? { opacity: 0 } : { filter: 'blur(28px)', scale: 0.8, opacity: 0 }}
-          animate={reducedMotion
-            ? { opacity: 1 }
-            : { filter: revealed ? 'blur(0px)' : 'blur(28px)', scale: revealed ? 1 : 0.8, opacity: 1 }}
-          transition={reducedMotion
-            ? { duration: 0.2, ease: 'easeOut' }
-            : { duration: 1.1, ease: EASE_STANDARD, delay: 0.15 }}
-        >
-          <span className="font-heading font-bold" style={{ fontSize: 100, color: TEXT, letterSpacing: '-0.04em', lineHeight: 1, display: 'block' }}>
-            {score.toFixed(1)}
-          </span>
-          <span className="font-heading font-bold text-[26px]" style={{ color: 'rgba(255,255,255,0.35)' }}>/10</span>
-        </motion.div>
-      </div>
-      <AnimatePresence>
-        {revealed && (
-          <motion.button
-            initial={{ opacity: 0, y: reducedMotion ? 0 : 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: reducedMotion ? 0 : 0.55 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onContinue}
-            className="relative z-10 mt-14 px-12 py-4 rounded-2xl font-heading font-bold text-[16px]"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.45)' }}
-          >
-            See My Full Results
-          </motion.button>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  )
-}
-
 // ── Invite Sheet ──────────────────────────────────────────────────────────────
 
 const REQUIRED = 3
@@ -757,9 +937,10 @@ export default function ScanUnlockGate() {
   const navigate = useNavigate()
   const { currentScan, isPremium, setIsPremium } = useStore()
 
-  const [showInvite, setShowInvite]     = useState(false)
-  const [showPromo, setShowPromo]       = useState(false)
-  const [showReveal, setShowReveal]     = useState(false)
+  const [showInvite, setShowInvite]         = useState(false)
+  const [showPromo, setShowPromo]           = useState(false)
+  const [showSlideshow, setShowSlideshow]   = useState(false)
+  const [justUnlocked, setJustUnlocked]     = useState(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
   const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
@@ -767,8 +948,11 @@ export default function ScanUnlockGate() {
   const [purchaseError, setPurchaseError] = useState('')
 
   useEffect(() => {
-    if (isPremium) navigate('/results', { replace: true })
-  }, [isPremium])
+    // Only auto-redirect if the user was ALREADY Pro when they landed here.
+    // Guard showSlideshow: PromoModal sets isPremium before onSuccess fires,
+    // so without this guard the navigate fires before the slideshow can render.
+    if (isPremium && !justUnlocked && !showSlideshow) navigate('/results', { replace: true })
+  }, [isPremium, showSlideshow]) // justUnlocked intentionally omitted — set simultaneously
 
   useEffect(() => {
     if (!currentScan) navigate('/scan', { replace: true })
@@ -784,12 +968,34 @@ export default function ScanUnlockGate() {
       .catch(() => {})
   }, [])
 
-  if (isPremium || !currentScan) return null
+  if (!currentScan) return null
 
-  const revealScore = currentScan?.glowScore ?? currentScan?.umaxScore ?? 7.0
+  // showSlideshow must be checked before the isPremium gate: PromoModal sets
+  // isPremium=true inside itself before onSuccess fires, so without this
+  // ordering the null-return fires and the slideshow never renders.
+  if (showSlideshow) {
+    return (
+      <UnlockRevealSlideshow
+        scan={currentScan}
+        onFinish={() => navigate('/results', { replace: true })}
+      />
+    )
+  }
 
-  if (showReveal) {
-    return <UnlockReveal score={revealScore} onContinue={() => navigate('/results', { replace: true })} />
+  if (isPremium && !justUnlocked) return null
+
+  // Shared handler — called by both the native purchase path and the promo
+  // path so both transitions are identical going forward.
+  function handleUnlockSuccess() {
+    // justUnlocked must be set BEFORE isPremium — each setState triggers its
+    // own render in async context. Setting isPremium first causes an
+    // intermediate render where isPremium=true, justUnlocked=false, which
+    // immediately redirects to /results before the slideshow can mount.
+    setJustUnlocked(true)
+    setIsPremium(true)
+    try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
+    try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
+    setShowSlideshow(true)
   }
 
   async function handleAscend() {
@@ -806,10 +1012,9 @@ export default function ScanUnlockGate() {
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
-          sessionStorage.setItem('asc_pro_splash_shown', '1')
-          setIsPremium(true)
           logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
-          navigate('/results', { replace: true })
+          handleUnlockSuccess()
+          setIsPurchasing(false)
           return
         }
         // Resolved without granting the entitlement — either the user
@@ -851,6 +1056,7 @@ export default function ScanUnlockGate() {
         isPurchasing={isPurchasing}
         error={purchaseError}
         trialEligibility={trialEligibility}
+        isPremium={isPremium}
       />
 
       <AnimatePresence>
@@ -858,10 +1064,10 @@ export default function ScanUnlockGate() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30">
             <PromoModal onClose={() => setShowPromo(false)} onSuccess={() => {
               setShowPromo(false)
-              // Flag this scan's reveal as shown so Results.jsx's own ScoreReveal
-              // doesn't replay the same score count-up seconds later.
-              try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
-              setShowReveal(true)
+              // PromoModal already called setIsPremium(true) internally before
+              // invoking onSuccess. handleUnlockSuccess sets justUnlocked FIRST
+              // so the auto-redirect useEffect doesn't fire before the slideshow mounts.
+              handleUnlockSuccess()
             }} />
           </motion.div>
         )}

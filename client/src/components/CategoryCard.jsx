@@ -38,18 +38,21 @@ const DIM  = 'var(--text-secondary)'
 
 // ── Card shell ────────────────────────────────────────────────────────────────
 
-export function CardShell({ badge, icon: Icon, children }) {
+export function CardShell({ badge, icon: Icon, children, facePhotoUrl }) {
   return (
     <div className="h-full flex flex-col overflow-y-auto"
          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
       <div className="flex flex-col px-6 pb-2">
-        {/* Badge row */}
+        {/* Badge row — with optional face photo avatar */}
         <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
             style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
           >
-            <Icon size={16} style={{ color: G }} />
+            {facePhotoUrl
+              ? <img src={facePhotoUrl} alt="Your scan" className="w-full h-full object-cover" />
+              : <Icon size={16} style={{ color: G }} />
+            }
           </div>
           <span
             className="font-heading font-bold text-[10px] tracking-[0.22em]"
@@ -152,7 +155,7 @@ export const EXTENDED_CATEGORIES = [
   },
 ]
 
-export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
+export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremium = false, facePhotoUrl }) {
   const data = scan?.extendedMetrics?.[categoryKey] ?? {}
   // Extended metrics now arrive a few seconds after the core score via a
   // separate follow-up call (see Scan.jsx/PremiumOnboarding.jsx) — while it's
@@ -171,7 +174,7 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
   })
 
   return (
-    <CardShell badge={badge} icon={icon}>
+    <CardShell badge={badge} icon={icon} facePhotoUrl={facePhotoUrl}>
       <div className="grid grid-cols-2 gap-2.5 mb-3">
         {tiles.map(({ label, value, unit, pct }) => (
           <div
@@ -190,6 +193,11 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
                   animate={{ opacity: [0.4, 0.9, 0.4] }}
                   transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
                 />
+              ) : isPremium ? (
+                <div className="flex items-end gap-0.5">
+                  <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                  {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+                </div>
               ) : (
                 <BlurLock size="sm">
                   <div className="flex items-end gap-0.5">
@@ -198,9 +206,11 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
                   </div>
                 </BlurLock>
               )}
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-              </span>
+              {!isPremium && (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+                </span>
+              )}
             </div>
             <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
               {isPending && pct === 0 ? (
@@ -217,6 +227,11 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics }) {
           </div>
         ))}
       </div>
+      {isPremium && (
+        <p className="text-center font-body text-[11px] mt-1 mb-3" style={{ color: 'rgba(198,168,92,0.45)' }}>
+          Continue for more insight
+        </p>
+      )}
     </CardShell>
   )
 }

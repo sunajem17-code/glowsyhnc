@@ -1670,9 +1670,10 @@ export default function PremiumOnboarding() {
   const setUnits           = useStore(s => s.setUnits)
   const setAuth            = useStore(s => s.setAuth)
   const setGuestSession    = useStore(s => s.setGuestSession)
-  const addScan            = useStore(s => s.addScan)
-  const currentScan        = useStore(s => s.currentScan)
-  const setCurrentScan     = useStore(s => s.setCurrentScan)
+  const addScan                = useStore(s => s.addScan)
+  const currentScan            = useStore(s => s.currentScan)
+  const setCurrentScan         = useStore(s => s.setCurrentScan)
+  const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
   const patchScanExtendedMetrics = useStore(s => s.patchScanExtendedMetrics)
   const setCurrentPlan     = useStore(s => s.setCurrentPlan)
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
@@ -1783,6 +1784,26 @@ export default function PremiumOnboarding() {
       addScan(scanRecord)
       setCurrentScan(scanRecord)
       setAssignedPhase(phase)
+
+      // Fire-and-forget: MediaPipe landmark extraction for FaceMetricsExplorer
+      if (scanRecord.facePhotoUrl) {
+        const photo = scanRecord.facePhotoUrl
+        const sid   = scanRecord.id
+        import('../utils/faceLandmarks.js')
+          .then(({ getLandmarks, toExplorerLandmarks2D, computeExplorerMetrics }) =>
+            getLandmarks(photo).then(lm => {
+              const named2D   = toExplorerLandmarks2D(lm)
+              const explorerM = computeExplorerMetrics(lm, g)
+              if (explorerM) {
+                setLastFaceScanCapture(photo, named2D, explorerM)
+                import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+                  saveScanMedia(sid, { photo, landmarks2D: named2D, faceMetrics: explorerM })
+                ).catch(() => {})
+              }
+            })
+          )
+          .catch(err => console.warn('[FaceExplorer] Landmark detection:', err.message))
+      }
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
       logAnalyticsEvent('scan_completed', { tier: scanRecord?.tier, score: scanRecord?.umaxScore, source: 'onboarding' })

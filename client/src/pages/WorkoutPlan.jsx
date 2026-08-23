@@ -660,7 +660,7 @@ export default function WorkoutPlan() {
                   <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
                   <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Your full personalized training split, built around your weak areas, not a generic template</p>
                   <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
-                    Upgrade to Pro →
+                    Upgrade to Pro
                   </button>
                 </div>
               </div>
@@ -762,7 +762,7 @@ export default function WorkoutPlan() {
                   <p className="font-heading font-bold text-sm text-primary mb-0.5">Pro Feature</p>
                   <p className="text-[11px] text-secondary font-body mb-3 text-center px-4">Full macro breakdown framed around your physique goals, not generic health advice</p>
                   <button onClick={() => navigate('/premium')} className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-black" style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)' }}>
-                    Upgrade to Pro →
+                    Upgrade to Pro
                   </button>
                 </div>
               </div>

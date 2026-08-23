@@ -1330,6 +1330,7 @@ export async function analyzeFacePhoto(photoUrl, gender = 'male') {
     // Jaw taper, gonial angle, face elongation = actual bone structure, not hair.
     let edgeDensity, lowerFaceEdges, symmetry
     let usedLandmarks = false
+    let rawLandmarks = null
 
     try {
       const { getLandmarks, computeStructuralMetrics } = await import('./faceLandmarks.js')
@@ -1341,6 +1342,9 @@ export async function analyzeFacePhoto(photoUrl, gender = 'male') {
       edgeDensity    = geo.edgeDensity      // facial sharpness from real geometry
       symmetry       = geo.symmetry         // symmetry from actual landmark positions
       usedLandmarks  = true
+      // Expose raw landmarks so callers can derive FaceMetricsExplorer data
+      // without re-running face mesh (already paid the WASM cost above).
+      rawLandmarks = landmarks
       console.info('[Analysis] Using MediaPipe landmarks:', {
         jawTaper: geo._jawTaper,
         elongation: geo._elongation,
@@ -1377,6 +1381,7 @@ export async function analyzeFacePhoto(photoUrl, gender = 'male') {
       aestheticScore,
       potentialScore,
       usedLandmarks,
+      _rawLandmarks: rawLandmarks,
     }
   } catch (e) {
     console.warn('Face analysis fallback:', e.message)

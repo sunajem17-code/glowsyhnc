@@ -177,7 +177,7 @@ export default function Referral() {
                   color: '#0A0A0A',
                 }}
               >
-                Claim 7 Days Pro Free →
+                Claim 7 Days Pro Free
               </motion.button>
             )}
             {trialStarted && (

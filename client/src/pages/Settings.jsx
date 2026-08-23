@@ -5,16 +5,16 @@ import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
   User, Crown, Ruler, Bell, Palette, Trash2, LogOut,
-  ChevronRight, Shield, FileText, Mail, AlertTriangle,
+  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import { api } from '../utils/api'
 import { isNative } from '../utils/iap'
 import { clearAllScanMedia } from '../utils/scanPhotoDb'
 import { triggerHaptic } from '../utils/haptics'
 import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
+import { useDeleteAccount } from '../utils/useDeleteAccount'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -111,10 +111,10 @@ export default function Settings() {
   const [notifPermission, setNotifPermission] = useState(null) // 'granted' | 'denied' | 'prompt' | null
   const [notifRequesting, setNotifRequesting] = useState(false)
 
-  // Delete-account flow
-  const [deleteStep, setDeleteStep] = useState('idle') // 'idle' | 'confirm' | 'loading' | 'error'
-  const [deleteError, setDeleteError] = useState('')
+  // Delete-account flow (shared hook — see useDeleteAccount.js)
+  const del = useDeleteAccount()
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [subAttested, setSubAttested] = useState(false)
 
   // Clear scan history flow
   const [clearConfirm, setClearConfirm] = useState(false)
@@ -154,26 +154,6 @@ export default function Settings() {
     }
   }
 
-  async function handleDeleteAccount() {
-    setDeleteStep('loading')
-    setDeleteError('')
-    try {
-      const result = await api.user.deleteAccount()
-      if (result?.error) {
-        setDeleteError(result.error)
-        setDeleteStep('error')
-        return
-      }
-      // Clear local IndexedDB photos in addition to what logout() clears from Zustand
-      await clearAllScanMedia().catch(err => console.warn('[Settings] clearAllScanMedia on delete failed:', err))
-      logout()
-      navigate('/', { replace: true })
-    } catch (err) {
-      setDeleteError(err?.message || 'Deletion failed. Email support@ascendus.com.')
-      setDeleteStep('error')
-    }
-  }
-
   function openMailto(address, subject) {
     const url = `mailto:${address}?subject=${encodeURIComponent(subject)}${appVersion ? `&body=${encodeURIComponent(`App version: ${appVersion}\n\n`)}` : ''}`
     // window.open / window.location both work in WKWebView and route to Mail.app
@@ -199,8 +179,76 @@ export default function Settings() {
   const displayName = user?.name ?? (isGuest ? 'Guest' : 'Ascendus User')
   const displayEmail = user?.email ?? (isGuest ? 'Guest session' : null)
 
-  // ── Delete account confirmation sheet ──────────────────────────────────────
-  if (deleteStep === 'confirm' || deleteStep === 'loading' || deleteStep === 'error') {
+  // ── Delete account — subscription gate ────────────────────────────────────
+  if (del.step === 'sub-gate') {
+    return (
+      <MotionPage className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+               style={{ background: 'rgba(224,122,95,0.12)' }}>
+            <AlertTriangle size={26} style={{ color: '#E07A5F' }} />
+          </div>
+          <h2 className="font-heading font-bold text-[22px] text-primary mb-3">Cancel Subscription First</h2>
+          <p className="font-body text-[14px] mb-4" style={{ color: 'var(--text-secondary)' }}>
+            You have an active {isPremium ? 'Ascendus subscription' : 'free trial'}.
+            Deleting your account will remove all your data, but it will <span className="font-bold" style={{ color: '#E07A5F' }}>not</span> cancel your App Store billing — you'll keep being charged.
+          </p>
+          <div className="rounded-2xl p-4 mb-5 text-left w-full"
+               style={{ background: 'rgba(224,122,95,0.06)', border: '1px solid rgba(224,122,95,0.2)' }}>
+            <p className="font-heading font-bold text-[12px] tracking-[0.12em] mb-2" style={{ color: '#E07A5F' }}>
+              HOW TO CANCEL ON iOS
+            </p>
+            <ol className="font-body text-[13px] leading-relaxed list-none p-0 m-0 flex flex-col gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <li>1. Open iPhone <span className="font-bold text-primary">Settings</span></li>
+              <li>2. Tap your Apple ID at the top</li>
+              <li>3. Tap <span className="font-bold text-primary">Subscriptions</span></li>
+              <li>4. Tap <span className="font-bold text-primary">Ascendus</span> → Cancel Subscription</li>
+            </ol>
+          </div>
+          <button
+            onClick={async () => {
+              triggerHaptic()
+              await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' }).catch(() => {})
+            }}
+            className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] mb-4"
+            style={{ background: 'rgba(198,168,92,0.1)', border: `1px solid ${GOLD}`, color: GOLD }}
+          >
+            Open Subscriptions in Settings
+          </button>
+          <button
+            onClick={() => { triggerHaptic(); setSubAttested(v => !v) }}
+            className="flex items-center gap-2.5 w-full mb-5 text-left"
+          >
+            {subAttested
+              ? <CheckSquare size={20} style={{ color: '#E07A5F', flexShrink: 0 }} />
+              : <Square size={20} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            }
+            <span className="font-body text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+              I've cancelled my subscription (or I understand I may still be billed)
+            </span>
+          </button>
+          <button
+            onClick={() => { triggerHaptic(); del.attestedAndContinue() }}
+            disabled={!subAttested}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-3 transition-opacity"
+            style={{ background: '#E07A5F', color: '#fff', opacity: subAttested ? 1 : 0.35 }}
+          >
+            Continue to Delete Account
+          </button>
+          <button
+            onClick={() => { setSubAttested(false); del.cancel() }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          >
+            Cancel
+          </button>
+        </div>
+      </MotionPage>
+    )
+  }
+
+  // ── Delete account — type-DELETE confirmation ──────────────────────────────
+  if (del.step === 'confirm' || del.step === 'loading' || del.step === 'error') {
     const canDelete = deleteConfirmText.trim().toUpperCase() === 'DELETE'
     return (
       <MotionPage className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
@@ -210,14 +258,9 @@ export default function Settings() {
             <AlertTriangle size={26} style={{ color: '#E07A5F' }} />
           </div>
           <h2 className="font-heading font-bold text-[22px] text-primary mb-3">Delete Account?</h2>
-          <p className="font-body text-[14px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-            This permanently deletes your account, all scans, your Glow Score history, and any active subscription reference. This cannot be undone.
+          <p className="font-body text-[14px] mb-6" style={{ color: 'var(--text-secondary)' }}>
+            This permanently deletes your account, all scans, your Glow Score history, and all data. This cannot be undone.
           </p>
-          {isPremium && (
-            <p className="font-body text-[13px] mb-4" style={{ color: '#E07A5F' }}>
-              Cancel your subscription first in {isNative() ? 'iOS Settings → Subscriptions' : 'your billing portal'} to avoid further charges.
-            </p>
-          )}
           <p className="font-body text-[13px] mb-2 text-left w-full" style={{ color: 'var(--text-secondary)' }}>
             Type <span className="font-heading font-bold" style={{ color: '#E07A5F' }}>DELETE</span> to confirm:
           </p>
@@ -227,7 +270,7 @@ export default function Settings() {
             onChange={e => setDeleteConfirmText(e.target.value)}
             placeholder="DELETE"
             autoCapitalize="characters"
-            disabled={deleteStep === 'loading'}
+            disabled={del.step === 'loading'}
             className="w-full px-4 py-3 rounded-xl font-heading font-bold text-[15px] mb-4 text-center outline-none"
             style={{
               background: 'var(--card)',
@@ -236,19 +279,19 @@ export default function Settings() {
               letterSpacing: '0.1em',
             }}
           />
-          {deleteError && (
-            <p className="font-body text-[13px] mb-4" style={{ color: '#E07A5F' }}>{deleteError}</p>
+          {del.deleteError && (
+            <p className="font-body text-[13px] mb-4" style={{ color: '#E07A5F' }}>{del.deleteError}</p>
           )}
           <button
-            onClick={handleDeleteAccount}
-            disabled={!canDelete || deleteStep === 'loading'}
+            onClick={() => { triggerHaptic(); del.confirm() }}
+            disabled={!canDelete || del.step === 'loading'}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-3 transition-opacity"
-            style={{ background: '#E07A5F', color: '#fff', opacity: (!canDelete || deleteStep === 'loading') ? 0.4 : 1 }}
+            style={{ background: '#E07A5F', color: '#fff', opacity: (!canDelete || del.step === 'loading') ? 0.4 : 1 }}
           >
-            {deleteStep === 'loading' ? 'Deleting…' : 'Delete My Account'}
+            {del.step === 'loading' ? 'Deleting…' : 'Delete My Account'}
           </button>
           <button
-            onClick={() => { setDeleteStep('idle'); setDeleteError(''); setDeleteConfirmText('') }}
+            onClick={() => { del.cancel(); setDeleteConfirmText('') }}
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
             style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
           >
@@ -438,7 +481,7 @@ export default function Settings() {
               icon={Trash2}
               label="Delete Account"
               value="Permanently deletes your account and all data"
-              onPress={() => setDeleteStep('confirm')}
+              onPress={() => { triggerHaptic(); del.start() }}
               danger
             />
           )}

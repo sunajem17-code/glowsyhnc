@@ -396,6 +396,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   const [claimLoading, setClaimLoading] = useState(false)
   const [claimError, setClaimError] = useState('')
   const setIsPremium = useStore(s => s.setIsPremium)
+  const isPremium    = useStore(s => s.isPremium)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
   // it, skip straight through" state. There is intentionally no way to exit
@@ -450,7 +451,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     { id: 'overall', el: <OverallCard scan={scan} /> },
     ...EXTENDED_CATEGORIES.map(cat => ({
       id: cat.key,
-      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} />,
+      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} isPremium={isPremium} />,
     })),
   ]
 

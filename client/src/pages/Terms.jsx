@@ -107,7 +107,7 @@ export default function Terms() {
         </Section>
 
         <p className="text-center font-body text-[11px] mt-6" style={{ color: TEXT_DIM }}>
-          Ascendus v1.0 · © 2025 Ascendus Inc. · Ontario, Canada
+          Ascendus v1.7.4 · © 2025 Ascendus Inc. · Ontario, Canada
         </p>
       </div>
     </div>

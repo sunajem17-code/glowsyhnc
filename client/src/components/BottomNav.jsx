@@ -26,12 +26,11 @@ export default function BottomNav() {
       className="flex-shrink-0 relative"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
-        background: 'var(--card)',
-        borderTop: '1px solid var(--border)',
-        boxShadow: '0 -1px 0 var(--border)',
+        background: 'var(--bg)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      <div className="flex items-center justify-around h-[68px]">
+      <div className="flex items-center justify-around h-[74px]">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname.startsWith(to)
           return (
@@ -39,11 +38,11 @@ export default function BottomNav() {
               key={to}
               to={to}
               onClick={triggerHaptic}
-              className="relative flex flex-col items-center gap-1 px-4 py-2"
+              className="relative flex flex-col items-center gap-1.5 px-4 py-2 min-w-[56px]"
             >
               <div className="relative">
                 <Icon
-                  size={21}
+                  size={24}
                   strokeWidth={isActive ? 2.5 : 1.7}
                   style={{
                     color: isActive ? GOLD : 'var(--text-secondary)',
@@ -60,7 +59,7 @@ export default function BottomNav() {
                 )}
               </div>
               <span
-                className="text-[10px] font-body font-medium transition-colors duration-200"
+                className="text-[11px] font-body font-medium transition-colors duration-200"
                 style={{ color: isActive ? GOLD : 'var(--text-secondary)' }}
               >
                 {label}

@@ -143,7 +143,7 @@ export default function PaymentSuccess() {
           className="mt-8 font-body text-[13px] underline"
           style={{ color: 'rgba(198,168,92,0.6)' }}
         >
-          Go to Dashboard →
+          Go to Dashboard
         </motion.button>
       </motion.div>
     </div>
