@@ -1,15 +1,15 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Camera, ClipboardList, TrendingUp, Users } from 'lucide-react'
+import { Camera, Grid2x2, TrendingUp, Users, Settings } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GOLD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const navItems = [
-  { to: '/', icon: Home, label: 'Home' },
-  { to: '/scan', icon: Camera, label: 'Scan' },
-  { to: '/plan', icon: ClipboardList, label: 'Plan' },
+  { to: '/scan',      icon: Camera,    label: 'Scan' },
+  { to: '/extras',   icon: Grid2x2,   label: 'Extras' },
   { to: '/progress', icon: TrendingUp, label: 'Progress' },
-  { to: '/community', icon: Users, label: 'Community' },
+  { to: '/community',icon: Users,     label: 'Community' },
+  { to: '/settings', icon: Settings,  label: 'Settings' },
 ]
 
 // Single source of truth for which routes are tab roots (lateral destinations
@@ -34,17 +34,17 @@ export default function BottomNav() {
     >
       <div className="flex items-center justify-around h-[68px]">
         {navItems.map(({ to, icon: Icon, label }) => {
-          const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+          const isActive = location.pathname.startsWith(to)
           return (
             <NavLink
               key={to}
               to={to}
               onClick={triggerHaptic}
-              className="relative flex flex-col items-center gap-1 px-4 py-2"
+              className="relative flex flex-col items-center gap-1 px-2 py-2"
             >
               <div className="relative">
                 <Icon
-                  size={21}
+                  size={19}
                   strokeWidth={isActive ? 2.5 : 1.7}
                   style={{
                     color: isActive ? GOLD : 'var(--text-secondary)',

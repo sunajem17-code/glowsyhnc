@@ -13,6 +13,7 @@ import PremiumSplash from './pages/PremiumSplash'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
+const Extras         = lazy(() => import('./pages/Extras'))
 const ScanHome       = lazy(() => import('./pages/ScanHome'))
 const Scan           = lazy(() => import('./pages/Scan'))
 const Results        = lazy(() => import('./pages/Results'))
@@ -33,6 +34,7 @@ const Landing        = lazy(() => import('./pages/Landing'))
 const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
 const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
 const Community      = lazy(() => import('./pages/Community'))
+const SettingsScreen = lazy(() => import('./pages/Settings'))
 const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
 
@@ -150,10 +152,11 @@ export default function App() {
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
               }>
-                <Route index element={<Dashboard />} />
+                <Route index element={<Navigate to="/scan" replace />} />
                 <Route path="scan" element={<ScanHome />} />
                 <Route path="scan/capture" element={<Scan />} />
                 <Route path="results" element={<Results />} />
+                <Route path="extras" element={<Extras />} />
                 <Route path="plan" element={<ActionPlan />} />
                 <Route path="progress" element={<Progress />} />
                 <Route path="checkin" element={<DailyCheckin />} />
@@ -167,6 +170,7 @@ export default function App() {
                 <Route path="swipemaxx" element={<SwipeMaxx />} />
                 <Route path="tindermaxx" element={<TinderMaxx />} />
                 <Route path="community" element={<Community />} />
+                <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="unlock" element={<ScanUnlockGate />} />
               </Route>
