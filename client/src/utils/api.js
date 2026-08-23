@@ -1,3 +1,5 @@
+import useStore from '../store/useStore'
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
 const BASE = `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
 
@@ -21,8 +23,19 @@ function friendlyError(raw, fallback) {
   return raw || fallback
 }
 
+function getToken() {
+  // Read from in-memory Zustand store — always current, no localStorage
+  // flush-timing issues. Falls back to localStorage only if the store hasn't
+  // hydrated yet (rare, only on very first render before rehydration).
+  const storeToken = useStore.getState().token
+  if (storeToken) return storeToken
+  try {
+    return JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token ?? null
+  } catch { return null }
+}
+
 async function request(path, options = {}) {
-  const token = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token
+  const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -113,7 +126,7 @@ export const api = {
   },
   scan: {
     upload: (formData) => {
-      const token = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')?.state?.token
+      const token = getToken()
       return fetch(`${BASE}/scan/upload`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},

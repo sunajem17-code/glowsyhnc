@@ -190,22 +190,10 @@ router.delete('/account', authMiddleware, async (req, res) => {
     console.error('[deleteAccount] SQLite cleanup error:', err.message)
   }
 
-  // ── 4. Delete Supabase Auth record ───────────────────────────────────────
-  // Must be last — once this succeeds the userId is gone from auth.users and
-  // any further Supabase admin calls for this user would 404.
-  if (sb) {
-    try {
-      const { error: authErr } = await sb.auth.admin.deleteUser(userId)
-      if (authErr) {
-        console.error('[deleteAccount] Supabase auth.admin.deleteUser failed:', authErr.message)
-        return res.status(500).json({ error: 'Account data deleted but auth record removal failed. Contact support.' })
-      }
-      console.log('[deleteAccount] Supabase auth record deleted for userId:', userId)
-    } catch (err) {
-      console.error('[deleteAccount] Supabase auth.admin.deleteUser threw:', err.message)
-      return res.status(500).json({ error: 'Account data deleted but auth record removal failed. Contact support.' })
-    }
-  }
+  // This app uses its own `users` table for auth (Apple Sign In verifies an
+  // Apple JWT and creates a row in users; no Supabase Auth records exist).
+  // Deleting the users row above is sufficient — sb.auth.admin.deleteUser
+  // would always return "User not found" because auth.users is never populated.
 
   console.log('[deleteAccount] Done for userId:', userId)
   res.json({ success: true })
