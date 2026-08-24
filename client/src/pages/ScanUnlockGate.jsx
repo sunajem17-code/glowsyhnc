@@ -441,7 +441,7 @@ function CardPercentile({ scan }) {
       {/* Photo + score row */}
       <div className="flex items-center gap-4 mb-5">
         <div
-          className="w-[60px] h-[60px] rounded-2xl overflow-hidden flex-shrink-0"
+          className="w-[60px] h-[60px] rounded-full overflow-hidden flex-shrink-0"
           style={{ background: 'rgba(255,255,255,0.06)' }}
         >
           {photo
@@ -450,7 +450,7 @@ function CardPercentile({ scan }) {
           }
         </div>
         <div>
-          <p className="font-body text-[10px] tracking-[0.14em] mb-0.5" style={{ color: 'rgba(139,92,246,0.7)' }}>GLOW SCORE</p>
+          <p className="font-body text-[10px] tracking-[0.14em] mb-0.5" style={{ color: 'rgba(139,92,246,0.7)' }}>UMAX SCORE</p>
           <div className="flex items-end gap-1">
             <span className="font-heading font-bold leading-none" style={{ fontSize: 46, color: TEXT, letterSpacing: '-0.03em' }}>
               {glowScore != null ? glowScore.toFixed(1) : '—'}
@@ -645,7 +645,7 @@ function CardProgress({ isPremium = false }) {
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
 
-function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing, error, trialEligibility = {}, isPremium = false }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, isPurchasing, error, trialEligibility = {}, isPremium = false }) {
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -658,6 +658,16 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
     obs.observe(containerRef.current)
     return () => obs.disconnect()
   }, [])
+
+  // The instant a user unlocks, jump back to the first card — that's now the
+  // new percentile card (see `cards` below, it only exists when isPremium),
+  // so this is what actually shows them the "you're unlocked" moment instead
+  // of leaving them stranded wherever they happened to be swiped to.
+  const prevIsPremium = useRef(isPremium)
+  useEffect(() => {
+    if (isPremium && !prevIsPremium.current) setCardIdx(0)
+    prevIsPremium.current = isPremium
+  }, [isPremium])
 
   const facePhoto = scan?.facePhotoUrl ?? null
   const cards = [
@@ -739,67 +749,86 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, isPurchasing,
         className="flex flex-col gap-2.5 px-6 flex-shrink-0"
         style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))', paddingTop: 8 }}
       >
-        {(() => {
-          const trialReady = trialEligibility.monthly === 'eligible' || trialEligibility.yearly === 'eligible'
-          return (
-            <>
-              <motion.button
-                whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-                onClick={() => { triggerHaptic(); onAscend() }}
-                disabled={isPurchasing}
-                className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
-                style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={isPurchasing ? 'processing' : 'ready'}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15, ease: EASE_STANDARD }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    {isPurchasing
-                      ? <Loader2 size={16} className="animate-spin" />
-                      : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
-                    }
-                    {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
-                  </motion.span>
-                </AnimatePresence>
-              </motion.button>
-              {trialReady && !isPurchasing && (
-                <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
-                  3 days free, then $7.99/mo or $49.99/yr · Cancel anytime
-                </p>
-              )}
-              {error && (
-                <p className="text-center text-[11px] font-body" style={{ color: RED }}>{error}</p>
-              )}
-            </>
-          )
-        })()}
-
-        {/* Invite is a secondary path, surfaced only once the user has seen every
-            card — not stacked as a competing ask on the very first reveal. */}
-        {cardIdx === cards.length - 1 && (
-          <button
-            onClick={onInvite}
-            disabled={isPurchasing}
-            className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
+        {isPremium ? (
+          // Already unlocked — the whole point of this screen right now is
+          // letting the user see every card go from locked to real, so the
+          // only thing left to do is move on once they're ready. No more
+          // purchase CTA, no more "have a promo code" (both would be dead UI
+          // for someone who just unlocked seconds ago).
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { triggerHaptic(); onContinue?.() }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
-            <UserPlus size={14} /> Invite 3 Friends: Get Free Access
-          </button>
-        )}
+            <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+            Continue
+          </motion.button>
+        ) : (
+          <>
+            {(() => {
+              const trialReady = trialEligibility.monthly === 'eligible' || trialEligibility.yearly === 'eligible'
+              return (
+                <>
+                  <motion.button
+                    whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+                    onClick={() => { triggerHaptic(); onAscend() }}
+                    disabled={isPurchasing}
+                    className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-70"
+                    style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+                  >
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={isPurchasing ? 'processing' : 'ready'}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15, ease: EASE_STANDARD }}
+                        className="flex items-center justify-center gap-2"
+                      >
+                        {isPurchasing
+                          ? <Loader2 size={16} className="animate-spin" />
+                          : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
+                        }
+                        {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.button>
+                  {trialReady && !isPurchasing && (
+                    <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
+                      3 days free, then $7.99/mo or $49.99/yr · Cancel anytime
+                    </p>
+                  )}
+                  {error && (
+                    <p className="text-center text-[11px] font-body" style={{ color: RED }}>{error}</p>
+                  )}
+                </>
+              )
+            })()}
 
-        <button
-          onClick={onPromo}
-          disabled={isPurchasing}
-          className="w-full py-2 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
-          style={{ color: 'rgba(198,168,92,0.35)' }}
-        >
-          Have a promo code?
-        </button>
+            {/* Invite is a secondary path, surfaced only once the user has seen every
+                card — not stacked as a competing ask on the very first reveal. */}
+            {cardIdx === cards.length - 1 && (
+              <button
+                onClick={onInvite}
+                disabled={isPurchasing}
+                className="w-full py-3.5 rounded-2xl font-heading font-semibold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ background: SURF, border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
+              >
+                <UserPlus size={14} /> Invite 3 Friends: Get Free Access
+              </button>
+            )}
+
+            <button
+              onClick={onPromo}
+              disabled={isPurchasing}
+              className="w-full py-2 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
+              style={{ color: 'rgba(198,168,92,0.35)' }}
+            >
+              Have a promo code?
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -983,14 +1012,34 @@ export default function ScanUnlockGate() {
 
   // Shared handler — called by both the native purchase path and the promo
   // path so both transitions are identical going forward.
+  //
+  // This used to call setShowSlideshow(true) synchronously in the same batch
+  // as setIsPremium(true) — since React batches both updates together, the
+  // very next render hit the `if (showSlideshow) return <UnlockRevealSlideshow/>`
+  // check below before SwipeableResultCards ever got a chance to re-render
+  // with isPremium=true. The result: the user never actually SAW the locked/
+  // blurred carousel switch to its unlocked state — purchasing or redeeming a
+  // promo code hard-cut straight to a completely different slideshow screen
+  // instead. Now this just flips isPremium/justUnlocked and stays on this
+  // same screen, so SwipeableResultCards re-renders with every card unlocked
+  // in place (including the percentile card, which only exists in the `cards`
+  // array when isPremium is true). The slideshow now only plays once the user
+  // taps "Continue" after actually seeing their unlocked results — see
+  // handleContinueAfterUnlock() below and SwipeableResultCards' onContinue.
   function handleUnlockSuccess() {
     setJustUnlocked(true)
     setIsPremium(true)
     updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
     // Set this key BEFORE React commits the batch — App.jsx reads it in the same
-    // render and skips GATE 2 (PremiumSplash), letting the slideshow mount instead.
+    // render and skips GATE 2 (PremiumSplash), which would otherwise unmount
+    // this screen before the user gets to see the unlocked carousel.
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
+  }
+
+  // Fires when the user taps "Continue" on the now-unlocked carousel — this
+  // is when the celebration slideshow actually plays, followed by /results.
+  function handleContinueAfterUnlock() {
     setShowSlideshow(true)
   }
 
@@ -1049,6 +1098,7 @@ export default function ScanUnlockGate() {
         onAscend={handleAscend}
         onInvite={() => setShowInvite(true)}
         onPromo={() => setShowPromo(true)}
+        onContinue={handleContinueAfterUnlock}
         isPurchasing={isPurchasing}
         error={purchaseError}
         trialEligibility={trialEligibility}

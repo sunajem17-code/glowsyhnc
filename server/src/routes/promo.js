@@ -73,13 +73,22 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     promo_expires_at: null, // null = lifetime, never expires
   }
 
-  try {
-    await updateUserById(req.userId, updates)
-  } catch (err) {
-    console.warn('[Promo] Supabase update failed:', err.message)
-  }
-
-  if (!isConfigured()) {
+  // Supabase is the source of truth when configured — a failed write here
+  // must NOT be swallowed. Previously this caught the error, logged a
+  // warning, and fell through to `success: true` anyway, so a bad write
+  // (missing column, RLS denial, whatever) told the client "you're Pro now"
+  // while the DB never actually changed. The client then optimistically
+  // flipped isPremium=true locally, and the next refreshProStatus() call
+  // read the real (unchanged) server state and silently downgraded the user
+  // back to free — looking like the redemption "didn't stick".
+  if (isConfigured()) {
+    try {
+      await updateUserById(req.userId, updates)
+    } catch (err) {
+      console.error('[Promo] Supabase update failed — NOT reporting success:', err.message)
+      return res.status(500).json({ error: 'internal_error' })
+    }
+  } else {
     try {
       db.prepare(`
         UPDATE users
@@ -87,7 +96,8 @@ router.post('/redeem', authMiddleware, async (req, res) => {
         WHERE id = ?
       `).run(req.userId)
     } catch (err) {
-      console.warn('[Promo] SQLite update failed (non-fatal):', err.message)
+      console.error('[Promo] SQLite update failed — NOT reporting success:', err.message)
+      return res.status(500).json({ error: 'internal_error' })
     }
   }
 

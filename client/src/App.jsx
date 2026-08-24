@@ -45,6 +45,22 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/auth" replace />
 }
 
+// Where to land right after onboarding finishes. finishOnboarding() and
+// handlePromoSuccess() in PremiumOnboarding.jsx set this flag synchronously
+// BEFORE flipping hasOnboarded (which swaps this whole <Routes> tree in from
+// the onboarding catch-all below), so this route reads it on the very first
+// render of the real app tree — deterministic, no race against an async
+// navigate() call. Falls back to /scan (the normal landing page) otherwise.
+const POST_ONBOARD_DEST_KEY = 'asc_post_onboard_dest'
+function PostAuthLanding() {
+  const dest = sessionStorage.getItem(POST_ONBOARD_DEST_KEY)
+  if (dest) {
+    sessionStorage.removeItem(POST_ONBOARD_DEST_KEY)
+    return <Navigate to={dest} replace />
+  }
+  return <Navigate to="/scan" replace />
+}
+
 export default function App() {
   const theme               = useStore(s => s.theme)
   const hasOnboarded        = useStore(s => s.hasOnboarded)
@@ -156,7 +172,7 @@ export default function App() {
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
               }>
-                <Route index element={<Navigate to="/scan" replace />} />
+                <Route index element={<PostAuthLanding />} />
                 <Route path="scan" element={<ScanHome />} />
                 <Route path="scan/capture" element={<Scan />} />
                 <Route path="results" element={<Results />} />
