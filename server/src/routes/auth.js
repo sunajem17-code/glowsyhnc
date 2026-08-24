@@ -174,8 +174,8 @@ router.post('/apple', authLimiter, async (req, res) => {
         }
         // Migrate any scan history from the guest session to the real account
         if (guestUserId && guestUserId !== existing.id) {
-          await sb.from('scan_history').update({ user_id: existing.id }).eq('user_id', guestUserId).catch(() => {})
-          await sb.from('users').delete().eq('id', guestUserId).eq('is_guest', true).catch(() => {})
+          try { await sb.from('scan_history').update({ user_id: existing.id }).eq('user_id', guestUserId) } catch {}
+          try { await sb.from('users').delete().eq('id', guestUserId).eq('is_guest', true) } catch {}
         }
         const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at, isAppleUser: true }
         return res.json({ user: safe, token: signToken(existing.id, existing.email) })
