@@ -1984,19 +1984,38 @@ export default function PremiumOnboarding() {
   function finishOnboarding() {
     clearDraft()
     sessionStorage.setItem('asc_pro_splash_shown', '1')
+    // Set the landing-page flag BEFORE flipping hasOnboarded. setHasOnboarded()
+    // swaps App.jsx's whole <Routes> tree (onboarding catch-all -> real app
+    // routes) in this same render, and the new tree's index route
+    // (PostAuthLanding in App.jsx) reads this flag synchronously on its very
+    // first render — so the destination is correct from the start instead of
+    // racing an async navigate() call against the default /scan redirect.
+    // The previous setTimeout(() => navigate(...), 0) approach was flaky —
+    // it sometimes lost that race and dropped users on Scan/Home instead of
+    // Results.
+    sessionStorage.setItem('asc_post_onboard_dest', '/results')
     setHasOnboarded()
     logAnalyticsEvent('onboarding_completed', { source: 'paywall' })
+    // Redundant fallback for the edge case where hasOnboarded was already
+    // true (no route-tree swap happens, so PostAuthLanding never mounts) —
+    // harmless no-op otherwise since it just re-confirms the same destination.
     navigate('/results', { replace: true })
   }
 
-  // PromoModal already flips isPremium/updates the user in the store itself
-  // on redemption — this only handles the piece that's specific to still
-  // being mid-onboarding: completing it (so App.jsx's !hasOnboarded gate
-  // stops routing back here) and moving on to results, same as a successful
-  // purchase above.
+  // NOTE: this comment used to say "PromoModal already flips isPremium" —
+  // that was wrong. PromoModal doesn't touch the store; the caller does
+  // (see OnboardingFinalSteps.jsx's PromoModal onSuccess, which now sets
+  // isPremium/updateUser directly). This function only handles the piece
+  // specific to still being mid-onboarding: completing it (so App.jsx's
+  // !hasOnboarded gate stops routing back here) and moving on to results,
+  // same as a successful purchase above.
   function handlePromoSuccess() {
     clearDraft()
     sessionStorage.setItem('asc_pro_splash_shown', '1')
+    // Same route-tree-swap fix as finishOnboarding() above — set the landing
+    // flag before setHasOnboarded() so App.jsx's index route lands correctly
+    // on its first render instead of racing an async navigate() call.
+    sessionStorage.setItem('asc_post_onboard_dest', '/results')
     setHasOnboarded()
     logAnalyticsEvent('promo_redeemed', { source: 'onboarding' })
     navigate('/results', { replace: true })
