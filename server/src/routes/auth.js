@@ -217,8 +217,13 @@ router.post('/apple', authLimiter, async (req, res) => {
     const safe = { id: user.id, name: user.name, email: user.email, subscriptionTier: user.subscription_tier || 'free', createdAt: user.created_at }
     return res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
-    console.error('[Auth] Apple sign in error:', err.message)
-    res.status(500).json({ error: 'internal_error' })
+    console.error('[Auth] Apple sign in error:', err.message, err.stack)
+    // TEMP DEBUG — this route is intermittently 500ing and Railway's log UI
+    // has been unreadable while chasing it live. Echo the real error back to
+    // the client so it shows up straight in Xcode's console instead of
+    // needing the dashboard at all. REVERT to { error: 'internal_error' }
+    // once this is diagnosed — never ship error.message/stack to clients.
+    res.status(500).json({ error: 'internal_error', debug: err.message, debugStack: String(err.stack).split('\n').slice(0, 5) })
   }
 })
 
