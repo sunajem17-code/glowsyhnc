@@ -10,6 +10,16 @@
       "env": {
         "PATH": "/usr/local/bin:/usr/bin:/bin"
       }
+    },
+    {
+      "name": "creator-portal",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["/Users/suleimannajem/looksmaxing/creator-portal/node_modules/.bin/vite"],
+      "cwd": "/Users/suleimannajem/looksmaxing/creator-portal",
+      "port": 5174,
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin"
+      }
     }
   ]
 }
