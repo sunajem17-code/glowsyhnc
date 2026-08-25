@@ -2,7 +2,7 @@ const express = require('express')
 const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
-const { getUserById, getSupabase, getScanHistory, isConfigured, getStreakByUserId } = require('../supabase')
+const { getUserById, getSupabase, isConfigured, getStreakByUserId } = require('../supabase')
 
 const router = express.Router()
 
@@ -197,13 +197,6 @@ router.delete('/account', authMiddleware, async (req, res) => {
 
   console.log('[deleteAccount] Done for userId:', userId)
   res.json({ success: true })
-})
-
-// ── GET /api/user/scan-history ────────────────────────────────────────────────
-// Returns the 12 most recent scan history entries for the logged-in user.
-router.get('/scan-history', authMiddleware, async (req, res) => {
-  const history = await getScanHistory(req.userId, 12)
-  res.json({ history })
 })
 
 // ── GET /api/user/unsubscribe?uid=:userId ─────────────────────────────────────

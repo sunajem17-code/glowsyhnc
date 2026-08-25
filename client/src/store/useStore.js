@@ -51,8 +51,6 @@ const useStore = create(
           todayCheckin: null,
           streak: { current: 0, longest: 0, lastDate: null },
           isPremium: false,
-          proTrialActive: false,
-          proTrialExpiresAt: null,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
           hasOnboarded: false,
@@ -69,7 +67,7 @@ const useStore = create(
       currentScan: null,
 
       // Capped at 100 to bound localStorage growth over time — history beyond
-      // that lives server-side (scan_history / Supabase) if it's ever needed.
+      // that lives server-side (the `scans` table in Supabase) if it's ever needed.
       addScan: (scan) => set(state => {
         const newScans = [scan, ...state.scans].slice(0, 100)
         const newState = { ...state, scans: newScans }
@@ -194,21 +192,8 @@ const useStore = create(
       // Referral
       referralCode: null,
       referralCount: 0,
-      proTrialActive: false,
-      proTrialExpiresAt: null,
       setReferralCode: (c) => set({ referralCode: c }),
       setReferralCount: (n) => set({ referralCount: n }),
-      startProTrial: () => {
-        const expires = new Date()
-        expires.setDate(expires.getDate() + 7)
-        set({ proTrialActive: true, proTrialExpiresAt: expires.toISOString(), isPremium: true })
-      },
-      checkProTrial: () => {
-        const { proTrialActive, proTrialExpiresAt } = get()
-        if (proTrialActive && proTrialExpiresAt && new Date() > new Date(proTrialExpiresAt)) {
-          set({ proTrialActive: false, isPremium: false })
-        }
-      },
 
       // UI State
       scanInProgress: false,
@@ -400,8 +385,6 @@ const useStore = create(
         lastScanDate: state.lastScanDate,
         referralCode: state.referralCode,
         referralCount: state.referralCount,
-        proTrialActive: state.proTrialActive,
-        proTrialExpiresAt: state.proTrialExpiresAt,
         isPremium: state.isPremium,
         gender: state.gender,
         hairType: state.hairType,

@@ -122,7 +122,6 @@ export const api = {
     profile: () => request('/user/profile'),
     update: (data) => request('/user/profile', { method: 'PUT', body: JSON.stringify(data) }),
     deleteAccount: () => request('/user/account', { method: 'DELETE' }),
-    scanHistory: () => request('/user/scan-history'),
   },
   scan: {
     upload: (formData) => {
@@ -158,7 +157,7 @@ export const api = {
     recommendations: (data) => request('/products/recommendations', { method: 'POST', body: JSON.stringify(data) }),
   },
   payments: {
-    createCheckout: (plan, noTrial = false) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan, noTrial }) }),
+    createCheckout: (plan) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
     portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
     syncRc: (rcUserId) => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({ rcUserId }) }),
@@ -181,8 +180,7 @@ export const api = {
   },
   referral: {
     count:     () => request('/referral/count'),
-    claimTrial: () => request('/referral/claim-trial', { method: 'POST' }),
-    unlockPro: () => request('/referral/unlock-pro',   { method: 'POST' }),
+    unlockPro: () => request('/referral/unlock-pro', { method: 'POST' }),
   },
   swipemaxx: {
     rank: (data) => request('/swipemaxx/rank', { method: 'POST', body: JSON.stringify(data) }),

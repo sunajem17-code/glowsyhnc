@@ -44,12 +44,11 @@ function updateLeaderboard(userId, glowScore) {
     const weekStart = getWeekStart()
     const existing = db.prepare('SELECT * FROM leaderboard WHERE username = ? AND week_start = ?').get(userId, weekStart)
     if (existing) {
-      const improvement = Math.max(0, clamped - existing.initial_score)
-      db.prepare('UPDATE leaderboard SET current_score = ?, improvement = ?, updated_at = datetime("now") WHERE username = ? AND week_start = ?')
-        .run(clamped, improvement, userId, weekStart)
+      db.prepare('UPDATE leaderboard SET current_score = ?, updated_at = datetime("now") WHERE username = ? AND week_start = ?')
+        .run(clamped, userId, weekStart)
     } else {
-      db.prepare('INSERT INTO leaderboard (id, username, initial_score, current_score, improvement, week_start) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(uuidv4(), userId, clamped, clamped, 0, weekStart)
+      db.prepare('INSERT INTO leaderboard (id, username, initial_score, current_score, week_start) VALUES (?, ?, ?, ?, ?)')
+        .run(uuidv4(), userId, clamped, clamped, weekStart)
     }
   } catch (err) {
     console.error('[Leaderboard] updateLeaderboard error:', err.message)

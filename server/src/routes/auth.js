@@ -172,9 +172,11 @@ router.post('/apple', authLimiter, async (req, res) => {
         if (!existing.apple_sub) {
           await sb.from('users').update({ apple_sub: appleSub }).eq('id', existing.id)
         }
-        // Migrate any scan history from the guest session to the real account
+        // Re-parent any scans from the guest session to the real account before
+        // deleting the guest row — scans.user_id is ON DELETE CASCADE, so
+        // skipping this would silently destroy them.
         if (guestUserId && guestUserId !== existing.id) {
-          try { await sb.from('scan_history').update({ user_id: existing.id }).eq('user_id', guestUserId) } catch {}
+          try { await sb.from('scans').update({ user_id: existing.id }).eq('user_id', guestUserId) } catch {}
           try { await sb.from('users').delete().eq('id', guestUserId).eq('is_guest', true) } catch {}
         }
         const safe = { id: existing.id, name: existing.name, email: existing.email, subscriptionTier: existing.subscription_tier || 'free', createdAt: existing.created_at, isAppleUser: true }
@@ -218,12 +220,7 @@ router.post('/apple', authLimiter, async (req, res) => {
     return res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
     console.error('[Auth] Apple sign in error:', err.message, err.stack)
-    // TEMP DEBUG — this route is intermittently 500ing and Railway's log UI
-    // has been unreadable while chasing it live. Echo the real error back to
-    // the client so it shows up straight in Xcode's console instead of
-    // needing the dashboard at all. REVERT to { error: 'internal_error' }
-    // once this is diagnosed — never ship error.message/stack to clients.
-    res.status(500).json({ error: 'internal_error', debug: err.message, debugStack: String(err.stack).split('\n').slice(0, 5) })
+    res.status(500).json({ error: 'internal_error' })
   }
 })
 

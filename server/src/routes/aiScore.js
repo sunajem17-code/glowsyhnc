@@ -2,7 +2,7 @@ const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
-const { getScanCache, setScanCache, saveScanHistory } = require('../supabase')
+const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
 
@@ -943,20 +943,8 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.warn('[aiScore] L2 cache call error (non-fatal):', e.message)
     }
 
-    // ── Persist to scan history (fire-and-forget, skip demo users) ────────────
-    // Wrapped in try-catch so a TypeError (e.g. undefined function) is non-fatal
+    // Update leaderboard server-side with Claude's verified score — never from client
     if (req.userId && req.userId !== 'demo') {
-      try {
-        saveScanHistory(req.userId, {
-          overallScore:    result.overallScore,
-          faceScore:       result.faceScore,
-          groomingScore:   result.groomingScore,
-          tier:            result.tier,
-        }).catch(err => console.warn('[aiScore] scan_history save failed (non-fatal):', err.message))
-      } catch (e) {
-        console.warn('[aiScore] scan_history call error (non-fatal):', e.message)
-      }
-      // Update leaderboard server-side with Claude's verified score — never from client
       try { updateLeaderboard(req.userId, result.overallScore) } catch (e) {
         console.warn('[aiScore] leaderboard update failed (non-fatal):', e.message)
       }
