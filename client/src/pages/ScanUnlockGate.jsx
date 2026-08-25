@@ -136,13 +136,31 @@ function Card1Score({ scan, isPremium = false }) {
         pointerEvents: 'none',
       }} />
 
-      <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-6 overflow-y-auto"
+           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
+
+        {/* Badge row — same icon+label pattern CardShell gives every other
+            card in this carousel. This card used to hand-roll its own plain
+            text label with no icon and vertically-centered content instead
+            of the shared top-anchored layout, which is why it looked like
+            the odd one out swiping between it and the rest. */}
+        <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.22)' }}
+          >
+            <Sparkles size={16} style={{ color: G }} />
+          </div>
+          <span
+            className="font-heading font-bold text-[10px] tracking-[0.22em]"
+            style={{ color: 'rgba(198,168,92,0.75)' }}
+          >
+            GLOW SCORE
+          </span>
+        </div>
 
         {/* Hero score */}
         <div className="mb-5">
-          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-2" style={{ color: 'rgba(198,168,92,0.65)' }}>
-            GLOW SCORE
-          </p>
           <MaybeBlur isPremium={isPremium} size="lg">
             <div className="flex items-end gap-1.5 mb-3">
               <span className="font-heading font-bold leading-none" style={{ fontSize: 62, color: TEXT, letterSpacing: '-0.03em', lineHeight: 1 }}>
@@ -202,7 +220,7 @@ function Card1Score({ scan, isPremium = false }) {
         )}
 
         {/* Metric cards */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           {lockedMetrics.map(({ label, value, unit, pct }) => (
             <div key={label} className="rounded-2xl p-4 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
               <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
@@ -271,35 +289,44 @@ function Card3FaceMetrics({ scan, isPremium = false }) {
   return (
     <CardShell badge="FACE METRICS" icon={Smile}>
       {metrics.length > 0 && (
+        // Same tile treatment as CategoryCard's extended-metric cards (label
+        // style, value+lock row, progress bar) — this card used to have its
+        // own smaller per-tile icon + tiny label style instead, which made it
+        // look like a different design swiped in from the rest of the carousel.
         <div className="grid grid-cols-2 gap-3 mb-3">
-          {metrics.map(({ label, value, icon: Icon }) => (
+          {metrics.map(({ label, value }) => (
             <div
               key={label}
               className="rounded-2xl p-4 flex flex-col"
-              style={{ background: 'rgba(198,168,92,0.04)', border: '1px solid rgba(198,168,92,0.12)' }}
+              style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}
             >
-              <div className="flex items-center justify-between mb-2.5">
-                <Icon size={12} style={{ color: G }} />
+              <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
+                {label}
+              </span>
+              <div className="flex items-center justify-between mb-2">
+                <MaybeBlur isPremium={isPremium} size="sm">
+                  <div className="flex items-end gap-0.5">
+                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>
+                      {value.toFixed(1)}
+                    </span>
+                    <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>/10</span>
+                  </div>
+                </MaybeBlur>
                 {!isPremium && (
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
                     <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
                   </span>
                 )}
               </div>
-              <p
-                className="font-heading font-bold text-[9px] tracking-[0.12em] mb-3"
-                style={{ color: 'rgba(198,168,92,0.6)' }}
-              >
-                {label}
-              </p>
-              <MaybeBlur isPremium={isPremium}>
-                <div className="flex items-end gap-0.5">
-                  <span className="font-heading font-bold text-[24px] leading-none" style={{ color: TEXT }}>
-                    {value.toFixed(1)}
-                  </span>
-                  <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>/10</span>
-                </div>
-              </MaybeBlur>
+              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${isPremium ? Math.min(100, (value / 10) * 100) : 0}%` }}
+                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                />
+              </div>
             </div>
           ))}
         </div>
