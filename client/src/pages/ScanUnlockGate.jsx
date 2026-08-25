@@ -793,15 +793,22 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                     </AnimatePresence>
                   </motion.button>
 
-                  {/* Promo code — always directly under the main button so it's never pushed off screen */}
-                  <button
-                    onClick={onPromo}
-                    disabled={isPurchasing}
-                    className="w-full py-2 font-body text-[13px] text-center active:opacity-60 disabled:opacity-30"
-                    style={{ color: 'rgba(198,168,92,0.85)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-                  >
-                    Have a promo code?
-                  </button>
+                  {/* Promo code — web only, same as Premium.jsx/Results.jsx/
+                      OnboardingFinalSteps.jsx (Apple's App Store guidelines
+                      don't allow a native app to offer an alternative unlock
+                      path that bypasses IAP). This screen was missing the
+                      gate the other three already have. Directly under the
+                      main button so it's never pushed off screen. */}
+                  {!isNative() && (
+                    <button
+                      onClick={onPromo}
+                      disabled={isPurchasing}
+                      className="w-full py-2 font-body text-[13px] text-center active:opacity-60 disabled:opacity-30"
+                      style={{ color: 'rgba(198,168,92,0.85)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                    >
+                      Have a promo code?
+                    </button>
+                  )}
 
                   {error && (
                     <p className="text-center text-[11px] font-body" style={{ color: RED }}>{error}</p>
