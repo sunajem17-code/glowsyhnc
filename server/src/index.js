@@ -35,6 +35,20 @@ try {
   console.warn('⚠️  Referral re-check scheduler not started:', e.message)
 }
 
+// ── Stale guest account cleanup — runs hourly ─────────────────────────────────
+try {
+  const cron = require('node-cron')
+  const { cleanupStaleGuests } = require('./utils/guestCleanup')
+  cron.schedule('0 * * * *', async () => {
+    try { await cleanupStaleGuests() } catch (e) { console.error('[GuestCleanup] cron error:', e.message) }
+  })
+  // Run once immediately on startup so guests stranded before this existed get swept
+  cleanupStaleGuests().catch(e => console.error('[GuestCleanup] startup run error:', e.message))
+  console.log('✅ Guest cleanup scheduler started (hourly, 24h+ stale)')
+} catch (e) {
+  console.warn('⚠️  Guest cleanup scheduler not started:', e.message)
+}
+
 // ── Built-in email scheduler (replaces Make.com) ──────────────────────────────
 try {
   const cron = require('node-cron')
