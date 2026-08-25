@@ -335,7 +335,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.6;
+				MARKETING_VERSION = 1.7.8;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.ascendus.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -361,7 +361,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.6;
+				MARKETING_VERSION = 1.7.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ascendus.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
