@@ -175,14 +175,14 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
 
   return (
     <CardShell badge={badge} icon={icon} facePhotoUrl={facePhotoUrl}>
-      <div className="grid grid-cols-2 gap-2.5 mb-3">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         {tiles.map(({ label, value, unit, pct }) => (
           <div
             key={label}
-            className="rounded-2xl p-3.5 flex flex-col"
+            className="rounded-2xl p-4 flex flex-col"
             style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}
           >
-            <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>
+            <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
               {label}
             </span>
             <div className="flex items-center justify-between mb-2">
@@ -195,13 +195,13 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
                 />
               ) : isPremium ? (
                 <div className="flex items-end gap-0.5">
-                  <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                  <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
                   {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                 </div>
               ) : (
                 <BlurLock size="sm">
                   <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </BlurLock>
@@ -212,7 +212,7 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
                 </span>
               )}
             </div>
-            <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+            <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
               {isPending && pct === 0 ? (
                 <motion.div
                   className="h-full rounded-full"
@@ -221,7 +221,9 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
                   transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
                 />
               ) : (
-                <ProgressBarFill pct={pct} />
+                // Locked users never see the real fill — the bar visually
+                // encodes the score even with the digit blurred above.
+                <ProgressBarFill pct={isPremium ? pct : 0} />
               )}
             </div>
           </div>

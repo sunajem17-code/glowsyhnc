@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
@@ -202,14 +202,14 @@ function Card1Score({ scan, isPremium = false }) {
         )}
 
         {/* Metric cards */}
-        <div className="grid grid-cols-2 gap-2.5 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           {lockedMetrics.map(({ label, value, unit, pct }) => (
-            <div key={label} className="rounded-2xl p-3.5 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
-              <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
+            <div key={label} className="rounded-2xl p-4 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
+              <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
               <div className="flex items-center justify-between mb-2">
                 <MaybeBlur isPremium={isPremium} size="sm">
                   <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </MaybeBlur>
@@ -219,12 +219,14 @@ function Card1Score({ scan, isPremium = false }) {
                   </span>
                 )}
               </div>
-              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
+                  // Locked users never see the real fill — the bar visually
+                  // encodes the score even with the digit blurred above.
+                  animate={{ width: `${isPremium ? pct : 0}%` }}
                   transition={{ duration: 0.9, ease: EASE_STANDARD }}
                 />
               </div>
@@ -648,6 +650,15 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
+  // Driven imperatively (see snapTo below) instead of via the `animate` prop.
+  // `animate={{x:...}}` only re-fires when its target value actually changes
+  // between renders — so a swipe that didn't cross the page threshold (same
+  // cardIdx before and after) never re-triggered it, leaving the rail
+  // wherever the raw drag gesture let go instead of snapping back. That's
+  // the "stuck in the middle" bug. useMotionValue + an explicit animate()
+  // call on every drag end (not just index changes) guarantees the snap
+  // always happens.
+  const x = useMotionValue(0)
 
   // Measure the viewport width so we can set real pixel-based dragConstraints.
   // This gives true 1:1 finger tracking with dragElastic={0}.
@@ -657,6 +668,20 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
     obs.observe(containerRef.current)
     return () => obs.disconnect()
   }, [])
+
+  function snapTo(idx) {
+    animate(x, -idx * containerW, { type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] })
+  }
+
+  // Keep the rail in sync whenever the target page or the measured width
+  // changes (mount, rotation, the post-unlock jump-to-first-card below, or a
+  // dot tap) — same imperative path as the drag-end snap, so there's only
+  // one place that ever moves `x`.
+  useEffect(() => {
+    if (!containerW) return
+    snapTo(cardIdx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardIdx, containerW])
 
   // The instant a user unlocks, jump back to the first card — that's now the
   // new percentile card (see `cards` below, it only exists when isPremium),
@@ -689,10 +714,19 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
   function handleDragEnd(_, info) {
     const DISTANCE = 60
     const VELOCITY = 400
+    let nextIdx = cardIdx
     if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
-      goTo(cardIdx + 1)
+      nextIdx = cardIdx + 1
     } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
-      goTo(cardIdx - 1)
+      nextIdx = cardIdx - 1
+    }
+    if (nextIdx !== cardIdx) {
+      goTo(nextIdx)
+    } else {
+      // Swipe didn't cross the page threshold — snap back to the current
+      // card explicitly. Without this the rail was left stranded at
+      // whatever raw pixel offset the finger released at.
+      snapTo(cardIdx)
     }
   }
 
@@ -712,9 +746,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         <motion.div
           className="absolute inset-y-0 left-0 flex"
-          style={{ width: containerW * cards.length }}
-          animate={{ x: -cardIdx * containerW }}
-          transition={{ type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
+          style={{ width: containerW * cards.length, x }}
           drag="x"
           dragConstraints={{ left: -(cards.length - 1) * containerW, right: 0 }}
           dragElastic={0}

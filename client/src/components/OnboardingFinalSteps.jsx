@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { Star, Check, Loader2, Lock, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
@@ -228,7 +228,7 @@ function OverallCard({ scan }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="grid grid-cols-2 gap-2.5 mb-6"
+          className="grid grid-cols-2 gap-3 mb-6"
         >
           {lockedMetrics.map(({ label, value, unit, pct }, i) => (
             <motion.div
@@ -236,19 +236,19 @@ function OverallCard({ scan }) {
               initial={{ opacity: 0, scale: 0.93 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.35 + i * 0.05 }}
-              className="rounded-2xl p-3.5 flex flex-col"
+              className="rounded-2xl p-4 flex flex-col"
               style={{
                 background: 'rgba(198,168,92,0.03)',
                 border: '1px solid rgba(198,168,92,0.15)',
               }}
             >
-              <span className="font-heading font-bold text-[17px] uppercase mb-2.5" style={{ color: G, letterSpacing: '-0.01em' }}>
+              <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
                 {label}
               </span>
               <div className="flex items-center justify-between mb-2">
                 <BlurLock size="sm">
                   <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[22px] leading-none" style={{ color: TEXT }}>{value}</span>
+                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
                     {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
                   </div>
                 </BlurLock>
@@ -256,12 +256,15 @@ function OverallCard({ scan }) {
                   <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
                 </span>
               </div>
-              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
+                  // OverallCard is always locked (no isPremium prop — pre-
+                  // purchase only), so the bar never gets the real fill, same
+                  // as the number right above it.
+                  animate={{ width: '0%' }}
                   transition={{ duration: 0.9, ease: EASE_STANDARD }}
                 />
               </div>
@@ -384,6 +387,13 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
+  // Driven imperatively (see snapTo below) instead of via the `animate` prop.
+  // `animate={{x:...}}` only re-fires when its target value actually changes
+  // between renders, so a swipe that didn't cross the page threshold (same
+  // cardIdx before and after) never re-triggered it — the rail was left
+  // wherever the raw drag gesture let go instead of snapping back ("stuck in
+  // the middle"). Same fix as ScanUnlockGate.jsx's SwipeableResultCards.
+  const x = useMotionValue(0)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -391,6 +401,16 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     obs.observe(containerRef.current)
     return () => obs.disconnect()
   }, [])
+
+  function snapTo(idx) {
+    animate(x, -idx * containerW, { type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] })
+  }
+
+  useEffect(() => {
+    if (!containerW) return
+    snapTo(cardIdx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardIdx, containerW])
   const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
   const [claimLoading, setClaimLoading] = useState(false)
@@ -464,10 +484,18 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   function handleDragEnd(_, info) {
     const DISTANCE = 60
     const VELOCITY = 400
+    let nextIdx = cardIdx
     if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
-      goTo(cardIdx + 1)
+      nextIdx = cardIdx + 1
     } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
-      goTo(cardIdx - 1)
+      nextIdx = cardIdx - 1
+    }
+    if (nextIdx !== cardIdx) {
+      goTo(nextIdx)
+    } else {
+      // Swipe didn't cross the page threshold — snap back to the current
+      // card explicitly instead of leaving the rail stranded mid-drag.
+      snapTo(cardIdx)
     }
   }
 
@@ -490,9 +518,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         <motion.div
           className="absolute inset-y-0 left-0 flex"
-          style={{ width: containerW * cards.length }}
-          animate={{ x: -cardIdx * containerW }}
-          transition={{ type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
+          style={{ width: containerW * cards.length, x }}
           drag="x"
           dragConstraints={{ left: -(cards.length - 1) * containerW, right: 0 }}
           dragElastic={0}
