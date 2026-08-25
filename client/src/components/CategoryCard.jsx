@@ -3,6 +3,12 @@ import { motion } from 'framer-motion'
 import { Lock, Eye, Smile, ScanFace, Scissors, Layers } from 'lucide-react'
 import { GOLD, EASE_STANDARD } from '../utils/theme'
 
+// Fixed fill for every locked tile's progress bar, identical regardless of
+// the real score — a real (but non-computed) percentage so the bar reads as
+// "there's a score here, unlock to see it" instead of looking broken/empty,
+// without the fill length leaking anything about the actual value.
+const LOCKED_FILL_PCT = 62
+
 // Animates from 0 → pct once on mount via CSS transition.
 // Immune to re-renders and prop changes — the effect has no deps so it fires
 // exactly once per mount, and subsequent pct changes just transition smoothly
@@ -220,10 +226,22 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
                   animate={{ x: ['-100%', '100%'] }}
                   transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
                 />
+              ) : isPremium ? (
+                <ProgressBarFill pct={pct} />
               ) : (
-                // Locked users never see the real fill — the bar visually
-                // encodes the score even with the digit blurred above.
-                <ProgressBarFill pct={isPremium ? pct : 0} />
+                // Locked users never see the real fill (that would leak the
+                // score through bar length even with the digit blurred), but
+                // an empty bar reads as broken rather than "locked, unlock to
+                // see it" — so every locked tile gets the same fixed,
+                // non-informative fill instead of 0%, static with no
+                // fill-in animation since there's nothing being "revealed".
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+                    width: `${LOCKED_FILL_PCT}%`,
+                  }}
+                />
               )}
             </div>
           </div>

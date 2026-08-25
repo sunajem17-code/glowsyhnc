@@ -18,6 +18,11 @@ const BG = '#080808'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.5)'
 const SURFACE = 'rgba(255,255,255,0.04)'
+// Fixed fill for OverallCard's locked progress bars, identical regardless of
+// the real score — see CategoryCard.jsx's LOCKED_FILL_PCT for the full
+// rationale (same value, kept local rather than shared per this file's
+// existing "duplicate rather than share" convention for onboarding-only code).
+const LOCKED_FILL_PCT = 62
 
 async function openAppStoreReview() {
   if (!Capacitor.isNativePlatform()) return
@@ -257,15 +262,18 @@ function OverallCard({ scan }) {
                 </span>
               </div>
               <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                <motion.div
+                {/* OverallCard is always locked (no isPremium prop — pre-
+                    purchase only), so the bar never gets the real fill, same
+                    as the number right above it. Fixed, non-computed, static
+                    fill instead of 0% — an empty bar reads as broken rather
+                    than "locked, unlock to see it", and there's no fill-in
+                    to animate since this state is never revealed here. */}
+                <div
                   className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                  initial={{ width: 0 }}
-                  // OverallCard is always locked (no isPremium prop — pre-
-                  // purchase only), so the bar never gets the real fill, same
-                  // as the number right above it.
-                  animate={{ width: '0%' }}
-                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                  style={{
+                    background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+                    width: `${LOCKED_FILL_PCT}%`,
+                  }}
                 />
               </div>
             </motion.div>

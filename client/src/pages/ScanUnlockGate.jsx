@@ -28,6 +28,12 @@ async function logAnalyticsEvent(name, params) {
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
+// Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
+// identical regardless of the real score — a real (but non-computed) percentage
+// so the bar reads as "there's a score here, unlock to see it" instead of
+// looking broken/empty, without the fill length leaking anything about the
+// actual value.
+const LOCKED_FILL_PCT = 62
 // BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
 // custom properties (root wrapper below applies the "dark" scope so they resolve
 // correctly — .dark isn't otherwise activated anywhere in the app). --text-secondary
@@ -238,15 +244,27 @@ function Card1Score({ scan, isPremium = false }) {
                 )}
               </div>
               <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                  initial={{ width: 0 }}
-                  // Locked users never see the real fill — the bar visually
-                  // encodes the score even with the digit blurred above.
-                  animate={{ width: `${isPremium ? pct : 0}%` }}
-                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
-                />
+                {isPremium ? (
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                  />
+                ) : (
+                  // Locked users never see the real fill (it would leak the
+                  // score through bar length even with the digit blurred),
+                  // but an empty bar reads as broken rather than "locked" —
+                  // fixed, non-informative fill, static, no animation.
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+                      width: `${LOCKED_FILL_PCT}%`,
+                    }}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -319,13 +337,23 @@ function Card3FaceMetrics({ scan, isPremium = false }) {
                 )}
               </div>
               <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${isPremium ? Math.min(100, (value / 10) * 100) : 0}%` }}
-                  transition={{ duration: 0.9, ease: EASE_STANDARD }}
-                />
+                {isPremium ? (
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (value / 10) * 100)}%` }}
+                    transition={{ duration: 0.9, ease: EASE_STANDARD }}
+                  />
+                ) : (
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+                      width: `${LOCKED_FILL_PCT}%`,
+                    }}
+                  />
+                )}
               </div>
             </div>
           ))}
