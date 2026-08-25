@@ -1688,6 +1688,11 @@ export default function PremiumOnboarding() {
   // just no longer reachable from this button).
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  // Synchronous re-entrancy lock — isPurchasing alone can't prevent a true
+  // double-tap, since two clicks in the same render cycle both close over
+  // the same pre-update React state. A ref updates immediately, outside
+  // React's batching, so the second call sees the first one's lock.
+  const purchaseLockRef = useRef(false)
 
   // Silently establish a guest session so the AI score API call during the
   // "Analyzing…" step has a valid JWT — even though the user hasn't signed in
@@ -1860,6 +1865,9 @@ export default function PremiumOnboarding() {
   // patch) are harmless to set unconditionally — nothing gates access on
   // them, only hasOnboarded does, and re-onboarding just re-sets them anyway.
   async function handleAscend() {
+    if (purchaseLockRef.current) return
+    purchaseLockRef.current = true
+
     clearDraft()
     setGender(formData.gender || null)
     setLegalConsented()
@@ -1955,6 +1963,7 @@ export default function PremiumOnboarding() {
           setHasOnboarded()
           logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
           setIsPurchasing(false)
+          purchaseLockRef.current = false
           // PremiumSplash (App.jsx Gate 2) now handles the "welcome" moment.
           // We don't need setPurchaseSuccess — this component is about to unmount.
           return
@@ -1963,12 +1972,13 @@ export default function PremiumOnboarding() {
           setPurchaseError('Unable to complete purchase. Please try again.')
         }
         setIsPurchasing(false)
+        purchaseLockRef.current = false
         return
       }
       // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
       const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
       const token  = stored?.state?.token
-      if (!token || token === 'demo-token') { setIsPurchasing(false); setSigningIn(true); return }
+      if (!token || token === 'demo-token') { setIsPurchasing(false); purchaseLockRef.current = false; setSigningIn(true); return }
       const { url } = await api.payments.createCheckout('monthly')
       window.location.href = url
       // Leave isPurchasing=true — the page is about to navigate away.
@@ -1982,6 +1992,7 @@ export default function PremiumOnboarding() {
         setPurchaseError(isUserFacingMsg ? err.message : 'Unable to complete purchase. Please try again.')
       }
       setIsPurchasing(false)
+      purchaseLockRef.current = false
     }
   }
 

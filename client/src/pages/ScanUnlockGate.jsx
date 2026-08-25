@@ -967,6 +967,9 @@ export default function ScanUnlockGate() {
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
+  // for why isPurchasing alone can't prevent a true double-tap.
+  const purchaseLockRef = useRef(false)
 
   useEffect(() => {
     if (isPremium && !justUnlockedRef.current) navigate('/results', { replace: true })
@@ -998,6 +1001,9 @@ export default function ScanUnlockGate() {
   }
 
   async function handleAscend() {
+    if (purchaseLockRef.current) return
+    purchaseLockRef.current = true
+
     setIsPurchasing(true)
     setPurchaseError('')
     try {
@@ -1010,6 +1016,7 @@ export default function ScanUnlockGate() {
           logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
           handleUnlockSuccess()
           setIsPurchasing(false)
+          purchaseLockRef.current = false
           return
         }
         // Resolved without granting the entitlement — either the user
@@ -1019,12 +1026,13 @@ export default function ScanUnlockGate() {
           setPurchaseError('Unable to complete purchase. Please try again.')
         }
         setIsPurchasing(false)
+        purchaseLockRef.current = false
         return
       }
       // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
       const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
       const token  = stored?.state?.token
-      if (!token || token === 'demo-token') { setIsPurchasing(false); navigate('/auth'); return }
+      if (!token || token === 'demo-token') { setIsPurchasing(false); purchaseLockRef.current = false; navigate('/auth'); return }
       const { url } = await api.payments.createCheckout('monthly')
       window.location.href = url
       // Leave isPurchasing=true — the page is about to navigate away.
@@ -1034,6 +1042,7 @@ export default function ScanUnlockGate() {
         setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
       }
       setIsPurchasing(false)
+      purchaseLockRef.current = false
     }
   }
 

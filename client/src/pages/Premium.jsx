@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -56,6 +56,9 @@ export default function Premium() {
   const [unlockMsg, setUnlockMsg]         = useState('')
   const [copied, setCopied]               = useState(false)
   const [copyFailed, setCopyFailed]       = useState(false)
+  // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
+  // for why subscribingNow alone can't prevent a true double-tap.
+  const purchaseLockRef = useRef(false)
 
   const [searchParams] = useSearchParams()
 
@@ -78,6 +81,9 @@ export default function Premium() {
   }, [searchParams, setIsPremium])
 
   async function handleSubscribe() {
+    if (purchaseLockRef.current) return
+    purchaseLockRef.current = true
+
     setSubscribingNow(true)
     setCheckoutError('')
     try {
@@ -111,6 +117,7 @@ export default function Premium() {
       }
     } finally {
       setSubscribingNow(false)
+      purchaseLockRef.current = false
     }
   }
 
