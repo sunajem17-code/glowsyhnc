@@ -208,7 +208,8 @@ router.get('/unsubscribe', async (req, res) => {
   try {
     const sb = getSupabase()
     if (sb) {
-      await sb.from('users').update({ email_unsubscribed: true }).eq('id', uid)
+      const { error } = await sb.from('users').update({ email_unsubscribed: true }).eq('id', uid)
+      if (error) throw new Error(error.message)
     } else {
       db.prepare('UPDATE users SET email_unsubscribed = 1 WHERE id = ?').run(uid)
     }

@@ -163,36 +163,8 @@ db.exec(`
   );
 `)
 
-// Referral fraud prevention tables
-db.exec(`
-  -- One row per credited referral; device_id PRIMARY KEY atomically prevents
-  -- the same device from being counted as a referral more than once, ever.
-  CREATE TABLE IF NOT EXISTS referral_device_log (
-    device_id   TEXT PRIMARY KEY,
-    referrer_id TEXT NOT NULL,
-    new_user_id TEXT NOT NULL,
-    created_at  TEXT DEFAULT (datetime('now'))
-  );
-
-  -- Audit trail for every blocked or held referral attempt.
-  CREATE TABLE IF NOT EXISTS referral_fraud_log (
-    id          TEXT PRIMARY KEY,
-    event_type  TEXT NOT NULL,
-    ref_code    TEXT,
-    device_id   TEXT,
-    new_user_id TEXT,
-    reason      TEXT,
-    created_at  TEXT DEFAULT (datetime('now'))
-  );
-`)
-
 // Idempotent migrations — ignore if columns already exist
 const migrations = [
-  // referral_fraud_log additions for velocity_hold re-check flow
-  "ALTER TABLE referral_fraud_log ADD COLUMN referrer_id TEXT",
-  "ALTER TABLE referral_fraud_log ADD COLUMN re_check_after TEXT",
-  "ALTER TABLE referral_fraud_log ADD COLUMN resolved_at TEXT",
-  "ALTER TABLE referral_fraud_log ADD COLUMN resolution TEXT",
   "ALTER TABLE users ADD COLUMN referral_code TEXT",
   "ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN pro_trial_expires_at TEXT",
@@ -209,6 +181,10 @@ const migrations = [
   // 17+ age confirmation
   "ALTER TABLE users ADD COLUMN age_confirmed INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN age_confirmed_at TEXT",
+  // Honored by GET /api/user/unsubscribe — previously wrote to a column
+  // that only existed on Supabase, never SQLite, so the local fallback
+  // path silently never persisted an unsubscribe at all.
+  "ALTER TABLE users ADD COLUMN email_unsubscribed INTEGER DEFAULT 0",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }
