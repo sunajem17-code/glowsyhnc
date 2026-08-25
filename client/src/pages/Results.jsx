@@ -820,7 +820,7 @@ function ProText({ text, onUpgrade }) {
 function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const reducedMotion = useReducedMotion()
   const navigate = useNavigate()
-  const { setIsPremium } = useStore()
+  const { setIsPremium, updateUser } = useStore()
   const [plan, setPlan]       = useState('monthly')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -978,7 +978,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         <div className="rounded-xl p-1 mb-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="grid grid-cols-2 gap-0.5">
             {[
-              { key: 'monthly', label: 'Monthly', price: '$7.99/mo' },
+              { key: 'monthly', label: 'Monthly', price: '$9.99/mo' },
               { key: 'annual',  label: 'Annual',  price: '$4.17/mo', badge: 'SAVE 48%' },
             ].map(({ key, label, price, badge }) => (
               <button
@@ -1032,8 +1032,8 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         <div className="mt-1 mb-2 space-y-0.5">
           <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.22)' }}>
             {isNative()
-              ? 'Ascendus Pro is $7.99/month or $49.99/year. Payment charged to your Apple ID.'
-              : `$0 today · then ${plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$7.99/mo'} · cancel anytime`}
+              ? 'Ascendus Pro is $9.99/month or $49.99/year. Payment charged to your Apple ID.'
+              : `$0 today · then ${plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$9.99/mo'} · cancel anytime`}
           </p>
           {isNative() && (
             <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.18)' }}>
@@ -1110,7 +1110,17 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         {showPromo && (
           <PromoModal
             onClose={() => setShowPromo(false)}
-            onSuccess={onClose}
+            onSuccess={() => {
+              // PromoModal no longer mutates the store itself (see its own
+              // comment) — this sheet owns the mutation, same as
+              // ScanUnlockGate's handleUnlockSuccess. Without this, redeeming
+              // a code here showed "Lifetime Pro unlocked!" and then closed
+              // without ever actually unlocking anything.
+              setIsPremium(true)
+              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
+              try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
+              onClose()
+            }}
           />
         )}
       </AnimatePresence>

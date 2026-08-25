@@ -476,15 +476,13 @@ export default function Settings() {
             label="Sign Out"
             onPress={() => setSignOutConfirm(true)}
           />
-          {!isGuest && (
-            <SettingsRow
-              icon={Trash2}
-              label="Delete Account"
-              value="Permanently deletes your account and all data"
-              onPress={() => { triggerHaptic(); del.start() }}
-              danger
-            />
-          )}
+          <SettingsRow
+            icon={Trash2}
+            label="Delete Account"
+            value="Permanently deletes your account and all data"
+            onPress={() => { triggerHaptic(); del.start() }}
+            danger
+          />
         </div>
 
         {/* ── Footer links ── */}

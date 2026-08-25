@@ -1947,6 +1947,18 @@ export default function PremiumOnboarding() {
           // setIsPremium alone triggers Gate 2 (PremiumSplash) which unmounts
           // this component — finishOnboarding/setHasOnboarded would never run.
           console.log('[ASCEND] Purchase success: setting isPremium + hasOnboarded together')
+          // Same fix as finishOnboarding()/handlePromoSuccess() below — set the
+          // landing-page flag BEFORE flipping hasOnboarded, so App.jsx's
+          // PostAuthLanding index route lands on /results deterministically
+          // instead of falling through to its default /scan redirect. This
+          // path (a real native purchase) was the one call site that got
+          // missed when that fix was written — it flips isPremium+hasOnboarded
+          // but never set the destination flag, so buying (as opposed to
+          // redeeming a promo code) during onboarding still dropped the user
+          // on Scan/Home instead of Results. The flag survives Gate 2
+          // (PremiumSplash) playing in between, since sessionStorage isn't
+          // tied to this component's lifecycle.
+          sessionStorage.setItem('asc_post_onboard_dest', '/results')
           setIsPremium(true)
           setHasOnboarded()
           logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })

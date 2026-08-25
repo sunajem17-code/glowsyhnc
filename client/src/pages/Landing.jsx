@@ -104,7 +104,7 @@ export default function Landing() {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
-      description: 'Free tier with 1 scan/month. Pro plan at $7.99/month.',
+      description: 'Free tier with 1 scan/month. Pro plan at $9.99/month.',
     },
     aggregateRating: {
       '@type': 'AggregateRating',
@@ -636,7 +636,7 @@ export default function Landing() {
               name: 'Jordan L.',
               handle: '@jordanl',
               score: '+14 pts',
-              quote: 'Best $7.99 I spend every month. The before/after comparison is addicting, you can actually see the progress.',
+              quote: 'Best $9.99 I spend every month. The before/after comparison is addicting, you can actually see the progress.',
             },
           ].map(({ initial, name, handle, score, quote }) => (
             <div

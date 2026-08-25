@@ -9,7 +9,6 @@ import {
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import UnlockRevealSlideshow from '../components/UnlockRevealSlideshow'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
 import { triggerHaptic } from '../utils/haptics'
@@ -450,7 +449,7 @@ function CardPercentile({ scan }) {
           }
         </div>
         <div>
-          <p className="font-body text-[10px] tracking-[0.14em] mb-0.5" style={{ color: 'rgba(139,92,246,0.7)' }}>UMAX SCORE</p>
+          <p className="font-body text-[10px] tracking-[0.14em] mb-0.5" style={{ color: 'rgba(139,92,246,0.7)' }}>GLOW SCORE</p>
           <div className="flex items-end gap-1">
             <span className="font-heading font-bold leading-none" style={{ fontSize: 46, color: TEXT, letterSpacing: '-0.03em' }}>
               {glowScore != null ? glowScore.toFixed(1) : '—'}
@@ -794,9 +793,20 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                       </motion.span>
                     </AnimatePresence>
                   </motion.button>
+
+                  {/* Promo code — always directly under the main button so it's never pushed off screen */}
+                  <button
+                    onClick={onPromo}
+                    disabled={isPurchasing}
+                    className="w-full py-2 font-body text-[13px] text-center active:opacity-60 disabled:opacity-30"
+                    style={{ color: 'rgba(198,168,92,0.85)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                  >
+                    Have a promo code?
+                  </button>
+
                   {trialReady && !isPurchasing && (
                     <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
-                      3 days free, then $7.99/mo or $49.99/yr · Cancel anytime
+                      3 days free, then $9.99/mo or $49.99/yr · Cancel anytime
                     </p>
                   )}
                   {error && (
@@ -806,8 +816,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
               )
             })()}
 
-            {/* Invite is a secondary path, surfaced only once the user has seen every
-                card — not stacked as a competing ask on the very first reveal. */}
             {cardIdx === cards.length - 1 && (
               <button
                 onClick={onInvite}
@@ -818,15 +826,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                 <UserPlus size={14} /> Invite 3 Friends: Get Free Access
               </button>
             )}
-
-            <button
-              onClick={onPromo}
-              disabled={isPurchasing}
-              className="w-full py-2 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
-              style={{ color: 'rgba(198,168,92,0.35)' }}
-            >
-              Have a promo code?
-            </button>
           </>
         )}
       </div>
@@ -964,12 +963,12 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 
 export default function ScanUnlockGate() {
   const navigate = useNavigate()
-  const { currentScan, isPremium, setIsPremium, updateUser } = useStore()
+  const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
 
   const [showInvite, setShowInvite]         = useState(false)
   const [showPromo, setShowPromo]           = useState(false)
-  const [showSlideshow, setShowSlideshow]   = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
+  const justUnlockedRef = useRef(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
   const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
@@ -977,8 +976,8 @@ export default function ScanUnlockGate() {
   const [purchaseError, setPurchaseError] = useState('')
 
   useEffect(() => {
-    if (isPremium && !justUnlocked && !showSlideshow) navigate('/results', { replace: true })
-  }, [isPremium, showSlideshow]) // justUnlocked intentionally omitted — set simultaneously
+    if (isPremium && !justUnlockedRef.current) navigate('/results', { replace: true })
+  }, [isPremium])
 
   useEffect(() => {
     if (!currentScan) navigate('/scan', { replace: true })
@@ -996,51 +995,16 @@ export default function ScanUnlockGate() {
 
   if (!currentScan) return null
 
-  // showSlideshow must be checked before the isPremium gate: PromoModal sets
-  // isPremium=true inside itself before onSuccess fires, so without this
-  // ordering the null-return fires and the slideshow never renders.
-  if (showSlideshow) {
-    return (
-      <UnlockRevealSlideshow
-        scan={currentScan}
-        onFinish={() => navigate('/results', { replace: true })}
-      />
-    )
-  }
-
   if (isPremium && !justUnlocked) return null
 
-  // Shared handler — called by both the native purchase path and the promo
-  // path so both transitions are identical going forward.
-  //
-  // This used to call setShowSlideshow(true) synchronously in the same batch
-  // as setIsPremium(true) — since React batches both updates together, the
-  // very next render hit the `if (showSlideshow) return <UnlockRevealSlideshow/>`
-  // check below before SwipeableResultCards ever got a chance to re-render
-  // with isPremium=true. The result: the user never actually SAW the locked/
-  // blurred carousel switch to its unlocked state — purchasing or redeeming a
-  // promo code hard-cut straight to a completely different slideshow screen
-  // instead. Now this just flips isPremium/justUnlocked and stays on this
-  // same screen, so SwipeableResultCards re-renders with every card unlocked
-  // in place (including the percentile card, which only exists in the `cards`
-  // array when isPremium is true). The slideshow now only plays once the user
-  // taps "Continue" after actually seeing their unlocked results — see
-  // handleContinueAfterUnlock() below and SwipeableResultCards' onContinue.
   function handleUnlockSuccess() {
-    setJustUnlocked(true)
-    setIsPremium(true)
-    updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
-    // Set this key BEFORE React commits the batch — App.jsx reads it in the same
-    // render and skips GATE 2 (PremiumSplash), which would otherwise unmount
-    // this screen before the user gets to see the unlocked carousel.
+    justUnlockedRef.current = true
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
-  }
-
-  // Fires when the user taps "Continue" on the now-unlocked carousel — this
-  // is when the celebration slideshow actually plays, followed by /results.
-  function handleContinueAfterUnlock() {
-    setShowSlideshow(true)
+    setJustUnlocked(true)
+    setShowUnlockSlideshow(true)
+    setIsPremium(true)
+    updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
 
   async function handleAscend() {
@@ -1098,7 +1062,6 @@ export default function ScanUnlockGate() {
         onAscend={handleAscend}
         onInvite={() => setShowInvite(true)}
         onPromo={() => setShowPromo(true)}
-        onContinue={handleContinueAfterUnlock}
         isPurchasing={isPurchasing}
         error={purchaseError}
         trialEligibility={trialEligibility}

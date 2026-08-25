@@ -38,12 +38,12 @@ const FEATURES = [
 const TESTIMONIALS = [
   { name: 'Marcus T.', handle: '@marcust', score: '+1.8 pts', quote: 'My posture went from D to B+ in 8 weeks. The plan actually works.', initial: 'M' },
   { name: 'Sarah K.', handle: '@sarahk', score: '+2.2 pts', quote: 'The skincare routine cleared my skin in 6 weeks. Unreal.', initial: 'S' },
-  { name: 'Jordan L.', handle: '@jordanl', score: '+1.4 pts', quote: 'Best $7.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
+  { name: 'Jordan L.', handle: '@jordanl', score: '+1.4 pts', quote: 'Best $9.99 I spend every month. The roadmap alone changed my whole approach.', initial: 'J' },
 ]
 
 export default function Premium() {
   const navigate = useNavigate()
-  const { setIsPremium, isPremium, logout } = useStore()
+  const { setIsPremium, isPremium, logout, updateUser } = useStore()
   const [plan, setPlan] = useState('yearly')
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -290,7 +290,7 @@ export default function Premium() {
           style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
         >
           {[
-            { key: 'monthly', label: 'Monthly', price: '$1.84/wk' },
+            { key: 'monthly', label: 'Monthly', price: '$2.31/wk' },
             { key: 'yearly',  label: 'Yearly',  price: '$0.96/wk', badge: 'Save 48%' },
           ].map(({ key, label, price, badge }) => (
             <button
@@ -323,7 +323,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($7.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
           {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
@@ -561,15 +561,15 @@ export default function Premium() {
           {(() => {
             if (subscribingNow) return 'Opening checkout…'
             const eligible = trialEligibility[plan] === 'eligible'
-            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial (then $49.99/yr)' : 'Start 3-Day Free Trial (then $7.99/mo)'
-            return plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($7.99/mo)'
+            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial (then $49.99/yr)' : 'Start 3-Day Free Trial (then $9.99/mo)'
+            return plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($9.99/mo)'
           })()}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
           {trialEligibility[plan] === 'eligible'
             ? plan === 'yearly'
               ? '3-day free trial, then $49.99/year. Auto-renews unless cancelled before trial ends.'
-              : '3-day free trial, then $7.99/month. Auto-renews unless cancelled before trial ends.'
+              : '3-day free trial, then $9.99/month. Auto-renews unless cancelled before trial ends.'
             : plan === 'yearly'
               ? 'Billed annually · Cancel anytime'
               : 'Billed monthly · Cancel anytime'
@@ -579,7 +579,7 @@ export default function Premium() {
         {/* Apple IAP required disclosure */}
         <div className="mt-2 mb-4 px-1 space-y-1">
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
-            Ascendus Pro is $7.99 USD/month or $49.99 USD/year.
+            Ascendus Pro is $9.99 USD/month or $49.99 USD/year.
             {isNative() ? ' Payment will be charged to your Apple ID account.' : ''}
           </p>
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
@@ -614,6 +614,10 @@ export default function Premium() {
           <PromoModal
             onClose={() => setShowPromo(false)}
             onSuccess={() => {
+              // Same fix as Results.jsx's PaywallSheet and OnboardingFinalSteps —
+              // PromoModal doesn't touch the store itself, the caller has to.
+              setIsPremium(true)
+              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
               setShowPromo(false)
               navigate(-1)
             }}

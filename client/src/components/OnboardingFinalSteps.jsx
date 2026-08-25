@@ -396,6 +396,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   const [claimLoading, setClaimLoading] = useState(false)
   const [claimError, setClaimError] = useState('')
   const setIsPremium = useStore(s => s.setIsPremium)
+  const updateUser   = useStore(s => s.updateUser)
   const isPremium    = useStore(s => s.isPremium)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
@@ -571,7 +572,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
         )}
 
         <p className="text-center font-body mt-2" style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, lineHeight: 1.5 }}>
-          Pro: $7.99/month or $49.99/year · Auto-renews unless cancelled 24h before renewal · Cancel anytime in Settings
+          Pro: $9.99/month or $49.99/year · Auto-renews unless cancelled 24h before renewal · Cancel anytime in Settings
           {' · '}
           <a href="https://ascendus.store/privacy" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'underline' }}>Privacy Policy</a>
           {' · '}
@@ -598,7 +599,17 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
         {showPromo && (
           <PromoModal
             onClose={() => setShowPromo(false)}
-            onSuccess={() => { setShowPromo(false); onPromoSuccess?.() }}
+            onSuccess={() => {
+              // PromoModal stopped mutating the store itself a while back —
+              // every caller owns its own setIsPremium now (see Results.jsx's
+              // PaywallSheet for the same fix). This one was still missing
+              // it, so redeeming here showed the success animation and then
+              // just navigated on with isPremium still false.
+              setIsPremium(true)
+              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
+              setShowPromo(false)
+              onPromoSuccess?.()
+            }}
           />
         )}
       </AnimatePresence>

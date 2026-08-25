@@ -234,6 +234,10 @@ const useStore = create(
       isPremium: false,
       setIsPremium: (v) => set({ isPremium: v }),
 
+      // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
+      showUnlockSlideshow: false,
+      setShowUnlockSlideshow: (v) => set({ showUnlockSlideshow: v }),
+
       // Refresh Pro status from server — call after payment, trial activation, or app foreground
       // Throttled: won't re-run if called within 60s of the last successful refresh.
       _lastProRefresh: 0,

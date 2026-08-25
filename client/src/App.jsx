@@ -10,6 +10,7 @@ import UpdatePrompt from './components/UpdatePrompt'
 import Splash from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import PremiumSplash from './pages/PremiumSplash'
+import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
@@ -67,9 +68,12 @@ export default function App() {
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
-  const checkProTrial       = useStore(s => s.checkProTrial)
-  const refreshProStatus    = useStore(s => s.refreshProStatus)
-  const logout              = useStore(s => s.logout)
+  const checkProTrial           = useStore(s => s.checkProTrial)
+  const refreshProStatus        = useStore(s => s.refreshProStatus)
+  const logout                  = useStore(s => s.logout)
+  const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
+  const setShowUnlockSlideshow  = useStore(s => s.setShowUnlockSlideshow)
+  const currentScan             = useStore(s => s.currentScan)
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -129,6 +133,19 @@ export default function App() {
     sessionStorage.setItem(SESSION_KEY, '1')
     setProSplashDone(true)
   }, [])
+
+  // ── UNLOCK SLIDESHOW: absolute top-level, no portal needed ──────
+  if (showUnlockSlideshow && currentScan) {
+    return (
+      <UnlockRevealSlideshow
+        scan={currentScan}
+        onFinish={() => {
+          setShowUnlockSlideshow(false)
+          window.location.replace('/results')
+        }}
+      />
+    )
+  }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
   if (!splashDone && isAuthenticated) {
