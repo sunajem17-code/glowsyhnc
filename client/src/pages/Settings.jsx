@@ -190,7 +190,7 @@ export default function Settings() {
           </div>
           <h2 className="font-heading font-bold text-[22px] text-primary mb-3">Cancel Subscription First</h2>
           <p className="font-body text-[14px] mb-4" style={{ color: 'var(--text-secondary)' }}>
-            You have an active {isPremium ? 'Ascendus subscription' : 'free trial'}.
+            You have an active Ascendus subscription.
             Deleting your account will remove all your data, but it will <span className="font-bold" style={{ color: '#E07A5F' }}>not</span> cancel your App Store billing — you'll keep being charged.
           </p>
           <div className="rounded-2xl p-4 mb-5 text-left w-full"

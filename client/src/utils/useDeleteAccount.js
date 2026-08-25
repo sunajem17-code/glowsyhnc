@@ -9,7 +9,7 @@ import useStore from '../store/useStore'
  *
  * Steps exposed to callers:
  *   'idle'         – nothing open
- *   'sub-gate'     – user has active subscription or trial; must self-attest
+ *   'sub-gate'     – user has an active subscription; must self-attest
  *                    they've cancelled before proceeding
  *   'confirm'      – type DELETE confirmation
  *   'loading'      – API call in-flight
@@ -26,16 +26,15 @@ import useStore from '../store/useStore'
  */
 export function useDeleteAccount() {
   const navigate = useNavigate()
-  const { isPremium, proTrialActive, logout } = useStore(s => ({
-    isPremium:      s.isPremium,
-    proTrialActive: s.proTrialActive,
-    logout:         s.logout,
+  const { isPremium, logout } = useStore(s => ({
+    isPremium: s.isPremium,
+    logout:    s.logout,
   }))
 
   const [step, setStep] = useState('idle')
   const [deleteError, setDeleteError] = useState('')
 
-  const hasActiveSubscription = isPremium || proTrialActive
+  const hasActiveSubscription = isPremium
 
   function start() {
     setDeleteError('')

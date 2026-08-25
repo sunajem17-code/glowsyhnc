@@ -815,8 +815,8 @@ export default function Scan() {
         </p>
         <p className="text-secondary text-sm font-body mb-6">Upgrade to Pro for unlimited scans.</p>
         <button onClick={() => navigate('/premium')} className="btn-primary mb-3 max-w-xs">Unlock Unlimited Scans</button>
-        <button onClick={() => navigate('/referral')} className="text-sm font-heading font-bold" style={{ color: '#C6A85C' }}>
-          <span className="flex items-center gap-1.5"><Gift size={14} /> Or share with 5 friends for 3 days free</span>
+        <button onClick={() => navigate('/premium')} className="text-sm font-heading font-bold" style={{ color: '#C6A85C' }}>
+          <span className="flex items-center gap-1.5"><Gift size={14} /> Or share with 3 friends to unlock</span>
         </button>
       </div>
     )

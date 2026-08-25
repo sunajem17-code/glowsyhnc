@@ -19,59 +19,6 @@ router.get('/count', verifyToken, async (req, res) => {
   res.json({ count: user?.referral_count || 0, code: user?.referral_code || null })
 })
 
-// POST /api/referral/claim-trial
-router.post('/claim-trial', verifyToken, async (req, res) => {
-  if (req.isDemo) return res.status(403).json({ error: 'Account required to claim trial' })
-
-  const user = await getUser(req.userId)
-  if (!user) return res.status(404).json({ error: 'User not found' })
-
-  if (user.subscription_tier === 'premium') {
-    return res.json({ ok: true, message: 'Already Pro' })
-  }
-
-  if (user.pro_trial_expires_at && new Date() < new Date(user.pro_trial_expires_at)) {
-    return res.json({ ok: true, expiresAt: user.pro_trial_expires_at })
-  }
-
-  const count = user.referral_count || 0
-  if (count < 5) {
-    return res.status(403).json({
-      error: `Need 5 referrals to claim trial. You have ${count}.`,
-      referralCount: count,
-    })
-  }
-
-  const expires = new Date()
-  expires.setDate(expires.getDate() + 7)
-  const expiresAt = expires.toISOString()
-
-  // Update Supabase (primary) + SQLite (fallback).
-  // If both fail, do not return success — the tier was never actually updated.
-  let sbOk = false
-  let sqliteOk = false
-
-  try {
-    await updateUserById(req.userId, { subscription_tier: 'trial', pro_trial_expires_at: expiresAt })
-    sbOk = true
-  } catch (err) {
-    console.error('[referral/claim-trial] Supabase update failed:', err.message)
-  }
-
-  try {
-    db.prepare("UPDATE users SET subscription_tier = 'trial', pro_trial_expires_at = ? WHERE id = ?").run(expiresAt, req.userId)
-    sqliteOk = true
-  } catch (err) {
-    console.error('[referral/claim-trial] SQLite update failed:', err.message)
-  }
-
-  if (!sbOk && !sqliteOk) {
-    return res.status(500).json({ error: 'Failed to activate trial — please try again or contact support.' })
-  }
-
-  res.json({ ok: true, expiresAt })
-})
-
 // POST /api/referral/unlock-pro
 // Grant permanent Pro if user has >= 3 referrals (share-to-unlock flow)
 router.post('/unlock-pro', verifyToken, async (req, res) => {

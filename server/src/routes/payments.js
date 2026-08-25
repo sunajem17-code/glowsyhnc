@@ -24,7 +24,7 @@ const PRICES = {
 
 // Create Stripe Checkout session
 router.post('/create-checkout', authMiddleware, async (req, res) => {
-  const { plan, noTrial } = req.body // plan: 'monthly' | 'annual', noTrial: bool
+  const { plan } = req.body // plan: 'monthly' | 'annual'
   if (!PRICES[plan]) return res.status(400).json({ error: 'Invalid plan' })
 
   // Fail fast with a clear log if the real price ID was never configured —
@@ -72,7 +72,6 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       mode: 'subscription',
       line_items: [{ price: PRICES[plan], quantity: 1 }],
       subscription_data: {
-        ...(noTrial ? {} : { trial_period_days: 3 }),
         metadata: { userId: user.id, plan },
       },
       metadata: { userId: user.id, plan },

@@ -10,7 +10,7 @@ import { StepRating, StepScoresWaiting } from '../components/OnboardingFinalStep
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
-import { checkTrialEligibility, isNative, purchasePro, initRevenueCat } from '../utils/iap'
+import { isNative, purchasePro, initRevenueCat } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -1686,15 +1686,8 @@ export default function PremiumOnboarding() {
   // here from ScanUnlockGate.jsx's handleAscend (Step 1 of retiring that
   // screen; ScanUnlockGate itself is untouched and still routable at /unlock,
   // just no longer reachable from this button).
-  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
-
-  useEffect(() => {
-    checkTrialEligibility()
-      .then(result => setTrialEligibility(result))
-      .catch(() => {})
-  }, [])
 
   // Silently establish a guest session so the AI score API call during the
   // "Analyzing…" step has a valid JWT — even though the user hasn't signed in
@@ -1935,8 +1928,7 @@ export default function PremiumOnboarding() {
         }
 
         // ── Step 4: Purchase ──────────────────────────────────────────────────
-        const plan = trialEligibility.monthly === 'eligible' ? 'monthly'
-          : trialEligibility.yearly === 'eligible' ? 'yearly' : 'monthly'
+        const plan = 'monthly'
         console.log('[ASCEND] Step 4: calling purchasePro, plan:', plan)
         const result = await purchasePro(plan)
         console.log('[ASCEND] Step 4 result:', result?.success ? 'SUCCESS' : 'FAILED', 'reason:', result?.reason)
@@ -1977,7 +1969,7 @@ export default function PremiumOnboarding() {
       const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
       const token  = stored?.state?.token
       if (!token || token === 'demo-token') { setIsPurchasing(false); setSigningIn(true); return }
-      const { url } = await api.payments.createCheckout('monthly', false)
+      const { url } = await api.payments.createCheckout('monthly')
       window.location.href = url
       // Leave isPurchasing=true — the page is about to navigate away.
     } catch (err) {

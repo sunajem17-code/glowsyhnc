@@ -6,7 +6,7 @@ import { Check, X, ChevronLeft, Lock, Users, Share2, CheckCircle, Loader2 } from
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import { isNative, purchasePro, restorePurchases, initRevenueCat, checkTrialEligibility } from '../utils/iap'
+import { isNative, purchasePro, restorePurchases, initRevenueCat } from '../utils/iap'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
@@ -56,21 +56,11 @@ export default function Premium() {
   const [unlockMsg, setUnlockMsg]         = useState('')
   const [copied, setCopied]               = useState(false)
   const [copyFailed, setCopyFailed]       = useState(false)
-  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
 
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
     initRevenueCat().catch(() => {})
-    if (isNative()) {
-      checkTrialEligibility()
-        .then(result => {
-          setTrialEligibility(result)
-          const path = (result.monthly === 'eligible' || result.yearly === 'eligible') ? 'trial' : 'standard'
-          console.log(`[PAYWALL][path=${path}] Paywall shown`)
-        })
-        .catch(() => {})
-    }
   }, [])
 
   useEffect(() => {
@@ -107,7 +97,7 @@ export default function Premium() {
           setSubscribingNow(false)
           return
         }
-        const { url } = await api.payments.createCheckout(plan, false)
+        const { url } = await api.payments.createCheckout(plan)
         window.location.href = url
       }
     } catch (err) {
@@ -560,20 +550,11 @@ export default function Premium() {
         >
           {(() => {
             if (subscribingNow) return 'Opening checkout…'
-            const eligible = trialEligibility[plan] === 'eligible'
-            if (eligible) return plan === 'yearly' ? 'Start 3-Day Free Trial (then $49.99/yr)' : 'Start 3-Day Free Trial (then $9.99/mo)'
             return plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($9.99/mo)'
           })()}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
-          {trialEligibility[plan] === 'eligible'
-            ? plan === 'yearly'
-              ? '3-day free trial, then $49.99/year. Auto-renews unless cancelled before trial ends.'
-              : '3-day free trial, then $9.99/month. Auto-renews unless cancelled before trial ends.'
-            : plan === 'yearly'
-              ? 'Billed annually · Cancel anytime'
-              : 'Billed monthly · Cancel anytime'
-          }
+          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
         </p>
 
         {/* Apple IAP required disclosure */}

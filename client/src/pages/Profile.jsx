@@ -599,10 +599,10 @@ export default function Profile() {
                 letterSpacing: '0.01em',
               }}
             >
-              Start Free Trial <ArrowRight size={15} style={{ display: 'inline', verticalAlign: 'middle' }} />
+              Get Ascendus Pro <ArrowRight size={15} style={{ display: 'inline', verticalAlign: 'middle' }} />
             </motion.button>
             <p className="text-center text-[10px] font-body mt-2.5" style={{ color: TEXT_DIM }}>
-              3-day free trial · Cancel anytime
+              Cancel anytime
             </p>
           </div>
         </motion.div>
@@ -1201,7 +1201,7 @@ export default function Profile() {
                   {del.step === 'sub-gate' && (
                     <>
                       <p className="font-body text-[13px] mb-3" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                        You have an active {isPremium ? 'Ascendus subscription' : 'free trial'}. Deleting your account removes all your data but does <span style={{ color: '#EF4444', fontWeight: 700 }}>not</span> cancel App Store billing.
+                        You have an active Ascendus subscription. Deleting your account removes all your data but does <span style={{ color: '#EF4444', fontWeight: 700 }}>not</span> cancel App Store billing.
                       </p>
                       <div style={{ borderRadius: 14, padding: '14px', marginBottom: 16, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
                         <p className="font-heading font-bold text-[11px] tracking-[0.12em]" style={{ color: '#EF4444', marginBottom: 8 }}>HOW TO CANCEL ON iOS</p>

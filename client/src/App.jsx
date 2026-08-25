@@ -27,7 +27,6 @@ const HairMaxx       = lazy(() => import('./pages/HairMaxx'))
 const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
 const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'))
 const Terms          = lazy(() => import('./pages/Terms'))
-const Referral       = lazy(() => import('./pages/Referral'))
 const Compare        = lazy(() => import('./pages/Compare'))
 const AICoach        = lazy(() => import('./pages/AICoach'))
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
@@ -68,7 +67,6 @@ export default function App() {
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
-  const checkProTrial           = useStore(s => s.checkProTrial)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
   const logout                  = useStore(s => s.logout)
   const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
@@ -90,11 +88,6 @@ export default function App() {
   useEffect(() => {
     initRevenueCat(userId ?? null).catch(() => {})
   }, [userId])
-
-  // Check if pro trial has expired on load
-  useEffect(() => {
-    if (checkProTrial) checkProTrial()
-  }, [])
 
   // Refresh Pro status on startup and whenever app comes back to foreground
   useEffect(() => {
@@ -201,7 +194,6 @@ export default function App() {
                 <Route path="premium" element={<Premium />} />
                 <Route path="hairmaxx" element={<HairMaxx />} />
                 <Route path="leaderboard" element={<Leaderboard />} />
-                <Route path="referral" element={<Referral />} />
                 <Route path="compare" element={<Compare />} />
                 <Route path="coach" element={<AICoach />} />
                 <Route path="swipemaxx" element={<SwipeMaxx />} />

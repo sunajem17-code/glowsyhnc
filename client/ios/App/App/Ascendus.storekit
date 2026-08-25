@@ -24,13 +24,6 @@
           "familySharable" : false,
           "groupNumber" : 1,
           "internalID" : "ascendus_monthly_001",
-          "introductoryOffer" : {
-            "displayPrice" : "0.00",
-            "duration" : 1,
-            "durationUnit" : "WEEK",
-            "mode" : "FREE_TRIAL",
-            "offerID" : "monthly_trial"
-          },
           "localizations" : [
             {
               "description" : "Full access to Ascendus Pro",
@@ -51,13 +44,6 @@
           "familySharable" : false,
           "groupNumber" : 2,
           "internalID" : "ascendus_yearly_001",
-          "introductoryOffer" : {
-            "displayPrice" : "0.00",
-            "duration" : 1,
-            "durationUnit" : "WEEK",
-            "mode" : "FREE_TRIAL",
-            "offerID" : "yearly_trial"
-          },
           "localizations" : [
             {
               "description" : "Full access to Ascendus Pro",

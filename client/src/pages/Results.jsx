@@ -872,7 +872,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
         const token  = stored?.state?.token
         if (!token || token === 'demo-token') { navigate('/auth'); return }
-        const { url } = await api.payments.createCheckout(plan, false)
+        const { url } = await api.payments.createCheckout(plan)
         window.location.href = url
       }
     } catch (err) {
@@ -1011,7 +1011,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           </div>
         </div>
 
-        {/* Primary CTA — free trial */}
+        {/* Primary CTA */}
         <motion.button
           whileTap={{ scale: loading ? 1 : 0.97 }}
           onClick={handleCheckout}
@@ -1025,7 +1025,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
             letterSpacing: '0.01em',
           }}
         >
-          {loading ? 'Opening checkout…' : 'Start 3-Day Free Trial'}
+          {loading ? 'Opening checkout…' : 'Get Ascendus Pro'}
         </motion.button>
 
         {/* Apple IAP required disclosure */}
@@ -2085,7 +2085,7 @@ export default function Results() {
             <Home size={17} style={{ color: 'rgba(255,255,255,0.7)' }} />
           </button>
           <button
-            onClick={() => navigate('/referral')}
+            onClick={() => navigate('/premium')}
             className="py-3.5 rounded-2xl font-heading font-bold text-[13px] flex items-center justify-center gap-1.5"
             style={{
               background: 'rgba(198,168,92,0.10)',
@@ -2093,7 +2093,7 @@ export default function Results() {
               color: '#C6A85C',
             }}
           >
-            <Gift size={14} style={{ display: 'inline', marginRight: 4 }} /> Share 5 Friends
+            <Gift size={14} style={{ display: 'inline', marginRight: 4 }} /> Share 3 Friends
           </button>
           <button
             onClick={() => setShowPaywall(true)}
@@ -2103,7 +2103,7 @@ export default function Results() {
               boxShadow: '0 4px 16px rgba(198,168,92,0.3)',
             }}
           >
-            Start Free Trial
+            Get Ascendus Pro
           </button>
         </div>
       </div>

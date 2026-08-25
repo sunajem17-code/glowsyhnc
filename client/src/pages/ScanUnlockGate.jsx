@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { checkTrialEligibility, isNative, purchasePro } from '../utils/iap'
+import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
@@ -644,7 +644,7 @@ function CardProgress({ isPremium = false }) {
 // ── Swipeable Result Cards ────────────────────────────────────────────────────
 
 
-function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, isPurchasing, error, trialEligibility = {}, isPremium = false }) {
+function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, isPurchasing, error, isPremium = false }) {
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -766,7 +766,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
         ) : (
           <>
             {(() => {
-              const trialReady = trialEligibility.monthly === 'eligible' || trialEligibility.yearly === 'eligible'
               return (
                 <>
                   <motion.button
@@ -789,7 +788,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                           ? <Loader2 size={16} className="animate-spin" />
                           : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
                         }
-                        {isPurchasing ? 'Processing…' : trialReady ? 'Start 3-Day Free Trial' : 'Unlock Full Results'}
+                        {isPurchasing ? 'Processing…' : 'Unlock Full Results'}
                       </motion.span>
                     </AnimatePresence>
                   </motion.button>
@@ -804,11 +803,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                     Have a promo code?
                   </button>
 
-                  {trialReady && !isPurchasing && (
-                    <p className="text-center text-[10px] font-body" style={{ color: 'rgba(198,168,92,0.5)', marginTop: -6 }}>
-                      3 days free, then $9.99/mo or $49.99/yr · Cancel anytime
-                    </p>
-                  )}
                   {error && (
                     <p className="text-center text-[11px] font-body" style={{ color: RED }}>{error}</p>
                   )}
@@ -971,7 +965,6 @@ export default function ScanUnlockGate() {
   const justUnlockedRef = useRef(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
-  const [trialEligibility, setTrialEligibility] = useState({ monthly: 'unknown', yearly: 'unknown' })
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
 
@@ -987,9 +980,6 @@ export default function ScanUnlockGate() {
     if (!currentScan || isPremium) return
     api.referral.count()
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
-      .catch(() => {})
-    checkTrialEligibility()
-      .then(result => setTrialEligibility(result))
       .catch(() => {})
   }, [])
 
@@ -1012,11 +1002,7 @@ export default function ScanUnlockGate() {
     setPurchaseError('')
     try {
       if (isNative()) {
-        // Prefer whichever plan the "3-Day Free Trial" copy is actually
-        // promising — monthly by default, but fall back to yearly if only
-        // that one is trial-eligible.
-        const plan = trialEligibility.monthly === 'eligible' ? 'monthly'
-          : trialEligibility.yearly === 'eligible' ? 'yearly' : 'monthly'
+        const plan = 'monthly'
         const result = await purchasePro(plan)
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
@@ -1039,7 +1025,7 @@ export default function ScanUnlockGate() {
       const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
       const token  = stored?.state?.token
       if (!token || token === 'demo-token') { setIsPurchasing(false); navigate('/auth'); return }
-      const { url } = await api.payments.createCheckout('monthly', false)
+      const { url } = await api.payments.createCheckout('monthly')
       window.location.href = url
       // Leave isPurchasing=true — the page is about to navigate away.
     } catch (err) {
@@ -1064,7 +1050,6 @@ export default function ScanUnlockGate() {
         onPromo={() => setShowPromo(true)}
         isPurchasing={isPurchasing}
         error={purchaseError}
-        trialEligibility={trialEligibility}
         isPremium={isPremium}
       />
 

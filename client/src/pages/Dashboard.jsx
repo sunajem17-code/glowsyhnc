@@ -116,14 +116,14 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
-                  Get 3 days Pro free
+                  Get Ascendus Pro free
                 </p>
                 <p className="font-body text-[11px] text-secondary leading-snug">
                   Refer {3 - (referralCount ?? 0)} more friend{3 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock
                 </p>
               </div>
               <button
-                onClick={() => { triggerHaptic(); navigate('/referral') }}
+                onClick={() => { triggerHaptic(); navigate('/premium') }}
                 className="font-heading font-bold text-xs px-3 py-1.5 rounded-xl flex-shrink-0"
                 style={{ background: 'rgba(198,168,92,0.18)', color: GOLD }}
               >
