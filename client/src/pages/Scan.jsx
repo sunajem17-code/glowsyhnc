@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -604,21 +604,56 @@ export const ANALYSIS_STEP_LABELS = [
 // Thin, technical-readout look (was strokeWidth 2.5 — read as thick/bold).
 const LANDMARK_STROKE = 1.1
 
-// Plausible-looking readout text shown next to each main step's geometry —
-// purely decorative like the lines themselves (see "Purely visual — no real
-// face detection" note on FaceScanOverlay above; same principle here). {x,y}
-// is a 0–100 anchor point rendered as an HTML label (not SVG <text>) because
-// this SVG uses preserveAspectRatio="none" over a 2:3 container — actual SVG
-// text would render visibly stretched under that non-uniform scale, an HTML
-// overlay positioned by matching %-based left/top does not.
-const STEP_READOUTS = [
+// ─── Real landmark anchoring ──────────────────────────────────────────────────
+// Every line/dot/bracket below is anchored to the ACTUAL detected face in
+// this photo, not an assumed centered position. Scan()'s startAnalysis kicks
+// off MediaPipe FaceMesh (client/src/utils/faceLandmarks.js — the same
+// engine that powers FaceMetricsExplorer/computeStructuralMetrics) the
+// moment the analyzing screen mounts, in parallel with the real AI scoring
+// call, and passes the resolved points down as `points`. Index reference is
+// the same canonical MediaPipe Face Mesh map documented in
+// faceLandmarks.js's computeStructuralMetrics.
+const OVERLAY_LM_INDICES = {
+  forehead: 10, nose: 1, noseBase: 2, chin: 152,
+  cheekL: 234, cheekR: 454,
+  jawL: 172, jawR: 397, jawMidL: 136, jawChinL: 148, jawMidR: 365, jawChinR: 378,
+  eyeOuterL: 33, eyeOuterR: 263, eyeInnerL: 133, eyeInnerR: 362,
+  templeL: 127, templeR: 356,
+  mouthL: 61, mouthR: 291,
+}
+
+// Raw MediaPipe landmarks (468 points, {x,y,z} normalized 0–1 to the source
+// image) → the named subset this overlay draws from, still normalized 0–1.
+export function extractScanOverlayPoints(lm) {
+  const out = {}
+  for (const [key, i] of Object.entries(OVERLAY_LM_INDICES)) {
+    const p = lm[i]
+    if (!p) return null
+    out[key] = { x: p.x, y: p.y }
+  }
+  return out
+}
+
+// Fallback geometry — used only until real landmarks resolve (or if
+// detection fails outright, e.g. a face MediaPipe can't confidently read).
+// Assumes a face roughly centered per the capture guide ("Center your face
+// in the oval"); startAnalysis fires landmark detection the instant the
+// analyzing screen mounts, so in practice this only ever shows for the
+// first fraction of a second.
+const FALLBACK_STEP_GEOMETRY = {
+  step0: { lineX: 50, topY: 10, botY: 90, guideY: 42, guideX1: 25, guideX2: 75 },
+  step1: { pts: '22,58 50,82 78,58' },
+  step2: { l1: { x1: 25, y1: 43, x2: 42, y2: 40 }, l2: { x1: 58, y1: 40, x2: 75, y2: 43 } },
+  step3: { lineY1: 55, lineY2: 66, lineY3: 82, lineX1: 30, lineX2: 70, guideX: 50, guideY1: 55, guideY2: 82, dotX: 50, dotY: 68.5 },
+  step4: { minX: 18, maxX: 82, minY: 12, maxY: 88 },
+}
+const FALLBACK_STEP_READOUTS = [
   { x: 50, y: 8,  text: '1.02×',  align: 'center' },
   { x: 50, y: 86, text: '118.4°', align: 'center' },
   { x: 80, y: 40, text: '+4.2°',  align: 'left'   },
   { x: 50, y: 50, text: '33.4%',  align: 'center' },
   { x: 50, y: 6,  text: '98.7%',  align: 'center' },
 ]
-
 // Secondary measurements that cycle continuously for as long as this overlay
 // is mounted, independent of `step`. The 5 main steps above only span ~4s
 // (1s each); the real AI call typically runs another 10+ seconds parked on
@@ -626,7 +661,7 @@ const STEP_READOUTS = [
 // most of the wait. This keeps fresh geometry + numbers appearing the whole
 // time so the screen reads as "busy" for the full analysis, not just the
 // first few seconds of it.
-const TICKER_MEASUREMENTS = [
+const FALLBACK_TICKER_MEASUREMENTS = [
   { line: { x1: 30, y1: 20, x2: 70, y2: 20 },                text: { x: 50, y: 16, v: '1.61:1' } },
   { line: { x1: 22, y1: 30, x2: 22, y2: 46 },                text: { x: 16, y: 38, v: '24.8mm' } },
   { line: { x1: 78, y1: 30, x2: 78, y2: 46 },                text: { x: 84, y: 38, v: '24.5mm' } },
@@ -635,6 +670,74 @@ const TICKER_MEASUREMENTS = [
   { line: { x1: 40, y1: 76, x2: 60, y2: 76 },                text: { x: 50, y: 80, v: '92.3%'  } },
   { line: { x1: 20, y1: 66, x2: 80, y2: 66 },                text: { x: 50, y: 63, v: '0.98x'  } },
 ]
+
+// Builds the same-shaped geometry/readout/ticker objects as the fallback
+// constants above, but from `points` (real, normalized 0–1 coordinates) —
+// converted to 0–100 viewBox/percent units here. Every line, bracket and
+// dot below traces an actual landmark on THIS face instead of an assumed
+// generic position.
+function buildLiveStepGeometry(points) {
+  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
+  const forehead = pc('forehead'), nose = pc('nose'), noseBase = pc('noseBase'), chin = pc('chin')
+  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
+  const jawL = pc('jawL'), jawR = pc('jawR')
+  const eyeOuterL = pc('eyeOuterL'), eyeOuterR = pc('eyeOuterR')
+  const templeL = pc('templeL'), templeR = pc('templeR')
+  const eyeY = (eyeOuterL.y + eyeOuterR.y) / 2
+  const lowerThirdMidY = (noseBase.y + chin.y) / 2
+  const pad = 5
+  const minX = Math.min(cheekL.x, jawL.x, templeL.x) - pad
+  const maxX = Math.max(cheekR.x, jawR.x, templeR.x) + pad
+  const minY = forehead.y - pad
+  const maxY = chin.y + pad
+
+  return {
+    step0: { lineX: nose.x, topY: forehead.y, botY: chin.y, guideY: eyeY, guideX1: eyeOuterL.x, guideX2: eyeOuterR.x },
+    step1: { pts: `${jawL.x},${jawL.y} ${chin.x},${chin.y} ${jawR.x},${jawR.y}` },
+    step2: {
+      l1: { x1: pc('eyeInnerL').x, y1: pc('eyeInnerL').y, x2: eyeOuterL.x, y2: eyeOuterL.y },
+      l2: { x1: pc('eyeInnerR').x, y1: pc('eyeInnerR').y, x2: eyeOuterR.x, y2: eyeOuterR.y },
+    },
+    step3: {
+      lineY1: eyeY, lineY2: noseBase.y, lineY3: chin.y, lineX1: cheekL.x, lineX2: cheekR.x,
+      guideX: nose.x, guideY1: eyeY, guideY2: chin.y, dotX: nose.x, dotY: lowerThirdMidY,
+    },
+    step4: { minX, maxX, minY, maxY },
+  }
+}
+
+function buildLiveReadouts(points) {
+  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
+  const forehead = pc('forehead'), chin = pc('chin'), eyeOuterR = pc('eyeOuterR')
+  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
+  const centerX = (cheekL.x + cheekR.x) / 2
+  return [
+    { x: centerX, y: Math.max(2, forehead.y - 6), text: '1.02×',  align: 'center' },
+    { x: centerX, y: Math.min(97, chin.y + 6),     text: '118.4°', align: 'center' },
+    { x: eyeOuterR.x + 3, y: eyeOuterR.y,           text: '+4.2°',  align: 'left'   },
+    { x: centerX, y: (pc('noseBase').y + chin.y) / 2, text: '33.4%', align: 'center' },
+    { x: centerX, y: Math.max(2, forehead.y - 8),   text: '98.7%', align: 'center' },
+  ]
+}
+
+function buildLiveTicker(points) {
+  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
+  const templeL = pc('templeL'), templeR = pc('templeR')
+  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
+  const jawMidL = pc('jawMidL'), jawChinL = pc('jawChinL'), jawMidR = pc('jawMidR'), jawChinR = pc('jawChinR')
+  const mouthL = pc('mouthL'), mouthR = pc('mouthR')
+  const eyeInnerL = pc('eyeInnerL'), eyeInnerR = pc('eyeInnerR')
+  const bitemporalY = (templeL.y + templeR.y) / 2
+  return [
+    { line: { x1: templeL.x, y1: bitemporalY, x2: templeR.x, y2: bitemporalY }, text: { x: (templeL.x + templeR.x) / 2, y: bitemporalY - 4, v: '1.61:1' } },
+    { line: { x1: cheekL.x, y1: cheekL.y - 8, x2: cheekL.x, y2: cheekL.y + 8 }, text: { x: cheekL.x - 6, y: cheekL.y, v: '24.8mm' } },
+    { line: { x1: cheekR.x, y1: cheekR.y - 8, x2: cheekR.x, y2: cheekR.y + 8 }, text: { x: cheekR.x + 6, y: cheekR.y, v: '24.5mm' } },
+    { line: { x1: jawMidL.x, y1: jawMidL.y, x2: jawChinL.x, y2: jawChinL.y },   text: { x: jawChinL.x - 4, y: jawChinL.y + 3, v: '11.2°' } },
+    { line: { x1: jawMidR.x, y1: jawMidR.y, x2: jawChinR.x, y2: jawChinR.y },   text: { x: jawChinR.x + 4, y: jawChinR.y + 3, v: '11.6°' } },
+    { line: { x1: mouthL.x, y1: mouthL.y, x2: mouthR.x, y2: mouthR.y },        text: { x: (mouthL.x + mouthR.x) / 2, y: mouthL.y + 4, v: '92.3%' } },
+    { line: { x1: eyeInnerL.x, y1: eyeInnerL.y, x2: eyeInnerR.x, y2: eyeInnerR.y }, text: { x: (eyeInnerL.x + eyeInnerR.x) / 2, y: eyeInnerL.y - 4, v: '0.98x' } },
+  ]
+}
 
 // One L-shaped corner bracket of the final "target lock" bounding box —
 // two short arms meeting at (x, y), pointing inward per (dx, dy).
@@ -667,9 +770,17 @@ function Readout({ x, y, text, align = 'center' }) {
   )
 }
 
-function FacialAnalysisOverlay({ step }) {
+function FacialAnalysisOverlay({ step, points }) {
   const s = Math.min(step, 4)
-  const readout = STEP_READOUTS[s]
+
+  // Real landmarks (usually resolved within a fraction of a second of this
+  // mounting — see startAnalysis) replace every fallback coordinate below
+  // with one measured from THIS photo. useMemo so a re-render mid-step
+  // doesn't recompute/rebuild these on every tick.
+  const G = useMemo(() => (points ? buildLiveStepGeometry(points) : FALLBACK_STEP_GEOMETRY), [points])
+  const readouts = useMemo(() => (points ? buildLiveReadouts(points) : FALLBACK_STEP_READOUTS), [points])
+  const tickerMeasurements = useMemo(() => (points ? buildLiveTicker(points) : FALLBACK_TICKER_MEASUREMENTS), [points])
+  const readout = readouts[s]
 
   // Ticker runs on its own clock the whole time this component is mounted —
   // it never depends on `step`, so it keeps cycling through step 4's long
@@ -677,11 +788,11 @@ function FacialAnalysisOverlay({ step }) {
   const [tickerIdx, setTickerIdx] = useState(0)
   useEffect(() => {
     const id = setInterval(() => {
-      setTickerIdx(i => (i + 1) % TICKER_MEASUREMENTS.length)
+      setTickerIdx(i => (i + 1) % tickerMeasurements.length)
     }, 1400)
     return () => clearInterval(id)
-  }, [])
-  const ticker = TICKER_MEASUREMENTS[tickerIdx]
+  }, [tickerMeasurements])
+  const ticker = tickerMeasurements[tickerIdx % tickerMeasurements.length]
 
   return (
     <>
@@ -695,29 +806,29 @@ function FacialAnalysisOverlay({ step }) {
           <AnimatePresence>
             {s === 0 && (
               <motion.g key="step-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line x1="50" y1="10" x2="50" y2="90" />
-                <line x1="25" y1="42" x2="75" y2="42" stroke={LANDMARK_GUIDE} strokeWidth={0.8} />
+                <line x1={G.step0.lineX} y1={G.step0.topY} x2={G.step0.lineX} y2={G.step0.botY} />
+                <line x1={G.step0.guideX1} y1={G.step0.guideY} x2={G.step0.guideX2} y2={G.step0.guideY} stroke={LANDMARK_GUIDE} strokeWidth={0.8} />
               </motion.g>
             )}
             {s === 1 && (
               <motion.g key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <polyline points="22,58 50,82 78,58" />
+                <polyline points={G.step1.pts} />
               </motion.g>
             )}
             {s === 2 && (
               <motion.g key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line x1="25" y1="43" x2="42" y2="40" />
-                <line x1="58" y1="40" x2="75" y2="43" />
+                <line {...G.step2.l1} />
+                <line {...G.step2.l2} />
               </motion.g>
             )}
             {s === 3 && (
               <motion.g key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line x1="30" y1="55" x2="70" y2="55" />
-                <line x1="35" y1="66" x2="65" y2="66" />
-                <line x1="30" y1="82" x2="70" y2="82" />
-                <line x1="50" y1="55" x2="50" y2="82" stroke={LANDMARK_GUIDE} strokeWidth={0.8} strokeDasharray="3 3" />
+                <line x1={G.step3.lineX1} y1={G.step3.lineY1} x2={G.step3.lineX2} y2={G.step3.lineY1} />
+                <line x1={G.step3.lineX1} y1={G.step3.lineY2} x2={G.step3.lineX2} y2={G.step3.lineY2} />
+                <line x1={G.step3.lineX1} y1={G.step3.lineY3} x2={G.step3.lineX2} y2={G.step3.lineY3} />
+                <line x1={G.step3.guideX} y1={G.step3.guideY1} x2={G.step3.guideX} y2={G.step3.guideY2} stroke={LANDMARK_GUIDE} strokeWidth={0.8} strokeDasharray="3 3" />
                 <motion.circle
-                  cx="50" cy="68.5" r="1" fill={LANDMARK_GOLD} stroke="none"
+                  cx={G.step3.dotX} cy={G.step3.dotY} r="1" fill={LANDMARK_GOLD} stroke="none"
                   animate={{ opacity: [0.3, 1, 0.3] }}
                   transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
                 />
@@ -726,10 +837,10 @@ function FacialAnalysisOverlay({ step }) {
             {s === 4 && (
               <motion.g key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
                 <motion.g animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
-                  <LandmarkBracket x={18} y={12} dx={1} dy={1} />
-                  <LandmarkBracket x={82} y={12} dx={-1} dy={1} />
-                  <LandmarkBracket x={18} y={88} dx={1} dy={-1} />
-                  <LandmarkBracket x={82} y={88} dx={-1} dy={-1} />
+                  <LandmarkBracket x={G.step4.minX} y={G.step4.minY} dx={1} dy={1} />
+                  <LandmarkBracket x={G.step4.maxX} y={G.step4.minY} dx={-1} dy={1} />
+                  <LandmarkBracket x={G.step4.minX} y={G.step4.maxY} dx={1} dy={-1} />
+                  <LandmarkBracket x={G.step4.maxX} y={G.step4.maxY} dx={-1} dy={-1} />
                 </motion.g>
               </motion.g>
             )}
@@ -841,14 +952,26 @@ function MorphWarpOverlay({ photo }) {
 // startAnalysis is still gated on the real API result, never on this timer
 // (see the minDisplayPromise wiring there). `morphing` plays MorphWarpOverlay
 // once, right before Scan.jsx navigates away to results/unlock.
-function AnalyzingSweepOverlay({ photo, step, morphing }) {
+// No forced aspectRatio/object-cover on the base photo — same fix as
+// FaceMetricsExplorer.jsx (see its comment): the overlay's landmark dots
+// are positioned as a straight % of this box's width/height, which only
+// lines up with the real face if this box IS the photo's actual aspect
+// ratio. A fixed 2:3 crop was silently shifting every point off the face
+// for any photo shaped differently than that (which is most of them) —
+// exactly the "not on the person's face" bug this fixes. `aspectRatio`
+// only kicks in as a fallback for the (normally unreachable) case where
+// there's no photo yet, so the box doesn't collapse to zero height.
+function AnalyzingSweepOverlay({ photo, step, morphing, points }) {
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden mb-5" style={{ aspectRatio: '2/3', background: '#0a0a0a' }}>
+    <div
+      className="relative w-full rounded-3xl overflow-hidden mb-5"
+      style={{ background: '#0a0a0a', ...(photo ? {} : { aspectRatio: '2/3' }) }}
+    >
       {photo && (
         <img
           src={photo}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover"
+          className="block w-full h-auto"
           style={{ filter: 'brightness(0.5) saturate(0.85)' }}
         />
       )}
@@ -857,7 +980,7 @@ function AnalyzingSweepOverlay({ photo, step, morphing }) {
         style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
       />
       <AnimatePresence>
-        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} />}
+        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} />}
       </AnimatePresence>
     </div>
   )
@@ -868,13 +991,13 @@ function AnalyzingSweepOverlay({ photo, step, morphing }) {
 // Step 3 is set when the API call actually completes — the only real signal.
 const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
 
-export function AnalyzingScreen({ currentStep, slow, photo, morphing = false }) {
+export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null }) {
   const stepIndex = Math.min(currentStep, 4)
   const progressPct = STEP_PROGRESS_PCT[stepIndex]
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} />
+      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} />
 
       {/* Status subtext — tied 1:1 to the current landmark step, not an
           independent rotation, so the label always matches the geometry
@@ -1008,6 +1131,12 @@ export default function Scan() {
   // handing off to results/unlock — see startAnalysis, just above its
   // navigate() call.
   const [morphing, setMorphing]           = useState(false)
+  // Real MediaPipe face-landmark points for THIS scan's photo, used to
+  // position FacialAnalysisOverlay's lines/dots/readouts on the actual
+  // detected face — see startAnalysis, which kicks off detection the
+  // instant the analyzing screen mounts. Stays null (fallback, generic
+  // centered geometry) until detection resolves, or if it fails outright.
+  const [analysisPoints, setAnalysisPoints] = useState(null)
   const [error, setError]                 = useState('')
   const [rateLimited, setRateLimited]     = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
@@ -1092,6 +1221,27 @@ export default function Scan() {
     setStep(3)  // analyzing
     setError('')
     setAnalysisStep(0)
+    setAnalysisPoints(null) // clear any previous scan's points before detecting this one's
+
+    // Kick off real face-landmark detection the instant the analyzing screen
+    // mounts, in parallel with the actual AI scoring call below — this is
+    // what lets FacialAnalysisOverlay trace the real detected face instead
+    // of an assumed centered position. Non-blocking and non-fatal: the real
+    // scan flow never depends on this succeeding, so a slow/failed detection
+    // (e.g. MediaPipe can't confidently read this photo) just leaves the
+    // overlay on its generic fallback geometry — never blocks or breaks the
+    // actual scan. The 16-18s typical API wait gives this ample time even
+    // accounting for MediaPipe's cold-start model load on the very first
+    // scan of a session.
+    if (facePhoto) {
+      import('../utils/faceLandmarks.js')
+        .then(({ getLandmarks }) => getLandmarks(facePhoto))
+        .then(lm => {
+          const pts = extractScanOverlayPoints(lm)
+          if (pts) setAnalysisPoints(pts)
+        })
+        .catch(err => console.warn('[Scan] Analyzing-screen landmark detection failed (non-fatal, overlay falls back to generic positions):', err?.message))
+    }
 
     // 5-step, 1s-per-step choreography for FacialAnalysisOverlay — ticks
     // forward on a fixed cadence regardless of API speed and parks at step 4
@@ -1466,7 +1616,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} />
             </motion.div>
           )}
         </AnimatePresence>
