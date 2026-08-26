@@ -634,6 +634,28 @@ export function extractScanOverlayPoints(lm) {
   return out
 }
 
+// Full dense wireframe mesh (the "scanning" beat, distinct from the gold
+// step-by-step readouts above) — built from the SAME detected landmarks,
+// so it tracks and stays locked to this exact face too. `edges` is
+// MediaPipe's own standard face triangulation (FACEMESH_TESSELATION, ~2,556
+// directed edges around 468 points — real anatomical topology, not
+// invented) deduped to unique undirected pairs and flattened into ONE SVG
+// path string, rather than one <line> per edge — a single path is one DOM
+// node for the WebView to animate instead of well over a thousand.
+export function buildMeshPathD(lm, edges) {
+  const seen = new Set()
+  let d = ''
+  for (const [a, b] of edges) {
+    const key = a < b ? `${a}_${b}` : `${b}_${a}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    const pa = lm[a], pb = lm[b]
+    if (!pa || !pb) continue
+    d += `M ${(pa.x * 100).toFixed(2)} ${(pa.y * 100).toFixed(2)} L ${(pb.x * 100).toFixed(2)} ${(pb.y * 100).toFixed(2)} `
+  }
+  return d || null
+}
+
 // Fallback geometry — used only until real landmarks resolve (or if
 // detection fails outright, e.g. a face MediaPipe can't confidently read).
 // Assumes a face roughly centered per the capture guide ("Center your face
@@ -946,6 +968,49 @@ function MorphWarpOverlay({ photo }) {
   )
 }
 
+const MESH_CYAN = '#4DE8E0'
+const MESH_GLOW = 'rgba(77, 232, 224, 0.85)'
+
+// One-time ~3.4s "mesh lock-on" beat that plays as soon as real landmarks
+// resolve (see startAnalysis) — a dense wireframe (buildMeshPathD, above)
+// fades in over the real detected face, a bright line sweeps top-to-bottom
+// across it once, then it fades out and the normal gold step-by-step
+// overlay (already running underneath the whole time) is what's left.
+// Cyan rather than gold specifically so this reads as its own distinct
+// "tracking locked" moment instead of blending into that later sequence.
+// Renders nothing until `pathD` exists — see AnalyzingSweepOverlay, which
+// mounts this once per scan, so the animation timing below starts exactly
+// when the real mesh is ready to show, not from an arbitrary earlier time.
+function FaceMeshScanOverlay({ pathD }) {
+  if (!pathD) return null
+  return (
+    <motion.div
+      className="absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 1, 0] }}
+      transition={{ duration: 3.4, times: [0, 0.1, 0.88, 1], ease: 'easeInOut' }}
+    >
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ filter: `drop-shadow(0 0 2px ${MESH_GLOW})` }}
+      >
+        <path d={pathD} fill="none" stroke={MESH_CYAN} strokeWidth={0.35} strokeLinecap="round" opacity={0.8} vectorEffect="non-scaling-stroke" />
+        <motion.line
+          x1="0" x2="100"
+          initial={{ y1: 0, y2: 0 }}
+          animate={{ y1: 100, y2: 100 }}
+          transition={{ duration: 3, ease: 'linear' }}
+          stroke={MESH_CYAN}
+          strokeWidth={0.6}
+          opacity={0.9}
+        />
+      </svg>
+    </motion.div>
+  )
+}
+
 // The user's real captured photo with the step-synced landmark overlay above
 // (FacialAnalysisOverlay) — replaces the earlier generic sweep-line/dot-mesh
 // versions entirely. Purely visual; onScanComplete-equivalent completion in
@@ -961,7 +1026,7 @@ function MorphWarpOverlay({ photo }) {
 // exactly the "not on the person's face" bug this fixes. `aspectRatio`
 // only kicks in as a fallback for the (normally unreachable) case where
 // there's no photo yet, so the box doesn't collapse to zero height.
-function AnalyzingSweepOverlay({ photo, step, morphing, points }) {
+function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
   return (
     <div
       className="relative w-full rounded-3xl overflow-hidden mb-5"
@@ -982,6 +1047,11 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points }) {
       <AnimatePresence>
         {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} />}
       </AnimatePresence>
+      {/* Plays once, on top of whichever step is currently showing, the
+          moment the real mesh is ready — see FaceMeshScanOverlay. Suppressed
+          during the final morph flourish since by then it's long finished
+          its one 3.4s pass anyway; this just guards against any overlap. */}
+      {!morphing && <FaceMeshScanOverlay pathD={meshPathD} />}
     </div>
   )
 }
@@ -991,13 +1061,13 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points }) {
 // Step 3 is set when the API call actually completes — the only real signal.
 const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
 
-export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null }) {
+export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null, meshPathD = null }) {
   const stepIndex = Math.min(currentStep, 4)
   const progressPct = STEP_PROGRESS_PCT[stepIndex]
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} />
+      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} />
 
       {/* Status subtext — tied 1:1 to the current landmark step, not an
           independent rotation, so the label always matches the geometry
@@ -1137,6 +1207,10 @@ export default function Scan() {
   // instant the analyzing screen mounts. Stays null (fallback, generic
   // centered geometry) until detection resolves, or if it fails outright.
   const [analysisPoints, setAnalysisPoints] = useState(null)
+  // Deduped SVG path string for the ~3.4s mesh-scan beat (FaceMeshScanOverlay)
+  // — built from the same detection call as analysisPoints above, see
+  // startAnalysis. null until that resolves (the beat simply doesn't play).
+  const [meshPathD, setMeshPathD]         = useState(null)
   const [error, setError]                 = useState('')
   const [rateLimited, setRateLimited]     = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
@@ -1222,23 +1296,31 @@ export default function Scan() {
     setError('')
     setAnalysisStep(0)
     setAnalysisPoints(null) // clear any previous scan's points before detecting this one's
+    setMeshPathD(null)      // same for the mesh-scan beat — don't replay the last scan's mesh
 
     // Kick off real face-landmark detection the instant the analyzing screen
     // mounts, in parallel with the actual AI scoring call below — this is
     // what lets FacialAnalysisOverlay trace the real detected face instead
-    // of an assumed centered position. Non-blocking and non-fatal: the real
-    // scan flow never depends on this succeeding, so a slow/failed detection
-    // (e.g. MediaPipe can't confidently read this photo) just leaves the
-    // overlay on its generic fallback geometry — never blocks or breaks the
-    // actual scan. The 16-18s typical API wait gives this ample time even
-    // accounting for MediaPipe's cold-start model load on the very first
-    // scan of a session.
+    // of an assumed centered position, and what the mesh-scan beat
+    // (FaceMeshScanOverlay) draws from too. Non-blocking and non-fatal: the
+    // real scan flow never depends on either succeeding, so a slow/failed
+    // detection (e.g. MediaPipe can't confidently read this photo) just
+    // leaves the overlay on its generic fallback geometry and skips the
+    // mesh beat entirely — never blocks or breaks the actual scan. The
+    // 16-18s typical API wait gives this ample time even accounting for
+    // MediaPipe's cold-start model load on the very first scan of a session.
     if (facePhoto) {
       import('../utils/faceLandmarks.js')
         .then(({ getLandmarks }) => getLandmarks(facePhoto))
         .then(lm => {
           const pts = extractScanOverlayPoints(lm)
           if (pts) setAnalysisPoints(pts)
+          import('@mediapipe/face_mesh')
+            .then(({ FACEMESH_TESSELATION }) => {
+              const d = buildMeshPathD(lm, FACEMESH_TESSELATION)
+              if (d) setMeshPathD(d)
+            })
+            .catch(err => console.warn('[Scan] Face mesh tessellation unavailable (non-fatal, mesh-scan beat skipped):', err?.message))
         })
         .catch(err => console.warn('[Scan] Analyzing-screen landmark detection failed (non-fatal, overlay falls back to generic positions):', err?.message))
     }
@@ -1616,7 +1698,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} meshPathD={meshPathD} />
             </motion.div>
           )}
         </AnimatePresence>
