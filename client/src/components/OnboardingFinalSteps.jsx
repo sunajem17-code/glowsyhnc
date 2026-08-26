@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
-import { Star, Check, Loader2, Lock, X, Tag } from 'lucide-react'
+import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
@@ -9,7 +9,7 @@ import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
-import { EXTENDED_CATEGORIES, CategoryCard } from './CategoryCard'
+import { EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from './CategoryCard'
 import PromoModal from './PromoModal'
 
 const G = GOLD
@@ -18,12 +18,6 @@ const BG = '#080808'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.5)'
 const SURFACE = 'rgba(255,255,255,0.04)'
-// Fixed fill for OverallCard's locked progress bars, identical regardless of
-// the real score — see CategoryCard.jsx's LOCKED_FILL_PCT for the full
-// rationale (same value, kept local rather than shared per this file's
-// existing "duplicate rather than share" convention for onboarding-only code).
-const LOCKED_FILL_PCT = 62
-
 async function openAppStoreReview() {
   if (!Capacitor.isNativePlatform()) return
   try {
@@ -134,31 +128,6 @@ export function StepRating({ onNext }) {
   )
 }
 
-// Same blur-lock treatment as ScanUnlockGate's Card1Score — kept as a local
-// copy rather than a shared import since the two files already duplicate the
-// growth-area/celeb-match helpers above for the same reason (no shared
-// "onboarding result card" module exists yet).
-function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
-  const blur = size === 'lg' ? 'blur(16px)' : size === 'sm' ? 'blur(11px)' : 'blur(13px)'
-  return (
-    <span style={{ position: 'relative', display: 'inline-block', userSelect: 'none', ...extraStyle }}>
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: -6,
-          borderRadius: 10,
-          background: 'radial-gradient(circle, rgba(198,168,92,0.08) 0%, transparent 72%)',
-          pointerEvents: 'none',
-        }}
-      />
-      <span style={{ position: 'relative', display: 'inline-block', filter: blur }}>
-        {children}
-      </span>
-    </span>
-  )
-}
-
 // ── Card 1: Overall — the original StepScoresWaiting content, now the first
 // card of the carousel below. Self-contained (computes everything off `scan`
 // alone) to match Card1Score/CategoryCard's own pattern in ScanUnlockGate.jsx.
@@ -183,14 +152,17 @@ function OverallCard({ scan }) {
   }
 
 
-  // Six real fields — same as Card1Score, not fabricated categories.
+  // Six real fields — same as Card1Score, not fabricated categories. Only
+  // TEASER_KEYS.overall ('potential') is ever shown for real here — this
+  // card has no isPremium prop at all (pre-purchase only), so every other
+  // tile locks unconditionally.
   const lockedMetrics = [
-    { label: 'PSL Tier',           value: tier ?? 'N/A',                                                  unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
-    { label: 'Potential',          value: potential ?? 'N/A',                                              unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
-    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                  unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
-    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
-    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
-    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
+    { key: 'pslTier',           label: 'PSL Tier',           value: tier ?? 'N/A',                                                  unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { key: 'potential',         label: 'Potential',          value: potential ?? 'N/A',                                              unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { key: 'symmetry',          label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                  unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { key: 'jawline',           label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { key: 'skinClarity',       label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { key: 'facialProportions', label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -228,54 +200,23 @@ function OverallCard({ scan }) {
           </span>
         </motion.div>
 
-        {/* ── Six locked metric cards — 2×3 grid, matching Card1Score ───────── */}
+        {/* ── Six metric cards — 2×3 grid, same MetricTile as every other
+            category card (UPPER THIRD etc.) so boxes are byte-identical.
+            Only TEASER_KEYS.overall ('potential') reveals for real. ────── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="grid grid-cols-2 gap-3 mb-6"
+          className="grid grid-cols-2 gap-3 mb-3"
         >
-          {lockedMetrics.map(({ label, value, unit, pct }, i) => (
+          {lockedMetrics.map(({ key, label, value, unit, pct }, i) => (
             <motion.div
               key={label}
               initial={{ opacity: 0, scale: 0.93 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.35 + i * 0.05 }}
-              className="rounded-2xl p-4 flex flex-col"
-              style={{
-                background: 'rgba(198,168,92,0.03)',
-                border: '1px solid rgba(198,168,92,0.15)',
-              }}
             >
-              <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
-                {label}
-              </span>
-              <div className="flex items-center justify-between mb-2">
-                <BlurLock size="sm">
-                  <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
-                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                  </div>
-                </BlurLock>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                </span>
-              </div>
-              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                {/* OverallCard is always locked (no isPremium prop — pre-
-                    purchase only), so the bar never gets the real fill, same
-                    as the number right above it. Fixed, non-computed, static
-                    fill instead of 0% — an empty bar reads as broken rather
-                    than "locked, unlock to see it", and there's no fill-in
-                    to animate since this state is never revealed here. */}
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
-                    width: `${LOCKED_FILL_PCT}%`,
-                  }}
-                />
-              </div>
+              <MetricTile label={label} value={value} unit={unit} pct={pct} locked={key !== TEASER_KEYS.overall} />
             </motion.div>
           ))}
         </motion.div>
@@ -292,7 +233,7 @@ function OverallCard({ scan }) {
 // paywall on /unlock isn't the first time the user sees any of this. Swipe/drag
 // mechanics (index state, velocity-aware drag commit, spring transition, "X OF
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
-// "Unlock Results Now" CTA below is untouched, still a flat call to onAscend.
+// "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
 // ── Exit-intent: annual-discount offer ──────────────────────────────────────
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
@@ -425,7 +366,6 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   const [claimError, setClaimError] = useState('')
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser   = useStore(s => s.updateUser)
-  const isPremium    = useStore(s => s.isPremium)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
   // it, skip straight through" state. There is intentionally no way to exit
@@ -480,7 +420,13 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     { id: 'overall', el: <OverallCard scan={scan} /> },
     ...EXTENDED_CATEGORIES.map(cat => ({
       id: cat.key,
-      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} isPremium={isPremium} />,
+      // isPremium is hardcoded false — this screen is pre-purchase only, it
+      // must never trust the global store's live isPremium (which is how
+      // every category tile ended up fully unlocked here: a device/account
+      // reaching onboarding with stale isPremium=true left over from an
+      // earlier session made these tiles show real values while OverallCard
+      // right next to it — never wired to isPremium at all — stayed locked).
+      el: <CategoryCard scan={scan} categoryKey={cat.key} badge={cat.badge} icon={cat.icon} metrics={cat.metrics} isPremium={false} />,
     })),
   ]
 
@@ -597,7 +543,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
               className="flex items-center justify-center gap-2.5"
             >
               {isPurchasing && <Loader2 size={20} className="animate-spin" />}
-              {isPurchasing ? 'Processing…' : 'Unlock Results Now'}
+              {isPurchasing ? 'Processing…' : 'Ready to Transform'}
             </motion.span>
           </AnimatePresence>
         </motion.button>

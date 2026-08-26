@@ -74,6 +74,22 @@ export function CardShell({ badge, icon: Icon, children, facePhotoUrl }) {
   )
 }
 
+// One metric per category is shown for real even when locked — a teaser,
+// not a leak — everything else in that category still blurs/locks normally.
+// Only applies to the non-premium state; once isPremium is true every tile
+// unlocks as normal regardless of this map. 'overall' isn't one of
+// EXTENDED_CATEGORIES (OverallCard/Card1Score build their own metric list),
+// but its teaser key lives here too so every "which metric teases this
+// category" answer comes from one place.
+export const TEASER_KEYS = {
+  overall:       'potential',
+  eyes:          'canthalTilt',
+  lowerThird:    'lips',
+  midface:       'maxilla',
+  upperThird:    'norwoodStage',
+  miscellaneous: 'harmony',
+}
+
 export function BlurLock({ children, size = 'md', style: extraStyle = {} }) {
   const blur = size === 'lg' ? 'blur(16px)' : size === 'sm' ? 'blur(11px)' : 'blur(13px)'
   return (
@@ -161,6 +177,76 @@ export const EXTENDED_CATEGORIES = [
   },
 ]
 
+// Single metric tile — label, value (blurred+locked or plain), lock icon,
+// progress bar. Shared by CategoryCard's 5 extended-metric categories AND
+// (via direct import) OverallCard/Card1Score's own 6-metric grids, so all
+// three places render byte-identical boxes instead of three hand-tuned
+// copies that can drift out of sync with each other.
+export function MetricTile({ label, value, unit, pct, locked, isPending = false }) {
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col"
+      style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}
+    >
+      <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
+        {label}
+      </span>
+      <div className="flex items-center justify-between mb-2">
+        {isPending && value === 'N/A' ? (
+          <motion.div
+            className="h-[22px] w-12 rounded-md"
+            style={{ background: 'rgba(198,168,92,0.15)' }}
+            animate={{ opacity: [0.4, 0.9, 0.4] }}
+            transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        ) : locked ? (
+          <BlurLock size="sm">
+            <div className="flex items-end gap-0.5">
+              <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
+              {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+            </div>
+          </BlurLock>
+        ) : (
+          <div className="flex items-end gap-0.5">
+            <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
+            {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
+          </div>
+        )}
+        {locked && (
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
+            <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
+          </span>
+        )}
+      </div>
+      <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+        {isPending && pct === 0 ? (
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
+            animate={{ x: ['-100%', '100%'] }}
+            transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        ) : locked ? (
+          // Locked tiles never show the real fill (that would leak the score
+          // through bar length even with the digit blurred), but an empty bar
+          // reads as broken rather than "locked, unlock to see it" — so every
+          // locked tile gets the same fixed, non-informative fill instead of
+          // 0%, static with no fill-in animation since nothing's "revealed".
+          <div
+            className="h-full rounded-full"
+            style={{
+              background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
+              width: `${LOCKED_FILL_PCT}%`,
+            }}
+          />
+        ) : (
+          <ProgressBarFill pct={pct} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremium = false, facePhotoUrl }) {
   const data = scan?.extendedMetrics?.[categoryKey] ?? {}
   // Extended metrics now arrive a few seconds after the core score via a
@@ -168,84 +254,30 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
   // in flight, tiles show a pulsing placeholder instead of a bare "—", so
   // this reads as "still loading" rather than "no data available".
   const isPending = scan?.extendedMetricsStatus === 'pending'
+  const teaserKey = TEASER_KEYS[categoryKey]
 
   const tiles = metrics.map(({ key, label }) => {
     const score = data[key]?.score ?? null
     return {
+      // metricKey (not `key`) — a plain `key` field here would leak into the
+      // {...tile} spread below and collide with JSX's own reserved `key`
+      // prop (React warns "key prop being spread into JSX" even though the
+      // explicit key={tile.label} below is what actually gets used).
+      metricKey: key,
       label,
-      value: score != null ? score.toFixed(1) : 'N/A',
-      unit:  score != null ? '/10' : '',
-      pct:   score != null ? Math.min(100, (score / 10) * 100) : 0,
+      value:  score != null ? score.toFixed(1) : 'N/A',
+      unit:   score != null ? '/10' : '',
+      pct:    score != null ? Math.min(100, (score / 10) * 100) : 0,
+      // Non-premium: every tile locks except the one designated teaser for
+      // this category. Premium: everything unlocks, teaser map is irrelevant.
+      locked: !isPremium && key !== teaserKey,
     }
   })
 
   return (
     <CardShell badge={badge} icon={icon} facePhotoUrl={facePhotoUrl}>
       <div className="grid grid-cols-2 gap-3 mb-3">
-        {tiles.map(({ label, value, unit, pct }) => (
-          <div
-            key={label}
-            className="rounded-2xl p-4 flex flex-col"
-            style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}
-          >
-            <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
-              {label}
-            </span>
-            <div className="flex items-center justify-between mb-2">
-              {isPending && value === 'N/A' ? (
-                <motion.div
-                  className="h-[22px] w-12 rounded-md"
-                  style={{ background: 'rgba(198,168,92,0.15)' }}
-                  animate={{ opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              ) : isPremium ? (
-                <div className="flex items-end gap-0.5">
-                  <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
-                  {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                </div>
-              ) : (
-                <BlurLock size="sm">
-                  <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
-                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                  </div>
-                </BlurLock>
-              )}
-              {!isPremium && (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                  <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                </span>
-              )}
-            </div>
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-              {isPending && pct === 0 ? (
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                  animate={{ x: ['-100%', '100%'] }}
-                  transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              ) : isPremium ? (
-                <ProgressBarFill pct={pct} />
-              ) : (
-                // Locked users never see the real fill (that would leak the
-                // score through bar length even with the digit blurred), but
-                // an empty bar reads as broken rather than "locked, unlock to
-                // see it" — so every locked tile gets the same fixed,
-                // non-informative fill instead of 0%, static with no
-                // fill-in animation since there's nothing being "revealed".
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
-                    width: `${LOCKED_FILL_PCT}%`,
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        ))}
+        {tiles.map(tile => <MetricTile key={tile.label} {...tile} isPending={isPending} />)}
       </div>
       {isPremium && (
         <p className="text-center font-body text-[11px] mt-1 mb-3" style={{ color: 'rgba(198,168,92,0.45)' }}>

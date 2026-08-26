@@ -10,7 +10,7 @@ import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
-import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard } from '../components/CategoryCard'
+import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import { triggerHaptic } from '../utils/haptics'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import MotionPage from '../components/MotionPage'
@@ -124,12 +124,12 @@ function Card1Score({ scan, isPremium = false }) {
   const toScorePct = v => v != null ? Math.min(100, (v / 10) * 100) : 0
 
   const lockedMetrics = [
-    { label: 'PSL Tier',           value: tier ?? 'N/A',                                            unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
-    { label: 'Potential',          value: potential ?? 'N/A',                                       unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
-    { label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                   unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
-    { label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
-    { label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
-    { label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
+    { key: 'pslTier',           label: 'PSL Tier',           value: tier ?? 'N/A',                                            unit: '',                                    pct: glowScore != null ? Math.min(100, (glowScore / 10) * 100) : 0 },
+    { key: 'potential',         label: 'Potential',          value: potential ?? 'N/A',                                       unit: potential ? '/10' : '',                pct: potential != null ? Math.min(100, (parseFloat(potential) / 10) * 100) : 0 },
+    { key: 'symmetry',          label: 'Symmetry',           value: symmetry != null ? symmetry.toFixed(1) : 'N/A',                   unit: symmetry != null ? '/10' : '',          pct: toScorePct(symmetry) },
+    { key: 'jawline',           label: 'Jawline',            value: jawlineDefinition != null ? jawlineDefinition.toFixed(1) : 'N/A', unit: jawlineDefinition != null ? '/10' : '', pct: toScorePct(jawlineDefinition) },
+    { key: 'skinClarity',       label: 'Skin Clarity',       value: skinClarity != null ? skinClarity.toFixed(1) : 'N/A',             unit: skinClarity != null ? '/10' : '',       pct: toScorePct(skinClarity) },
+    { key: 'facialProportions', label: 'Facial Proportions', value: facialProportions != null ? facialProportions.toFixed(1) : 'N/A', unit: facialProportions != null ? '/10' : '', pct: toScorePct(facialProportions) },
   ]
 
   return (
@@ -225,48 +225,13 @@ function Card1Score({ scan, isPremium = false }) {
           </div>
         )}
 
-        {/* Metric cards */}
+        {/* Metric cards — same MetricTile as CategoryCard's extended-metric
+            categories, so boxes are byte-identical. Locked state reveals only
+            TEASER_KEYS.overall ('potential') even pre-purchase; once
+            isPremium is true every tile unlocks as normal. */}
         <div className="grid grid-cols-2 gap-3 mb-3">
-          {lockedMetrics.map(({ label, value, unit, pct }) => (
-            <div key={label} className="rounded-2xl p-4 flex flex-col" style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}>
-              <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>{label}</span>
-              <div className="flex items-center justify-between mb-2">
-                <MaybeBlur isPremium={isPremium} size="sm">
-                  <div className="flex items-end gap-0.5">
-                    <span className="font-heading font-bold text-[23px] leading-none" style={{ color: TEXT }}>{value}</span>
-                    {unit && <span className="font-heading font-bold text-[11px] mb-0.5" style={{ color: DIM }}>{unit}</span>}
-                  </div>
-                </MaybeBlur>
-                {!isPremium && (
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'rgba(198,168,92,0.18)', flexShrink: 0 }}>
-                    <Lock size={12} style={{ color: 'rgba(198,168,92,0.9)' }} />
-                  </span>
-                )}
-              </div>
-              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                {isPremium ? (
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.9, ease: EASE_STANDARD }}
-                  />
-                ) : (
-                  // Locked users never see the real fill (it would leak the
-                  // score through bar length even with the digit blurred),
-                  // but an empty bar reads as broken rather than "locked" —
-                  // fixed, non-informative fill, static, no animation.
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)',
-                      width: `${LOCKED_FILL_PCT}%`,
-                    }}
-                  />
-                )}
-              </div>
-            </div>
+          {lockedMetrics.map(({ key, label, value, unit, pct }) => (
+            <MetricTile key={label} label={label} value={value} unit={unit} pct={pct} locked={!isPremium && key !== TEASER_KEYS.overall} />
           ))}
         </div>
 
@@ -875,7 +840,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
                           ? <Loader2 size={16} className="animate-spin" />
                           : <Sparkles size={16} style={{ color: '#0A0A0A' }} />
                         }
-                        {isPurchasing ? 'Processing…' : 'Unlock Full Results'}
+                        {isPurchasing ? 'Processing…' : 'Ready to Transform'}
                       </motion.span>
                     </AnimatePresence>
                   </motion.button>
