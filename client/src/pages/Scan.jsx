@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, ArrowRight, Gift, Target, Star, Zap, Map, User, UserRound, ChevronLeft } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -40,41 +40,80 @@ export const ANALYSIS_STEPS = [
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
 
-function GenderSelector({ selected, onSelect }) {
+// Mars/Venus stroke icons — kept in sync with PremiumOnboarding.jsx's
+// StepGender by design intent (same visual language for gender selection
+// wherever it appears, onboarding or rescan).
+function MarsIcon({ color, size = 96 }) {
   return (
-    <div className="flex flex-col h-full px-4">
-      <div className="flex-1 flex flex-col justify-center">
-        <p className="text-secondary font-body text-sm text-center mb-8 max-w-xs mx-auto">
-          Overall Rating benchmarks and tier labels differ for men and women.
-          Select to get accurate results.
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { key: 'male',   GenderIcon: User,      label: 'Male',   color: '#0984E3', bg: 'rgba(9,132,227,0.08)' },
-            { key: 'female', GenderIcon: UserRound,  label: 'Female', color: '#E84393', bg: 'rgba(232,67,147,0.08)' },
-          ].map(({ key, GenderIcon, label, color, bg }) => (
-            <motion.button
-              key={key}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => onSelect(key)}
-              className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-200"
-              style={{ borderColor: selected === key ? color : 'var(--border)', background: selected === key ? bg : 'var(--card)' }}
-            >
-              <GenderIcon size={40} style={{ color }} />
-              <p className="font-heading font-bold text-base text-primary">{label}</p>
-              {selected === key && (
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: color }}>
-                  <CheckCircle2 size={14} className="text-white" />
-                </motion.div>
-              )}
-            </motion.button>
-          ))}
+    <svg width={size} height={size} viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
+      <circle cx="55" cy="64" r="26" stroke={color} strokeWidth="7" />
+      <line x1="73" y1="46" x2="101" y2="18" stroke={color} strokeWidth="7" strokeLinecap="round" />
+      <polyline points="77,18 101,18 101,42" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function VenusIcon({ color, size = 96 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
+      <circle cx="55" cy="38" r="26" stroke={color} strokeWidth="7" />
+      <line x1="55" y1="64" x2="55" y2="98" stroke={color} strokeWidth="7" strokeLinecap="round" />
+      <line x1="39" y1="82" x2="71" y2="82" stroke={color} strokeWidth="7" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// Ported from PremiumOnboarding.jsx's StepGender — same big cards, same
+// Mars/Venus icons, same tap-to-advance behavior, so the rescan flow's
+// gender step matches the one users already see on first onboarding instead
+// of the smaller, more cluttered two-icon grid this used to be.
+function GenderSelector({ selected, onSelect, onAdvance }) {
+  const MALE_BLUE   = '#4A90E2'
+  const FEMALE_PINK = '#E85D9E'
+
+  function pick(gender) {
+    onSelect(gender)
+    setTimeout(onAdvance, 300)
+  }
+
+  const cardStyle = (gender) => ({
+    width: '100%', maxWidth: 340, height: 280,
+    borderRadius: 22,
+    border: '1.5px solid var(--border)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', transition: 'background 0.2s',
+    background: selected === gender
+      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
+      : 'var(--card)',
+  })
+
+  return (
+    <div className="flex flex-col h-full px-6 items-center justify-center gap-5">
+      <motion.div
+        whileTap={{ scale: 0.97 }}
+        onClick={() => pick('male')}
+        style={cardStyle('male')}
+      >
+        <div className="flex flex-col items-center">
+          <MarsIcon color={MALE_BLUE} size={144} />
+          <p className="font-heading font-bold text-2xl text-primary mt-3">Male</p>
         </div>
-        <p className="text-center text-[10px] text-secondary font-body mt-6">
-          This only affects tier labels and benchmarks. All analysis is private and on-device.
-        </p>
-      </div>
+      </motion.div>
+
+      <motion.div
+        whileTap={{ scale: 0.97 }}
+        onClick={() => pick('female')}
+        style={cardStyle('female')}
+      >
+        <div className="flex flex-col items-center">
+          <VenusIcon color={FEMALE_PINK} size={144} />
+          <p className="font-heading font-bold text-2xl text-primary mt-3">Female</p>
+        </div>
+      </motion.div>
+
+      <p className="text-center text-[10px] text-secondary font-body mt-2">
+        This only affects tier labels and benchmarks. All analysis is private and on-device.
+      </p>
     </div>
   )
 }
@@ -377,7 +416,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
   // ── End hero layout ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full px-3">
+    <div className="flex flex-col h-full px-3 justify-center">
       {cameraOpen && (
         <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
       )}
@@ -501,29 +540,6 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
 
 // ─── Analyzing Screen ─────────────────────────────────────────────────────────
 
-// Rotates through a few distinct-sounding status lines instead of one frozen
-// line. Purely presentational — timer-driven, NOT tied to real backend
-// progress (the core-score call gives no granular progress events, so this
-// deliberately never claims a percentage). Loops continuously so it still
-// feels alive if the real result takes longer than one full cycle.
-const ANALYZING_MESSAGES = [
-  'Analyzing facial features...',
-  'Measuring symmetry...',
-  'Reading skin texture...',
-  'Mapping bone structure...',
-  'Evaluating proportions...',
-  'Cross-referencing your profile...',
-]
-
-function useRotatingIndex(length, intervalMs) {
-  const [index, setIndex] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setIndex(i => (i + 1) % length), intervalMs)
-    return () => clearInterval(id)
-  }, [length, intervalMs])
-  return index
-}
-
 // Matches the 6 category names from the Ascendus Analysis results carousel
 // (CategoryCard.jsx's EXTENDED_CATEGORIES + OnboardingFinalSteps.jsx's
 // OverallCard), sequenced top-to-bottom anatomically — not the carousel's own
@@ -553,46 +569,6 @@ const SWEEP_ONE_WAY_MS = 1200
 const SWEEP_DOTS = SWEEP_FEATURE_ROWS.flatMap((cy, row) => [35, 50, 65].map(cx => ({ cx, cy, row })))
 const SWEEP_FULL_CYCLE_S = (SWEEP_ONE_WAY_MS * 2) / 1000
 
-// Plain CSS @keyframes for the line + one per dot row, injected once via a
-// <style> tag — deliberately NOT driven by Framer Motion's `animate` prop.
-// Framer Motion's JS-level animation engine defers to the OS
-// prefers-reduced-motion setting (same as this app's existing FaceScanOverlay,
-// which freezes identically under it despite its own reducedMotion="never"
-// override), which would leave this whole effect static for anyone with
-// Reduce Motion on. A plain CSS animation isn't gated by that check unless a
-// `@media (prefers-reduced-motion: reduce)` rule explicitly disables it here
-// — which this deliberately does not do, since the effect is purely
-// decorative and conveys no information the label text doesn't already say.
-const SWEEP_KEYFRAMES_CSS = `
-@keyframes ascendus-sweep-line {
-  0% { top: 0%; }
-  50% { top: 100%; }
-  100% { top: 0%; }
-}
-${SWEEP_FEATURE_ROWS.map((cy, row) => {
-  const downPct = (cy / 200) * 100
-  const upPct = (1 - cy / 200) * 100
-  const eps = 2.5
-  const d0 = Math.max(0, downPct - eps).toFixed(2)
-  const d1 = downPct.toFixed(2)
-  const d2 = Math.min(100, downPct + eps).toFixed(2)
-  const u0 = Math.max(0, upPct - eps).toFixed(2)
-  const u1 = upPct.toFixed(2)
-  const u2 = Math.min(100, upPct + eps).toFixed(2)
-  return `
-@keyframes ascendus-sweep-dot-${row} {
-  0% { opacity: 0.2; }
-  ${d0}% { opacity: 0.2; }
-  ${d1}% { opacity: 1; }
-  ${d2}% { opacity: 0.2; }
-  ${u0}% { opacity: 0.2; }
-  ${u1}% { opacity: 1; }
-  ${u2}% { opacity: 0.2; }
-  100% { opacity: 0.2; }
-}`
-}).join('\n')}
-`
-
 // A dim landmark dot that briefly brightens as the sweep line's position
 // crosses it — on both the downward AND the return upward pass, via its
 // row's CSS keyframe. Extra feedback only — the sweep line is the main effect.
@@ -606,30 +582,97 @@ function SweepFeatureDot({ cx, cy, row }) {
   )
 }
 
-function SweepLine() {
+// ─── Facial Analysis Overlay ─────────────────────────────────────────────────
+// Landmark-style vector overlay drawn directly over the captured photo,
+// synced 1:1 with the analysis step (see startAnalysis's 1s-per-step ticker).
+// viewBox is a plain 0–100 percent grid, so every coordinate below is a
+// literal %-of-photo position. Colors are a slightly warmer gold than the
+// shared GOLD token — kept local to this effect rather than promoted to
+// theme.js since nothing else uses this exact shade.
+const LANDMARK_GOLD  = '#E5C158'
+const LANDMARK_GLOW  = 'rgba(229, 193, 88, 0.85)'
+const LANDMARK_GUIDE = 'rgba(255, 255, 255, 0.25)'
+
+export const ANALYSIS_STEP_LABELS = [
+  'Detecting facial symmetry...',
+  'Measuring jawline angle & ramus height...',
+  'Evaluating canthal tilt & eye canopy...',
+  'Analyzing lower third proportions...',
+  'Finalizing facial matrix...',
+]
+
+// One L-shaped corner bracket of the final "target lock" bounding box —
+// two short arms meeting at (x, y), pointing inward per (dx, dy).
+function LandmarkBracket({ x, y, dx, dy }) {
+  const arm = 8
+  return <path d={`M ${x} ${y + dy * arm} L ${x} ${y} L ${x + dx * arm} ${y}`} />
+}
+
+function FacialAnalysisOverlay({ step }) {
+  const s = Math.min(step, 4)
   return (
-    <div
-      className="absolute left-0 right-0"
-      style={{
-        height: 2,
-        background: GOLD,
-        boxShadow: `0 0 16px 3px ${GOLD}, 0 0 4px 1px ${GOLD}`,
-        animation: `ascendus-sweep-line ${SWEEP_FULL_CYCLE_S}s ease-in-out infinite`,
-      }}
-    />
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      style={{ filter: `drop-shadow(0 0 3px ${LANDMARK_GLOW})` }}
+    >
+      <g fill="none" stroke={LANDMARK_GOLD} strokeWidth={2.5} strokeLinecap="round" vectorEffect="non-scaling-stroke">
+        <AnimatePresence>
+          {s === 0 && (
+            <motion.g key="step-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <line x1="50" y1="10" x2="50" y2="90" />
+              <line x1="25" y1="42" x2="75" y2="42" stroke={LANDMARK_GUIDE} strokeWidth={1.5} />
+            </motion.g>
+          )}
+          {s === 1 && (
+            <motion.g key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <polyline points="22,58 50,82 78,58" />
+            </motion.g>
+          )}
+          {s === 2 && (
+            <motion.g key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <line x1="25" y1="43" x2="42" y2="40" />
+              <line x1="58" y1="40" x2="75" y2="43" />
+            </motion.g>
+          )}
+          {s === 3 && (
+            <motion.g key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <line x1="30" y1="55" x2="70" y2="55" />
+              <line x1="35" y1="66" x2="65" y2="66" />
+              <line x1="30" y1="82" x2="70" y2="82" />
+              <line x1="50" y1="55" x2="50" y2="82" stroke={LANDMARK_GUIDE} strokeWidth={1.5} strokeDasharray="3 3" />
+              <motion.circle
+                cx="50" cy="68.5" r="1.6" fill={LANDMARK_GOLD} stroke="none"
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </motion.g>
+          )}
+          {s === 4 && (
+            <motion.g key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <motion.g animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
+                <LandmarkBracket x={18} y={12} dx={1} dy={1} />
+                <LandmarkBracket x={82} y={12} dx={-1} dy={1} />
+                <LandmarkBracket x={18} y={88} dx={1} dy={-1} />
+                <LandmarkBracket x={82} y={88} dx={-1} dy={-1} />
+              </motion.g>
+            </motion.g>
+          )}
+        </AnimatePresence>
+      </g>
+    </svg>
   )
 }
 
-// The user's real captured photo with a glowing horizontal line sweeping
-// top<->bottom (document-scanner style) — replaces the dot-mesh/on-photo-
-// label and checklist-thumbnail versions entirely. Purely timer/animation
-// driven, not tied to real backend progress; the label crossfades in a fixed
-// spot at the bottom of the photo as the line's position crosses each
-// feature's band, derived from the same duration as the line itself.
-function AnalyzingSweepOverlay({ photo }) {
+// The user's real captured photo with the step-synced landmark overlay above
+// (FacialAnalysisOverlay) — replaces the earlier generic sweep-line/dot-mesh
+// versions entirely. Purely visual; onScanComplete-equivalent completion in
+// startAnalysis is still gated on the real API result, never on this timer
+// (see the minDisplayPromise wiring there).
+function AnalyzingSweepOverlay({ photo, step }) {
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden mb-5" style={{ aspectRatio: '2/3', background: '#0a0a0a' }}>
-      <style>{SWEEP_KEYFRAMES_CSS}</style>
+    <div className="relative w-full rounded-3xl overflow-hidden mb-5" style={{ aspectRatio: '2/3', background: '#0a0a0a' }}>
       {photo && (
         <img
           src={photo}
@@ -642,7 +685,7 @@ function AnalyzingSweepOverlay({ photo }) {
         className="absolute inset-0"
         style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
       />
-      <SweepLine />
+      <FacialAnalysisOverlay step={step} />
     </div>
   )
 }
@@ -653,22 +696,24 @@ function AnalyzingSweepOverlay({ photo }) {
 const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
 
 export function AnalyzingScreen({ currentStep, slow, photo }) {
-  const msgIndex = useRotatingIndex(ANALYZING_MESSAGES.length, 2800)
-  const progressPct = STEP_PROGRESS_PCT[Math.min(currentStep, 4)]
+  const stepIndex = Math.min(currentStep, 4)
+  const progressPct = STEP_PROGRESS_PCT[stepIndex]
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} />
+      <AnalyzingSweepOverlay photo={photo} step={currentStep} />
 
-      {/* Status subtext — timer-driven rotation, not tied to backend state */}
+      {/* Status subtext — tied 1:1 to the current landmark step, not an
+          independent rotation, so the label always matches the geometry
+          drawn over the photo (see FacialAnalysisOverlay). */}
       <div className="h-5 mb-4 flex items-center justify-center">
         <AnimatePresence mode="wait">
-          <motion.p key={msgIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+          <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.3 }}
             className="text-xs font-body"
             style={{ color: slow ? GOLD : 'var(--text-secondary)' }}
           >
-            {ANALYZING_MESSAGES[msgIndex]}
+            {ANALYSIS_STEP_LABELS[stepIndex]}
           </motion.p>
         </AnimatePresence>
       </div>
@@ -795,6 +840,7 @@ export default function Scan() {
 
   const startAnalysisRef  = useRef(null)
   const rateLimitInitial  = useRef(30)
+  const sideTriggerRef    = useRef(null)
 
   // Countdown → auto-retry
   useEffect(() => {
@@ -869,6 +915,23 @@ export default function Scan() {
     setError('')
     setAnalysisStep(0)
 
+    // 5-step, 1s-per-step choreography for FacialAnalysisOverlay — ticks
+    // forward on a fixed cadence regardless of API speed and parks at step 4
+    // (pulsing) once it gets there. minDisplayPromise is the real completion
+    // gate: below, we always await BOTH the real API result AND this timer,
+    // so a fast response still plays the full animation, and a slow one just
+    // holds on the step-4 visual until the real result actually exists —
+    // there is no path where we proceed on the timer alone.
+    const stageTimer = setInterval(() => {
+      setAnalysisStep(prev => {
+        if (prev >= 4) return prev
+        triggerHaptic()
+        return prev + 1
+      })
+    }, 1000)
+    const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
+    const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 5000))
+
     try {
       const faceB64    = await toBase64(facePhoto)
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
@@ -887,18 +950,10 @@ export default function Scan() {
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null
 
-      setAnalysisStep(1)
-      setSlowAnalysis(false)
-      const stageTimer = setInterval(() => setAnalysisStep(prev => prev < 2 ? prev + 1 : prev), 1800)
-      const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
-
       let aiResult
       if (token === 'demo-token') {
         // Demo users: return mock results instead of hitting the backend
         await new Promise(r => setTimeout(r, 2500))
-        clearInterval(stageTimer)
-        clearTimeout(slowTimer)
-        setSlowAnalysis(false)
         // Round first, then derive tier from the SAME rounded value used for
         // overallScore — computing tier from the unrounded score can land it
         // on the wrong side of a threshold vs. the rounded score shown elsewhere.
@@ -947,15 +1002,14 @@ export default function Scan() {
 
         } finally {
           setScanInFlight(false)
-          clearInterval(stageTimer)
-          clearTimeout(slowTimer)
-          setSlowAnalysis(false)
         }
       }
 
-      setAnalysisStep(2)
-      await new Promise(r => setTimeout(r, 350))
-      setAnalysisStep(3)
+      // Real result is in hand — but never finish before the minimum 5-step
+      // choreography has fully played out (a fast response just waits here;
+      // a slow one already has the ticker parked, pulsing, at step 4).
+      await minDisplayPromise
+      setAnalysisStep(4)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -1131,6 +1185,10 @@ export default function Scan() {
         }
         setStep(2)
       }
+    } finally {
+      clearInterval(stageTimer)
+      clearTimeout(slowTimer)
+      setSlowAnalysis(false)
     }
   }
 
@@ -1162,19 +1220,26 @@ export default function Scan() {
           one still using PageHeader. */}
       {!isAnalyzing && (
         (step === 1 || step === 2) ? (
-          <div
-            className="flex items-center gap-3 px-4 pb-4 flex-shrink-0"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 44px)' }}
-          >
+          // Ported from PremiumOnboarding.jsx's PhotoStepScreen (its BackBtn +
+          // "STEP X OF 3" tag + big headline treatment) instead of this
+          // screen's old smaller inline chevron+title row, using this file's
+          // own theme-aware tokens (var(--card)/var(--border)/text-primary)
+          // rather than onboarding's hardcoded always-dark colors, since this
+          // screen (unlike onboarding) supports light mode too.
+          <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
             <button
               onClick={() => { triggerHaptic(); navigate(-1) }}
-              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
-              style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+              aria-label="Go back"
+              className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
             >
-              <ChevronLeft size={20} className="text-primary" />
+              <ChevronLeft size={18} className="text-primary" />
             </button>
-            <h1 className="font-heading font-bold text-[18px] text-primary">
-              {step === 1 ? 'Take Your Front Photo' : 'Side Profile'}
+            <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>
+              STEP {step + 1} OF 3
+            </p>
+            <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
+              {step === 1 ? 'Take your front photo' : 'Now, your side profile.'}
             </h1>
           </div>
         ) : (
@@ -1192,7 +1257,7 @@ export default function Scan() {
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <GenderSelector selected={gender} onSelect={setLocalGender} />
+              <GenderSelector selected={gender} onSelect={setLocalGender} onAdvance={() => setStep(1)} />
             </motion.div>
           )}
           {step === 1 && (
@@ -1209,6 +1274,7 @@ export default function Scan() {
                 guide="Turn 90° to the right. Stand straight, arms relaxed at sides. 3–6 feet from camera. Natural lighting."
                 photo={sidePhoto}
                 gender={gender}
+                triggerRef={sideTriggerRef}
                 onPhoto={url => { setSidePhoto(url); setError('') }} />
             </motion.div>
           )}
@@ -1343,12 +1409,8 @@ export default function Scan() {
       {!isAnalyzing && (
         <div className="px-4 pb-8 pt-2">
 
-          {/* Step 0: gender */}
-          {step === 0 && (
-            <button onClick={() => gender && setStep(1)} disabled={!gender} className={`btn-primary flex items-center justify-center gap-2 ${!gender ? 'opacity-50' : ''}`}>
-              {gender ? <>Continue as {gender === 'male' ? 'Male' : 'Female'} <ArrowRight size={16} /></> : 'Select to continue'}
-            </button>
-          )}
+          {/* Step 0 (gender) has no CTA here — GenderSelector auto-advances
+              300ms after a tap, matching PremiumOnboarding.jsx's StepGender. */}
 
           {/* Step 1 (face) has no CTA here anymore — PhotoUploadStep's own
               button handles capture/scan, and the useEffect above advances
@@ -1376,9 +1438,19 @@ export default function Scan() {
                   ✦ Full Scan: Analyze Now
                 </button>
               ) : (
-                <p className="text-center text-[11px] font-body mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  Add a photo to continue
-                </p>
+                // Matches PremiumOnboarding.jsx's PhotoStepScreen side-profile
+                // CTA (GoldBtn label="Begin Scan", fired via the same
+                // triggerRef pattern) — this used to be inert placeholder
+                // text with no way to actually open the photo picker from
+                // here (PhotoUploadStep hides its own inner button for
+                // stepNum===2, and the photo frame itself is pointer-events-
+                // none), so there was no functional path to add a side photo.
+                <button
+                  onClick={() => sideTriggerRef.current?.()}
+                  className="btn-primary"
+                >
+                  Begin Scan
+                </button>
               )}
               <button
                 onClick={() => startAnalysis(true)}
