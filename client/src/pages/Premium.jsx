@@ -16,7 +16,6 @@ const GOLD_LIGHT = '#D4B96A'
 const GOLD_DARK = '#A8893A'
 const SURFACE = '#0D0D0D'
 const SURFACE_2 = '#141414'
-const SURFACE_3 = '#1C1C1C'
 const BORDER = 'rgba(255,255,255,0.06)'
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
 const TEXT = '#F0EDE8'
@@ -44,7 +43,6 @@ const TESTIMONIALS = [
 export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout, updateUser } = useStore()
-  const [plan, setPlan] = useState('yearly')
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
@@ -88,7 +86,7 @@ export default function Premium() {
     setCheckoutError('')
     try {
       if (isNative()) {
-        const result = await purchasePro(plan)
+        const result = await purchasePro('monthly')
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           sessionStorage.setItem('asc_pro_splash_shown', '1')
@@ -103,7 +101,7 @@ export default function Premium() {
           setSubscribingNow(false)
           return
         }
-        const { url } = await api.payments.createCheckout(plan)
+        const { url } = await api.payments.createCheckout('monthly')
         window.location.href = url
       }
     } catch (err) {
@@ -281,33 +279,6 @@ export default function Premium() {
 
       <div className="px-4">
 
-        {/* ── Plan Toggle ──────────────────────────────────────────────── */}
-        <div
-          className="flex rounded-2xl p-1 mb-5"
-          style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}
-        >
-          {[
-            { key: 'monthly', label: 'Monthly', price: '$2.31/wk' },
-            { key: 'yearly',  label: 'Yearly',  price: '$0.96/wk', badge: 'Save 48%' },
-          ].map(({ key, label, price, badge }) => (
-            <button
-              key={key}
-              onClick={() => { triggerHaptic(); setPlan(key) }}
-              className="flex-1 py-3 rounded-xl flex flex-col items-center transition-all duration-200"
-              style={{
-                background: plan === key ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD_DARK})` : 'transparent',
-                color: plan === key ? '#0A0A0A' : TEXT_DIM,
-              }}
-            >
-              <span className="font-heading font-bold text-[13px]">{label}</span>
-              <span className="font-body text-[11px] mt-0.5">{price}</span>
-              {badge && plan === key && (
-                <span className="text-[9px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full bg-black/20">{badge}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
         {/* ── Subscribe CTA ─────────────────────────────────────────────── */}
         <motion.button
           whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
@@ -320,10 +291,10 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($9.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Pro ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
-          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
+          Billed monthly · Cancel anytime
         </p>
 
         {checkoutError && (
@@ -555,13 +526,10 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {(() => {
-            if (subscribingNow) return 'Opening checkout…'
-            return plan === 'yearly' ? 'Get Ascendus Pro ($49.99/yr)' : 'Get Ascendus Pro ($9.99/mo)'
-          })()}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Pro ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
-          {plan === 'yearly' ? 'Billed annually · Cancel anytime' : 'Billed monthly · Cancel anytime'}
+          Billed monthly · Cancel anytime
         </p>
 
         {/* Apple IAP required disclosure */}

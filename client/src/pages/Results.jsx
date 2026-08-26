@@ -821,7 +821,6 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
   const reducedMotion = useReducedMotion()
   const navigate = useNavigate()
   const { setIsPremium, updateUser } = useStore()
-  const [plan, setPlan]       = useState('monthly')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [showPromo, setShowPromo] = useState(false)
@@ -859,7 +858,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
     try {
       if (isNative()) {
         // iOS: Apple In-App Purchase via RevenueCat
-        const result = await purchasePro(plan)
+        const result = await purchasePro('monthly')
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
@@ -872,7 +871,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
         const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
         const token  = stored?.state?.token
         if (!token || token === 'demo-token') { navigate('/auth'); return }
-        const { url } = await api.payments.createCheckout(plan)
+        const { url } = await api.payments.createCheckout('monthly')
         window.location.href = url
       }
     } catch (err) {
@@ -974,43 +973,6 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           ))}
         </div>
 
-        {/* Plan toggle */}
-        <div className="rounded-xl p-1 mb-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="grid grid-cols-2 gap-0.5">
-            {[
-              { key: 'monthly', label: 'Monthly', price: '$9.99/mo' },
-              { key: 'annual',  label: 'Annual',  price: '$4.17/mo', badge: 'SAVE 48%' },
-            ].map(({ key, label, price, badge }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setPlan(key)}
-                className="relative py-2 rounded-lg text-center transition-colors duration-200 ease-out"
-                style={{
-                  border: `1px solid ${plan === key ? 'rgba(198,168,92,0.4)' : 'transparent'}`,
-                }}
-              >
-                {plan === key && (
-                  <motion.div
-                    layoutId="planHighlight"
-                    className="absolute inset-0 rounded-lg"
-                    style={{ background: 'rgba(198,168,92,0.18)' }}
-                    transition={reducedMotion ? { duration: 0.15 } : { type: 'spring', bounce: 0, duration: 0.3 }}
-                  />
-                )}
-                <p className="relative text-[10px] font-heading font-bold leading-none mb-0.5"
-                  style={{ color: plan === key ? '#C6A85C' : 'rgba(255,255,255,0.3)' }}>
-                  {label}{badge && plan === key ? ` · ${badge}` : ''}
-                </p>
-                <p className="relative text-[12px] font-mono font-bold"
-                  style={{ color: plan === key ? '#F0EDE8' : 'rgba(255,255,255,0.25)' }}>
-                  {price}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Primary CTA */}
         <motion.button
           whileTap={{ scale: loading ? 1 : 0.97 }}
@@ -1033,7 +995,7 @@ function PaywallSheet({ glowScore, pillars, gender, onClose }) {
           <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.22)' }}>
             {isNative()
               ? 'Ascendus Pro is $9.99/month or $49.99/year. Payment charged to your Apple ID.'
-              : `$0 today · then ${plan === 'annual' ? '$49.99/yr ($4.17/mo)' : '$9.99/mo'} · cancel anytime`}
+              : '$0 today · then $9.99/mo · cancel anytime'}
           </p>
           {isNative() && (
             <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.18)' }}>

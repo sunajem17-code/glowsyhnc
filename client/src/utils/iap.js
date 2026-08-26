@@ -71,9 +71,21 @@ export async function purchasePro(plan = 'monthly') {
     }
 
     const isYearly = plan === 'yearly' || plan === 'annual'
+    // Never fall back to "whichever package happens to be listed first" —
+    // that can silently substitute a different billing cycle than the one
+    // requested. If the "current" offering's typed convenience getter
+    // (.monthly / .annual) isn't populated — e.g. the package in the
+    // RevenueCat dashboard is tagged CUSTOM instead of MONTHLY/ANNUAL —
+    // search every package in the offering by its actual packageType or
+    // product identifier instead, and fail loudly if the requested plan
+    // truly isn't there rather than buying whatever's first.
     const pkg =
       (isYearly ? offerings.current.annual : offerings.current.monthly) ??
-      offerings.current.availablePackages?.[0]
+      offerings.current.availablePackages?.find(p =>
+        isYearly
+          ? p.packageType === 'ANNUAL' || /year|annual/i.test(p.product?.identifier ?? '')
+          : p.packageType === 'MONTHLY' || /month/i.test(p.product?.identifier ?? '')
+      )
 
     if (!pkg) {
       throw new Error('The selected subscription plan is not available. Please try again later.')
@@ -93,9 +105,7 @@ export async function purchasePro(plan = 'monthly') {
   }
 }
 
-// Aliases for existing callers (Premium.jsx, Results.jsx, useStore.js)
 export const purchaseMonthly = () => purchasePro('monthly')
-export const purchaseYearly  = () => purchasePro('yearly')
 
 // ── Discounted annual (exit-intent offer) ─────────────────────────────────────
 // A separate, differently-priced product from the standard monthly/annual
