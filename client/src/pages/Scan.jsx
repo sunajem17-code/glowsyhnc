@@ -601,6 +601,41 @@ export const ANALYSIS_STEP_LABELS = [
   'Finalizing facial matrix...',
 ]
 
+// Thin, technical-readout look (was strokeWidth 2.5 — read as thick/bold).
+const LANDMARK_STROKE = 1.1
+
+// Plausible-looking readout text shown next to each main step's geometry —
+// purely decorative like the lines themselves (see "Purely visual — no real
+// face detection" note on FaceScanOverlay above; same principle here). {x,y}
+// is a 0–100 anchor point rendered as an HTML label (not SVG <text>) because
+// this SVG uses preserveAspectRatio="none" over a 2:3 container — actual SVG
+// text would render visibly stretched under that non-uniform scale, an HTML
+// overlay positioned by matching %-based left/top does not.
+const STEP_READOUTS = [
+  { x: 50, y: 8,  text: '1.02×',  align: 'center' },
+  { x: 50, y: 86, text: '118.4°', align: 'center' },
+  { x: 80, y: 40, text: '+4.2°',  align: 'left'   },
+  { x: 50, y: 50, text: '33.4%',  align: 'center' },
+  { x: 50, y: 6,  text: '98.7%',  align: 'center' },
+]
+
+// Secondary measurements that cycle continuously for as long as this overlay
+// is mounted, independent of `step`. The 5 main steps above only span ~4s
+// (1s each); the real AI call typically runs another 10+ seconds parked on
+// step 4's pulsing brackets, which used to just sit there doing nothing for
+// most of the wait. This keeps fresh geometry + numbers appearing the whole
+// time so the screen reads as "busy" for the full analysis, not just the
+// first few seconds of it.
+const TICKER_MEASUREMENTS = [
+  { line: { x1: 30, y1: 20, x2: 70, y2: 20 },                text: { x: 50, y: 16, v: '1.61:1' } },
+  { line: { x1: 22, y1: 30, x2: 22, y2: 46 },                text: { x: 16, y: 38, v: '24.8mm' } },
+  { line: { x1: 78, y1: 30, x2: 78, y2: 46 },                text: { x: 84, y: 38, v: '24.5mm' } },
+  { line: { x1: 38, y1: 46, x2: 38, y2: 60 },                text: { x: 32, y: 53, v: '11.2°'  } },
+  { line: { x1: 62, y1: 46, x2: 62, y2: 60 },                text: { x: 68, y: 53, v: '11.6°'  } },
+  { line: { x1: 40, y1: 76, x2: 60, y2: 76 },                text: { x: 50, y: 80, v: '92.3%'  } },
+  { line: { x1: 20, y1: 66, x2: 80, y2: 66 },                text: { x: 50, y: 63, v: '0.98x'  } },
+]
+
 // One L-shaped corner bracket of the final "target lock" bounding box —
 // two short arms meeting at (x, y), pointing inward per (dx, dy).
 function LandmarkBracket({ x, y, dx, dy }) {
@@ -608,60 +643,195 @@ function LandmarkBracket({ x, y, dx, dy }) {
   return <path d={`M ${x} ${y + dy * arm} L ${x} ${y} L ${x + dx * arm} ${y}`} />
 }
 
+// Small HTML readout label, positioned to match an SVG anchor point 1:1
+// (0–100 viewBox units map directly onto 0%–100% here).
+function Readout({ x, y, text, align = 'center' }) {
+  const translateX = align === 'center' ? '-50%' : align === 'left' ? '0%' : '-100%'
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -2 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="absolute font-mono"
+      style={{
+        left: `${x}%`, top: `${y}%`,
+        transform: `translate(${translateX}, -50%)`,
+        fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
+        color: LANDMARK_GOLD, textShadow: `0 0 6px ${LANDMARK_GLOW}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {text}
+    </motion.div>
+  )
+}
+
 function FacialAnalysisOverlay({ step }) {
   const s = Math.min(step, 4)
+  const readout = STEP_READOUTS[s]
+
+  // Ticker runs on its own clock the whole time this component is mounted —
+  // it never depends on `step`, so it keeps cycling through step 4's long
+  // hold instead of freezing once the main 5-step choreography finishes.
+  const [tickerIdx, setTickerIdx] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTickerIdx(i => (i + 1) % TICKER_MEASUREMENTS.length)
+    }, 1400)
+    return () => clearInterval(id)
+  }, [])
+  const ticker = TICKER_MEASUREMENTS[tickerIdx]
+
   return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      style={{ filter: `drop-shadow(0 0 3px ${LANDMARK_GLOW})` }}
-    >
-      <g fill="none" stroke={LANDMARK_GOLD} strokeWidth={2.5} strokeLinecap="round" vectorEffect="non-scaling-stroke">
-        <AnimatePresence>
-          {s === 0 && (
-            <motion.g key="step-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <line x1="50" y1="10" x2="50" y2="90" />
-              <line x1="25" y1="42" x2="75" y2="42" stroke={LANDMARK_GUIDE} strokeWidth={1.5} />
-            </motion.g>
-          )}
-          {s === 1 && (
-            <motion.g key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <polyline points="22,58 50,82 78,58" />
-            </motion.g>
-          )}
-          {s === 2 && (
-            <motion.g key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <line x1="25" y1="43" x2="42" y2="40" />
-              <line x1="58" y1="40" x2="75" y2="43" />
-            </motion.g>
-          )}
-          {s === 3 && (
-            <motion.g key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <line x1="30" y1="55" x2="70" y2="55" />
-              <line x1="35" y1="66" x2="65" y2="66" />
-              <line x1="30" y1="82" x2="70" y2="82" />
-              <line x1="50" y1="55" x2="50" y2="82" stroke={LANDMARK_GUIDE} strokeWidth={1.5} strokeDasharray="3 3" />
-              <motion.circle
-                cx="50" cy="68.5" r="1.6" fill={LANDMARK_GOLD} stroke="none"
-                animate={{ opacity: [0.3, 1, 0.3] }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            </motion.g>
-          )}
-          {s === 4 && (
-            <motion.g key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <motion.g animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
-                <LandmarkBracket x={18} y={12} dx={1} dy={1} />
-                <LandmarkBracket x={82} y={12} dx={-1} dy={1} />
-                <LandmarkBracket x={18} y={88} dx={1} dy={-1} />
-                <LandmarkBracket x={82} y={88} dx={-1} dy={-1} />
+    <>
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ filter: `drop-shadow(0 0 3px ${LANDMARK_GLOW})` }}
+      >
+        <g fill="none" stroke={LANDMARK_GOLD} strokeWidth={LANDMARK_STROKE} strokeLinecap="round" vectorEffect="non-scaling-stroke">
+          <AnimatePresence>
+            {s === 0 && (
+              <motion.g key="step-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <line x1="50" y1="10" x2="50" y2="90" />
+                <line x1="25" y1="42" x2="75" y2="42" stroke={LANDMARK_GUIDE} strokeWidth={0.8} />
               </motion.g>
-            </motion.g>
-          )}
+            )}
+            {s === 1 && (
+              <motion.g key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <polyline points="22,58 50,82 78,58" />
+              </motion.g>
+            )}
+            {s === 2 && (
+              <motion.g key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <line x1="25" y1="43" x2="42" y2="40" />
+                <line x1="58" y1="40" x2="75" y2="43" />
+              </motion.g>
+            )}
+            {s === 3 && (
+              <motion.g key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <line x1="30" y1="55" x2="70" y2="55" />
+                <line x1="35" y1="66" x2="65" y2="66" />
+                <line x1="30" y1="82" x2="70" y2="82" />
+                <line x1="50" y1="55" x2="50" y2="82" stroke={LANDMARK_GUIDE} strokeWidth={0.8} strokeDasharray="3 3" />
+                <motion.circle
+                  cx="50" cy="68.5" r="1" fill={LANDMARK_GOLD} stroke="none"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                />
+              </motion.g>
+            )}
+            {s === 4 && (
+              <motion.g key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <motion.g animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
+                  <LandmarkBracket x={18} y={12} dx={1} dy={1} />
+                  <LandmarkBracket x={82} y={12} dx={-1} dy={1} />
+                  <LandmarkBracket x={18} y={88} dx={1} dy={-1} />
+                  <LandmarkBracket x={82} y={88} dx={-1} dy={-1} />
+                </motion.g>
+              </motion.g>
+            )}
+          </AnimatePresence>
+
+          {/* Continuously-cycling secondary measurement — thinner still,
+              dimmer, so it reads as background activity rather than
+              competing with whichever main step is currently front-and-center. */}
+          <AnimatePresence mode="wait">
+            <motion.line
+              key={tickerIdx}
+              {...ticker.line}
+              strokeWidth={0.7}
+              stroke={LANDMARK_GUIDE}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.9, 0.9, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.35, ease: 'easeInOut' }}
+            />
+          </AnimatePresence>
+        </g>
+      </svg>
+
+      {/* HTML readout labels — see Readout's comment on why these aren't
+          plain SVG <text> nodes. */}
+      <div className="absolute inset-0 pointer-events-none">
+        <AnimatePresence mode="wait">
+          {readout && <Readout key={`step-${s}`} {...readout} />}
         </AnimatePresence>
-      </g>
-    </svg>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`ticker-${tickerIdx}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute font-mono"
+            style={{
+              left: `${ticker.text.x}%`, top: `${ticker.text.y}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: 9, fontWeight: 500,
+              color: 'rgba(255,255,255,0.55)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {ticker.text.v}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </>
+  )
+}
+
+// A quick, punchy "morph" flourish played once the real result is in hand,
+// right before handing off to the results/unlock screen — scale pulse +
+// blur pulse + a thin RGB-channel split (duplicated, offset, screen-blended
+// copies of the photo) + a gold flash. Deliberately NOT a true pixel-warp
+// (feDisplacementMap/feTurbulence) — that's unreliable inside WKWebView on
+// iOS, so this fakes the "morphing" feel with filters/transforms that render
+// consistently everywhere. ~900ms total; Scan.jsx's startAnalysis awaits
+// roughly that long before navigating so the flourish is never cut off mid-play.
+function MorphWarpOverlay({ photo }) {
+  return (
+    <motion.div
+      className="absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+    >
+      {photo && (
+        <>
+          <motion.img
+            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={{ mixBlendMode: 'screen', filter: 'sepia(1) saturate(4) hue-rotate(-25deg)' }}
+            initial={{ x: 0, opacity: 0 }}
+            animate={{ x: [0, -3, 2, 0], opacity: [0, 0.5, 0.5, 0] }}
+            transition={{ duration: 0.9, ease: 'easeInOut' }}
+          />
+          <motion.img
+            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={{ mixBlendMode: 'screen', filter: 'saturate(4) hue-rotate(180deg)' }}
+            initial={{ x: 0, opacity: 0 }}
+            animate={{ x: [0, 3, -2, 0], opacity: [0, 0.5, 0.5, 0] }}
+            transition={{ duration: 0.9, ease: 'easeInOut' }}
+          />
+          <motion.img
+            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            initial={{ scale: 1, filter: 'blur(0px) brightness(0.5)' }}
+            animate={{ scale: [1, 1.06, 0.99, 1], filter: ['blur(0px) brightness(0.5)', 'blur(6px) brightness(1.1)', 'blur(2px) brightness(0.8)', 'blur(0px) brightness(0.9)'] }}
+            transition={{ duration: 0.9, ease: 'easeInOut' }}
+          />
+        </>
+      )}
+      <motion.div
+        className="absolute inset-0"
+        style={{ background: LANDMARK_GOLD, mixBlendMode: 'overlay' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.55, 0] }}
+        transition={{ duration: 0.9, ease: 'easeInOut' }}
+      />
+    </motion.div>
   )
 }
 
@@ -669,8 +839,9 @@ function FacialAnalysisOverlay({ step }) {
 // (FacialAnalysisOverlay) — replaces the earlier generic sweep-line/dot-mesh
 // versions entirely. Purely visual; onScanComplete-equivalent completion in
 // startAnalysis is still gated on the real API result, never on this timer
-// (see the minDisplayPromise wiring there).
-function AnalyzingSweepOverlay({ photo, step }) {
+// (see the minDisplayPromise wiring there). `morphing` plays MorphWarpOverlay
+// once, right before Scan.jsx navigates away to results/unlock.
+function AnalyzingSweepOverlay({ photo, step, morphing }) {
   return (
     <div className="relative w-full rounded-3xl overflow-hidden mb-5" style={{ aspectRatio: '2/3', background: '#0a0a0a' }}>
       {photo && (
@@ -685,7 +856,9 @@ function AnalyzingSweepOverlay({ photo, step }) {
         className="absolute inset-0"
         style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
       />
-      <FacialAnalysisOverlay step={step} />
+      <AnimatePresence>
+        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} />}
+      </AnimatePresence>
     </div>
   )
 }
@@ -695,13 +868,13 @@ function AnalyzingSweepOverlay({ photo, step }) {
 // Step 3 is set when the API call actually completes — the only real signal.
 const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
 
-export function AnalyzingScreen({ currentStep, slow, photo }) {
+export function AnalyzingScreen({ currentStep, slow, photo, morphing = false }) {
   const stepIndex = Math.min(currentStep, 4)
   const progressPct = STEP_PROGRESS_PCT[stepIndex]
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} step={currentStep} />
+      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} />
 
       {/* Status subtext — tied 1:1 to the current landmark step, not an
           independent rotation, so the label always matches the geometry
@@ -830,6 +1003,11 @@ export default function Scan() {
   const [sidePhoto, setSidePhoto]         = useState(null)
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
+  // Drives the ~900ms morph-warp flourish (MorphWarpOverlay, in
+  // AnalyzingSweepOverlay) that plays over the finished photo right before
+  // handing off to results/unlock — see startAnalysis, just above its
+  // navigate() call.
+  const [morphing, setMorphing]           = useState(false)
   const [error, setError]                 = useState('')
   const [rateLimited, setRateLimited]     = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
@@ -1144,6 +1322,13 @@ export default function Scan() {
       logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
+
+      // Play the morph-warp flourish over the finished photo before handing
+      // off — MorphWarpOverlay's own keyframes run ~900ms; 950ms gives it a
+      // hair of buffer so navigate() never cuts it off mid-play.
+      setMorphing(true)
+      await new Promise(r => setTimeout(r, 950))
+
       // Premium users see full results immediately; free users hit the unlock gate
       navigate(isPremium ? '/results' : '/unlock')
     } catch (err) {
@@ -1189,6 +1374,7 @@ export default function Scan() {
       clearInterval(stageTimer)
       clearTimeout(slowTimer)
       setSlowAnalysis(false)
+      setMorphing(false)
     }
   }
 
@@ -1280,7 +1466,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} />
             </motion.div>
           )}
         </AnimatePresence>
