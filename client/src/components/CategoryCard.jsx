@@ -188,7 +188,18 @@ export function MetricTile({ label, value, unit, pct, locked, isPending = false 
       className="rounded-2xl p-4 flex flex-col"
       style={{ background: 'rgba(198,168,92,0.03)', border: '1px solid rgba(198,168,92,0.15)' }}
     >
-      <span className="font-heading font-bold text-[18px] uppercase mb-3" style={{ color: G, letterSpacing: '-0.01em' }}>
+      {/* minHeight reserves space for a full 2-line label regardless of how
+          many lines this particular label actually wraps to. Without it,
+          tiles were sized by their own content — a page where most labels
+          are one word ("Lips", "Nose") ended up with visibly shorter boxes
+          than a page where most labels wrap ("Norwood Stage", "Forehead
+          Proportion"), even though every tile shares this exact component.
+          2 lines * 1.2 line-height = 2.4em, so every tile reserves the same
+          label height whether it needs one line or two. */}
+      <span
+        className="font-heading font-bold text-[18px] uppercase mb-3 leading-[1.2]"
+        style={{ color: G, letterSpacing: '-0.01em', minHeight: '2.4em', display: 'block' }}
+      >
         {label}
       </span>
       <div className="flex items-center justify-between mb-2">
