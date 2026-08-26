@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Sparkles, Moon, Settings } from 'lucide-react'
+import { Camera, ChevronRight, Dumbbell, Moon, Settings } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
@@ -30,7 +30,7 @@ const SLIDE_VARIANTS = {
 // consumes all the space, leaving nothing to redistribute) but centers
 // BeginScanCard's now-shorter box+text+button group in the freed-up space
 // instead of leaving it pinned to the top with a dead gap at the bottom.
-function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, visualClassName = 'flex-1', footer }) {
+function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, visual, visualClassName = 'flex-1', footer }) {
   return (
     <div
       className="flex flex-col justify-center h-full px-6 pb-4"
@@ -59,7 +59,7 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon, onAction, visual, vi
             className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
             style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
           >
-            <Icon size={17} /> {cta}
+            {Icon && <Icon size={17} />}{cta}
           </motion.button>
         </>
       )}
@@ -93,7 +93,6 @@ function BeginScanCard({ onBegin, limitMessage }) {
       title="Begin Scan"
       body="Get your AI-powered Glow Score, tier, and personalized action plan in under 60 seconds."
       cta="Start Your Scan"
-      icon={Sparkles}
       onAction={onBegin}
       visualClassName="aspect-[4/5] flex-shrink-0"
       visual={
