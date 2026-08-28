@@ -35,8 +35,8 @@ if (_devScanCap) {
 }
 
 const checkScan = {
-  free: createLimiter('scan:free', _devScanCap || 3, '24 h', 24 * 60 * 60 * 1000),
-  demo: createLimiter('scan:demo', 1, '1 h',   1 * 60 * 60 * 1000),
+  free: createLimiter('scan:free', _devScanCap || 999, '24 h', 24 * 60 * 60 * 1000),
+  demo: createLimiter('scan:demo', 999, '1 h',   1 * 60 * 60 * 1000),
 }
 
 // ── 1. Token verification ──────────────────────────────────────────────────────

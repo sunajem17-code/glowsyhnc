@@ -30,8 +30,9 @@ const RESCAN_NOTIF_ID = 1002
 export async function scheduleStreakReminder() {
   if (!isNative()) return
   try {
-    const granted = await requestNotificationPermission()
-    if (!granted) return
+    // Only schedule if already granted — never prompt here (onboarding handles that)
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') return
 
     // Cancel existing streak reminder before rescheduling
     await LocalNotifications.cancel({ notifications: [{ id: STREAK_NOTIF_ID }] })
@@ -71,8 +72,9 @@ export async function cancelStreakReminder() {
 export async function scheduleRescanNotification(daysUntilReady = 14) {
   if (!isNative()) return
   try {
-    const granted = await requestNotificationPermission()
-    if (!granted) return
+    // Only schedule if already granted — never prompt here
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') return
 
     // Always cancel the old one first
     await LocalNotifications.cancel({ notifications: [{ id: RESCAN_NOTIF_ID }] })

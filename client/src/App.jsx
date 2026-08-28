@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
-import { requestNotificationPermission, scheduleStreakReminder } from './utils/notifications'
+import { scheduleStreakReminder } from './utils/notifications'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
@@ -98,12 +98,10 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [isAuthenticated])
 
-  // Request notification permission + schedule streak reminder after login
+  // Schedule streak reminder only — permission is requested during onboarding
   useEffect(() => {
     if (!isAuthenticated) return
-    requestNotificationPermission().then(granted => {
-      if (granted) scheduleStreakReminder().catch(() => {})
-    }).catch(() => {})
+    scheduleStreakReminder().catch(() => {})
   }, [isAuthenticated])
 
   // Network connectivity monitoring — graceful offline handling via browser API

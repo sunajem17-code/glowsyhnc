@@ -10,6 +10,32 @@ import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
+
+// ── Animated processing overlay (bars + "Processing" label) ──────────────────
+function ProcessingOverlay() {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 50,
+      background: 'rgba(10,10,10,0.82)', backdropFilter: 'blur(6px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16,
+    }}>
+      <p style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 20, color: '#fff', letterSpacing: '-0.01em' }}>
+        Processing
+      </p>
+      {/* Animated equalizer bars */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 36 }}>
+        {[0, 1, 2, 3].map(i => (
+          <motion.div
+            key={i}
+            style={{ width: 7, borderRadius: 4, background: GOLD }}
+            animate={{ height: ['12px', '32px', '12px'] }}
+            transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
@@ -750,7 +776,8 @@ function StepNotifications({ onNext }) {
     setLoading(true)
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
-      await PushNotifications.requestPermissions()
+      const result = await PushNotifications.requestPermissions()
+      if (result.receive === 'granted') await PushNotifications.register()
     } catch {
       // not available on web or permission unavailable — proceed anyway
     }
@@ -870,7 +897,8 @@ function StepAuth({ onNext }) {
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', position: 'relative' }}>
+      <AnimatePresence>{loading && <motion.div key="proc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, zIndex: 50 }}><ProcessingOverlay /></motion.div>}</AnimatePresence>
       <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
           <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Create your account</h1>
@@ -2225,6 +2253,12 @@ export default function PremiumOnboarding() {
           exit="exit"
           transition={pageTrans}
           className="absolute inset-0"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.15}
+          onDragEnd={(e, info) => {
+            if (info.offset.x > 60 && step > 0) { triggerHaptic(); goBack() }
+          }}
         >
           {steps[step]}
         </motion.div>

@@ -6,7 +6,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics'
 export async function triggerHaptic() {
   if (!Capacitor.isNativePlatform()) return
   try {
-    await Haptics.impact({ style: ImpactStyle.Light })
+    await Haptics.impact({ style: ImpactStyle.Heavy })
   } catch {
     // haptics unavailable — not fatal, ignore
   }

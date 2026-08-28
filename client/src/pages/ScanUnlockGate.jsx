@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { isNative, purchasePro } from '../utils/iap'
 import {
-  UserPlus, Share2, Check, Loader2, Users, ChevronRight,
+  UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -1012,6 +1012,399 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
   )
 }
 
+// ── Pro Paywall (full-screen modal, opens when "Get Ascendus Pro" is tapped) ──
+const PAYWALL_CARDS = [
+  {
+    title: 'Get your ratings',
+    content: (scan) => {
+      const fd = scan?.faceData ?? {}
+      const gs = scan?.glowScore ?? null
+      const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 70
+      const barColor = pct => pct >= 75 ? '#4CD964' : pct >= 55 ? '#C6A85C' : '#FF9500'
+      const items = [
+        { label: 'Overall',      pct: toBar(gs) },
+        { label: 'Potential',    pct: Math.min(100, toBar(gs) + 14) },
+        { label: 'Jawline',      pct: toBar(fd.jawlineDefinition) },
+        { label: 'Symmetry',     pct: toBar(fd.symmetry) },
+        { label: 'Skin Quality', pct: toBar(fd.skinClarity) },
+        { label: 'Cheekbones',   pct: toBar(fd.cheekbones ?? fd.facialProportions) },
+      ]
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          {items.map(({ label, pct }) => (
+            <div key={label} className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <p className="font-body text-[11px] mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
+              <p className="font-heading font-bold text-[22px] leading-none mb-2" style={{ color: '#fff' }}>
+                {Math.round(pct)}
+              </p>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    },
+  },
+  {
+    title: 'AI Glow Coach',
+    content: () => (
+      <div className="flex flex-col gap-3">
+        <div className="self-start max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <p className="font-body text-[13px] leading-snug" style={{ color: '#fff' }}>
+            Hey! I'm your personal glow-up coach. What do you want to improve first?
+          </p>
+        </div>
+        <div className="self-end max-w-[80%] px-4 py-3 rounded-2xl rounded-tr-sm" style={{ background: GRAD }}>
+          <p className="font-heading font-semibold text-[13px]" style={{ color: '#0A0A0A' }}>
+            How do I get a sharper jawline?
+          </p>
+        </div>
+        <div className="self-start max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <p className="font-body text-[13px] leading-snug" style={{ color: '#fff' }}>
+            A sharper jawline comes from lowering body fat, mewing, and chewing hard gum daily…
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: 'Start improving',
+    content: () => (
+      <div className="flex flex-col gap-3">
+        {[
+          { emoji: '🧴', title: 'Start a skincare routine', sub: 'Clear skin is the highest-ROI glow-up. Tap to learn more.' },
+          { emoji: '💪', title: 'Build your jaw & frame', sub: 'Targeted exercises and habits that add definition fast.' },
+          { emoji: '✂️', title: 'Optimize your hairstyle', sub: 'The right cut changes your entire face shape. See what works.' },
+        ].map(({ emoji, title, sub }) => (
+          <div key={title} className="flex items-center gap-3 px-3 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 22 }}>{emoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-bold text-[13px] leading-tight" style={{ color: '#fff' }}>{title}</p>
+              <p className="font-body text-[11px] leading-snug mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{sub}</p>
+            </div>
+            <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    ),
+  },
+]
+
+function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
+  const [cardIdx, setCardIdx] = useState(0)
+  const x = useMotionValue(0)
+  const containerRef = useRef(null)
+  const [containerW, setContainerW] = useState(0)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(([e]) => setContainerW(e.contentRect.width))
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!containerW) return
+    animate(x, -cardIdx * containerW, { type: 'tween', duration: 0.32, ease: [0.25, 0.1, 0.25, 1] })
+  }, [cardIdx, containerW])
+
+  function handleDragEnd(_, info) {
+    const D = 60, V = 400
+    if ((info.offset.x < -D || info.velocity.x < -V) && cardIdx < PAYWALL_CARDS.length - 1) setCardIdx(c => c + 1)
+    else if ((info.offset.x > D || info.velocity.x > V) && cardIdx > 0) setCardIdx(c => c - 1)
+    else animate(x, -cardIdx * containerW, { type: 'tween', duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
+  }
+
+  return (
+    <motion.div
+      initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+      transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+      className="absolute inset-0 z-40 flex flex-col"
+      style={{ background: '#0A0A0A' }}
+    >
+      {/* Header */}
+      <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8 }}>
+        <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
+          <X size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
+        </button>
+        <h1 className="font-heading font-bold italic text-[38px] leading-none mt-3 mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          ASCEND
+        </h1>
+        <p className="font-body text-[15px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Unlock your full glow-up potential.
+        </p>
+      </div>
+
+      {/* Swipeable feature cards */}
+      <div ref={containerRef} className="flex-1 relative overflow-hidden mx-5 my-4 rounded-3xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <motion.div
+          className="flex h-full"
+          style={{ x, width: `${PAYWALL_CARDS.length * 100}%` }}
+          drag="x"
+          dragConstraints={{ left: -(PAYWALL_CARDS.length - 1) * containerW, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={handleDragEnd}
+        >
+          {PAYWALL_CARDS.map((card, i) => (
+            <div key={i} className="flex flex-col p-5 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0 }}>
+              <h2 className="font-heading font-bold text-[20px] mb-4" style={{ color: '#fff', letterSpacing: '-0.01em' }}>
+                {card.title}
+              </h2>
+              {card.content(scan)}
+            </div>
+          ))}
+        </motion.div>
+      </div>
+
+      {/* Dots */}
+      <div className="flex items-center justify-center gap-2 mb-3">
+        {PAYWALL_CARDS.map((_, i) => (
+          <motion.div key={i}
+            animate={{ width: i === cardIdx ? 18 : 6, background: i === cardIdx ? G : 'rgba(255,255,255,0.25)' }}
+            style={{ height: 6, borderRadius: 99 }}
+          />
+        ))}
+      </div>
+
+      {/* Social proof */}
+      <p className="text-center font-body text-[12px] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        500,000+ scans completed
+      </p>
+
+      {/* CTA */}
+      <div className="px-5 pb-safe" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}>
+        <motion.button
+          whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+          onClick={() => { triggerHaptic(); onPurchase() }}
+          disabled={isPurchasing}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
+          style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.4)' }}
+        >
+          {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : '✦ '}
+          {isPurchasing ? 'Processing…' : 'Unlock Now'}
+        </motion.button>
+        <div className="flex items-center justify-center gap-5">
+          {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
+            <button key={label} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Invite popup (simple code share, shown when "Invite 3 Friends" is tapped) ─
+function InvitePopup({ referralCode, referralCount, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const [showRedeem, setShowRedeem] = useState(false)
+  const [redeemCode, setRedeemCode] = useState('')
+  const [redeemMsg, setRedeemMsg] = useState('')
+  const [redeemLoading, setRedeemLoading] = useState(false)
+  const link = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
+  const shareText = `I'm using Ascendus to track my glow-up. Try it free 👇 ${link}`
+
+  async function handleCopy() {
+    try { await navigator.clipboard.writeText(referralCode ?? link); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
+  }
+
+  async function handleShare() {
+    try {
+      if (navigator.share) await navigator.share({ title: 'Ascendus', text: shareText, url: link })
+      else { await navigator.clipboard.writeText(shareText); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    } catch {}
+  }
+
+  async function handleRedeem() {
+    if (!redeemCode.trim()) return
+    setRedeemLoading(true); setRedeemMsg('')
+    try {
+      await api.referral.redeem(redeemCode.trim().toUpperCase())
+      setRedeemMsg('✓ Code applied!')
+    } catch (err) {
+      setRedeemMsg(err?.message || 'Invalid code.')
+    } finally { setRedeemLoading(false) }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="absolute inset-0 z-30 flex items-end"
+      style={{ background: 'rgba(0,0,0,0.7)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full rounded-t-3xl flex flex-col"
+        style={{ background: '#141414', border: '1px solid rgba(198,168,92,0.2)', borderBottom: 0, paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))' }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-4">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
+        </div>
+
+        <div className="px-6">
+          <h2 className="font-heading font-bold text-[22px] mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+            Share your invite code
+          </h2>
+          <p className="font-body text-[13px] mb-6" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Invite 3 friends to unlock results
+          </p>
+
+          {/* Code box */}
+          <div className="flex items-center gap-3 px-5 py-4 rounded-2xl mb-2" style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.25)' }}>
+            <span className="font-heading font-bold text-[26px] flex-1 tracking-[0.15em]" style={{ color: G }}>
+              {referralCode ?? '—'}
+            </span>
+            <button
+              onClick={() => { triggerHaptic(); handleCopy() }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-heading font-bold text-[12px]"
+              style={{ background: copied ? 'rgba(52,199,89,0.15)' : 'rgba(198,168,92,0.15)', color: copied ? '#34C759' : G }}
+            >
+              {copied ? <><Check size={13} />Copied</> : 'Copy'}
+            </button>
+          </div>
+
+          {/* Progress */}
+          <p className="font-body text-[12px] mb-5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            {referralCount}/{REQUIRED} friends joined
+          </p>
+
+          {/* Share button */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { triggerHaptic(); handleShare() }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3"
+            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+          >
+            <Share2 size={16} /> Share Your Link
+          </motion.button>
+
+          {/* Redeem toggle */}
+          {!showRedeem ? (
+            <button onClick={() => setShowRedeem(true)} className="w-full py-3 font-body text-[13px] text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Have a friend's code? Redeem →
+            </button>
+          ) : (
+            <div className="flex gap-2 mt-1">
+              <input
+                value={redeemCode}
+                onChange={e => setRedeemCode(e.target.value.toUpperCase().slice(0, 5))}
+                placeholder="ENTER CODE"
+                maxLength={5}
+                className="flex-1 px-4 py-3 rounded-xl font-heading font-bold text-[15px] tracking-widest text-center"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none' }}
+              />
+              <button
+                onClick={() => { triggerHaptic(); handleRedeem() }}
+                disabled={redeemLoading || redeemCode.length < 5}
+                className="px-5 py-3 rounded-xl font-heading font-bold text-[14px] disabled:opacity-40"
+                style={{ background: GRAD, color: '#0A0A0A' }}
+              >
+                {redeemLoading ? '…' : 'Go'}
+              </button>
+            </div>
+          )}
+          {redeemMsg && <p className="text-center text-[12px] font-body mt-2" style={{ color: redeemMsg.startsWith('✓') ? '#34C759' : RED }}>{redeemMsg}</p>}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// ── Locked reveal screen (shown to free users before purchase) ────────────────
+function LockedRevealScreen({ scan, onAscend, onInvite, isPurchasing, error }) {
+  const facePhoto = scan?.facePhotoUrl ?? null
+  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
+  const fd = scan?.faceData ?? {}
+
+  const potential = glowScore != null ? Math.min(10, glowScore + 1.4).toFixed(1) : null
+  const symmetry = fd.symmetry ?? null
+  const jawline = fd.jawlineDefinition ?? null
+  const skinClarity = fd.skinClarity ?? null
+  const cheekbones = fd.cheekbones ?? fd.facialProportions ?? null
+
+  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 70
+  const barColor = pct => pct >= 75 ? '#4CD964' : pct >= 55 ? '#C6A85C' : '#FF9500'
+
+  const metrics = [
+    { label: 'Overall',      pct: toBar(glowScore) },
+    { label: 'Potential',    pct: Math.min(100, toBar(glowScore) + 14) },
+    { label: 'Jawline',      pct: toBar(jawline) },
+    { label: 'Symmetry',     pct: toBar(symmetry) },
+    { label: 'Skin Clarity', pct: toBar(skinClarity) },
+    { label: 'Cheekbones',   pct: toBar(cheekbones) },
+  ]
+
+  return (
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+      <div className="flex flex-col items-center px-6 pb-10"
+           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+
+        {/* Header */}
+        <h1 className="font-heading font-bold text-[28px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          👀 Reveal your ratings
+        </h1>
+        <p className="font-body text-[14px] text-center mb-6 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Invite 3 friends or get Ascendus Pro to view your results
+        </p>
+
+        {/* Face photo circle */}
+        <div className="relative mb-5" style={{ width: 112, height: 112 }}>
+          <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid #fff', background: '#111' }}>
+            {facePhoto
+              ? <img src={facePhoto} alt="Your scan" className="w-full h-full object-cover" style={{ filter: 'brightness(0.35)' }} />
+              : <div className="w-full h-full" style={{ background: '#111' }} />
+            }
+          </div>
+        </div>
+
+        {/* Metrics card — Umax-style 3-column grid */}
+        <div className="w-full rounded-3xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="font-heading font-bold text-[15px] mb-3" style={{ color: '#fff' }}>Get your ratings</p>
+          <div className="grid grid-cols-3 gap-2">
+            {metrics.map(({ label, pct }) => (
+              <div key={label} className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <p className="font-body text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
+                <p className="font-heading font-bold text-[22px] leading-none mb-2" style={{ color: '#fff', filter: 'blur(6px)' }}>
+                  {Math.round(pct)}
+                </p>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                  <div className="h-full rounded-full" style={{ width: '100%', background: GRAD }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTAs */}
+        <motion.button
+          whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+          onClick={() => { triggerHaptic(); onAscend() }}
+          disabled={isPurchasing}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
+          style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          {isPurchasing ? <Loader2 size={16} className="animate-spin" /> : '✦ '}
+          {isPurchasing ? 'Processing…' : 'Get Ascendus Pro'}
+        </motion.button>
+
+        <button
+          onClick={() => { triggerHaptic(); onInvite() }}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
+        >
+          <UserPlus size={16} /> Invite 3 Friends
+        </button>
+
+        {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
+      </div>
+    </div>
+  )
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function ScanUnlockGate() {
@@ -1019,6 +1412,7 @@ export default function ScanUnlockGate() {
   const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
 
   const [showInvite, setShowInvite]         = useState(false)
+  const [showPaywall, setShowPaywall]       = useState(false)
   const [showPromo, setShowPromo]           = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
   const justUnlockedRef = useRef(false)
@@ -1111,15 +1505,36 @@ export default function ScanUnlockGate() {
       className="fixed inset-0 z-50 overflow-hidden dark"
       style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      <SwipeableResultCards
-        scan={currentScan}
-        onAscend={handleAscend}
-        onInvite={() => setShowInvite(true)}
-        onPromo={() => setShowPromo(true)}
-        isPurchasing={isPurchasing}
-        error={purchaseError}
-        isPremium={isPremium}
-      />
+      {(isPremium || justUnlocked) ? (
+        <SwipeableResultCards
+          scan={currentScan}
+          onAscend={handleAscend}
+          onInvite={() => setShowInvite(true)}
+          onPromo={() => setShowPromo(true)}
+          isPurchasing={isPurchasing}
+          error={purchaseError}
+          isPremium={isPremium}
+        />
+      ) : (
+        <LockedRevealScreen
+          scan={currentScan}
+          onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
+          onInvite={() => { triggerHaptic(); setShowInvite(true) }}
+          isPurchasing={isPurchasing}
+          error={purchaseError}
+        />
+      )}
+
+      <AnimatePresence>
+        {showPaywall && !isPremium && (
+          <ProPaywall
+            scan={currentScan}
+            onClose={() => setShowPaywall(false)}
+            onPurchase={handleAscend}
+            isPurchasing={isPurchasing}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showPromo && (
@@ -1134,21 +1549,11 @@ export default function ScanUnlockGate() {
 
       <AnimatePresence>
         {showInvite && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-20"
-            style={{ background: 'rgba(0,0,0,0.65)' }}
-            onClick={() => setShowInvite(false)}
-          >
-            <div onClick={e => e.stopPropagation()} className="absolute inset-0">
-              <InviteSheet
-                referralCode={referralCode}
-                referralCount={referralCount}
-                onClose={() => setShowInvite(false)}
-                onUnlocked={() => navigate('/results', { replace: true })}
-              />
-            </div>
-          </motion.div>
+          <InvitePopup
+            referralCode={referralCode}
+            referralCount={referralCount}
+            onClose={() => setShowInvite(false)}
+          />
         )}
       </AnimatePresence>
     </MotionPage>
