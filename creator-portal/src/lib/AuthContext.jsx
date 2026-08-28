@@ -15,7 +15,14 @@ export function AuthProvider({ children }) {
     }
     const { data, error } = await supabase.from('creators').select('*').eq('id', userId).single()
     if (error) {
-      console.error('[auth] failed to load creator profile', error)
+      console.error('[auth] failed to load creator profile', {
+        userId,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        status: error.status,
+      })
       setCreator(null)
       return
     }
@@ -47,7 +54,7 @@ export function AuthProvider({ children }) {
   const signInWithDiscord = useCallback(() => {
     return supabase.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
   }, [])
 
@@ -59,7 +66,7 @@ export function AuthProvider({ children }) {
     session,
     creator,
     loading,
-    isAdmin: creator?.role === 'admin',
+    isAdmin: creator?.is_admin === true,
     signInWithDiscord,
     signOut,
     refreshCreator,

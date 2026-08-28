@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-
-if (!url || !publishableKey) {
-  throw new Error('[supabase] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are required')
-}
-
-export const supabase = createClient(url, publishableKey)
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)

@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+.next
+
+# Media files
+*.mov
+*.mp4
+*.png
+*.jpg
+*.jpeg

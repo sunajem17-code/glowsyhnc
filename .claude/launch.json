@@ -14,9 +14,9 @@
     {
       "name": "creator-portal",
       "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["/Users/suleimannajem/looksmaxing/creator-portal/node_modules/.bin/vite"],
+      "runtimeArgs": ["/Users/suleimannajem/looksmaxing/creator-portal/node_modules/.bin/next", "dev"],
       "cwd": "/Users/suleimannajem/looksmaxing/creator-portal",
-      "port": 5174,
+      "port": 3000,
       "env": {
         "PATH": "/usr/local/bin:/usr/bin:/bin"
       }

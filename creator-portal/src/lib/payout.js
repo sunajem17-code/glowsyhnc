@@ -21,3 +21,26 @@ export function describeMilestones(payoutStructure, tier = 'standard') {
     })
     .join(' · ')
 }
+
+/**
+ * Calculate payout from a payout_tiers.milestones value and a view count.
+ * Two shapes are supported:
+ *   - Milestone array: [{ min_views, cumulative_payout }, ...] — pays the
+ *     highest-threshold milestone the view count has crossed.
+ *   - Freeform: { freeform: true, amount } — a fixed amount regardless of
+ *     views, for one-off custom deals.
+ *
+ * @param {Array|{freeform: true, amount: number}} milestones
+ * @param {number} viewCount
+ * @returns {number} payout in USD
+ */
+export function calcPayout(milestones, viewCount) {
+  if (!milestones) return 0
+  if (!Array.isArray(milestones)) {
+    return milestones.freeform ? Number(milestones.amount) || 0 : 0
+  }
+  if (milestones.length === 0) return 0
+  const sorted = [...milestones].sort((a, b) => b.min_views - a.min_views)
+  const hit = sorted.find((m) => viewCount >= m.min_views)
+  return hit ? hit.cumulative_payout : 0
+}
