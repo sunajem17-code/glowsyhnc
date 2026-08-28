@@ -8,10 +8,12 @@ import { Admin } from './pages/Admin'
 import { AdminPayoutRun } from './pages/AdminPayoutRun'
 import { AdminCreators } from './pages/AdminCreators'
 import { AdminBriefs } from './pages/AdminBriefs'
+import { Dashboard } from './pages/dashboard/Dashboard'
+import { Leaderboard } from './pages/dashboard/Leaderboard'
+import { PayoutCalendar } from './pages/dashboard/PayoutCalendar'
 import { ActiveBriefs } from './pages/dashboard/ActiveBriefs'
 import { SubmitVideo } from './pages/dashboard/SubmitVideo'
 import { MySubmissions } from './pages/dashboard/MySubmissions'
-import { Payouts } from './pages/dashboard/Payouts'
 
 export default function App() {
   return (
@@ -22,11 +24,12 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
-              <Route path="/dashboard" element={<Navigate to="/dashboard/briefs" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard/leaderboard" element={<Leaderboard />} />
+              <Route path="/dashboard/payout-calendar" element={<PayoutCalendar />} />
               <Route path="/dashboard/briefs" element={<ActiveBriefs />} />
               <Route path="/dashboard/submit" element={<SubmitVideo />} />
               <Route path="/dashboard/submissions" element={<MySubmissions />} />
-              <Route path="/dashboard/payouts" element={<Payouts />} />
               <Route path="/settings" element={<Settings />} />
 
               <Route element={<AdminRoute />}>

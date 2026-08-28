@@ -14,7 +14,7 @@ export function Login() {
   const { session, loading, signInWithDiscord } = useAuth()
 
   if (loading) return null
-  if (session) return <Navigate to="/dashboard/briefs" replace />
+  if (session) return <Navigate to="/dashboard" replace />
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">

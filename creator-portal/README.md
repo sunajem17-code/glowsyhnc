@@ -125,12 +125,31 @@ To move a creator to VIP tier:
 update creators set tier = 'vip' where discord_handle = 'their-discord-username';
 ```
 
-## Weekly payout runs
+## Payout schedule and runs
 
-Payment is batched weekly per creator, not per submission. `milestones_hit.batch_date` is
-`null` until a milestone has actually been paid out; the Admin → **Payout Run** page
-(`/admin/payouts`) lists every creator with any unpaid milestone, summed across all their
-videos, via the `get_weekly_payout_run()` RPC.
+Payment happens on a **fixed calendar schedule** — the 7th, 14th, 21st, and 28th of each
+month — not a rolling weekly interval. Dates live in the `payout_dates` table
+(`payout_date`, `is_override`, `note`), seeded from Jan 2026 through Dec 2028. One-time
+exceptions (e.g. September 2026's first run moved to the 1st) are just rows with
+`is_override = true` replacing what would otherwise be the normal date that month — add more
+exceptions the same way:
+
+```sql
+-- remove the normal date being replaced, if any
+delete from payout_dates where payout_date = '2027-01-07';
+-- add the override
+insert into payout_dates (payout_date, is_override, note)
+values ('2027-01-05', true, 'Why this date moved');
+```
+
+`getNextPayoutDate()` (`src/lib/payoutSchedule.js`) is the single place both the Admin Payout
+Run page and the Dashboard countdown card pull the next date from. Payment is still batched
+**per creator** (all their unpaid milestones at once), not per submission.
+`milestones_hit.batch_date` is `null` until a milestone has actually been paid out; the
+Admin → **Payout Run** page (`/admin/payouts`) lists every creator with any unpaid milestone,
+summed across all their videos, via the `get_weekly_payout_run()` RPC — named before this
+correction, kept as-is since renaming it is a cosmetic-only change with no logic difference.
+Creators see the same schedule read-only on **Payout Calendar** (`/dashboard/payout-calendar`).
 
 **Eligibility gate:** before a creator can be paid, their `creators.us_audience_pct` /
 `creators.t1_audience_pct` must meet their tier's minimum — checked server-side in

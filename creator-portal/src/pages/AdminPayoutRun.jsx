@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { getNextPayoutDate, formatPayoutDate } from '../lib/payoutSchedule'
 
 function ThresholdLabel({ tier }) {
   return tier === 'vip' ? '20% US + 20% T1' : '10% US + 10% T1'
@@ -64,14 +65,18 @@ export function AdminPayoutRun() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [nextDate, setNextDate] = useState(null)
 
   function load() {
     setLoading(true)
-    supabase.rpc('get_weekly_payout_run').then(({ data, error: rpcError }) => {
-      if (rpcError) setError(rpcError.message)
-      else setRows(data ?? [])
-      setLoading(false)
-    })
+    Promise.all([supabase.rpc('get_weekly_payout_run'), getNextPayoutDate()])
+      .then(([runRes, next]) => {
+        if (runRes.error) setError(runRes.error.message)
+        else setRows(runRes.data ?? [])
+        setNextDate(next)
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
   }
 
   useEffect(load, [])
@@ -83,11 +88,22 @@ export function AdminPayoutRun() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-text">Weekly Payout Run</h1>
+        <h1 className="text-lg font-semibold text-text">Payout Run</h1>
         <p className="mt-1 text-sm text-text-muted">
           Every creator with unpaid milestones, summed across all their videos. Paying a creator
           marks every unpaid milestone in their ledger with today's batch date.
         </p>
+        {nextDate && (
+          <p className="mt-2 text-sm text-text">
+            Next scheduled payout:{' '}
+            <span className="font-medium text-gold">{formatPayoutDate(nextDate.payout_date)}</span>
+            {nextDate.is_override && (
+              <span className="ml-2 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold">
+                Schedule change
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       {loading && <p className="text-sm text-text-muted">Loading…</p>}
