@@ -5,12 +5,10 @@ import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLin
 import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
-import TransformationScreen from '../components/TransformationScreen'
-import { StepRating, StepScoresWaiting } from '../components/OnboardingFinalSteps'
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
-import { isNative, purchasePro, initRevenueCat } from '../utils/iap'
+import { isNative } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
@@ -600,79 +598,347 @@ function VenusIcon({ color }) {
   )
 }
 
+const UMAX_PURPLE = 'linear-gradient(180deg, #9D4EDD 0%, #7B2FBE 100%)'
+const UMAX_PURPLE_DIM = 'linear-gradient(180deg, #6B3FA0 0%, #512B8C 100%)'
+
 function StepGender({ data, onChange, onNext }) {
   const [selected, setSelected] = useState(null)
 
   function pick(gender) {
+    triggerHaptic()
     setSelected(gender)
     onChange('gender', gender)
-    setTimeout(onNext, 300)
+    setTimeout(onNext, 220)
   }
-
-  const MALE_BLUE   = '#4A90E2'
-  const FEMALE_PINK = '#E85D9E'
-
-  const cardStyle = (gender) => ({
-    width: 288, height: 288,
-    borderRadius: 22,
-    border: '1.5px solid #262626',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
-    background: selected === gender
-      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
-      : '#141414',
-  })
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <motion.div
-        initial={{ opacity: 0, y: -18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="px-6"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}
-      >
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: '#C6A85C' }}>
-          STEP 1 OF 3
-        </p>
-        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>
-          Are you male or female?
-        </h1>
-      </motion.div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, paddingBottom: 40 }}>
-        <motion.div
-          initial={{ opacity: 0, y: -18 }}
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.06 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => pick('male')}
-          style={cardStyle('male')}
+          transition={{ duration: 0.3 }}
+          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <MarsIcon color={MALE_BLUE} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
-          </div>
-        </motion.div>
+          Choose gender
+        </motion.h1>
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: -18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.12 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => pick('female')}
-          style={cardStyle('female')}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14, padding: '0 24px 24px' }}>
+        {[
+          { key: 'male', label: 'Male' },
+          { key: 'female', label: 'Female' },
+        ].map(({ key, label }, i) => (
+          <motion.button
+            key={key}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.07, duration: 0.3 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => pick(key)}
+            style={{
+              width: '100%', padding: '22px 0',
+              borderRadius: 50,
+              background: selected === key ? UMAX_PURPLE_DIM : UMAX_PURPLE,
+              border: 'none', cursor: 'pointer',
+              color: '#ffffff', fontWeight: 700, fontSize: 20,
+              fontFamily: 'inherit',
+              boxShadow: selected === key ? 'none' : '0 4px 24px rgba(155,78,221,0.35)',
+            }}
+          >
+            {label}
+          </motion.button>
+        ))}
+      </div>
+
+      <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)', textAlign: 'center' }}>
+        <button
+          onClick={() => { triggerHaptic(); onChange('gender', 'male'); onNext() }}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 16, fontFamily: 'inherit', cursor: 'pointer' }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <VenusIcon color={FEMALE_PINK} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
-          </div>
+          skip
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP REFERRAL ────────────────────────────────────────────────────────────
+function StepReferral({ onNext }) {
+  const [code, setCode] = useState('')
+
+  function handleContinue() {
+    triggerHaptic()
+    // Store code in sessionStorage so it can be sent after auth
+    if (code.trim()) {
+      try { sessionStorage.setItem('asc_referral_code', code.trim().toUpperCase()) } catch {}
+    }
+    onNext()
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}
+        >
+          Do you have a referral code?
+        </motion.h1>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 24px 24px' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
+          <input
+            type="text"
+            placeholder="jX7yT2"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            autoCapitalize="characters"
+            maxLength={12}
+            style={{
+              width: '100%', padding: '20px 20px',
+              borderRadius: 16,
+              background: '#1a1a1a',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#ffffff', fontSize: 18, fontWeight: 600, fontFamily: 'inherit',
+              outline: 'none', boxSizing: 'border-box',
+              letterSpacing: '0.05em',
+            }}
+          />
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14, marginTop: 12, marginBottom: 32 }}>
+            Enter your code here, or skip
+          </p>
+          <button
+            onClick={handleContinue}
+            style={{
+              width: '100%', padding: '22px 0',
+              borderRadius: 50,
+              background: UMAX_PURPLE,
+              border: 'none', cursor: 'pointer',
+              color: '#ffffff', fontWeight: 700, fontSize: 20,
+              fontFamily: 'inherit',
+              boxShadow: '0 4px 24px rgba(155,78,221,0.35)',
+            }}
+          >
+            Continue
+          </button>
         </motion.div>
       </div>
     </div>
   )
 }
 
+// ── STEP NOTIFICATIONS ───────────────────────────────────────────────────────
+function StepNotifications({ onNext }) {
+  async function handleEnable() {
+    triggerHaptic()
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications')
+      await PushNotifications.requestPermissions()
+    } catch {
+      // not available on web or permission unavailable — proceed anyway
+    }
+    onNext()
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}
+        >
+          Enable notifications
+        </motion.h1>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.12, duration: 0.4, type: 'spring', stiffness: 200 }}
+          style={{
+            width: 220, height: 220,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 40% 35%, #3a3a3a, #1a1a1a)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span style={{ fontSize: 100 }}>🔔</span>
+        </motion.div>
+      </div>
+
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+        <button
+          onClick={handleEnable}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: UMAX_PURPLE,
+            border: 'none', cursor: 'pointer',
+            color: '#ffffff', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(155,78,221,0.35)',
+          }}
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  )
+}
+
+
+// ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
+function StepAuth({ onNext }) {
+  const [loading, setLoading] = useState(null) // 'apple' | 'google' | null
+  const [error, setError]     = useState('')
+  const setAuth = useStore(s => s.setAuth)
+  const isAuthenticated = useStore(s => s.isAuthenticated)
+  const isGuest         = useStore(s => s.isGuest)
+  const user            = useStore(s => s.user)
+
+  // Already signed in on native — skip this step (web stays for dev visibility)
+  useEffect(() => {
+    if (isNative() && isAuthenticated && !isGuest) onNext()
+  }, [])
+
+  async function handleApple() {
+    triggerHaptic()
+    setError('')
+    setLoading('apple')
+    try {
+      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+      const appleResult = await SignInWithApple.authorize({
+        clientId: 'com.ascendus.app',
+        scopes: 'email name',
+        nonce: Math.random().toString(36).substring(2, 15),
+      })
+      const identityToken = appleResult?.response?.identityToken
+      if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
+
+      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+      const authRes = await fetch(`${API_BASE}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityToken,
+          user: appleResult.response.user,
+          email: appleResult.response.email,
+          fullName: appleResult.response.fullName,
+          guestUserId: isGuest ? user?.id : undefined,
+        }),
+      })
+      const authData = await authRes.json()
+      if (!authRes.ok) throw new Error(authData.error || 'Authentication failed')
+      setAuth(authData.user, authData.token)
+      onNext()
+    } catch (err) {
+      if (err?.message?.toLowerCase().includes('cancel')) {
+        // user dismissed the sheet — not an error
+      } else {
+        setError(err.message || 'Sign in failed. Please try again.')
+      }
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  function handleGoogle() {
+    triggerHaptic()
+    setError('Google Sign In coming soon.')
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}
+        >
+          Create your account
+        </motion.h1>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
+        {/* Google — white, on top like Umax */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleGoogle}
+          disabled={!!loading}
+          style={{
+            width: '100%', padding: '20px 0', borderRadius: 50,
+            background: '#ffffff', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            cursor: 'pointer', opacity: loading === 'apple' ? 0.5 : 1,
+          }}
+        >
+          {loading === 'google' ? (
+            <Loader2 size={24} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+          )}
+          <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#000', letterSpacing: '-0.01em' }}>
+            {loading === 'google' ? 'Signing in…' : 'Sign in with Google'}
+          </span>
+        </motion.button>
+
+        {/* Apple — black below like Umax */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleApple}
+          disabled={!!loading}
+          style={{
+            width: '100%', padding: '20px 0', borderRadius: 50,
+            background: '#0a0a0a', border: '1.5px solid rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            cursor: loading ? 'not-allowed' : 'pointer', opacity: loading === 'google' ? 0.5 : 1,
+          }}
+        >
+          {loading === 'apple' ? (
+            <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.81 3.22.82.94-.17 1.83-.89 3.13-.96 1.69-.09 2.96.64 3.78 1.82-3.47 2.08-2.67 6.62.87 7.89-.62 1.48-1.46 2.94-3 3.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+          )}
+          <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#fff', letterSpacing: '-0.01em' }}>
+            {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+          </span>
+        </motion.button>
+
+        {error ? (
+          <p className="text-center font-body text-[12px]" style={{ color: '#E85D9E' }}>{error}</p>
+        ) : null}
+
+        {/* TODO: remove before launch */}
+        <button
+          onClick={() => { triggerHaptic(); onNext() }}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', marginTop: 8, textDecoration: 'underline' }}
+        >
+          Skip for now (dev only)
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
 const FOCUS_OPTIONS = [
@@ -1671,7 +1937,6 @@ export default function PremiumOnboarding() {
   const setAuth            = useStore(s => s.setAuth)
   const setGuestSession    = useStore(s => s.setGuestSession)
   const addScan                = useStore(s => s.addScan)
-  const currentScan            = useStore(s => s.currentScan)
   const setCurrentScan         = useStore(s => s.setCurrentScan)
   const setLastFaceScanCapture = useStore(s => s.setLastFaceScanCapture)
   const patchScanExtendedMetrics = useStore(s => s.patchScanExtendedMetrics)
@@ -1681,18 +1946,6 @@ export default function PremiumOnboarding() {
   const incrementScanCount = useStore(s => s.incrementScanCount)
   const setIsPremium       = useStore(s => s.setIsPremium)
   const user               = useStore(s => s.user)
-
-  // Purchase state for StepScoresWaiting's "Unlock Results Now" button — moved
-  // here from ScanUnlockGate.jsx's handleAscend (Step 1 of retiring that
-  // screen; ScanUnlockGate itself is untouched and still routable at /unlock,
-  // just no longer reachable from this button).
-  const [isPurchasing, setIsPurchasing] = useState(false)
-  const [purchaseError, setPurchaseError] = useState('')
-  // Synchronous re-entrancy lock — isPurchasing alone can't prevent a true
-  // double-tap, since two clicks in the same render cycle both close over
-  // the same pre-update React state. A ref updates immediately, outside
-  // React's batching, so the second call sees the first one's lock.
-  const purchaseLockRef = useRef(false)
 
   // Silently establish a guest session so the AI score API call during the
   // "Analyzing…" step has a valid JWT — even though the user hasn't signed in
@@ -1711,12 +1964,8 @@ export default function PremiumOnboarding() {
   // step ≥ 3 so they never see Welcome/SignUp again.
   const draft = loadDraft()
 
-  // Dormant again — the Welcome screen (steps[1], "Brutally honest. Built
-  // to improve you.") must always be the literal first thing a never-signed-up
-  // user sees, no slides in front of it. IntroSlides (the 3-slide "why
-  // Ascendus" sequence) stays in the codebase in case it's wanted again
-  // later, but introDone defaults true so it never shows unprompted.
-  const [introDone, setIntroDone] = useState(true)
+  // Intro slides play first for new users on every fresh app launch.
+  const [introDone, setIntroDone] = useState(false)
   // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
   // same reason — new unauthenticated sessions start straight at Welcome(1).
   // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
@@ -1725,10 +1974,10 @@ export default function PremiumOnboarding() {
   // Interrupted sessions (isAuthenticated=true but hasOnboarded=false) resume at gender (step 2).
   // Gender (step 2) is the first screen on a fresh launch. Welcome/Intro are
   // still in the steps array but skipped by default — start at 2 for everyone.
-  const [step, setStep] = useState(isAuthenticated ? Math.max(2, draft?.step ?? 2) : (draft?.step ?? 2))
+  // Flow simplified: gender is now step 0. Always start at 0.
+  const [step, setStep] = useState(draft?.step ?? 0)
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
-  const [purchaseSuccess, setPurchaseSuccess] = useState(false)
 
   const [formData, setFormData] = useState({
     gender: '', goal: '',
@@ -1754,23 +2003,13 @@ export default function PremiumOnboarding() {
     setStep(s => s + 1)
   }
   function goBack() {
-    if (step <= 1) return
+    if (step <= 0) return
     setDir(-1)
     setStep(s => s - 1)
   }
 
-  // Called by StepScanCapture when analysis completes — saves the scan record
-  // to the store, then continues the normal step sequence (Transformation →
-  // Rating → ScoresWaiting) instead of jumping straight to the /unlock route.
-  // hasOnboarded only flips at the very end, in handleAscend — flipping it
-  // here would swap App.jsx out of the !hasOnboarded routing branch mid-flow
-  // and unmount this component.
-  //
-  // Phase is computed with the same assignPhase(faceScore, goal) call
-  // Scan.jsx's own (post-onboarding) scan flow uses — this is the actual
-  // vocabulary ActionPlan.jsx and generatePlanTasks() read (LEAN/SCULPT/
-  // TRANSFORM/REFINE), not the separate BMI-based CUT/BULK/RECOMP/MAINTENANCE
-  // result WorkoutPlan.jsx's body-stats screen shows.
+  // REMOVED: handleScanDone — moved to paywall flow
+  // eslint-disable-next-line no-unused-vars
   function handleScanDone(scanRecord) {
     try {
       const g = formData.gender || 'male'
@@ -1842,207 +2081,23 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // NOT a verbatim port of ScanUnlockGate.jsx's handleAscend — it couldn't be.
-  // In the original flow, finish('/unlock') already ran (setHasOnboarded,
-  // setLegalConsented, setAgeConfirmed, setUserProfile, the Supabase profile
-  // patch) before ScanUnlockGate ever mounted, so its handleAscend never had
-  // to worry about onboarding-completion state. Here, this button IS what
-  // used to trigger finish() — but unlike finish()'s other side effects (none
-  // of which gate any route — see below), setHasOnboarded() is NOT run
-  // unconditionally up front anymore. It's the one flag App.jsx's routing
-  // actually checks (!hasOnboarded ? <PremiumOnboarding/> : ...), so setting
-  // it before the purchase even starts meant closing the app mid-purchase
-  // (during the StoreKit sheet, on a cancel, on a network drop) left the user
-  // permanently marked "onboarded" with isPremium still false and no route
-  // back to any paywall — a real bypass, not hypothetical. It now only flips
-  // on the native success path below, and — since the web/Stripe redirect
-  // tears down this whole function's execution context — on confirmed
-  // payment in PaymentSuccess.jsx instead. An interrupted attempt now
-  // correctly leaves hasOnboarded false, sending the user back through
-  // onboarding (from Consent — the step array always resets there for an
-  // already-authenticated user) rather than skipping it. The other fields
-  // below (userProfile/gender/legalConsented/ageConfirmed, the Supabase
-  // patch) are harmless to set unconditionally — nothing gates access on
-  // them, only hasOnboarded does, and re-onboarding just re-sets them anyway.
-  async function handleAscend() {
-    if (purchaseLockRef.current) return
-    purchaseLockRef.current = true
+  // Called after StepAuth — moves to notifications step.
+  function handleAuthDone() {
+    goNext()
+  }
 
+  // Called after StepNotifications — final unlock.
+  function handleFinalDone() {
     clearDraft()
     setGender(formData.gender || null)
     setLegalConsented()
     setAgeConfirmed()
-
-    setIsPurchasing(true)
-    setPurchaseError('')
-    try {
-      if (isNative()) {
-        // ── Step 1: Apple Sign In (if no existing session) ────────────────────
-        // Auth happens here, at the paywall, not earlier in the flow.
-        // Apple only returns email/name on the very first authorization ever —
-        // subsequent calls return only the stable `user` identifier. The stable
-        // identifier is what we pass to RevenueCat so purchases restore correctly
-        // on reinstall or device change, regardless of whether email came back.
-        let appleStableId = null
-        if (!isAuthenticated || isGuest) {
-          console.log('[ASCEND] Step 1: initiating Apple Sign In (native flow)')
-          const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-          // redirectURI must be omitted for native iOS — it triggers the web-based
-          // SFSafariViewController flow which requires a signed-in App Store account
-          // and produces a "Sign in to Apple Account in Settings" system alert instead
-          // of the native ASAuthorizationAppleIDProvider sheet.
-          const appleResult = await SignInWithApple.authorize({
-            clientId: 'com.ascendus.app',
-            scopes: 'email name',
-            nonce: Math.random().toString(36).substring(2, 15),
-          })
-          console.log('[ASCEND] Step 1 complete: Apple Sign In returned — user:', appleResult?.response?.user, 'hasToken:', !!appleResult?.response?.identityToken, 'hasEmail:', !!appleResult?.response?.email)
-          const identityToken = appleResult?.response?.identityToken
-          if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
-
-          // Stable Apple user identifier — present on every auth, not just first
-          appleStableId = appleResult.response.user
-
-          console.log('[ASCEND] Step 2: posting identity token to /api/auth/apple (guestUserId:', isGuest ? user?.id : 'none', ')')
-          const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-          const authRes = await fetch(`${API_BASE}/api/auth/apple`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              identityToken,
-              user: appleResult.response.user,
-              email: appleResult.response.email,    // null on non-first auth; server handles this
-              fullName: appleResult.response.fullName,
-              // Migrate any scan data saved under the guest session
-              guestUserId: isGuest ? user?.id : undefined,
-            }),
-          })
-          const authData = await authRes.json()
-          if (!authRes.ok) {
-            console.error('[ASCEND] Step 2 failed: /api/auth/apple returned', authRes.status, authData)
-            throw new Error(authData.error || 'Authentication failed')
-          }
-          console.log('[ASCEND] Step 2 complete: auth token stored, userId:', authData.user?.id)
-          setAuth(authData.user, authData.token)
-          api.user.update({ gender: formData.gender }).catch(() => {})
-          api.supabase.updateUser({ ai_consent: true, consent_at: new Date().toISOString() }).catch(() => {})
-
-          // ── Step 3: Tie RevenueCat to the stable Apple ID (not Supabase UUID) ──
-          // Using the Apple stable identifier ensures purchase restoration works
-          // on reinstall/device change — RC looks up the same ID Apple returns.
-          console.log('[ASCEND] Step 3: initialising RevenueCat with Apple stable ID')
-          await initRevenueCat(appleStableId)
-          console.log('[ASCEND] Step 3 complete: RevenueCat initialised')
-        }
-
-        // ── Step 4: Purchase ──────────────────────────────────────────────────
-        const plan = 'monthly'
-        console.log('[ASCEND] Step 4: calling purchasePro, plan:', plan)
-        const result = await purchasePro(plan)
-        console.log('[ASCEND] Step 4 result:', result?.success ? 'SUCCESS' : 'FAILED', 'reason:', result?.reason)
-        if (result?.success) {
-          const rcUserId = result.customerInfo?.originalAppUserId
-          api.payments.syncRc(rcUserId).catch(() => {})
-          // Both flags must be set together before App.jsx re-renders.
-          // setIsPremium alone triggers Gate 2 (PremiumSplash) which unmounts
-          // this component — finishOnboarding/setHasOnboarded would never run.
-          console.log('[ASCEND] Purchase success: setting isPremium + hasOnboarded together')
-          // Same fix as finishOnboarding()/handlePromoSuccess() below — set the
-          // landing-page flag BEFORE flipping hasOnboarded, so App.jsx's
-          // PostAuthLanding index route lands on /results deterministically
-          // instead of falling through to its default /scan redirect. This
-          // path (a real native purchase) was the one call site that got
-          // missed when that fix was written — it flips isPremium+hasOnboarded
-          // but never set the destination flag, so buying (as opposed to
-          // redeeming a promo code) during onboarding still dropped the user
-          // on Scan/Home instead of Results. The flag survives Gate 2
-          // (PremiumSplash) playing in between, since sessionStorage isn't
-          // tied to this component's lifecycle.
-          sessionStorage.setItem('asc_post_onboard_dest', '/results')
-          setIsPremium(true)
-          setHasOnboarded()
-          logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
-          setIsPurchasing(false)
-          purchaseLockRef.current = false
-          // PremiumSplash (App.jsx Gate 2) now handles the "welcome" moment.
-          // We don't need setPurchaseSuccess — this component is about to unmount.
-          return
-        }
-        if (result?.reason !== 'cancelled') {
-          setPurchaseError('Unable to complete purchase. Please try again.')
-        }
-        setIsPurchasing(false)
-        purchaseLockRef.current = false
-        return
-      }
-      // Web: Stripe checkout — same flow as PaywallSheet's handleCheckout.
-      const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-      const token  = stored?.state?.token
-      if (!token || token === 'demo-token') { setIsPurchasing(false); purchaseLockRef.current = false; setSigningIn(true); return }
-      const { url } = await api.payments.createCheckout('monthly')
-      window.location.href = url
-      // Leave isPurchasing=true — the page is about to navigate away.
-    } catch (err) {
-      const msg = (err?.message || '').toLowerCase()
-      if (!msg.includes('cancel')) {
-        console.error('[ASCEND] Purchase/auth error:', err)
-        // Never expose raw JS error messages (ReferenceError, TypeError, etc.) to users —
-        // those are programming errors, not user-facing copy. Always show the generic fallback.
-        const isUserFacingMsg = err?.userFacing === true
-        setPurchaseError(isUserFacingMsg ? err.message : 'Unable to complete purchase. Please try again.')
-      }
-      setIsPurchasing(false)
-      purchaseLockRef.current = false
-    }
-  }
-
-  function finishOnboarding() {
-    clearDraft()
-    sessionStorage.setItem('asc_pro_splash_shown', '1')
-    // Set the landing-page flag BEFORE flipping hasOnboarded. setHasOnboarded()
-    // swaps App.jsx's whole <Routes> tree (onboarding catch-all -> real app
-    // routes) in this same render, and the new tree's index route
-    // (PostAuthLanding in App.jsx) reads this flag synchronously on its very
-    // first render — so the destination is correct from the start instead of
-    // racing an async navigate() call against the default /scan redirect.
-    // The previous setTimeout(() => navigate(...), 0) approach was flaky —
-    // it sometimes lost that race and dropped users on Scan/Home instead of
-    // Results.
-    sessionStorage.setItem('asc_post_onboard_dest', '/results')
     setHasOnboarded()
-    logAnalyticsEvent('onboarding_completed', { source: 'paywall' })
-    // Redundant fallback for the edge case where hasOnboarded was already
-    // true (no route-tree swap happens, so PostAuthLanding never mounts) —
-    // harmless no-op otherwise since it just re-confirms the same destination.
-    navigate('/results', { replace: true })
+    logAnalyticsEvent('onboarding_completed', { source: 'notifications_step' })
   }
 
-  // NOTE: this comment used to say "PromoModal already flips isPremium" —
-  // that was wrong. PromoModal doesn't touch the store; the caller does
-  // (see OnboardingFinalSteps.jsx's PromoModal onSuccess, which now sets
-  // isPremium/updateUser directly). This function only handles the piece
-  // specific to still being mid-onboarding: completing it (so App.jsx's
-  // !hasOnboarded gate stops routing back here) and moving on to results,
-  // same as a successful purchase above.
-  function handlePromoSuccess() {
-    clearDraft()
-    sessionStorage.setItem('asc_pro_splash_shown', '1')
-    // Same route-tree-swap fix as finishOnboarding() above — set the landing
-    // flag before setHasOnboarded() so App.jsx's index route lands correctly
-    // on its first render instead of racing an async navigate() call.
-    sessionStorage.setItem('asc_post_onboard_dest', '/results')
-    setHasOnboarded()
-    logAnalyticsEvent('promo_redeemed', { source: 'onboarding' })
-    navigate('/results', { replace: true })
-  }
-
-  // Progress bar: only during gender step (2); scan has its own step UI
-  const QUIZ_START = 2
-  const QUIZ_END = 3
-  const showProgress = step >= QUIZ_START && step < QUIZ_END
-  const progressPct = showProgress ? ((step - QUIZ_START) / (QUIZ_END - QUIZ_START)) * 100 : 0
-  const stepCounter = step - QUIZ_START + 1
-  const stepTotal = QUIZ_END - QUIZ_START + 1
+  // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
+  const TOTAL_STEPS = 4
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -2062,60 +2117,7 @@ export default function PremiumOnboarding() {
     )
   }
 
-  // Post-purchase welcome screen — shown before flipping hasOnboarded so this
-  // component stays mounted during the animation.
-  if (purchaseSuccess) {
-    return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center px-8 text-center" style={{ background: '#000000' }}>
-        {/* Gold ambient glow */}
-        <div style={{
-          position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%, -50%)',
-          width: 300, height: 300, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(198,168,92,0.18) 0%, transparent 70%)',
-          filter: 'blur(40px)', pointerEvents: 'none',
-        }} />
-
-        <motion.div
-          initial={{ scale: 0.7, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-          style={{ marginBottom: 32 }}
-        >
-          <img src={logo} alt="Ascendus" style={{ width: 100, mixBlendMode: 'lighten' }} />
-        </motion.div>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="font-heading font-bold"
-          style={{ fontSize: 34, letterSpacing: '-0.02em', color: '#F0EDE8', marginBottom: 12 }}
-        >
-          Welcome to Ascendus.
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="font-body"
-          style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 48, maxWidth: 280 }}
-        >
-          Your results are ready. Let's see where you stand.
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55, duration: 0.5 }}
-          className="w-full"
-          style={{ maxWidth: 320 }}
-        >
-          <GoldBtn label="View My Results" onClick={finishOnboarding} />
-        </motion.div>
-      </div>
-    )
-  }
+  // REMOVED: purchaseSuccess welcome screen — no longer purchasing in onboarding
 
   function handleDemo() {
     setAuth({ id: 'demo', name: 'Demo User', email: 'demo@ascendus.app' }, 'demo-token')
@@ -2165,50 +2167,43 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=intro, 1=welcome, 2=gender, 3=scan(face+side+analyze),
-  //       4=transformation, 5=scores-waiting/paywall (Apple Sign In + purchase combined)
-  // Auth (Apple Sign In) happens inside handleAscend at step 5.
-  // Name is never collected — we don't need it.
+  // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
   const steps = [
-    <StepIntro key="intro" onNext={goNext} />,
-    <StepWelcome key="welcome"
-      onCreateAccount={goNext}
-      onSignIn={() => setSigningIn(true)}
-      onDemo={handleDemo}
-    />,
-    <StepGender key="gender" data={formData} onChange={updateField}
-      onNext={goNext}
-    />,
-    <StepScanCapture key="scan"
-      gender={formData.gender}
-      onDone={handleScanDone}
-      onBack={goBack}
-      guestReadyRef={guestReadyRef}
-    />,
-    <TransformationScreen key="transformation" onNext={goNext} />,
-    <StepScoresWaiting key="scores-waiting" scan={currentScan} onAscend={handleAscend} onPromoSuccess={handlePromoSuccess} isPurchasing={isPurchasing} error={purchaseError} />,
+    <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
+    <StepReferral key="referral" onNext={goNext} />,
+    <StepAuth key="auth" onNext={handleAuthDone} />,
+    <StepNotifications key="notifications" onNext={handleFinalDone} />,
   ]
 
   return (
     <MotionPage
       baseClassName=""
       className="relative flex flex-col h-full overflow-hidden dark"
-      style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
+      style={{ background: '#0a0a0a', '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {/* Progress bar (steps 1-9) */}
-      {showProgress && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 z-20" style={{ background: 'rgba(255,255,255,0.06)' }}>
-          <motion.div
-            className="h-full"
-            style={{ background: `linear-gradient(90deg, #A8893A, ${G}, #D4B96A)` }}
-            initial={false}
-            animate={{ width: `${progressPct}%` }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
+      {/* Umax-style story progress bar */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 'env(safe-area-inset-top, 0px)',
+          left: 0, right: 0,
+          display: 'flex',
+          gap: 4,
+          padding: '12px 16px 0',
+          zIndex: 20,
+        }}
+      >
+        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1, height: 3, borderRadius: 99,
+              background: i <= step ? '#ffffff' : 'rgba(255,255,255,0.25)',
+              transition: 'background 0.3s',
+            }}
           />
-        </div>
-      )}
-
-
+        ))}
+      </div>
 
       <AnimatePresence mode="wait" custom={dir}>
         <motion.div

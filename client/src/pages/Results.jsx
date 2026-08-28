@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion'
-import { Share2, ArrowRight, ChevronDown, ChevronUp, ChevronRight, Lock, ShoppingBag, ExternalLink, Sparkles, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
+import { Share2, ArrowRight, ChevronDown, ChevronUp, ChevronRight, Lock, ShoppingBag, ExternalLink, Camera, BarChart2, Star, AlertTriangle, Target, Columns, Ruler, User, ArrowUpRight, Scissors, FlaskConical, Heart, Gift, Bot, Flame, Zap, TrendingUp, Dumbbell, Map, Home } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import logo from '../assets/ascendus-icon.png'
@@ -14,6 +14,7 @@ import ShareCardModal from '../components/ShareCardModal'
 import DevRankCard from '../components/DevRankCard'
 import ProLock from '../components/ProLock'
 import PromoModal from '../components/PromoModal'
+import PaywallModal from '../components/PaywallModal'
 import { scoreColor } from '../utils/analysis'
 import { isNative, purchasePro, restorePurchases } from '../utils/iap'
 import { GOLD_GRADIENT, RED } from '../utils/theme'
@@ -812,281 +813,6 @@ function ProText({ text, onUpgrade }) {
         </button>
       </div>
     </div>
-  )
-}
-
-// ─── Paywall Full-Screen ──────────────────────────────────────────────────────
-
-function PaywallSheet({ glowScore, pillars, gender, onClose }) {
-  const reducedMotion = useReducedMotion()
-  const navigate = useNavigate()
-  const { setIsPremium, updateUser } = useStore()
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const [showPromo, setShowPromo] = useState(false)
-
-  // ── Personalisation — find worst pillar ──────────────────────────────────
-  const PILLAR_LABELS = {
-    harmony:    'Harmony',
-    angularity: 'Angularity',
-    features:   'Features',
-    dimorphism: gender === 'female' ? 'Femininity' : 'Dimorphism',
-  }
-  const worstEntry = pillars
-    ? Object.entries(pillars).reduce((a, b) => (a[1] < b[1] ? a : b))
-    : null
-  const worstKey   = worstEntry?.[0] ?? null
-  const worstScore = worstEntry?.[1] ?? null
-  const worstLabel = worstKey ? (PILLAR_LABELS[worstKey] ?? worstKey) : null
-  const scoreDrag  = worstScore != null ? Math.min(1.8, (7.5 - worstScore) * 0.18).toFixed(1) : null
-
-  const potential = Math.min(10, (glowScore ?? 5) + 1.8).toFixed(1)
-  const gap       = ((Number(potential) - (glowScore ?? 5)).toFixed(1))
-
-  const hookHeadline = worstLabel && worstScore != null && worstScore < 6.5
-    ? `Your ${worstLabel} has the most room to grow, and it's your fastest path to +${scoreDrag} pts.`
-    : `You're ${gap} points below your potential.`
-
-  const hookSub = worstLabel && worstScore != null && worstScore < 6.5
-    ? `One focused pillar. Pro unlocks the exact protocol to raise it.`
-    : `Your full breakdown and 12-week protocol are waiting.`
-
-  // ── Direct checkout ───────────────────────────────────────────────────────
-  async function handleCheckout() {
-    setLoading(true)
-    setError('')
-    try {
-      if (isNative()) {
-        // iOS: Apple In-App Purchase via RevenueCat
-        const result = await purchasePro('monthly')
-        if (result?.success) {
-          const rcUserId = result.customerInfo?.originalAppUserId
-          api.payments.syncRc(rcUserId).catch(() => {})
-          sessionStorage.setItem('asc_pro_splash_shown', '1')
-          setIsPremium(true)
-          navigate('/dashboard')
-        }
-      } else {
-        // Web: Stripe checkout
-        const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-        const token  = stored?.state?.token
-        if (!token || token === 'demo-token') { navigate('/auth'); return }
-        const { url } = await api.payments.createCheckout('monthly')
-        window.location.href = url
-      }
-    } catch (err) {
-      const msg = (err?.message || '').toLowerCase()
-      if (!msg.includes('cancel')) {
-        setError('Unable to complete purchase. Please try again.')
-      }
-      setLoading(false)
-    }
-  }
-
-  const locked = [
-    worstLabel && worstScore != null && worstScore < 6.5
-      ? { icon: <Target size={14} style={{ color: '#C6A85C' }} />, label: `Maximize Your ${worstLabel}`, sub: `Exact protocol to raise ${worstScore.toFixed(1)} → 8.0+` }
-      : { icon: <TrendingUp size={14} style={{ color: '#C6A85C' }} />, label: 'Score Projection', sub: `Your potential: ${potential}/10 · roadmap included` },
-    { icon: <Ruler size={14} style={{ color: '#C6A85C' }} />, label: 'Full Face Metrics', sub: '6 detailed scores + AI descriptors' },
-    { icon: <Scissors size={14} style={{ color: '#C6A85C' }} />, label: 'Hairstyle Recommendations', sub: 'Face-shape matched styles + protocols' },
-    { icon: <Map size={14} style={{ color: '#C6A85C' }} />, label: '12-Week Personalized Plan', sub: 'Built from your exact scan results' },
-    { icon: <Bot size={14} style={{ color: '#C6A85C' }} />, label: 'AI Improvement Coach', sub: 'Unlimited questions about your results' },
-  ]
-
-  return (
-    <motion.div
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 24 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 24 }}
-      transition={reducedMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', bounce: 0, duration: 0.35 }}
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: '#080604' }}
-    >
-      {/* Gold top accent */}
-      <div className="h-px w-full flex-shrink-0"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(198,168,92,0.55), transparent)' }} />
-
-      {/* Scrollable content — everything except the sticky dismiss footer */}
-      <div className="flex-1 overflow-y-auto px-5 pt-9 pb-4 flex flex-col">
-
-        {/* Logo + badge */}
-        <div className="flex items-center justify-center gap-2 mb-5">
-          <img src={logo} alt="Ascendus" style={{ height: 28, mixBlendMode: 'lighten' }} />
-          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full"
-            style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.25)' }}>
-            <Sparkles size={10} style={{ color: '#C6A85C' }} />
-            <span className="text-[9px] font-heading font-bold uppercase tracking-widest" style={{ color: '#C6A85C' }}>Pro</span>
-          </div>
-        </div>
-
-        {/* Score projection */}
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="text-center">
-            <p className="font-mono font-bold leading-none mb-1" style={{ fontSize: 36, color: '#E07A5F' }}>
-              {glowScore?.toFixed(1) ?? 'N/A'}
-            </p>
-            <p className="text-[9px] font-body uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>Current</p>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <ArrowRight size={22} style={{ color: 'rgba(198,168,92,0.6)' }} />
-            <span className="text-[8px] font-heading font-bold" style={{ color: '#C6A85C' }}>+{gap}</span>
-          </div>
-          <div className="text-center">
-            <p className="font-mono font-bold leading-none mb-1" style={{ fontSize: 36, color: '#34C759' }}>
-              {potential}
-            </p>
-            <p className="text-[9px] font-body uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>Potential</p>
-          </div>
-        </div>
-
-        {/* Personalised hook */}
-        <div className="mb-4 px-4 py-3.5 rounded-2xl"
-          style={{ background: 'rgba(224,122,95,0.09)', border: '1px solid rgba(224,122,95,0.22)' }}>
-          <p className="font-heading font-bold text-[14px] text-white mb-1 leading-snug">{hookHeadline}</p>
-          <p className="font-body text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>{hookSub}</p>
-        </div>
-
-        {/* Social proof */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="flex -space-x-1.5">
-            {['#C6A85C','#A29BFE','#34C759'].map((c, i) => (
-              <div key={i} className="w-5 h-5 rounded-full border-2 border-black" style={{ background: c, opacity: 0.85 }} />
-            ))}
-          </div>
-          <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>
-            <span className="font-bold" style={{ color: 'rgba(255,255,255,0.65)' }}>1,200+ users</span> improved their score this month
-          </p>
-        </div>
-
-        {/* Locked items */}
-        <div className="space-y-1.5 mb-5">
-          {locked.map(({ icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="flex-shrink-0 flex items-center">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-heading font-semibold text-[12px] text-white leading-snug">{label}</p>
-                <p className="font-body text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.33)' }}>{sub}</p>
-              </div>
-              <Lock size={12} style={{ color: '#C6A85C', flexShrink: 0 }} />
-            </div>
-          ))}
-        </div>
-
-        {/* Primary CTA */}
-        <motion.button
-          whileTap={{ scale: loading ? 1 : 0.97 }}
-          onClick={handleCheckout}
-          disabled={loading}
-          type="button"
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mb-1 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
-          style={{
-            background: GOLD_GRADIENT,
-            color: '#0A0A0A',
-            boxShadow: '0 4px 20px rgba(198,168,92,0.35)',
-            letterSpacing: '0.01em',
-          }}
-        >
-          {loading ? 'Opening checkout…' : 'Get Ascendus Pro'}
-        </motion.button>
-
-        {/* Apple IAP required disclosure */}
-        <div className="mt-1 mb-2 space-y-0.5">
-          <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.22)' }}>
-            {isNative()
-              ? 'Ascendus Pro is $9.99/month or $49.99/year. Payment charged to your Apple ID.'
-              : '$0 today · then $9.99/mo · cancel anytime'}
-          </p>
-          {isNative() && (
-            <p className="text-center text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.18)' }}>
-              Renews automatically. Cancel in Apple ID Account Settings 24h before renewal.
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <p className="text-center text-[11px] font-body mb-2" style={{ color: RED }}>{error}</p>
-        )}
-
-        {/* Restore Purchases — required by Apple */}
-        {isNative() && (
-          <button
-            onClick={async () => {
-              setLoading(true)
-              setError('')
-              try {
-                const info = await restorePurchases()
-                if (info?.entitlements?.active?.['Ascendus Pro']) {
-                  const rcUserId = info?.originalAppUserId
-                  api.payments.syncRc(rcUserId).catch(() => {})
-                  sessionStorage.setItem('asc_pro_splash_shown', '1')
-                  setIsPremium(true)
-                  onClose()
-                } else {
-                  setError('No previous purchase found.')
-                }
-              } catch {
-                setError('Restore failed. Please try again.')
-              } finally {
-                setLoading(false)
-              }
-            }}
-            disabled={loading}
-            type="button"
-            className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70 disabled:opacity-40"
-            style={{ color: 'rgba(198,168,92,0.5)' }}
-          >
-            Restore Purchases
-          </button>
-        )}
-
-      </div>{/* end scrollable content */}
-
-      {/* Sticky dismiss footer — always visible, no scrolling required */}
-      <div
-        className="flex-shrink-0 px-5 flex flex-col gap-1"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
-      >
-        {!isNative() && (
-          <button
-            onClick={() => setShowPromo(true)}
-            type="button"
-            className="w-full py-1.5 font-body text-[11px] text-center transition-opacity hover:opacity-70"
-            style={{ color: 'rgba(198,168,92,0.45)' }}
-          >
-            Have a promo code?
-          </button>
-        )}
-        <button
-          onClick={onClose}
-          type="button"
-          className="w-full py-3 font-body text-[13px] text-center"
-          style={{ color: 'rgba(255,255,255,0.30)' }}
-        >
-          No thanks, I'll stay at {glowScore?.toFixed(1) ?? 'N/A'}
-        </button>
-      </div>
-
-      {/* Promo modal */}
-      <AnimatePresence>
-        {showPromo && (
-          <PromoModal
-            onClose={() => setShowPromo(false)}
-            onSuccess={() => {
-              // PromoModal no longer mutates the store itself (see its own
-              // comment) — this sheet owns the mutation, same as
-              // ScanUnlockGate's handleUnlockSuccess. Without this, redeeming
-              // a code here showed "Lifetime Pro unlocked!" and then closed
-              // without ever actually unlocking anything.
-              setIsPremium(true)
-              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
-              try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
-              onClose()
-            }}
-          />
-        )}
-      </AnimatePresence>
-    </motion.div>
   )
 }
 
@@ -2101,11 +1827,11 @@ export default function Results() {
     {/* ── Paywall (free users) ──────────────────────────────────── */}
     <AnimatePresence>
       {showPaywall && !isPremium && (
-        <PaywallSheet
-          glowScore={glowScore}
-          pillars={pillars}
+        <PaywallModal
+          scan={currentScan}
           gender={gender ?? 'male'}
           onClose={() => { sessionStorage.setItem('asc_paywall_dismissed', '1'); paywallDismissed.current = true; setShowPaywall(false) }}
+          onPurchaseSuccess={() => { setShowPaywall(false) }}
         />
       )}
     </AnimatePresence>

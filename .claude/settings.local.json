@@ -83,5 +83,9 @@
       "Bash(cp face-metrics-demo-female.jpg face-metrics-demo-female.jpg.bak)",
       "Bash(python3 *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

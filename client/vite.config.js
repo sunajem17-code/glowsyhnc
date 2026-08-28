@@ -8,6 +8,7 @@ const API_TARGET = process.env.VITE_API_URL
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true,
     proxy: {
       '/api': {
         target: API_TARGET,

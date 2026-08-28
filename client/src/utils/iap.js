@@ -52,7 +52,7 @@ function isCancelError(e) {
 }
 
 // ── Unified purchase entry point ──────────────────────────────────────────────
-// plan: 'monthly' | 'yearly' | 'annual'
+// plan: 'monthly' | 'yearly' | 'annual' | 'weekly'
 export async function purchasePro(plan = 'monthly') {
   if (!isNative()) return { success: false, reason: 'web' }
   try {
@@ -71,21 +71,29 @@ export async function purchasePro(plan = 'monthly') {
     }
 
     const isYearly = plan === 'yearly' || plan === 'annual'
+    const isWeekly = plan === 'weekly'
     // Never fall back to "whichever package happens to be listed first" —
     // that can silently substitute a different billing cycle than the one
     // requested. If the "current" offering's typed convenience getter
-    // (.monthly / .annual) isn't populated — e.g. the package in the
-    // RevenueCat dashboard is tagged CUSTOM instead of MONTHLY/ANNUAL —
+    // (.monthly / .annual / .weekly) isn't populated — e.g. the package in the
+    // RevenueCat dashboard is tagged CUSTOM instead of MONTHLY/ANNUAL/WEEKLY —
     // search every package in the offering by its actual packageType or
     // product identifier instead, and fail loudly if the requested plan
     // truly isn't there rather than buying whatever's first.
-    const pkg =
-      (isYearly ? offerings.current.annual : offerings.current.monthly) ??
-      offerings.current.availablePackages?.find(p =>
-        isYearly
-          ? p.packageType === 'ANNUAL' || /year|annual/i.test(p.product?.identifier ?? '')
-          : p.packageType === 'MONTHLY' || /month/i.test(p.product?.identifier ?? '')
-      )
+    const pkg = isWeekly
+      ? (offerings.current.weekly ??
+         offerings.current.availablePackages?.find(p =>
+           p.packageType === 'WEEKLY' || /week/i.test(p.product?.identifier ?? '')
+         ))
+      : isYearly
+        ? (offerings.current.annual ??
+           offerings.current.availablePackages?.find(p =>
+             p.packageType === 'ANNUAL' || /year|annual/i.test(p.product?.identifier ?? '')
+           ))
+        : (offerings.current.monthly ??
+           offerings.current.availablePackages?.find(p =>
+             p.packageType === 'MONTHLY' || /month/i.test(p.product?.identifier ?? '')
+           ))
 
     if (!pkg) {
       throw new Error('The selected subscription plan is not available. Please try again later.')
@@ -106,6 +114,7 @@ export async function purchasePro(plan = 'monthly') {
 }
 
 export const purchaseMonthly = () => purchasePro('monthly')
+export const purchaseWeekly = () => purchasePro('weekly')
 
 // ── Discounted annual (exit-intent offer) ─────────────────────────────────────
 // A separate, differently-priced product from the standard monthly/annual

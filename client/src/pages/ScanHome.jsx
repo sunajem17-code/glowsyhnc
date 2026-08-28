@@ -1,328 +1,131 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Moon, Settings } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Settings } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
-import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-const DAILY_SCAN_LIMIT = 3
-
-// Same slide/drag gesture pattern as ScanUnlockGate's SwipeableResultCards
-// (direction-aware enter/exit, velocity-aware drag commit) — reused here for
-// consistency, but with SPRING_STANDARD/EASE_STANDARD instead of that
-// component's own hand-tuned spring, per the app's established motion tokens.
-const SLIDE_VARIANTS = {
-  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
-}
-
-// visualClassName lets a specific card opt out of the default flex-1
-// fill (which stretches the box to eat all leftover vertical space in the
-// h-full column) in favor of a fixed aspect ratio instead — only
-// BeginScanCard's grid/camera visual currently does this; PastResultCard's
-// photo and BodyCard's visual still want to fill the available height, so
-// they're untouched by leaving this prop at its default. justify-center on
-// the outer column is inert for those two (their flex-1 box already
-// consumes all the space, leaving nothing to redistribute) but centers
-// BeginScanCard's now-shorter box+text+button group in the freed-up space
-// instead of leaving it pinned to the top with a dead gap at the bottom.
-function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, visual, visualClassName = 'flex-1', footer }) {
-  return (
-    <div
-      className="flex flex-col justify-center h-full px-6 pb-4"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
-    >
-      <div className={`relative rounded-2xl overflow-hidden mb-5 ${visualClassName}`} style={{ background: '#000' }}>
-        {visual}
-      </div>
-      <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1.5" style={{ color: GOLD }}>
-        {eyebrow}
-      </p>
-      <h2 className="font-heading font-bold text-[24px] text-primary mb-2" style={{ letterSpacing: '-0.02em' }}>
-        {title}
-      </h2>
-      {/* footer lets a card swap out the default pitch-text + big CTA button
-          for something else (e.g. BodyCard's compact returning-user row)
-          without duplicating the visual/eyebrow/title markup above. */}
-      {footer ?? (
-        <>
-          <p className="font-body text-[14px] text-secondary mb-6 leading-relaxed">
-            {body}
-          </p>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { triggerHaptic(); onAction() }}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-          >
-            {Icon && <Icon size={17} />}{cta}
-          </motion.button>
-        </>
-      )}
-    </div>
-  )
-}
-
-function BeginScanCard({ onBegin, limitMessage }) {
-  if (limitMessage) {
-    return (
-      <CardShell
-        eyebrow="DAILY LIMIT REACHED"
-        title="3 Scans Done"
-        body={limitMessage}
-        cta="Got It"
-        icon={Moon}
-        onAction={() => triggerHaptic()}
-        visualClassName="aspect-[4/5] flex-shrink-0"
-        visual={
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
-            <Moon size={56} style={{ color: `${GOLD}55` }} />
-          </div>
-        }
-      />
-    )
-  }
-
-  return (
-    <CardShell
-      eyebrow="NEW SCAN"
-      title="Begin Scan"
-      body="Get your AI-powered Glow Score, tier, and personalized action plan in under 60 seconds."
-      cta="Start Your Scan"
-      onAction={onBegin}
-      visualClassName="aspect-[4/5] flex-shrink-0"
-      visual={
-        <>
-          {/* Icon renders first so FaceScanOverlay (rendered after, below)
-              paints on top of it, matching Scan.jsx's own stacking — there,
-              FaceScanOverlay is always the last-rendered element in its
-              branch, with nothing painted after/above it. */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Camera size={48} style={{ color: `${GOLD}66` }} />
-          </div>
-          <FaceScanOverlay loop showDots={false} />
-        </>
-      }
-    />
-  )
-}
-
-function PastResultCard({ scan, onView }) {
-  const photo = scan.facePhotoUrl ?? scan.photos?.face ?? null
-  const dateLabel = scan.analyzedAt
-    ? new Date(scan.analyzedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    : null
-
-  return (
-    <CardShell
-      eyebrow="LAST SCAN"
-      title="Past Result"
-      body={dateLabel ? `Your last scan: ${dateLabel}.` : 'Your most recent scan.'}
-      cta="Results"
-      icon={ChevronRight}
-      onAction={onView}
-      visual={
-        <>
-          {photo ? (
-            <img src={photo} alt="Last scan" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Camera size={48} style={{ color: 'rgba(255,255,255,0.15)' }} />
-            </div>
-          )}
-          <div
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 45%)' }}
-          />
-          {scan.glowScore != null && (
-            <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
-              <div>
-                <p className="font-body text-[11px] text-white/60 uppercase tracking-wide mb-0.5">Glow Score</p>
-                <p className="font-heading font-bold text-[28px] text-white leading-none">{scan.glowScore.toFixed(1)}</p>
-              </div>
-              {scan.tier && (
-                <span
-                  className="font-heading font-bold text-[11px] px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(198,168,92,0.2)', color: GOLD, border: `1px solid ${GOLD}55` }}
-                >
-                  {scan.tier.toUpperCase()}
-                </span>
-              )}
-            </div>
-          )}
-        </>
-      }
-    />
-  )
-}
-
-function BodyCard({ onBody, physiqueScore, trainingSplit, bodyPhotoUrl }) {
-  // Once a physique score exists, a plan has been generated at least once —
-  // swap the generic first-time pitch for a compact "you already have a
-  // plan" row instead of repeating the same sales copy forever.
-  const hasPlan = physiqueScore?.overall != null
-  const planLabel = trainingSplit ?? 'Custom Plan'
-
-  return (
-    <CardShell
-      eyebrow="PHYSIQUE"
-      title="Body"
-      body="Track your physique score and get a training plan built around your weak points."
-      cta="View Training Plan"
-      icon={Dumbbell}
-      onAction={onBody}
-      visual={
-        <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0f22' }}>
-          <Dumbbell size={56} style={{ color: `${GOLD}66` }} />
-        </div>
-      }
-      footer={hasPlan ? (
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); onBody() }}
-          className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-        >
-          <div className="w-[52px] h-[52px] rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#0a0f22' }}>
-            {bodyPhotoUrl ? (
-              <img src={bodyPhotoUrl} alt="Your body" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Dumbbell size={22} style={{ color: `${GOLD}88` }} />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 text-left min-w-0">
-            <p className="font-heading font-bold text-[15px] text-primary truncate">
-              Physique · {physiqueScore.overall.toFixed(1)}
-            </p>
-            <p className="font-body text-[12px] text-secondary mt-0.5 truncate">
-              Plan active · {planLabel}
-            </p>
-          </div>
-          <ChevronRight size={18} className="text-secondary flex-shrink-0" />
-        </motion.button>
-      ) : undefined}
-    />
-  )
-}
+const UMAX_PURPLE = 'linear-gradient(180deg, #9D4EDD 0%, #7B2FBE 100%)'
 
 export default function ScanHome() {
   const navigate = useNavigate()
   const scans = useStore(s => s.scans)
-  const currentScan = useStore(s => s.currentScan)
-  const setCurrentScan = useStore(s => s.setCurrentScan)
-  const streak = useStore(s => s.streak)
-  const proScanCount = useStore(s => s.proScanCount)
-  const proScanDate = useStore(s => s.proScanDate)
-  const [cardIdx, setCardIdx] = useState(0)
-  const [direction, setDirection] = useState(1)
-
   const latestScan = scans?.[0] ?? null
+  const [tab, setTab] = useState(0) // 0=begin, 1=past (dots like Umax)
 
-  // Daily limit: 3 scans per calendar day (local device time), matching the
-  // streak reset logic which also uses toDateString() as the day boundary.
-  const today = new Date().toDateString()
-  const atLimit = proScanDate === today && proScanCount >= DAILY_SCAN_LIMIT
-
-  const limitMessage = atLimit
-    ? (streak.current > 0
-        ? `Come back tomorrow to continue your ${streak.current} day streak!`
-        : 'Come back tomorrow to start a streak!')
-    : null
-
-  // "Past Result" only appears once a scan actually exists — a first-time
-  // user never sees a card built from placeholder/fake data.
-  const cards = [
-    { id: 'begin', el: <BeginScanCard onBegin={() => navigate('/scan/capture')} limitMessage={limitMessage} /> },
-    ...(latestScan ? [{
-      id: 'past',
-      el: <PastResultCard scan={latestScan} onView={() => { setCurrentScan(latestScan); navigate('/results') }} />,
-    }] : []),
-    {
-      id: 'body',
-      el: (
-        <BodyCard
-          onBody={() => navigate('/workout-plan')}
-          physiqueScore={currentScan?.physiqueScore ?? null}
-          trainingSplit={currentScan?.trainingSplit ?? null}
-          bodyPhotoUrl={currentScan?.bodyPhotoUrl ?? null}
-        />
-      ),
-    },
+  const tabs = [
+    { id: 'begin' },
+    ...(latestScan ? [{ id: 'past' }] : []),
+    { id: 'body' },
   ]
 
-  function goTo(idx) {
-    if (idx === cardIdx) return
-    setDirection(idx > cardIdx ? 1 : -1)
-    setCardIdx(idx)
-  }
-
-  // Velocity-aware, not just distance-aware — matches SwipeableResultCards'
-  // own drag-commit thresholds.
-  function handleDragEnd(_, info) {
-    const DISTANCE = 60
-    const VELOCITY = 400
-    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
-      goTo(cardIdx + 1)
-    } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
-      goTo(cardIdx - 1)
-    }
-  }
-
   return (
-    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Gear icon: absolute so it floats over the full-bleed card carousel */}
-      <button
-        onClick={() => { triggerHaptic(); navigate('/settings') }}
-        className="absolute z-10 flex items-center justify-center w-9 h-9 rounded-xl active:scale-95 transition-transform"
+    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: '#0a0a0a' }}>
+      {/* Header */}
+      <div
         style={{
-          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-          right: 16,
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+          paddingLeft: 20, paddingRight: 20, paddingBottom: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
         }}
-        aria-label="Settings"
       >
-        <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
-      </button>
-      <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={cardIdx}
-            custom={direction}
-            variants={SLIDE_VARIANTS}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={SPRING_STANDARD}
-            className="absolute inset-0"
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
-            onDragEnd={handleDragEnd}
-          >
-            {cards[cardIdx].el}
-          </motion.div>
-        </AnimatePresence>
+        <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 22, margin: 0, letterSpacing: '-0.01em' }}>
+          Facial Analysis
+        </h1>
+        <button
+          onClick={() => { triggerHaptic(); navigate('/settings') }}
+          style={{
+            background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10,
+            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}
+        >
+          <Settings size={18} color="rgba(255,255,255,0.5)" />
+        </button>
       </div>
 
-      {/* Page-dot indicator — same animated width/opacity pattern used for the
-          intro-slides carousel elsewhere in the app. */}
-      <div className="flex items-center justify-center gap-2 py-4 flex-shrink-0">
-        {cards.map((_, i) => (
-          <motion.div
-            key={i}
-            animate={{ width: i === cardIdx ? 20 : 6, opacity: i === cardIdx ? 1 : 0.35 }}
-            transition={{ duration: 0.3, ease: EASE_STANDARD }}
-            style={{ height: 6, borderRadius: 99, background: GOLD }}
-          />
-        ))}
+      {/* Main card — face mesh placeholder */}
+      <div style={{ flex: 1, padding: '0 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div
+          style={{
+            flex: 1,
+            borderRadius: 24,
+            overflow: 'hidden',
+            position: 'relative',
+            background: '#111',
+            minHeight: 0,
+          }}
+        >
+          {/* Face placeholder / last scan photo */}
+          {latestScan?.facePhotoUrl ? (
+            <img
+              src={latestScan.facePhotoUrl}
+              alt="Last scan"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
+            />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f0f1e 100%)' }}>
+              {/* Generic face silhouette */}
+              <svg viewBox="0 0 300 400" style={{ width: '100%', height: '100%', opacity: 0.25 }} preserveAspectRatio="xMidYMid meet">
+                <ellipse cx="150" cy="160" rx="80" ry="100" fill="#fff"/>
+                <ellipse cx="150" cy="300" rx="60" ry="40" fill="#fff"/>
+              </svg>
+            </div>
+          )}
+
+          {/* Face mesh overlay */}
+          <FaceScanOverlay loop showDots={false} />
+
+          {/* Gradient + text overlay at bottom */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)',
+              padding: '60px 24px 28px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+            }}
+          >
+            <p style={{ color: '#fff', fontWeight: 700, fontSize: 20, textAlign: 'center', margin: 0, lineHeight: 1.3 }}>
+              Get your ratings and recommendations
+            </p>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
+              style={{
+                width: '100%',
+                padding: '20px 0',
+                borderRadius: 50,
+                background: UMAX_PURPLE,
+                border: 'none', cursor: 'pointer',
+                color: '#fff', fontWeight: 700, fontSize: 18,
+                fontFamily: 'inherit',
+                boxShadow: '0 4px 24px rgba(155,78,221,0.45)',
+              }}
+            >
+              Begin scan
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Dots */}
+        {tabs.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, paddingTop: 12 }}>
+            {tabs.map((_, i) => (
+              <div
+                key={i}
+                onClick={() => setTab(i)}
+                style={{
+                  width: i === tab ? 20 : 6, height: 6, borderRadius: 99,
+                  background: i === tab ? '#fff' : 'rgba(255,255,255,0.25)',
+                  transition: 'all 0.2s', cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </MotionPage>
   )
