@@ -217,21 +217,40 @@ export default function AICoach() {
 
   // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
-    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: '#0a0a0a' }}>
-      {/* Header — Umax style */}
+    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="px-5 pb-3 flex items-center justify-between flex-shrink-0"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
+        className="px-4 pb-3 flex items-center justify-between flex-shrink-0"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
       >
-        <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 22, margin: 0 }}>Your coach</h1>
         <div className="flex items-center gap-3">
-          <span
-            style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: 'rgba(155,78,221,0.15)', color: '#9D4EDD', border: '1px solid rgba(155,78,221,0.3)' }}
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
           >
-            {isPremium ? 'PRO' : 'FREE'}
-          </span>
+            <Sparkles size={18} style={{ color: GOLD }} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-heading font-bold text-[18px] text-primary">AI Coach</h1>
+              <span
+                className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
+                style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
+              >
+                {isPremium ? 'PRO' : 'FREE'}
+              </span>
+            </div>
+            <p className="font-body text-[11px] text-secondary">
+              {isPremium
+                ? (latestScan ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded` : 'No scan yet')
+                : freeCoachLocked
+                  ? 'Free limit reached: upgrade for unlimited'
+                  : `${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} remaining`}
+            </p>
+          </div>
+        </div>
         {messages.length > 1 && !freeCoachLocked && (
           <button
             onClick={() => {
@@ -251,7 +270,6 @@ export default function AICoach() {
             <RotateCcw size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
           </button>
         )}
-        </div>
       </motion.div>
 
       {/* Messages */}

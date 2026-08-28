@@ -599,65 +599,73 @@ function VenusIcon({ color }) {
 }
 
 const UMAX_PURPLE = 'linear-gradient(180deg, #9D4EDD 0%, #7B2FBE 100%)'
-const UMAX_PURPLE_DIM = 'linear-gradient(180deg, #6B3FA0 0%, #512B8C 100%)'
 
 function StepGender({ data, onChange, onNext }) {
   const [selected, setSelected] = useState(null)
+
+  const MALE_BLUE   = '#4A90E2'
+  const FEMALE_PINK = '#E85D9E'
 
   function pick(gender) {
     triggerHaptic()
     setSelected(gender)
     onChange('gender', gender)
-    setTimeout(onNext, 220)
+    setTimeout(onNext, 300)
   }
+
+  const cardStyle = (gender) => ({
+    width: 288, height: 288,
+    borderRadius: 22,
+    border: '1.5px solid #262626',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+    background: selected === gender
+      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
+      : '#141414',
+  })
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
+      <motion.div
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="px-6"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}
+      >
+        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>
+          Are you male or female?
+        </h1>
+      </motion.div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, paddingBottom: 40 }}>
+        <motion.div
+          initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.06 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => pick('male')}
+          style={cardStyle('male')}
         >
-          Choose gender
-        </motion.h1>
-      </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <MarsIcon color={MALE_BLUE} />
+            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
+          </div>
+        </motion.div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14, padding: '0 24px 24px' }}>
-        {[
-          { key: 'male', label: 'Male' },
-          { key: 'female', label: 'Female' },
-        ].map(({ key, label }, i) => (
-          <motion.button
-            key={key}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.07, duration: 0.3 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => pick(key)}
-            style={{
-              width: '100%', padding: '22px 0',
-              borderRadius: 50,
-              background: selected === key ? UMAX_PURPLE_DIM : UMAX_PURPLE,
-              border: 'none', cursor: 'pointer',
-              color: '#ffffff', fontWeight: 700, fontSize: 20,
-              fontFamily: 'inherit',
-              boxShadow: selected === key ? 'none' : '0 4px 24px rgba(155,78,221,0.35)',
-            }}
-          >
-            {label}
-          </motion.button>
-        ))}
-      </div>
-
-      <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)', textAlign: 'center' }}>
-        <button
-          onClick={() => { triggerHaptic(); onChange('gender', 'male'); onNext() }}
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 16, fontFamily: 'inherit', cursor: 'pointer' }}
+        <motion.div
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut', delay: 0.12 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => pick('female')}
+          style={cardStyle('female')}
         >
-          skip
-        </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <VenusIcon color={FEMALE_PINK} />
+            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
+          </div>
+        </motion.div>
       </div>
     </div>
   )
@@ -666,10 +674,8 @@ function StepGender({ data, onChange, onNext }) {
 // ── STEP REFERRAL ────────────────────────────────────────────────────────────
 function StepReferral({ onNext }) {
   const [code, setCode] = useState('')
-
   function handleContinue() {
     triggerHaptic()
-    // Store code in sessionStorage so it can be sent after auth
     if (code.trim()) {
       try { sessionStorage.setItem('asc_referral_code', code.trim().toUpperCase()) } catch {}
     }
@@ -678,18 +684,13 @@ function StepReferral({ onNext }) {
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}
-        >
-          Do you have a referral code?
-        </motion.h1>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+        <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Do you have a referral code?</h1>
+        </motion.div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 24px 24px' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px' }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -697,39 +698,44 @@ function StepReferral({ onNext }) {
         >
           <input
             type="text"
-            placeholder="jX7yT2"
+            placeholder="AB1CD"
             value={code}
-            onChange={e => setCode(e.target.value)}
+            onChange={e => setCode(e.target.value.toUpperCase().slice(0, 5))}
             autoCapitalize="characters"
-            maxLength={12}
+            maxLength={5}
             style={{
-              width: '100%', padding: '20px 20px',
+              width: '100%', padding: '22px 20px',
               borderRadius: 16,
               background: '#1a1a1a',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#ffffff', fontSize: 18, fontWeight: 600, fontFamily: 'inherit',
+              border: `1px solid ${code.length === 5 ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.1)'}`,
+              color: '#ffffff', fontSize: 22, fontWeight: 700, fontFamily: 'inherit',
               outline: 'none', boxSizing: 'border-box',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.18em', textAlign: 'center',
+              transition: 'border-color 0.2s',
             }}
           />
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14, marginTop: 12, marginBottom: 32 }}>
-            Enter your code here, or skip
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14, marginTop: 12 }}>
+            Enter your 5-letter code, or skip
           </p>
-          <button
-            onClick={handleContinue}
-            style={{
-              width: '100%', padding: '22px 0',
-              borderRadius: 50,
-              background: UMAX_PURPLE,
-              border: 'none', cursor: 'pointer',
-              color: '#ffffff', fontWeight: 700, fontSize: 20,
-              fontFamily: 'inherit',
-              boxShadow: '0 4px 24px rgba(155,78,221,0.35)',
-            }}
-          >
-            Continue
-          </button>
         </motion.div>
+      </div>
+
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleContinue}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: GOLD_GRADIENT,
+            border: 'none', cursor: 'pointer',
+            color: '#000000', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+          }}
+        >
+          Continue
+        </motion.button>
       </div>
     </div>
   )
@@ -737,28 +743,27 @@ function StepReferral({ onNext }) {
 
 // ── STEP NOTIFICATIONS ───────────────────────────────────────────────────────
 function StepNotifications({ onNext }) {
+  const [loading, setLoading] = useState(false)
+
   async function handleEnable() {
     triggerHaptic()
+    setLoading(true)
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
       await PushNotifications.requestPermissions()
     } catch {
       // not available on web or permission unavailable — proceed anyway
     }
+    setLoading(false)
     onNext()
   }
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}
-        >
-          Enable notifications
-        </motion.h1>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+        <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Enable notifications</h1>
+        </motion.div>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -779,20 +784,25 @@ function StepNotifications({ onNext }) {
       </div>
 
       <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
-        <button
+        <motion.button
+          whileTap={{ scale: 0.97 }}
           onClick={handleEnable}
+          disabled={loading}
           style={{
             width: '100%', padding: '22px 0',
             borderRadius: 50,
-            background: UMAX_PURPLE,
+            background: GOLD_GRADIENT,
             border: 'none', cursor: 'pointer',
-            color: '#ffffff', fontWeight: 700, fontSize: 20,
+            color: '#000000', fontWeight: 700, fontSize: 20,
             fontFamily: 'inherit',
-            boxShadow: '0 4px 24px rgba(155,78,221,0.35)',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}
         >
-          Continue
-        </button>
+          {loading
+            ? <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
+            : 'Continue'}
+        </motion.button>
       </div>
     </div>
   )
@@ -861,15 +871,10 @@ function StepAuth({ onNext }) {
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 76px)' }}>
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{ color: '#ffffff', fontWeight: 800, fontSize: 32, letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}
-        >
-          Create your account
-        </motion.h1>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+        <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Create your account</h1>
+        </motion.div>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
@@ -1642,7 +1647,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           if (!sidePhoto) sideTriggerRef.current?.()
           else runAnalysisWithData(facePhoto, sidePhoto)
         }}
-        extra={<ConsentMicroText />}
+        extra={null}
       />
     )
   }
@@ -1965,7 +1970,7 @@ export default function PremiumOnboarding() {
   const draft = loadDraft()
 
   // Intro slides play first for new users on every fresh app launch.
-  const [introDone, setIntroDone] = useState(false)
+  const [introDone, setIntroDone] = useState(true)
   // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
   // same reason — new unauthenticated sessions start straight at Welcome(1).
   // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
@@ -2092,6 +2097,11 @@ export default function PremiumOnboarding() {
     setGender(formData.gender || null)
     setLegalConsented()
     setAgeConfirmed()
+    // If user skipped auth, set a guest session so ProtectedRoute doesn't block
+    const token = useStore.getState().token
+    if (!token) {
+      useStore.getState().setAuth({ id: 'guest', name: 'Guest', email: '' }, 'demo-token')
+    }
     setHasOnboarded()
     logAnalyticsEvent('onboarding_completed', { source: 'notifications_step' })
   }
@@ -2171,8 +2181,8 @@ export default function PremiumOnboarding() {
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
     <StepReferral key="referral" onNext={goNext} />,
-    <StepAuth key="auth" onNext={handleAuthDone} />,
-    <StepNotifications key="notifications" onNext={handleFinalDone} />,
+    <StepNotifications key="notifications" onNext={goNext} />,
+    <StepAuth key="auth" onNext={handleFinalDone} />,
   ]
 
   return (

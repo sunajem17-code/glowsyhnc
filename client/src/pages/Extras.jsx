@@ -1,18 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Heart, Scissors, CheckSquare, CalendarCheck, Settings } from 'lucide-react'
+import { Scissors, CheckSquare, CalendarCheck, Settings } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const CARDS = [
-  {
-    to: '/swipemaxx',
-    icon: Heart,
-    title: 'SwipeMaxx',
-    subtitle: 'Optimize your dating profile',
-    accent: '#C6A85C',
-  },
   {
     to: '/hairmaxx',
     icon: Scissors,

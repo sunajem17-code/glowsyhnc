@@ -144,7 +144,7 @@ function SideGuide({ size = 'normal', gender }) {
 
 // ─── Live Camera Overlay ──────────────────────────────────────────────────────
 
-function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
+function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
   const videoRef   = useRef()
   const canvasRef  = useRef()
   const streamRef  = useRef()
@@ -190,6 +190,32 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Title bar */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+        paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
+      }}>
+        <button
+          onClick={() => { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }}
+          style={{ position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'none', border: 'none', cursor: 'pointer', color: '#fff', padding: 4 }}
+        >
+          <ChevronLeft size={28} color="#fff" />
+        </button>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: 20, fontFamily: 'inherit' }}>
+          {stepNum === 1 ? 'Upload a front selfie' : 'Upload a side selfie'}
+        </span>
+        {!error && (
+          <button onClick={() => { setReady(false); setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
+            style={{ position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <RefreshCw size={22} color="#fff" />
+          </button>
+        )}
+      </div>
+
+      {/* Live preview — fills screen */}
       <div className="relative flex-1 overflow-hidden">
         {error ? (
           <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4">
@@ -201,22 +227,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
           <>
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
-
-            {/* Guide overlay */}
-            {ready && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {stepNum === 1 ? (
-                  <svg width="180" height="240" viewBox="0 0 180 240" className="opacity-60">
-                    <ellipse cx="90" cy="120" rx="72" ry="100" fill="none" stroke="#C6A85C" strokeWidth="2.5" strokeDasharray="10,6"/>
-                    <line x1="90"  y1="10"  x2="90"  y2="230" stroke="white" strokeWidth="0.5" opacity="0.3"/>
-                    <line x1="10"  y1="120" x2="170" y2="120" stroke="white" strokeWidth="0.5" opacity="0.3"/>
-                  </svg>
-                ) : (
-                  /* Side-profile wireframe overlay */
-                  <SideGuide size="overlay" gender={gender} />
-                )}
-              </div>
-            )}
             {!ready && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 size={36} className="text-white animate-spin" />
@@ -224,34 +234,32 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
             )}
           </>
         )}
-
-        {/* Close */}
-        <button
-          onClick={() => { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }}
-          aria-label="Close camera"
-          className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center"
-        >
-          <X size={20} className="text-white" />
-        </button>
-
-        {/* Flip */}
-        {!error && (
-          <button onClick={() => { setReady(false); setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
-            aria-label="Flip camera"
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
-            <RefreshCw size={18} className="text-white" />
-          </button>
-        )}
       </div>
 
-      {/* Capture button */}
+      {/* Take Picture button */}
       {!error && (
-        <div className="flex items-center justify-center py-8 bg-black">
-          <button onClick={capture} disabled={!ready}
-            aria-label="Take photo"
-            className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40">
-            <div className="w-14 h-14 rounded-full bg-white" />
+        <div style={{ padding: '12px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', background: '#000' }}>
+          <button
+            onClick={capture}
+            disabled={!ready}
+            style={{
+              width: '100%', padding: '22px 0', borderRadius: 50,
+              background: GOLD_GRADIENT, border: 'none', cursor: ready ? 'pointer' : 'not-allowed',
+              color: '#000', fontWeight: 700, fontSize: 20, fontFamily: 'inherit',
+              opacity: ready ? 1 : 0.5,
+              boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+            }}
+          >
+            Take Picture
           </button>
+          {onSkip && (
+            <button
+              onClick={() => { streamRef.current?.getTracks().forEach(t => t.stop()); onSkip() }}
+              style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 15, fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              Skip side photo
+            </button>
+          )}
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
@@ -1190,7 +1198,7 @@ export default function Scan() {
     return last.getMonth() === now.getMonth() && last.getFullYear() === now.getFullYear()
   })()
 
-  const [step, setStep]                   = useState(0)
+  const [step, setStep]                   = useState(1) // skip gender step — already collected in onboarding
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
@@ -1678,22 +1686,18 @@ export default function Scan() {
               <GenderSelector selected={gender} onSelect={setLocalGender} onAdvance={() => setStep(1)} />
             </motion.div>
           )}
-          {step === 1 && (
-            <motion.div key="face" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              {/* Photo and Live Face Scan are now both required, so taking a
-                  photo must NOT clear an already-completed scan (or vice
-                  versa) — they need to accumulate, not replace each other. */}
-              <PhotoUploadStep stepNum={1} guide="Center your face in the oval. Neutral expression, eyes forward. Natural lighting. No harsh shadows." photo={facePhoto} onPhoto={url => { setFacePhoto(url); setError('') }} gender={gender} />
-            </motion.div>
-          )}
-          {step === 2 && (
-            <motion.div key="side" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <PhotoUploadStep stepNum={2}
-                guide="Turn 90° to the right. Stand straight, arms relaxed at sides. 3–6 feet from camera. Natural lighting."
-                photo={sidePhoto}
+          {(step === 1 || step === 2) && (
+            <motion.div key={step} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+              <CameraOverlay
+                stepNum={step}
                 gender={gender}
-                triggerRef={sideTriggerRef}
-                onPhoto={url => { setSidePhoto(url); setError('') }} />
+                onCapture={(url, blob) => {
+                  if (step === 1) { setFacePhoto(url); setError(''); setStep(2) }
+                  else { setSidePhoto(url); setError(''); setStep(3); setTimeout(() => startAnalysisRef.current?.(), 50) }
+                }}
+                onClose={step === 1 ? () => navigate('/scan') : () => { setStep(1) }}
+                onSkip={step === 2 ? () => { setStep(3); setTimeout(() => startAnalysisRef.current?.(true), 50) } : undefined}
+              />
             </motion.div>
           )}
           {isAnalyzing && (

@@ -46,7 +46,7 @@ export default function Splash({ onDone }) {
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3, duration: 1.2, ease: EASE }}
-            style={{ position: 'relative', zIndex: 1, marginBottom: 28, mixBlendMode: 'lighten' }}
+            style={{ position: 'relative', zIndex: 1, marginBottom: 16, mixBlendMode: 'lighten' }}
           >
             <img
               src={logo}
