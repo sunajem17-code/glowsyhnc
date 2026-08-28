@@ -5,7 +5,7 @@
  * Exports:
  *   verifyToken   — JWT required; demo-token accepted as rate-limited guest
  *   claudeLimit   — Claude calls per hour (100 pro / 25 free / 5 demo)
- *   scanLimit     — 3 scans/day free users; 1/hour demo; unlimited pro
+ *   scanLimit     — 50 scans/day free users; 5/hour demo; unlimited pro
  *   requirePro    — 403 unless user has active Pro or trial
  *   resolvePro    — sets req.isPro without blocking
  *
@@ -35,8 +35,8 @@ if (_devScanCap) {
 }
 
 const checkScan = {
-  free: createLimiter('scan:free', _devScanCap || 3, '24 h', 24 * 60 * 60 * 1000),
-  demo: createLimiter('scan:demo', 1, '1 h',   1 * 60 * 60 * 1000),
+  free: createLimiter('scan:free', _devScanCap || 50, '24 h', 24 * 60 * 60 * 1000),
+  demo: createLimiter('scan:demo', 5, '1 h',   1 * 60 * 60 * 1000),
 }
 
 // ── 1. Token verification ──────────────────────────────────────────────────────
