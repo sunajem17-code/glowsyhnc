@@ -21,6 +21,7 @@ import { scheduleRescanNotification } from '../utils/notifications'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import ProcessingOverlay from '../components/ProcessingOverlay'
 
 // No-op on web — no native bridge, and no web Firebase app configured yet either.
 async function logAnalyticsEvent(name, params) {
@@ -144,19 +145,23 @@ function SideGuide({ size = 'normal', gender }) {
 
 // ─── Live Camera Overlay ──────────────────────────────────────────────────────
 
-function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
-  const videoRef   = useRef()
-  const canvasRef  = useRef()
-  const streamRef  = useRef()
-  const [ready, setReady]           = useState(false)
+function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
+  const videoRef    = useRef()
+  const canvasRef   = useRef()
+  const uploadRef   = useRef()
+  const streamRef   = useRef()
+  const [ready, setReady]         = useState(false)
   const [facingMode, setFacingMode] = useState('user')
-  const [error, setError]           = useState('')
+  const [error, setError]         = useState('')
+  const [capturedUrl, setCapturedUrl] = useState(null) // null = live camera, string = captured photo
 
   const startCamera = useCallback(async (mode) => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    setReady(false)
     try {
+      // Request highest available resolution — mobile cameras will cap naturally
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: mode, width: { ideal: 3840 }, height: { ideal: 2160 } },
         audio: false,
       })
       streamRef.current = stream
@@ -178,15 +183,61 @@ function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
+    // Freeze: pause video so the frame stays visible in-place (no separate img needed)
+    video.pause()
     canvas.width  = video.videoWidth
     canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
+    const ctx = canvas.getContext('2d')
+    // Mirror horizontally for front cam so captured image matches what user saw on screen
+    if (facingMode === 'user') {
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+    }
+    ctx.drawImage(video, 0, 0)
     canvas.toBlob(blob => {
-      const url = URL.createObjectURL(blob)
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      onCapture(url, blob)
-    }, 'image/jpeg', 0.92)
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        setCapturedUrl(url) // store for onCapture; video stays paused showing the freeze
+      }
+    }, 'image/jpeg', 0.95)
   }
+
+  function handleContinue() {
+    if (!capturedUrl) return
+    // Re-fetch blob from the object URL for the onCapture callback
+    fetch(capturedUrl).then(r => r.blob()).then(blob => onCapture(capturedUrl, blob))
+  }
+
+  function handleRetake() {
+    if (capturedUrl) { URL.revokeObjectURL(capturedUrl); setCapturedUrl(null) }
+    // Resume the paused video so live preview continues
+    if (videoRef.current) videoRef.current.play().catch(() => {})
+    // If stream was stopped (e.g. Continue was pressed then back), restart
+    if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
+      startCamera(facingMode)
+    }
+  }
+
+  async function handleUpload() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhoto()
+        if (dataUrl) { setCapturedUrl(dataUrl) }
+      } catch {}
+    } else {
+      uploadRef.current?.click()
+    }
+  }
+
+  function handleFileChange(e) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const url = URL.createObjectURL(f)
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    setCapturedUrl(url)
+  }
+
+  const showLive = !capturedUrl
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
@@ -198,29 +249,28 @@ function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
         flexShrink: 0,
       }}>
         <button
-          onClick={() => { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }}
+          onClick={() => {
+            if (capturedUrl) { handleRetake() }
+            else { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }
+          }}
           style={{ position: 'absolute', left: 16, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
         >
           <ChevronLeft size={28} color="#fff" />
         </button>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: 20, fontFamily: 'inherit' }}>
-          {stepNum === 1 ? 'Upload a front selfie' : 'Upload a side selfie'}
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: 18, fontFamily: 'inherit' }}>
+          {stepNum === 1 ? 'Take your front photo' : 'Take your side photo'}
         </span>
-        {!error && (
-          <button onClick={() => { setReady(false); setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
+        {showLive && !error && (
+          <button onClick={() => { setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
             style={{ position: 'absolute', right: 16, background: 'none', border: 'none', cursor: 'pointer' }}>
             <RefreshCw size={20} color="rgba(255,255,255,0.6)" />
           </button>
         )}
       </div>
 
-      {/* Camera card — Umax style rounded card, not full screen */}
+      {/* Camera / Photo area */}
       <div style={{ flex: 1, padding: '0 16px', minHeight: 0 }}>
-        <div style={{
-          width: '100%', height: '100%',
-          borderRadius: 20, overflow: 'hidden',
-          position: 'relative', background: '#111',
-        }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', position: 'relative', background: '#111' }}>
           {error ? (
             <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4">
               <AlertCircle size={40} className="text-warning" />
@@ -229,8 +279,14 @@ function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
             </div>
           ) : (
             <>
-              <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
-              {!ready && (
+              {/* Video always renders — paused after capture to show freeze-frame.
+                  Keep scaleX(-1) even when paused so the frozen frame matches what
+                  the user saw live. Canvas capture applies the same flip so the
+                  saved image is correctly oriented. */}
+              <video ref={videoRef} autoPlay playsInline muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover',
+                  transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
+              {!ready && !capturedUrl && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 size={36} className="text-white animate-spin" />
                 </div>
@@ -242,24 +298,24 @@ function CameraOverlay({ stepNum, onCapture, onClose, onSkip, gender }) {
 
       {/* Buttons */}
       {!error && (
-        <div style={{ padding: '16px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', flexShrink: 0 }}>
+        <div style={{ padding: '12px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
-            onClick={capture}
-            disabled={!ready}
+            onClick={() => { triggerHaptic(); capturedUrl ? handleContinue() : capture() }}
+            disabled={!capturedUrl && !ready}
             style={{
-              width: '100%', padding: '20px 0', borderRadius: 50,
-              background: GOLD_GRADIENT, border: 'none', cursor: ready ? 'pointer' : 'not-allowed',
-              color: '#000', fontWeight: 700, fontSize: 20, fontFamily: 'inherit',
-              opacity: ready ? 1 : 0.5,
+              width: '100%', padding: '18px 0', borderRadius: 50,
+              background: GOLD_GRADIENT, border: 'none', cursor: 'pointer',
+              color: '#000', fontWeight: 700, fontSize: 18, fontFamily: 'inherit',
+              opacity: (!capturedUrl && !ready) ? 0.5 : 1,
               boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
             }}
           >
-            Take Picture
+            {capturedUrl ? 'Continue' : 'Take Photo'}
           </button>
-          {/* Skip button removed — use back button instead */}
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
+      <input ref={uploadRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
     </div>
   )
 }
@@ -1185,12 +1241,17 @@ export default function Scan() {
   const setAssignedPhase  = useStore(s => s.setAssignedPhase)
   const setLastScanDate   = useStore(s => s.setLastScanDate)
   const logout            = useStore(s => s.logout)
+  const setScanLaunching  = useStore(s => s.setScanLaunching)
+
+  // Clear the global scan-launch overlay the instant this page mounts
+  useEffect(() => { setScanLaunching(false) }, [])
 
   // Monthly scan gate disabled — server-side Redis limit handles scan caps
   const isFreeScanBlocked = false
 
   const [step, setStep]                   = useState(1) // skip gender step — already collected in onboarding
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
+  const [showPhotoChoice, setShowPhotoChoice] = useState(false) // bottom sheet: take vs upload
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(null)
@@ -1202,6 +1263,7 @@ export default function Scan() {
   // handing off to results/unlock — see startAnalysis, just above its
   // navigate() call.
   const [morphing, setMorphing]           = useState(false)
+  const [transitioning, setTransitioning] = useState(false) // brief overlay between preview→analyze
   // Real MediaPipe face-landmark points for THIS scan's photo, used to
   // position FacialAnalysisOverlay's lines/dots/readouts on the actual
   // detected face — see startAnalysis, which kicks off detection the
@@ -1218,7 +1280,7 @@ export default function Scan() {
   const [claudeRateLimited, setClaudeRateLimited] = useState(false)
   const [scanCapReached, setScanCapReached] = useState(false)
   const [scanCapPlan, setScanCapPlan]     = useState('free')
-  const [showConsent, setShowConsent]     = useState(() => !hasAIConsent())
+  const [showConsent, setShowConsent]     = useState(false) // consent modal removed
 
   const startAnalysisRef  = useRef(null)
   const rateLimitInitial  = useRef(30)
@@ -1652,7 +1714,7 @@ export default function Scan() {
                 if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
                 else if (step === 2) { setStep(1) }
-                else { navigate(-1) }
+                else { setScanLaunching(true); navigate(-1) }
               }}
               aria-label="Go back"
               className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
@@ -1664,7 +1726,7 @@ export default function Scan() {
               STEP {step === 1 ? '1' : '2'} OF 2
             </p>
             <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
-              {step === 1 ? 'Take your front photo.' : 'Now, your side profile'}
+              {step === 1 ? 'Take your front photo' : 'Now, your side profile'}
             </h1>
           </div>
         ) : (
@@ -1686,7 +1748,7 @@ export default function Scan() {
             </motion.div>
           )}
           {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
-            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6 gap-6">
+            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6 gap-5">
               <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: step === 1 ? '4/5' : '3/4', border: '1px solid rgba(198,168,92,0.35)' }}>
                 <img
                   src={step === 1
@@ -1697,42 +1759,124 @@ export default function Scan() {
                   className="w-full h-full object-cover"
                 />
               </div>
+              {/* Single Begin Scan button — tap opens the take/upload choice sheet */}
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                onClick={() => { triggerHaptic(); setCameraOpen(true) }}
+                onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
                 className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
                 style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
               >
                 Begin Scan
               </motion.button>
+
+              {/* iOS-style action sheet — appears over the guide content */}
+              <AnimatePresence>
+                {showPhotoChoice && (
+                  <>
+                    <motion.div
+                      key="backdrop"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[60]"
+                      style={{ background: 'rgba(0,0,0,0.45)' }}
+                      onClick={() => setShowPhotoChoice(false)}
+                    />
+                    <motion.div
+                      key="sheet"
+                      initial={{ opacity: 0, scale: 0.97, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                      transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="fixed left-4 right-4 z-[61] rounded-2xl overflow-hidden"
+                      style={{ bottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Take Photo row */}
+                      <button
+                        onClick={() => { triggerHaptic(); setShowPhotoChoice(false); setCameraOpen(true) }}
+                        className="w-full flex items-center justify-center gap-2 py-4 font-heading font-semibold text-[17px] active:opacity-70"
+                        style={{ background: 'rgba(30,30,32,0.96)', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+                      >
+                        <Camera size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Take Photo
+                      </button>
+                      {/* Choose from Library row */}
+                      <button
+                        onClick={async () => {
+                          triggerHaptic(); setShowPhotoChoice(false)
+                          try {
+                            let url = null
+                            if (isNative()) { url = await pickPhoto() }
+                            else {
+                              url = await new Promise(resolve => {
+                                const inp = document.createElement('input')
+                                inp.type = 'file'; inp.accept = 'image/*'
+                                inp.onchange = e => resolve(e.target.files?.[0] ? URL.createObjectURL(e.target.files[0]) : null)
+                                inp.click()
+                              })
+                            }
+                            if (url) {
+                              if (step === 1) { setFacePhoto(url); setError(''); setStep(2) }
+                              else { setTransitioning(true); setSidePhoto(url); setError(''); setTimeout(() => { setStep(3); setTransitioning(false); setTimeout(() => startAnalysisRef.current?.(), 50) }, 300) }
+                            }
+                          } catch {}
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-4 font-heading font-semibold text-[17px] active:opacity-70"
+                        style={{ background: 'rgba(30,30,32,0.96)', color: '#fff' }}
+                      >
+                        <Upload size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Choose from Library
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
           {(step === 1 || step === 2) && previewPhoto && (
-            <motion.div key={`preview-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6 gap-6">
-              <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: step === 1 ? '4/5' : '3/4' }}>
+            <motion.div
+              key={`preview-${step}`}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-50 flex flex-col"
+              style={{ background: '#000' }}
+            >
+              {/* Photo fills all space above the buttons */}
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <img src={previewPhoto.url} alt="Your photo" className="w-full h-full object-cover" />
               </div>
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  triggerHaptic()
-                  const { url, blob, forStep } = previewPhoto
-                  setPreviewPhoto(null)
-                  if (forStep === 1) { setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2) }
-                  else { setSidePhoto(url); setError(''); setCameraOpen(false); setStep(3); setTimeout(() => startAnalysisRef.current?.(), 50) }
-                }}
-                className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-                style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+              {/* Both buttons pinned at the bottom */}
+              <div
+                className="flex-shrink-0 flex flex-col gap-3 px-5"
+                style={{ paddingTop: 14, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}
               >
-                Continue
-              </motion.button>
-              <button
-                onClick={() => { triggerHaptic(); setPreviewPhoto(null); setCameraOpen(true) }}
-                className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-                style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
-              >
-                Use Another
-              </button>
+                <button
+                  onClick={() => { triggerHaptic(); setPreviewPhoto(null); setCameraOpen(true) }}
+                  className="w-full py-4 rounded-2xl font-heading font-bold text-[16px]"
+                  style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
+                >
+                  Use Another
+                </button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    triggerHaptic()
+                    const { url, forStep } = previewPhoto
+                    if (forStep === 1) {
+                      setPreviewPhoto(null)
+                      setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
+                    } else {
+                      setTransitioning(true)
+                      setSidePhoto(url); setError(''); setCameraOpen(false)
+                      setTimeout(() => {
+                        setPreviewPhoto(null)
+                        setStep(3)
+                        setTransitioning(false)
+                        setTimeout(() => startAnalysisRef.current?.(), 50)
+                      }, 300)
+                    }
+                  }}
+                  className="w-full py-4 rounded-2xl font-heading font-bold text-[16px]"
+                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+                >
+                  Continue
+                </motion.button>
+              </div>
             </motion.div>
           )}
           {(step === 1 || step === 2) && cameraOpen && (
@@ -1742,11 +1886,19 @@ export default function Scan() {
                 gender={gender}
                 onCapture={(url, blob) => {
                   triggerHaptic()
-                  setPreviewPhoto({ url, blob, forStep: step })
-                  setCameraOpen(false)
+                  if (step === 1) {
+                    setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
+                  } else {
+                    setTransitioning(true)
+                    setSidePhoto(url); setError(''); setCameraOpen(false)
+                    setTimeout(() => {
+                      setStep(3)
+                      setTransitioning(false)
+                      setTimeout(() => startAnalysisRef.current?.(), 50)
+                    }, 300)
+                  }
                 }}
                 onClose={() => setCameraOpen(false)}
-                onSkip={step === 2 ? () => { setStep(3); setTimeout(() => startAnalysisRef.current?.(true), 50) } : undefined}
               />
             </motion.div>
           )}
@@ -1757,6 +1909,11 @@ export default function Scan() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Processing overlay — brief gap between preview Continue and analyzing screen */}
+      <AnimatePresence>
+        {transitioning && <ProcessingOverlay key="scan-transition" />}
+      </AnimatePresence>
 
       {/* Scan-cap upgrade modal */}
       {scanCapReached && (

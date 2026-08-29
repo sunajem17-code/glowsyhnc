@@ -1,35 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Moon, Settings } from 'lucide-react'
+import { Camera, ChevronRight, Dumbbell, Moon } from 'lucide-react'
 import useStore from '../store/useStore'
+const isPremiumSelector = s => s.isPremium
+const setScanLaunchingSelector = s => s.setScanLaunching
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
-import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const DAILY_SCAN_LIMIT = 3
 
-// Same slide/drag gesture pattern as ScanUnlockGate's SwipeableResultCards
-// (direction-aware enter/exit, velocity-aware drag commit) — reused here for
-// consistency, but with SPRING_STANDARD/EASE_STANDARD instead of that
-// component's own hand-tuned spring, per the app's established motion tokens.
 const SLIDE_VARIANTS = {
   enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
   center: { x: 0, opacity: 1 },
   exit: (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
 }
 
-// visualClassName lets a specific card opt out of the default flex-1
-// fill (which stretches the box to eat all leftover vertical space in the
-// h-full column) in favor of a fixed aspect ratio instead — only
-// BeginScanCard's grid/camera visual currently does this; PastResultCard's
-// photo and BodyCard's visual still want to fill the available height, so
-// they're untouched by leaving this prop at its default. justify-center on
-// the outer column is inert for those two (their flex-1 box already
-// consumes all the space, leaving nothing to redistribute) but centers
-// BeginScanCard's now-shorter box+text+button group in the freed-up space
-// instead of leaving it pinned to the top with a dead gap at the bottom.
 function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, visual, visualClassName = 'flex-1', footer }) {
   return (
     <div
@@ -45,9 +33,6 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, vis
       <h2 className="font-heading font-bold text-[24px] text-primary mb-2" style={{ letterSpacing: '-0.02em' }}>
         {title}
       </h2>
-      {/* footer lets a card swap out the default pitch-text + big CTA button
-          for something else (e.g. BodyCard's compact returning-user row)
-          without duplicating the visual/eyebrow/title markup above. */}
       {footer ?? (
         <>
           {body && (
@@ -69,7 +54,7 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, vis
   )
 }
 
-function BeginScanCard({ onBegin, limitMessage }) {
+function FaceScanCard({ onBegin, limitMessage }) {
   if (limitMessage) {
     return (
       <CardShell
@@ -91,18 +76,14 @@ function BeginScanCard({ onBegin, limitMessage }) {
 
   return (
     <CardShell
-      eyebrow="NEW SCAN"
+      eyebrow="NEW FACE SCAN"
       title="Begin Scan"
-      body={null}
+      body="Start your scan"
       cta="Start Your Scan"
       onAction={onBegin}
       visualClassName="aspect-[4/5] flex-shrink-0"
       visual={
         <>
-          {/* Icon renders first so FaceScanOverlay (rendered after, below)
-              paints on top of it, matching Scan.jsx's own stacking — there,
-              FaceScanOverlay is always the last-rendered element in its
-              branch, with nothing painted after/above it. */}
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera size={48} style={{ color: `${GOLD}66` }} />
           </div>
@@ -113,11 +94,54 @@ function BeginScanCard({ onBegin, limitMessage }) {
   )
 }
 
+function PhysiqueScanCard({ onBegin }) {
+  return (
+    <CardShell
+      eyebrow="NEW PHYSIQUE SCAN"
+      title="Begin Scan"
+      body="Start your scan"
+      cta="Start Your Scan"
+      onAction={onBegin}
+      visualClassName="aspect-[4/5] flex-shrink-0"
+      visual={
+        <>
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#000' }}>
+            <Dumbbell size={48} style={{ color: `${GOLD}66` }} />
+          </div>
+          <FaceScanOverlay loop showDots={false} />
+        </>
+      }
+    />
+  )
+}
+
 function PastResultCard({ scan, onView }) {
-  const photo = scan.facePhotoUrl ?? scan.photos?.face ?? null
-  const dateLabel = scan.analyzedAt
+  const photo = scan?.facePhotoUrl ?? scan?.photos?.face ?? null
+  const dateLabel = scan?.analyzedAt
     ? new Date(scan.analyzedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
     : null
+
+  if (!scan) {
+    return (
+      <CardShell
+        eyebrow="PAST SCANS"
+        title="No Scans Yet"
+        body="Past scans will appear here once you complete your first scan."
+        cta="Start a Scan"
+        icon={Camera}
+        onAction={() => {}}
+        visualClassName="aspect-[4/5] flex-shrink-0"
+        visual={
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: '#0a0a0a' }}>
+            <Camera size={48} style={{ color: 'rgba(255,255,255,0.1)' }} />
+            <p className="font-body text-[13px] text-center px-6" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              Past scans will appear here
+            </p>
+          </div>
+        }
+      />
+    )
+  }
 
   return (
     <CardShell
@@ -162,72 +186,29 @@ function PastResultCard({ scan, onView }) {
   )
 }
 
-function BodyCard({ onBody, physiqueScore, trainingSplit, bodyPhotoUrl }) {
-  // Once a physique score exists, a plan has been generated at least once —
-  // swap the generic first-time pitch for a compact "you already have a
-  // plan" row instead of repeating the same sales copy forever.
-  const hasPlan = physiqueScore?.overall != null
-  const planLabel = trainingSplit ?? 'Custom Plan'
-
-  return (
-    <CardShell
-      eyebrow="PHYSIQUE"
-      title="Body"
-      body="Track your physique score and get a training plan built around your weak points."
-      cta="View Training Plan"
-      icon={Dumbbell}
-      onAction={onBody}
-      visual={
-        <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0f22' }}>
-          <Dumbbell size={56} style={{ color: `${GOLD}66` }} />
-        </div>
-      }
-      footer={hasPlan ? (
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); onBody() }}
-          className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-        >
-          <div className="w-[52px] h-[52px] rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#0a0f22' }}>
-            {bodyPhotoUrl ? (
-              <img src={bodyPhotoUrl} alt="Your body" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Dumbbell size={22} style={{ color: `${GOLD}88` }} />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 text-left min-w-0">
-            <p className="font-heading font-bold text-[15px] text-primary truncate">
-              Physique · {physiqueScore.overall.toFixed(1)}
-            </p>
-            <p className="font-body text-[12px] text-secondary mt-0.5 truncate">
-              Plan active · {planLabel}
-            </p>
-          </div>
-          <ChevronRight size={18} className="text-secondary flex-shrink-0" />
-        </motion.button>
-      ) : undefined}
-    />
-  )
-}
-
 export default function ScanHome() {
   const navigate = useNavigate()
   const scans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)
   const setCurrentScan = useStore(s => s.setCurrentScan)
+  const isPremium = useStore(isPremiumSelector)
   const streak = useStore(s => s.streak)
   const proScanCount = useStore(s => s.proScanCount)
   const proScanDate = useStore(s => s.proScanDate)
+  const setScanLaunching = useStore(setScanLaunchingSelector)
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
 
+  useEffect(() => { setScanLaunching(false) }, [])
+
+  function beginScan(path) {
+    triggerHaptic()
+    setScanLaunching(true)
+    navigate(path)
+  }
+
   const latestScan = scans?.[0] ?? null
 
-  // Daily limit: 3 scans per calendar day (local device time), matching the
-  // streak reset logic which also uses toDateString() as the day boundary.
   const today = new Date().toDateString()
   const atLimit = proScanDate === today && proScanCount >= DAILY_SCAN_LIMIT
 
@@ -237,25 +218,10 @@ export default function ScanHome() {
         : 'Come back tomorrow to start a streak!')
     : null
 
-  // "Past Result" only appears once a scan actually exists — a first-time
-  // user never sees a card built from placeholder/fake data.
+  // Cards: Face Scan → Physique Scan
   const cards = [
-    { id: 'begin', el: <BeginScanCard onBegin={() => navigate('/scan/capture')} limitMessage={limitMessage} /> },
-    ...(latestScan ? [{
-      id: 'past',
-      el: <PastResultCard scan={latestScan} onView={() => { setCurrentScan(latestScan); navigate('/results') }} />,
-    }] : []),
-    {
-      id: 'body',
-      el: (
-        <BodyCard
-          onBody={() => navigate('/workout-plan')}
-          physiqueScore={currentScan?.physiqueScore ?? null}
-          trainingSplit={currentScan?.trainingSplit ?? null}
-          bodyPhotoUrl={currentScan?.bodyPhotoUrl ?? null}
-        />
-      ),
-    },
+    { id: 'face',    el: <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} /> },
+    { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/workout-plan')} /> },
   ]
 
   function goTo(idx) {
@@ -264,8 +230,6 @@ export default function ScanHome() {
     setCardIdx(idx)
   }
 
-  // Velocity-aware, not just distance-aware — matches SwipeableResultCards'
-  // own drag-commit thresholds.
   function handleDragEnd(_, info) {
     const DISTANCE = 60
     const VELOCITY = 400
@@ -278,21 +242,6 @@ export default function ScanHome() {
 
   return (
     <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Gear icon: absolute so it floats over the full-bleed card carousel */}
-      <button
-        onClick={() => { triggerHaptic(); navigate('/settings') }}
-        className="absolute z-10 flex items-center justify-center w-9 h-9 rounded-xl active:scale-95 transition-transform"
-        style={{
-          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-          right: 16,
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}
-        aria-label="Settings"
-      >
-        <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
-      </button>
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
@@ -314,15 +263,17 @@ export default function ScanHome() {
         </AnimatePresence>
       </div>
 
-      {/* Page-dot indicator — same animated width/opacity pattern used for the
-          intro-slides carousel elsewhere in the app. */}
+      {/* Dot indicator — fixed size circles, just color change */}
       <div className="flex items-center justify-center gap-2 py-4 flex-shrink-0">
         {cards.map((_, i) => (
-          <motion.div
+          <div
             key={i}
-            animate={{ width: i === cardIdx ? 20 : 6, opacity: i === cardIdx ? 1 : 0.35 }}
-            transition={{ duration: 0.3, ease: EASE_STANDARD }}
-            style={{ height: 6, borderRadius: 99, background: GOLD }}
+            onClick={() => goTo(i)}
+            style={{
+              width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
+              background: i === cardIdx ? GOLD : 'rgba(255,255,255,0.25)',
+              transition: 'background 0.2s',
+            }}
           />
         ))}
       </div>

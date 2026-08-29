@@ -234,7 +234,7 @@ export default function Premium() {
     <MotionPage baseClassName="page-scroll-full" style={{ background: SURFACE }}>
       <Helmet>
         <title>Ascendus Pro | Unlimited Looksmax Scans &amp; Glow Up Tracker</title>
-        <meta name="description" content="Upgrade to Ascendus Pro for unlimited AI face ratings, body composition scores, and a personalized looksmax plan. Start your glow up today." />
+        <meta name="description" content="Upgrade to Ascendus Max for unlimited AI face ratings, body composition scores, and a personalized looksmax plan. Start your glow up today." />
         <meta name="keywords" content="looksmax pro, face rating app, glow up tracker, AI appearance score, looksmaxxing app, unlimited scans" />
       </Helmet>
 
@@ -291,7 +291,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Pro ($9.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
           Billed monthly · Cancel anytime
@@ -526,7 +526,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Pro ($9.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
           Billed monthly · Cancel anytime
@@ -535,7 +535,7 @@ export default function Premium() {
         {/* Apple IAP required disclosure */}
         <div className="mt-2 mb-4 px-1 space-y-1">
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
-            Ascendus Pro is $9.99 USD/month or $49.99 USD/year.
+            Ascendus Max is $9.99 USD/month or $49.99 USD/year.
             {isNative() ? ' Payment will be charged to your Apple ID account.' : ''}
           </p>
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>

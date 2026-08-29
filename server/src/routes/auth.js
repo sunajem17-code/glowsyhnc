@@ -9,6 +9,14 @@ const { verifyAppleToken } = require('../utils/appleAuth')
 
 const router = express.Router()
 
+// Generate a 5-character uppercase alphanumeric invite code
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = ''
+  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return code
+}
+
 // ── Rate limiter: 10 attempts per 15 minutes per IP (Upstash-backed) ─────────
 const checkAuthLimit = createLimiter('auth', 10, '15 m', 15 * 60 * 1000)
 
@@ -37,7 +45,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
       const hash = await bcrypt.hash(password, 12)
       const id = uuid()
-      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      const ownCode = genCode()
 
       const user = await createUser({
         id,
@@ -74,7 +82,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
       const hash = await bcrypt.hash(password, 12)
       const id = uuid()
-      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      const ownCode = genCode()
 
       db.prepare('INSERT INTO users (id, email, name, password_hash, referral_code) VALUES (?, ?, ?, ?, ?)').run(id, email, name || '', hash, ownCode)
       db.prepare('INSERT INTO streaks (user_id) VALUES (?)').run(id)
@@ -187,7 +195,7 @@ router.post('/apple', authLimiter, async (req, res) => {
       // records written under that ID automatically belong to the real account.
       const id = guestUserId || uuid()
       const userName = name || 'Ascendus User'
-      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      const ownCode = genCode()
       if (guestUserId) {
         // Upgrade the guest row in-place rather than creating a new one
         await sb.from('users').update({
@@ -212,7 +220,7 @@ router.post('/apple', authLimiter, async (req, res) => {
     if (!user) {
       const id = uuid()
       const userName = name || 'Ascendus User'
-      const ownCode = `ASC${id.substring(0, 5).toUpperCase()}`
+      const ownCode = genCode()
       db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)').run(id, userName, appleEmail, appleSub, '', ownCode, 'free', new Date().toISOString())
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
     }
@@ -246,7 +254,7 @@ router.post('/guest', async (req, res) => {
         name:              'Guest',
         password_hash:     null,
         apple_sub:         null,
-        referral_code:     `GST${id.substring(0, 5).toUpperCase()}`,
+        referral_code:     genCode(),
         referral_count:    0,
         subscription_tier: 'free',
         is_guest:          true,
@@ -260,11 +268,11 @@ router.post('/guest', async (req, res) => {
       // SQLite fallback — is_guest column may not exist in local schema; use name sentinel
       try {
         db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)')
-          .run(id, '__guest__', null, null, '', `GST${id.substring(0, 5).toUpperCase()}`, 'free', new Date().toISOString())
+          .run(id, '__guest__', null, null, '', genCode(), 'free', new Date().toISOString())
       } catch {
         // If email column has NOT NULL constraint in local SQLite, use placeholder
         db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)')
-          .run(id, '__guest__', `guest-${id}@ascendus.internal`, null, '', `GST${id.substring(0, 5).toUpperCase()}`, 'free', new Date().toISOString())
+          .run(id, '__guest__', `guest-${id}@ascendus.internal`, null, '', genCode(), 'free', new Date().toISOString())
       }
     }
 

@@ -11,6 +11,7 @@ import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
+import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import MotionPage from '../components/MotionPage'
@@ -1013,82 +1014,133 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 }
 
 // ── Pro Paywall (full-screen modal, opens when "Get Ascendus Pro" is tapped) ──
-const PAYWALL_CARDS = [
-  {
-    title: 'Get your ratings',
-    content: (scan) => {
-      const fd = scan?.faceData ?? {}
-      const gs = scan?.glowScore ?? null
-      const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 70
-      const barColor = pct => pct >= 75 ? '#4CD964' : pct >= 55 ? '#C6A85C' : '#FF9500'
-      const items = [
-        { label: 'Overall',      pct: toBar(gs) },
-        { label: 'Potential',    pct: Math.min(100, toBar(gs) + 14) },
-        { label: 'Jawline',      pct: toBar(fd.jawlineDefinition) },
-        { label: 'Symmetry',     pct: toBar(fd.symmetry) },
-        { label: 'Skin Quality', pct: toBar(fd.skinClarity) },
-        { label: 'Cheekbones',   pct: toBar(fd.cheekbones ?? fd.facialProportions) },
-      ]
-      return (
-        <div className="grid grid-cols-3 gap-2">
-          {items.map(({ label, pct }) => (
-            <div key={label} className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <p className="font-body text-[11px] mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-              <p className="font-heading font-bold text-[22px] leading-none mb-2" style={{ color: '#fff' }}>
-                {Math.round(pct)}
-              </p>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    },
-  },
-  {
-    title: 'AI Glow Coach',
-    content: () => (
-      <div className="flex flex-col gap-3">
-        <div className="self-start max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
-          <p className="font-body text-[13px] leading-snug" style={{ color: '#fff' }}>
-            Hey! I'm your personal glow-up coach. What do you want to improve first?
+function PaywallRatingsCard() {
+  // Red→green bar color based on score percentage
+  const barColor = pct => {
+    const r = Math.round(255 * (1 - pct / 100))
+    const g = Math.round(200 * (pct / 100))
+    return `rgb(${Math.min(255, r + 40)},${g},30)`
+  }
+  const items = [
+    { label: 'Overall',      pct: 61 },
+    { label: 'Potential',    pct: 88 },
+    { label: 'Jawline',      pct: 57 },
+    { label: 'Symmetry',     pct: 63 },
+    { label: 'Skin Quality', pct: 68 },
+    { label: 'Cheekbones',   pct: 51 },
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(({ label, pct }) => (
+        <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
+          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
+          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>
+            {pct}
           </p>
-        </div>
-        <div className="self-end max-w-[80%] px-4 py-3 rounded-2xl rounded-tr-sm" style={{ background: GRAD }}>
-          <p className="font-heading font-semibold text-[13px]" style={{ color: '#0A0A0A' }}>
-            How do I get a sharper jawline?
-          </p>
-        </div>
-        <div className="self-start max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
-          <p className="font-body text-[13px] leading-snug" style={{ color: '#fff' }}>
-            A sharper jawline comes from lowering body fat, mewing, and chewing hard gum daily…
-          </p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: 'Start improving',
-    content: () => (
-      <div className="flex flex-col gap-3">
-        {[
-          { emoji: '🧴', title: 'Start a skincare routine', sub: 'Clear skin is the highest-ROI glow-up. Tap to learn more.' },
-          { emoji: '💪', title: 'Build your jaw & frame', sub: 'Targeted exercises and habits that add definition fast.' },
-          { emoji: '✂️', title: 'Optimize your hairstyle', sub: 'The right cut changes your entire face shape. See what works.' },
-        ].map(({ emoji, title, sub }) => (
-          <div key={title} className="flex items-center gap-3 px-3 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: 22 }}>{emoji}</span>
-            <div className="flex-1 min-w-0">
-              <p className="font-heading font-bold text-[13px] leading-tight" style={{ color: '#fff' }}>{title}</p>
-              <p className="font-body text-[11px] leading-snug mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{sub}</p>
-            </div>
-            <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Physique ratings — parallel to face ratings but body metrics
+function PaywallPhysiqueCard() {
+  const barColor = pct => {
+    const r = Math.round(255 * (1 - pct / 100))
+    const g = Math.round(200 * (pct / 100))
+    return `rgb(${Math.min(255, r + 40)},${g},30)`
+  }
+  const items = [
+    { label: 'Overall',       pct: 66 },
+    { label: 'Potential',     pct: 91 },
+    { label: 'Muscle Mass',   pct: 58 },
+    { label: 'Body Fat',      pct: 54 },
+    { label: 'V-Taper',       pct: 62 },
+    { label: 'Frame Width',   pct: 71 },
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(({ label, pct }) => (
+        <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
+          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
+          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>{pct}</p>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Daily To-Do preview — checklist style matching the Daily Check-In screenshot
+function PaywallDailyTodoCard() {
+  const sections = [
+    {
+      icon: '💧', label: 'Hydration',
+      items: ['Glass of water on wake', 'Hit 8 glasses today', 'Electrolytes after workout'],
+      done: [true, false, false],
+    },
+    {
+      icon: '✨', label: 'Skincare',
+      items: ['AM Routine', 'PM Routine'],
+      done: [false, false],
+    },
+    {
+      icon: '💪', label: 'Exercise',
+      items: ['Mark today\'s exercises complete'],
+      done: [false],
+    },
+  ]
+  return (
+    <div className="flex flex-col gap-2">
+      {sections.map(({ icon, label, items, done }) => (
+        <div key={label} className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span style={{ fontSize: 14 }}>{icon}</span>
+            <p className="font-heading font-bold text-[13px]" style={{ color: '#fff' }}>{label}</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, border: `1.5px solid ${done[i] ? G : 'rgba(255,255,255,0.25)'}`, background: done[i] ? G : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {done[i] && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                <p className="font-body text-[11px]" style={{ color: done[i] ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)' }}>{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// AI Coach chat preview card
+function PaywallCoachCard() {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="self-start max-w-[85%] px-3 py-2.5 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
+        <p className="font-body text-[12px] leading-snug" style={{ color: '#fff' }}>Your scan is loaded. Your #1 growth area is jawline definition.</p>
       </div>
-    ),
-  },
+      <div className="self-end max-w-[80%] px-3 py-2.5 rounded-2xl rounded-tr-sm" style={{ background: GRAD }}>
+        <p className="font-heading font-semibold text-[12px]" style={{ color: '#0A0A0A' }}>How do I get a sharper jawline?</p>
+      </div>
+      <div className="self-start max-w-[85%] px-3 py-2.5 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>
+        <p className="font-body text-[12px] leading-snug" style={{ color: '#fff' }}>Mew 24/7, chew mastic gum 20 min daily, drop body fat below 15%. Results in 3-6 months.</p>
+      </div>
+    </div>
+  )
+}
+
+const PAYWALL_CARDS = [
+  { title: 'Get your face ratings',    content: () => <PaywallRatingsCard /> },
+  { title: 'Get your physique ratings', content: () => <PaywallPhysiqueCard /> },
+  { title: 'AI Coach',                 content: () => <PaywallCoachCard /> },
+  { title: 'Daily To-Do',              content: () => <PaywallDailyTodoCard /> },
 ]
 
 function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
@@ -1124,22 +1176,22 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
       style={{ background: '#0A0A0A' }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8 }}>
+      <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 4 }}>
         <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
           <X size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
         </button>
-        <h1 className="font-heading font-bold italic text-[38px] leading-none mt-3 mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          ASCEND
+        <h1 className="font-heading font-bold text-[28px] leading-tight mt-2 mb-0.5" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          Start Your Transformation
         </h1>
-        <p className="font-body text-[15px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Unlock your full glow-up potential.
+        <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Unlock your full potential
         </p>
       </div>
 
-      {/* Swipeable feature cards */}
-      <div ref={containerRef} className="flex-1 relative overflow-hidden mx-5 my-4 rounded-3xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      {/* Swipeable feature cards — fixed height so all cards are equal, no excess space */}
+      <div ref={containerRef} className="flex-shrink-0 relative overflow-hidden mx-4 my-2 rounded-3xl" style={{ background: '#141414', height: 280 }}>
         <motion.div
-          className="flex h-full"
+          className="flex"
           style={{ x, width: `${PAYWALL_CARDS.length * 100}%` }}
           drag="x"
           dragConstraints={{ left: -(PAYWALL_CARDS.length - 1) * containerW, right: 0 }}
@@ -1147,8 +1199,8 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           onDragEnd={handleDragEnd}
         >
           {PAYWALL_CARDS.map((card, i) => (
-            <div key={i} className="flex flex-col p-5 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0 }}>
-              <h2 className="font-heading font-bold text-[20px] mb-4" style={{ color: '#fff', letterSpacing: '-0.01em' }}>
+            <div key={i} className="flex flex-col p-4 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0, height: 280 }}>
+              <h2 className="font-heading font-bold text-[18px] mb-3" style={{ color: '#fff', letterSpacing: '-0.01em' }}>
                 {card.title}
               </h2>
               {card.content(scan)}
@@ -1157,33 +1209,28 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
         </motion.div>
       </div>
 
-      {/* Dots */}
+      {/* Dots — fixed size, just color change */}
       <div className="flex items-center justify-center gap-2 mb-3">
         {PAYWALL_CARDS.map((_, i) => (
-          <motion.div key={i}
-            animate={{ width: i === cardIdx ? 18 : 6, background: i === cardIdx ? G : 'rgba(255,255,255,0.25)' }}
-            style={{ height: 6, borderRadius: 99 }}
-          />
+          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === cardIdx ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
         ))}
       </div>
 
-      {/* Social proof */}
-      <p className="text-center font-body text-[12px] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
-        500,000+ scans completed
-      </p>
-
-      {/* CTA */}
-      <div className="px-5 pb-safe" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}>
+      {/* CTA — sits directly under dots, no gap */}
+      <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 6 }}>
         <motion.button
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
           onClick={() => { triggerHaptic(); onPurchase() }}
           disabled={isPurchasing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 mb-1.5 disabled:opacity-70"
           style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.4)' }}
         >
-          {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : '✦ '}
+          {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
+        <p className="text-center font-body text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          $4.99 for 1 week · then billed monthly
+        </p>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
             <button key={label} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</button>
@@ -1197,12 +1244,9 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
 // ── Invite popup (simple code share, shown when "Invite 3 Friends" is tapped) ─
 function InvitePopup({ referralCode, referralCount, onClose }) {
   const [copied, setCopied] = useState(false)
-  const [showRedeem, setShowRedeem] = useState(false)
-  const [redeemCode, setRedeemCode] = useState('')
-  const [redeemMsg, setRedeemMsg] = useState('')
-  const [redeemLoading, setRedeemLoading] = useState(false)
   const link = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
   const shareText = `I'm using Ascendus to track my glow-up. Try it free 👇 ${link}`
+  const done = referralCount >= REQUIRED
 
   async function handleCopy() {
     try { await navigator.clipboard.writeText(referralCode ?? link); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
@@ -1213,17 +1257,6 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
       if (navigator.share) await navigator.share({ title: 'Ascendus', text: shareText, url: link })
       else { await navigator.clipboard.writeText(shareText); setCopied(true); setTimeout(() => setCopied(false), 2000) }
     } catch {}
-  }
-
-  async function handleRedeem() {
-    if (!redeemCode.trim()) return
-    setRedeemLoading(true); setRedeemMsg('')
-    try {
-      await api.referral.redeem(redeemCode.trim().toUpperCase())
-      setRedeemMsg('✓ Code applied!')
-    } catch (err) {
-      setRedeemMsg(err?.message || 'Invalid code.')
-    } finally { setRedeemLoading(false) }
   }
 
   return (
@@ -1240,74 +1273,47 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
         className="w-full rounded-t-3xl flex flex-col"
         style={{ background: '#141414', border: '1px solid rgba(198,168,92,0.2)', borderBottom: 0, paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))' }}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-4">
-          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
+        {/* Drag handle + close */}
+        <div className="flex items-center justify-between px-6 pt-4 pb-1">
+          <div className="w-10 h-1 rounded-full absolute left-1/2 -translate-x-1/2 top-3" style={{ background: 'rgba(255,255,255,0.12)' }} />
+          <div />
+          <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center ml-auto">
+            <X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />
+          </button>
         </div>
 
-        <div className="px-6">
-          <h2 className="font-heading font-bold text-[22px] mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+        <div className="px-6 pt-2 pb-4">
+          <h2 className="font-heading font-bold text-[24px] mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
             Share your invite code
           </h2>
-          <p className="font-body text-[13px] mb-6" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            Invite 3 friends to unlock results
+          <p className="font-body text-[13px] mb-5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Invite {REQUIRED} friends to unlock results
           </p>
 
-          {/* Code box */}
-          <div className="flex items-center gap-3 px-5 py-4 rounded-2xl mb-2" style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.25)' }}>
-            <span className="font-heading font-bold text-[26px] flex-1 tracking-[0.15em]" style={{ color: G }}>
+          {/* Code box — tap to copy */}
+          <button
+            onClick={() => { triggerHaptic(); handleCopy() }}
+            className="w-full flex items-center gap-3 px-5 py-5 rounded-2xl mb-5 active:opacity-80"
+            style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.3)' }}
+          >
+            <span className="font-heading font-bold text-[32px] flex-1 text-left tracking-[0.22em]" style={{ color: G }}>
               {referralCode ?? '—'}
             </span>
-            <button
-              onClick={() => { triggerHaptic(); handleCopy() }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-heading font-bold text-[12px]"
-              style={{ background: copied ? 'rgba(52,199,89,0.15)' : 'rgba(198,168,92,0.15)', color: copied ? '#34C759' : G }}
+            <div
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-heading font-bold text-[13px] flex-shrink-0"
+              style={{ background: copied ? 'rgba(52,199,89,0.15)' : 'rgba(198,168,92,0.18)', color: copied ? '#34C759' : G }}
             >
-              {copied ? <><Check size={13} />Copied</> : 'Copy'}
-            </button>
-          </div>
-
-          {/* Progress */}
-          <p className="font-body text-[12px] mb-5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            {referralCount}/{REQUIRED} friends joined
-          </p>
-
-          {/* Share button */}
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { triggerHaptic(); handleShare() }}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-          >
-            <Share2 size={16} /> Share Your Link
-          </motion.button>
-
-          {/* Redeem toggle */}
-          {!showRedeem ? (
-            <button onClick={() => setShowRedeem(true)} className="w-full py-3 font-body text-[13px] text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Have a friend's code? Redeem →
-            </button>
-          ) : (
-            <div className="flex gap-2 mt-1">
-              <input
-                value={redeemCode}
-                onChange={e => setRedeemCode(e.target.value.toUpperCase().slice(0, 5))}
-                placeholder="ENTER CODE"
-                maxLength={5}
-                className="flex-1 px-4 py-3 rounded-xl font-heading font-bold text-[15px] tracking-widest text-center"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none' }}
-              />
-              <button
-                onClick={() => { triggerHaptic(); handleRedeem() }}
-                disabled={redeemLoading || redeemCode.length < 5}
-                className="px-5 py-3 rounded-xl font-heading font-bold text-[14px] disabled:opacity-40"
-                style={{ background: GRAD, color: '#0A0A0A' }}
-              >
-                {redeemLoading ? '…' : 'Go'}
-              </button>
+              {copied ? <><Check size={14} /> Copied</> : 'Copy'}
             </div>
-          )}
-          {redeemMsg && <p className="text-center text-[12px] font-body mt-2" style={{ color: redeemMsg.startsWith('✓') ? '#34C759' : RED }}>{redeemMsg}</p>}
+          </button>
+
+          {/* Friends progress */}
+          <div className="flex items-center justify-between">
+            <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              {referralCount}/{REQUIRED} friends joined{done ? ' — ready to unlock!' : ''}
+            </p>
+            {done && <Check size={16} style={{ color: '#34C759' }} />}
+          </div>
         </div>
       </motion.div>
     </motion.div>
@@ -1315,89 +1321,96 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, onAscend, onInvite, isPurchasing, error }) {
+function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, error }) {
+  const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
   const fd = scan?.faceData ?? {}
+  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 68
 
-  const potential = glowScore != null ? Math.min(10, glowScore + 1.4).toFixed(1) : null
-  const symmetry = fd.symmetry ?? null
-  const jawline = fd.jawlineDefinition ?? null
-  const skinClarity = fd.skinClarity ?? null
-  const cheekbones = fd.cheekbones ?? fd.facialProportions ?? null
-
-  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 70
-  const barColor = pct => pct >= 75 ? '#4CD964' : pct >= 55 ? '#C6A85C' : '#FF9500'
-
+  // Fixed locked display values — these are shown blurred, so they
+  // function as teaser numbers, not real scores.
   const metrics = [
-    { label: 'Overall',      pct: toBar(glowScore) },
-    { label: 'Potential',    pct: Math.min(100, toBar(glowScore) + 14) },
-    { label: 'Jawline',      pct: toBar(jawline) },
-    { label: 'Symmetry',     pct: toBar(symmetry) },
-    { label: 'Skin Clarity', pct: toBar(skinClarity) },
-    { label: 'Cheekbones',   pct: toBar(cheekbones) },
+    { label: 'Overall',      pct: 61 },
+    { label: 'Potential',    pct: 88 },
+    { label: 'Symmetry',     pct: 63 },
+    { label: 'Skin Quality', pct: 68 },
+    { label: 'Jawline',      pct: 57 },
+    { label: 'Cheekbones',   pct: 51 },
   ]
 
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
-      <div className="flex flex-col items-center px-6 pb-10"
-           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      <div className="flex flex-col items-center px-5 pb-10"
+           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+
+        {/* Close button */}
+        <div className="w-full flex justify-end mb-3">
+          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="w-8 h-8 flex items-center justify-center">
+            <X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />
+          </button>
+        </div>
 
         {/* Header */}
-        <h1 className="font-heading font-bold text-[28px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          👀 Reveal your ratings
+        <h1 className="font-heading font-bold text-[26px] text-center leading-tight mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          Reveal your ratings
         </h1>
-        <p className="font-body text-[14px] text-center mb-6 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Invite 3 friends or get Ascendus Pro to view your results
+        <p className="font-body text-[13px] text-center mb-5 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Invite 3 friends or get Ascendus Max to view your results
         </p>
 
-        {/* Face photo circle */}
-        <div className="relative mb-5" style={{ width: 112, height: 112 }}>
-          <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid #fff', background: '#111' }}>
-            {facePhoto
-              ? <img src={facePhoto} alt="Your scan" className="w-full h-full object-cover" style={{ filter: 'brightness(0.35)' }} />
-              : <div className="w-full h-full" style={{ background: '#111' }} />
-            }
+        {/* Face circle overlapping card — Umax layout */}
+        <div className="relative w-full">
+          {/* Circle sits above card, centered */}
+          <div className="flex justify-center" style={{ marginBottom: -48, position: 'relative', zIndex: 2 }}>
+            <div style={{ width: 96, height: 96, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
+              {facePhoto
+                ? <img src={facePhoto} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
+                : null}
+            </div>
           </div>
-        </div>
 
-        {/* Metrics card — Umax-style 3-column grid */}
-        <div className="w-full rounded-3xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="font-heading font-bold text-[15px] mb-3" style={{ color: '#fff' }}>Get your ratings</p>
-          <div className="grid grid-cols-3 gap-2">
-            {metrics.map(({ label, pct }) => (
-              <div key={label} className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <p className="font-body text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-                <p className="font-heading font-bold text-[22px] leading-none mb-2" style={{ color: '#fff', filter: 'blur(6px)' }}>
-                  {Math.round(pct)}
-                </p>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                  <div className="h-full rounded-full" style={{ width: '100%', background: GRAD }} />
+          {/* Metrics card — same dark as gender selection cards */}
+          <div className="w-full rounded-3xl pt-16 pb-5 px-5" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+            <div className="grid grid-cols-2 gap-x-5" style={{ rowGap: 0 }}>
+              {metrics.map(({ label, pct }, idx) => (
+                <div key={label} style={{ paddingBottom: idx < 4 ? 20 : 0 }}>
+                  {/* Label with individual lock icon */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                    <Lock size={11} style={{ color: G, flexShrink: 0 }} />
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
+                  </div>
+                  {/* Bright white blurred number */}
+                  <div style={{ width: 60, height: 22, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 8, opacity: 0.9 }} />
+                  {/* Gold bar — blurred content, unlock to see real values */}
+                  <div style={{ height: 5, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* CTAs */}
-        <motion.button
-          whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={() => { triggerHaptic(); onAscend() }}
-          disabled={isPurchasing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
-          style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-        >
-          {isPurchasing ? <Loader2 size={16} className="animate-spin" /> : '✦ '}
-          {isPurchasing ? 'Processing…' : 'Get Ascendus Pro'}
-        </motion.button>
+        {/* CTAs — more space, bigger buttons */}
+        <div className="w-full mt-8 flex flex-col gap-3.5">
+          <motion.button
+            whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+            onClick={() => { triggerHaptic(); onAscend() }}
+            disabled={isPurchasing}
+            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          >
+            {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
+            {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
+          </motion.button>
 
-        <button
-          onClick={() => { triggerHaptic(); onInvite() }}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
-        >
-          <UserPlus size={16} /> Invite 3 Friends
-        </button>
+          <button
+            onClick={() => { triggerHaptic(); onInvite() }}
+            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px]"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
+          >
+            Invite 3 Friends
+          </button>
+        </div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
@@ -1524,6 +1537,10 @@ export default function ScanUnlockGate() {
           error={purchaseError}
         />
       )}
+
+      <AnimatePresence>
+        {isPurchasing && <ProcessingOverlay key="purchasing" />}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showPaywall && !isPremium && (

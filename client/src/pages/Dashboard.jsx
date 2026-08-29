@@ -116,7 +116,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
-                  Get Ascendus Pro free
+                  Get Ascendus Max free
                 </p>
                 <p className="font-body text-[11px] text-secondary leading-snug">
                   Refer {3 - (referralCount ?? 0)} more friend{3 - (referralCount ?? 0) === 1 ? '' : 's'} to unlock

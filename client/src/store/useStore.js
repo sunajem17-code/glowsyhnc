@@ -203,6 +203,10 @@ const useStore = create(
       setAnalysisStep: (v) => set({ analysisStep: v }),
 
       // Pending scan photos (before analysis)
+      // Global scan-launch overlay (persists across route transitions)
+      scanLaunching: false,
+      setScanLaunching: (v) => set({ scanLaunching: v }),
+
       pendingFacePhoto: null,
       setPendingFacePhoto: (url) => set({ pendingFacePhoto: url }),
       clearPendingPhotos: () => set({ pendingFacePhoto: null, pendingBodyPhoto: null }),

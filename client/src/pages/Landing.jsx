@@ -56,7 +56,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Is Ascendus free to use?',
-    a: 'Yes. You get one free face scan per month with your Glow Score, sub-scores, and basic recommendations. Ascendus Pro unlocks unlimited scans, your full 12-week action plan, before & after comparisons, the HairMaxx simulator, and personalized product recommendations.',
+    a: 'Yes. You get one free face scan per month with your Glow Score, sub-scores, and basic recommendations. Ascendus Max unlocks unlimited scans, your full 12-week action plan, before & after comparisons, the HairMaxx simulator, and personalized product recommendations.',
   },
   {
     q: 'How accurate is the AI face score?',

@@ -599,7 +599,7 @@ export default function Profile() {
                 letterSpacing: '0.01em',
               }}
             >
-              Get Ascendus Pro <ArrowRight size={15} style={{ display: 'inline', verticalAlign: 'middle' }} />
+              Get Ascendus Max <ArrowRight size={15} style={{ display: 'inline', verticalAlign: 'middle' }} />
             </motion.button>
             <p className="text-center text-[10px] font-body mt-2.5" style={{ color: TEXT_DIM }}>
               Cancel anytime

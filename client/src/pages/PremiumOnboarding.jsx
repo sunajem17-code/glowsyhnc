@@ -12,36 +12,13 @@ import { isNative } from '../utils/iap'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 
 // ── Animated processing overlay (bars + "Processing" label) ──────────────────
-function ProcessingOverlay() {
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 50,
-      background: 'rgba(10,10,10,0.82)', backdropFilter: 'blur(6px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16,
-    }}>
-      <p style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 20, color: '#fff', letterSpacing: '-0.01em' }}>
-        Processing
-      </p>
-      {/* Animated equalizer bars */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 36 }}>
-        {[0, 1, 2, 3].map(i => (
-          <motion.div
-            key={i}
-            style={{ width: 7, borderRadius: 4, background: GOLD }}
-            animate={{ height: ['12px', '32px', '12px'] }}
-            transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
 import { Capacitor } from '@capacitor/core'
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
+import ProcessingOverlay from '../components/ProcessingOverlay'
 
 // Analytics collection ships disabled by default (see GoogleService-Info.plist's
 // IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
@@ -898,7 +875,7 @@ function StepAuth({ onNext }) {
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', position: 'relative' }}>
-      <AnimatePresence>{loading && <motion.div key="proc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, zIndex: 50 }}><ProcessingOverlay /></motion.div>}</AnimatePresence>
+      <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
       <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
           <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Create your account</h1>
@@ -1590,7 +1567,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           {quotaExhausted ? (
             <>
               <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Daily scan limit reached</p>
-              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day. Upgrade to Ascendus Pro for unlimited scans.</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day. Upgrade to Ascendus Max for unlimited scans.</p>
               <button
                 onClick={onDone}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"

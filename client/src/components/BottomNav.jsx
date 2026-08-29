@@ -49,15 +49,7 @@ export default function BottomNav() {
                     transition: 'color 0.2s',
                   }}
                 />
-                {isActive && (
-                  <motion.div
-                    layoutId="navGoldDot"
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-                    style={{ background: GOLD, boxShadow: `0 0 6px ${GOLD}` }}
-                    transition={SPRING_STANDARD}
-                  />
-                )}
-              </div>
+                </div>
               <span
                 className="text-[11px] font-body font-medium transition-colors duration-200"
                 style={{ color: isActive ? GOLD : 'var(--text-secondary)' }}
