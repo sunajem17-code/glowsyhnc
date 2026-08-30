@@ -135,6 +135,7 @@ export const api = {
     analyze: (scanId) => request(`/scan/analyze/${scanId}`, { method: 'POST' }),
     history: () => request('/scan/history'),
     get: (id) => request(`/scan/${id}`),
+    stats: () => request('/scan/stats'),
   },
   plan: {
     current: () => request('/plan/current'),

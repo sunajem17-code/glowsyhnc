@@ -1148,6 +1148,12 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
   const x = useMotionValue(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
+  const [totalScans, setTotalScans] = useState(null)
+
+  // Pull real scan count from server — no hardcoded numbers
+  useEffect(() => {
+    api.scan.stats().then(d => { if (d?.totalScans != null) setTotalScans(d.totalScans) }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -1168,6 +1174,10 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
     else animate(x, -cardIdx * containerW, { type: 'tween', duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
   }
 
+  // Dynamic score gap — only shown if we have a real computed score
+  const userScore = scan?.umaxScore ?? scan?.glowScore ?? null
+  const scoreGap  = userScore != null ? Math.max(0, Math.round(100 - userScore)) : null
+
   return (
     <motion.div
       initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
@@ -1180,16 +1190,30 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
         <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
           <X size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
         </button>
-        <h1 className="font-heading font-bold text-[28px] leading-tight mt-2 mb-0.5" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Start Your Transformation
+
+        {/* Live scan counter — only rendered when real data is available */}
+        {totalScans != null && (
+          <div className="flex items-center gap-2 mt-3 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#34C759' }} />
+            <p className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {totalScans.toLocaleString()} facial scans completed
+            </p>
+          </div>
+        )}
+
+        <h1 className="font-heading font-bold text-[26px] leading-tight mt-2 mb-1.5" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          {scoreGap != null && scoreGap > 0
+            ? `You're leaving ${scoreGap} points of facial potential untapped. Stop guessing and unlock your custom growth plan.`
+            : "You're leaving facial potential untapped. Stop guessing and unlock your custom growth plan."
+          }
         </h1>
-        <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Unlock your full potential
+        <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          Less than the cost of one protein shake a month to completely upgrade your look.
         </p>
       </div>
 
-      {/* Swipeable feature cards — fixed height so all cards are equal, no excess space */}
-      <div ref={containerRef} className="flex-shrink-0 relative overflow-hidden mx-4 my-2 rounded-3xl" style={{ background: '#141414', height: 280 }}>
+      {/* Swipeable feature cards */}
+      <div ref={containerRef} className="flex-shrink-0 relative overflow-hidden mx-4 my-2 rounded-3xl" style={{ background: '#141414', height: 240 }}>
         <motion.div
           className="flex"
           style={{ x, width: `${PAYWALL_CARDS.length * 100}%` }}
@@ -1199,7 +1223,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           onDragEnd={handleDragEnd}
         >
           {PAYWALL_CARDS.map((card, i) => (
-            <div key={i} className="flex flex-col p-4 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0, height: 280 }}>
+            <div key={i} className="flex flex-col p-4 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0, height: 240 }}>
               <h2 className="font-heading font-bold text-[18px] mb-3" style={{ color: '#fff', letterSpacing: '-0.01em' }}>
                 {card.title}
               </h2>
@@ -1209,26 +1233,29 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
         </motion.div>
       </div>
 
-      {/* Dots — fixed size, just color change */}
+      {/* Dots */}
       <div className="flex items-center justify-center gap-2 mb-3">
         {PAYWALL_CARDS.map((_, i) => (
           <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === cardIdx ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
         ))}
       </div>
 
-      {/* CTA — sits directly under dots, no gap */}
-      <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 6 }}>
+      {/* CTA */}
+      <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 4 }}>
         <motion.button
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
           onClick={() => { triggerHaptic(); onPurchase() }}
           disabled={isPurchasing}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 mb-1.5 disabled:opacity-70"
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.4)' }}
         >
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
-        <p className="text-center font-body text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        <p className="text-center font-body text-[12px] mt-2 mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          No commitment. Cancel with one tap in your settings anytime.
+        </p>
+        <p className="text-center font-body text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.2)' }}>
           $4.99 for 1 week · then billed monthly
         </p>
         <div className="flex items-center justify-center gap-5">

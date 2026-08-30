@@ -5,6 +5,8 @@ import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLin
 import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
+import hypergamyChart from '../assets/hypergamy-chart.png'
+import haloEffectImg from '../assets/halo-effect.webp'
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
@@ -1005,6 +1007,132 @@ function StepAuth({ onNext }) {
             Skip for now (dev only)
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Halo Effect / Why Looksmax ─────────────────────────────────────────
+function StepHaloEffect({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const G_BORDER = 'rgba(198,168,92,0.28)'
+  const TEXT = '#FFFFFF'
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Scrollable top */}
+      {/* Image fills all space above card */}
+      <div style={{ flex: '1 1 0', minHeight: 0, position: 'relative' }}>
+        <BackBtn onBack={onBack} />
+        <img src={haloEffectImg} alt="The Halo Effect" style={{ width: '100%', height: '100%', maxHeight: 240, objectFit: 'cover', display: 'block' }} />
+      </div>
+
+      {/* Bottom card */}
+      <div style={{ flexShrink: 0, padding: '0 16px 28px' }}>
+        <div style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, margin: 0 }}>THE HALO EFFECT</p>
+          <h2 className="font-heading font-bold text-[20px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
+            Your face decides how the world treats you.
+          </h2>
+          <p className="font-body text-[12.5px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+            Better-looking people earn more, get hired faster, and are trusted immediately. Looksmaxing is not vanity — it is giving yourself every structural advantage life rewards.
+          </p>
+          <GoldBtn label="Next" onClick={onNext} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Hypergamy ───────────────────────────────────────────────────────────
+function StepHypergamy({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const G_BORDER = 'rgba(198,168,92,0.28)'
+  const TEXT = '#FFFFFF'
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A' }}>
+      {/* Header + chart — padded so card doesn't overlap */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '56px 24px 12px' }}>
+        <BackBtn onBack={onBack} />
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
+          EVOLUTIONARY BIOLOGY
+        </p>
+        <h1 className="font-heading font-bold text-[24px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
+          Dating apps changed the rules.
+        </h1>
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', marginBottom: 16 }}>
+          The top 20% get 80% of the attention — unless you optimize your structure.
+        </p>
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: `1.5px solid ${G_BORDER}` }}>
+          <img src={hypergamyChart} alt="Hypergamy data chart" style={{ display: 'block', width: '100%' }} />
+        </div>
+      </div>
+
+      {/* Bottom card — locked to bottom */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 24px' }}>
+        <div style={{
+          background: '#141414',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 24,
+          padding: '12px 16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <h2 className="font-heading font-bold text-[14px]" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
+            Hypergamy
+          </h2>
+          <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+            Modern dating apps changed the math completely. Women now have instant access to top tier profiles globally, meaning the average guy is no longer just competing locally. Right now 80% of attention goes to the top 20% of men, leaving the rest nearly invisible in a crowded digital marketplace.{' '}
+            <span style={{ color: 'rgba(255,255,255,0.88)' }}>The good news is it is not about luck. It is all about optimization.</span>{' '}
+            Once you figure out where you actually stand structurally, you can stop guessing, start maximizing your potential, and command the attention you deserve.
+          </p>
+          <GoldBtn label="Find out where you rank" onClick={onNext} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Why Appearance Matters ──────────────────────────────────────────────
+function StepWhyAppearance({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const G_BORDER = 'rgba(198,168,92,0.28)'
+  const TEXT = '#FFFFFF'
+  const BG = '#0A0A0A'
+  const stats = [
+    { value: '12%', label: 'more income earned by attractive people on average', cite: 'Hamermesh & Biddle, 1994' },
+    { value: '72%', label: 'of people say appearance affects their first impression within seconds', cite: 'Princeton Social Cognition Lab' },
+    { value: '3×', label: 'more likely to be seen as competent, trustworthy, and likeable', cite: 'Physical Attractiveness Research' },
+  ]
+  return (
+    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+      <BackBtn onBack={onBack} />
+      <div className="flex-1 flex flex-col justify-center pt-10 pb-4">
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-3" style={{ color: G }}>
+          THE SCIENCE
+        </p>
+        <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
+          Appearance isn't shallow. It's strategic.
+        </h1>
+        <p className="font-body text-[14px] leading-snug mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Research consistently shows that physical appearance affects how you're perceived — in dating, career, and social life.
+        </p>
+        <div className="flex flex-col gap-4">
+          {stats.map(s => (
+            <div key={s.value} className="rounded-2xl px-5 py-5" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-4">
+                <span className="font-heading font-bold text-[26px] shrink-0 w-14 text-center" style={{ color: G }}>{s.value}</span>
+                <div className="flex flex-col">
+                  <span className="font-body text-[15px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
+                  <p className="font-body text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.cite}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="pb-8">
+        <GoldBtn label="Next" onClick={onNext} />
       </div>
     </div>
   )
@@ -2274,7 +2402,7 @@ export default function PremiumOnboarding() {
   }
 
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
-  const TOTAL_STEPS = 5
+  const TOTAL_STEPS = 7
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -2344,9 +2472,11 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=gender, 1=primaryGoal, 2=referral, 3=notifications, 4=auth
+  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=referral, 5=notifications, 6=auth
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
+    <StepHaloEffect key="haloEffect" onNext={goNext} onBack={goBack} />,
+    <StepWhyAppearance key="whyAppearance" onNext={goNext} onBack={goBack} />,
     <StepPrimaryGoal key="primaryGoal" data={formData} onChange={updateField} onNext={goNext} onBack={goBack} />,
     <StepReferral key="referral" onNext={goNext} />,
     <StepNotifications key="notifications" onNext={goNext} />,
