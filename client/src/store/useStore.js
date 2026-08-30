@@ -215,6 +215,10 @@ const useStore = create(
       gender: null, // null = not selected yet, 'male' | 'female'
       setGender: (g) => set({ gender: g }),
 
+      // Primary goal selected during onboarding
+      primaryGoal: null, // 'dating' | 'jawline' | 'skin' | 'glow'
+      setPrimaryGoal: (g) => set({ primaryGoal: g }),
+
       // Hair type (detected by AI or selected manually by user)
       hairType: null, // null = not set, 'straight'|'wavy'|'curly'|'coily'|'locs'|'bald'
       setHairType: (t) => set({ hairType: t }),

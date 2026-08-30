@@ -22,3 +22,4 @@ dist/
 .env*.local
 server/awesome-claude-agents/
 .impeccable/
+.env*

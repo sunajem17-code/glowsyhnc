@@ -815,12 +815,45 @@ function StepNotifications({ onNext }) {
 
 // ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
 function StepAuth({ onNext }) {
-  const [loading, setLoading] = useState(null) // 'apple' | 'google' | null
-  const [error, setError]     = useState('')
+  const [loading, setLoading]       = useState(null) // 'apple' | 'google' | 'email' | null
+  const [error, setError]           = useState('')
+  const [titleTaps, setTitleTaps]   = useState(0)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [passInput, setPassInput]   = useState('')
   const setAuth = useStore(s => s.setAuth)
   const isAuthenticated = useStore(s => s.isAuthenticated)
   const isGuest         = useStore(s => s.isGuest)
   const user            = useStore(s => s.user)
+
+  function handleTitleTap() {
+    const next = titleTaps + 1
+    setTitleTaps(next)
+    if (next >= 5) { setShowEmailForm(true); setTitleTaps(0) }
+  }
+
+  async function handleEmailLogin() {
+    if (!emailInput || !passInput) return
+    triggerHaptic()
+    setError('')
+    setLoading('email')
+    try {
+      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, password: passInput }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Login failed')
+      setAuth(data.user, data.token)
+      onNext()
+    } catch (err) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setLoading(null)
+    }
+  }
 
   // Already signed in on native — skip this step (web stays for dev visibility)
   useEffect(() => {
@@ -878,7 +911,7 @@ function StepAuth({ onNext }) {
       <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
       <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Create your account</h1>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>Create your account</h1>
         </motion.div>
       </div>
 
@@ -934,23 +967,150 @@ function StepAuth({ onNext }) {
           </span>
         </motion.button>
 
+        {showEmailForm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={passInput}
+              onChange={e => setPassInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
+            />
+            <button
+              onClick={handleEmailLogin}
+              disabled={!!loading}
+              style={{ width: '100%', padding: '16px 0', borderRadius: 50, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
+            >
+              {loading === 'email' ? 'Signing in…' : 'Sign in'}
+            </button>
+          </div>
+        )}
+
         {error ? (
           <p className="text-center font-body text-[12px]" style={{ color: '#E85D9E' }}>{error}</p>
         ) : null}
 
-        {/* TODO: remove before launch */}
-        <button
-          onClick={() => { triggerHaptic(); onNext() }}
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', marginTop: 8, textDecoration: 'underline' }}
-        >
-          Skip for now (dev only)
-        </button>
+        {import.meta.env.DEV && (
+          <button
+            onClick={() => { triggerHaptic(); onNext() }}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', marginTop: 8, textDecoration: 'underline' }}
+          >
+            Skip for now (dev only)
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
+// ── STEP: Primary Goal ───────────────────────────────────────────────────────
+const PRIMARY_GOAL_OPTIONS = [
+  {
+    key: 'dating',
+    emoji: '💬',
+    label: 'Dating & Social Confidence',
+    desc: 'Look better in photos, on dating apps, and in person.',
+  },
+  {
+    key: 'jawline',
+    emoji: '🦷',
+    label: 'Jawline & Face Shape',
+    desc: 'Get a sharper jaw, better lower face structure, and stronger facial posture.',
+  },
+  {
+    key: 'skin',
+    emoji: '✨',
+    label: 'Skin Quality & Tone',
+    desc: 'Clear up acne, fix texture, and build a simple high-impact skincare routine.',
+  },
+  {
+    key: 'glow',
+    emoji: '🏆',
+    label: 'Total Glow-Up & Symmetry',
+    desc: 'Get a complete breakdown of your facial ratios and find out your maximum potential score.',
+  },
+]
+
+function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
+  const selected = data.primaryGoal || ''
+
+  function pick(key) {
+    onChange('primaryGoal', key)
+    setTimeout(onNext, 220)
+  }
+
+  return (
+    <div className="flex flex-col h-full px-5" style={{ background: BG }}>
+      <BackBtn onBack={onBack} />
+      <div className="flex-1 flex flex-col justify-center pt-16 pb-4">
+        <div className="mb-7">
+          <h1
+            className="font-heading font-bold text-[26px] leading-tight mb-2"
+            style={{ color: TEXT, letterSpacing: '-0.02em' }}
+          >
+            What do you want to fix or improve first?
+          </h1>
+          <p className="font-body text-[14px]" style={{ color: DIM }}>
+            Pick your main goal so we can customize your score and action plan.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {PRIMARY_GOAL_OPTIONS.map(({ key, emoji, label, desc }) => {
+            const isSelected = selected === key
+            return (
+              <motion.button
+                key={key}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => pick(key)}
+                className="flex items-start gap-4 px-4 py-4 rounded-2xl text-left transition-all duration-150"
+                style={{
+                  background: isSelected ? 'rgba(198,168,92,0.10)' : SURFACE,
+                  border: `1.5px solid ${isSelected ? G : BORDER}`,
+                }}
+              >
+                <span className="text-[26px] leading-none mt-0.5 flex-shrink-0">{emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-heading font-semibold text-[15px] leading-snug mb-1"
+                    style={{ color: isSelected ? G : TEXT }}
+                  >
+                    {label}
+                  </p>
+                  <p className="font-body text-[12px] leading-snug" style={{ color: DIM }}>
+                    {desc}
+                  </p>
+                </div>
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                  style={{
+                    background: isSelected ? G : 'transparent',
+                    border: isSelected ? 'none' : '1.5px solid rgba(255,255,255,0.15)',
+                  }}
+                >
+                  {isSelected && (
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                      <path d="M1 3.5L3.5 6L8 1" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </motion.button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const FOCUS_OPTIONS = [
   { key: 'jawline',   Icon: Bone,      label: 'Jawline & Chin' },
   { key: 'skin',      Icon: Sparkles,  label: 'Skin Quality' },
@@ -1942,6 +2102,7 @@ export default function PremiumOnboarding() {
   const setLegalConsented  = useStore(s => s.setLegalConsented)
   const setAgeConfirmed    = useStore(s => s.setAgeConfirmed)
   const setGender          = useStore(s => s.setGender)
+  const setPrimaryGoal     = useStore(s => s.setPrimaryGoal)
   const setAssignedPhase   = useStore(s => s.setAssignedPhase)
   const setUnits           = useStore(s => s.setUnits)
   const setAuth            = useStore(s => s.setAuth)
@@ -1990,7 +2151,7 @@ export default function PremiumOnboarding() {
   const [signingIn, setSigningIn] = useState(false)
 
   const [formData, setFormData] = useState({
-    gender: '', goal: '',
+    gender: '', goal: '', primaryGoal: '',
     improvementFocus: [],
     ...draft?.formData,
   })
@@ -2100,6 +2261,7 @@ export default function PremiumOnboarding() {
   function handleFinalDone() {
     clearDraft()
     setGender(formData.gender || null)
+    if (formData.primaryGoal) setPrimaryGoal(formData.primaryGoal)
     setLegalConsented()
     setAgeConfirmed()
     // If user skipped auth, set a guest session so ProtectedRoute doesn't block
@@ -2112,7 +2274,7 @@ export default function PremiumOnboarding() {
   }
 
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
-  const TOTAL_STEPS = 4
+  const TOTAL_STEPS = 5
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -2182,9 +2344,10 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
+  // Flow: 0=gender, 1=primaryGoal, 2=referral, 3=notifications, 4=auth
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
+    <StepPrimaryGoal key="primaryGoal" data={formData} onChange={updateField} onNext={goNext} onBack={goBack} />,
     <StepReferral key="referral" onNext={goNext} />,
     <StepNotifications key="notifications" onNext={goNext} />,
     <StepAuth key="auth" onNext={handleFinalDone} />,
