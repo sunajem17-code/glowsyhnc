@@ -877,26 +877,39 @@ function StepAuth({ onNext }) {
       if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
 
       const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-      const authRes = await fetch(`${API_BASE}/api/auth/apple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identityToken,
-          user: appleResult.response.user,
-          email: appleResult.response.email,
-          fullName: appleResult.response.fullName,
-          guestUserId: isGuest ? user?.id : undefined,
-        }),
-      })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20_000)
+      let authRes
+      try {
+        authRes = await fetch(`${API_BASE}/api/auth/apple`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identityToken,
+            user: appleResult.response.user,
+            email: appleResult.response.email,
+            fullName: appleResult.response.fullName,
+            guestUserId: isGuest ? user?.id : undefined,
+          }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
       const authData = await authRes.json()
       if (!authRes.ok) throw new Error(authData.error || 'Authentication failed')
       setAuth(authData.user, authData.token)
       onNext()
     } catch (err) {
-      if (err?.message?.toLowerCase().includes('cancel')) {
-        // user dismissed the sheet — not an error
-      } else {
-        setError(err.message || 'Sign in failed. Please try again.')
+      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
+        || err?.name === 'AbortError' && false // AbortError IS our timeout — fall through
+        || err?.message?.toLowerCase().includes('cancel')
+        || err?.message?.toLowerCase().includes('dismissed')
+      if (!isCancelled) {
+        const msg = err?.name === 'AbortError'
+          ? 'Sign in timed out. Please check your connection and try again.'
+          : (err.message || 'Sign in failed. Please try again.')
+        setError(msg)
       }
     } finally {
       setLoading(null)
@@ -1012,6 +1025,115 @@ function StepAuth({ onNext }) {
   )
 }
 
+// ── Halo Effect SVG Diagram ───────────────────────────────────────────────────
+function HaloEffectDiagram() {
+  const G = '#C6A85C'
+  return (
+    <svg viewBox="0 0 340 220" width="100%" style={{ display: 'block' }} xmlns="http://www.w3.org/2000/svg">
+      {/* Background */}
+      <rect width="340" height="220" fill="#111111" rx="14"/>
+
+      {/* Divider */}
+      <line x1="170" y1="16" x2="170" y2="204" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+
+      {/* ── LEFT: Higher Attractiveness ── */}
+      <text x="85" y="28" textAnchor="middle" fill="white" fontFamily="sans-serif" fontSize="11" fontWeight="700">Higher Attractiveness</text>
+
+      {/* Golden glow behind face */}
+      <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#C6A85C" stopOpacity="0.35"/>
+        <stop offset="100%" stopColor="#C6A85C" stopOpacity="0"/>
+      </radialGradient>
+      <ellipse cx="85" cy="95" rx="52" ry="60" fill="url(#glow)"/>
+
+      {/* Attractive face */}
+      {/* Head */}
+      <ellipse cx="85" cy="88" rx="30" ry="36" fill="#3d2b1f"/>
+      {/* Hair */}
+      <path d="M55 72 Q57 48 85 44 Q113 48 115 72 Q105 56 85 54 Q65 56 55 72Z" fill="#5a3515"/>
+      {/* Side hair */}
+      <path d="M55 72 Q52 80 54 90" stroke="#5a3515" strokeWidth="4" fill="none" strokeLinecap="round"/>
+      <path d="M115 72 Q118 80 116 90" stroke="#5a3515" strokeWidth="4" fill="none" strokeLinecap="round"/>
+      {/* Strong jawline */}
+      <path d="M58 100 Q60 124 85 130 Q110 124 112 100" fill="#3a2518"/>
+      {/* Eyes */}
+      <ellipse cx="74" cy="84" rx="6" ry="5" fill="white"/>
+      <ellipse cx="96" cy="84" rx="6" ry="5" fill="white"/>
+      <ellipse cx="75" cy="84" rx="3" ry="3" fill="#1a0f08"/>
+      <ellipse cx="97" cy="84" rx="3" ry="3" fill="#1a0f08"/>
+      <ellipse cx="76" cy="83" rx="1" ry="1" fill="white"/>
+      <ellipse cx="98" cy="83" rx="1" ry="1" fill="white"/>
+      {/* Eyebrows strong */}
+      <path d="M68 78 Q74 75 80 77" stroke="#4a2e10" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M90 77 Q96 75 102 78" stroke="#4a2e10" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      {/* Nose */}
+      <path d="M85 88 L82 100 Q85 103 88 100 L85 88" fill="#2e1f10" opacity="0.6"/>
+      {/* Confident smile */}
+      <path d="M73 110 Q85 120 97 110" stroke="#c07850" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      {/* Chin */}
+      <path d="M75 124 Q85 132 95 124" stroke="#2e1f10" strokeWidth="1.5" fill="none"/>
+      {/* Collar / suit */}
+      <path d="M55 140 Q60 130 75 132 L85 140 L95 132 Q110 130 115 140 L120 160 L50 160Z" fill="#2a2a2a"/>
+      <path d="M75 132 L85 148 L95 132" fill="#3a3a3a"/>
+      <rect x="83" y="132" width="4" height="16" fill="#e8e0d0" opacity="0.4"/>
+
+      {/* Gold pills left */}
+      {/* Row 1 */}
+      <rect x="26" y="163" width="72" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="62" y="174" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Trustworthy</text>
+      <rect x="102" y="163" width="60" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="132" y="174" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Competent</text>
+      {/* Row 2 */}
+      <rect x="16" y="183" width="58" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="45" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Confident</text>
+      <rect x="78" y="183" width="60" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="108" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Successful</text>
+      <rect x="142" y="183" width="52" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="168" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Likeable</text>
+
+      {/* ── RIGHT: Lower Attractiveness ── */}
+      <text x="255" y="28" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontFamily="sans-serif" fontSize="11" fontWeight="700">Lower Attractiveness</text>
+
+      {/* Plain face */}
+      <ellipse cx="255" cy="90" rx="28" ry="34" fill="#222222" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+      {/* Sparse hair */}
+      <path d="M227 76 Q232 62 255 60 Q270 62 275 70" stroke="rgba(255,255,255,0.2)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M228 76 Q225 68 230 62" stroke="rgba(255,255,255,0.15)" strokeWidth="2" fill="none"/>
+      {/* Eyes droopy */}
+      <ellipse cx="244" cy="86" rx="5.5" ry="4" fill="rgba(255,255,255,0.7)"/>
+      <ellipse cx="266" cy="86" rx="5.5" ry="4" fill="rgba(255,255,255,0.7)"/>
+      <ellipse cx="244" cy="87" rx="3" ry="2.5" fill="#555"/>
+      <ellipse cx="266" cy="87" rx="3" ry="2.5" fill="#555"/>
+      {/* Bags under eyes */}
+      <path d="M239 91 Q244 94 249 91" stroke="rgba(255,255,255,0.15)" strokeWidth="1" fill="none"/>
+      <path d="M261 91 Q266 94 271 91" stroke="rgba(255,255,255,0.15)" strokeWidth="1" fill="none"/>
+      {/* Nose bulbous */}
+      <ellipse cx="255" cy="102" rx="6" ry="5" fill="#2a2a2a" stroke="rgba(255,255,255,0.1)" strokeWidth="0.8"/>
+      {/* Frown */}
+      <path d="M244 114 Q255 108 266 114" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      {/* Jowls */}
+      <path d="M229 108 Q226 118 232 124" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none"/>
+      <path d="M281 108 Q284 118 278 124" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none"/>
+      {/* Worn shirt */}
+      <path d="M227 142 Q232 132 245 134 L255 142 L265 134 Q278 132 283 142 L288 162 L222 162Z" fill="#2a2520"/>
+      <path d="M245 134 L255 150 L265 134" fill="#332d28"/>
+
+      {/* Gray pills right */}
+      <rect x="178" y="163" width="72" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="214" y="174" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Less Capable</text>
+      <rect x="254" y="163" width="80" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="294" y="174" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Less Trustworthy</text>
+
+      <rect x="178" y="183" width="62" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="209" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Overlooked</text>
+      <rect x="244" y="183" width="52" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="270" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Average</text>
+      <rect x="300" y="183" width="32" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="316" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="7.5" fontWeight="600">Forget.</text>
+    </svg>
+  )
+}
+
 // ── STEP: Halo Effect / Why Looksmax ─────────────────────────────────────────
 function StepHaloEffect({ onNext, onBack }) {
   const G = '#C6A85C'
@@ -1020,18 +1142,31 @@ function StepHaloEffect({ onNext, onBack }) {
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Scrollable top */}
-      {/* Image fills all space above card */}
-      <div style={{ flex: '1 1 0', minHeight: 0, position: 'relative' }}>
+      {/* Scrollable top */}
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '72px 16px 16px' }}>
         <BackBtn onBack={onBack} />
-        <img src={haloEffectImg} alt="The Halo Effect" style={{ width: '100%', height: '100%', maxHeight: 240, objectFit: 'cover', display: 'block' }} />
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
+          THE HALO EFFECT
+        </p>
+        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
+          Your face decides how the world treats you.
+        </h1>
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
+          Science proves it — people instantly judge your intelligence, confidence, and success based on your looks alone.
+        </p>
+        <div style={{ borderRadius: 14, overflow: 'hidden', border: `1.5px solid ${G_BORDER}` }}>
+          <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%' }} />
+        </div>
+        <p className="font-body text-[11.5px] text-center mt-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          Same person. Different first impression. Science calls it the Halo Effect.
+        </p>
       </div>
 
       {/* Bottom card */}
       <div style={{ flexShrink: 0, padding: '0 16px 28px' }}>
         <div style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, margin: 0 }}>THE HALO EFFECT</p>
-          <h2 className="font-heading font-bold text-[20px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
-            Your face decides how the world treats you.
+          <h2 className="font-heading font-bold text-[18px]" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
+            Why You Need to Looksmax
           </h2>
           <p className="font-body text-[12.5px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
             Better-looking people earn more, get hired faster, and are trusted immediately. Looksmaxing is not vanity — it is giving yourself every structural advantage life rewards.
