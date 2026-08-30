@@ -37,6 +37,7 @@ const Community      = lazy(() => import('./pages/Community'))
 const SettingsScreen = lazy(() => import('./pages/Settings'))
 const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
+const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -193,6 +194,7 @@ export default function App() {
                 <Route path="hairmaxx" element={<HairMaxx />} />
                 <Route path="leaderboard" element={<Leaderboard />} />
                 <Route path="compare" element={<Compare />} />
+                <Route path="history" element={<ScanHistory />} />
                 <Route path="coach" element={<AICoach />} />
                 <Route path="swipemaxx" element={<SwipeMaxx />} />
                 <Route path="tindermaxx" element={<TinderMaxx />} />

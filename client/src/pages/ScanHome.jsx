@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Moon } from 'lucide-react'
+import { Camera, ChevronRight, Dumbbell, Moon, History } from 'lucide-react'
 import useStore from '../store/useStore'
 const isPremiumSelector = s => s.isPremium
 const setScanLaunchingSelector = s => s.setScanLaunching
@@ -218,10 +218,26 @@ export default function ScanHome() {
         : 'Come back tomorrow to start a streak!')
     : null
 
-  // Cards: Face Scan → Physique Scan
+  // Cards: Face Scan → Physique Scan → History
   const cards = [
     { id: 'face',    el: <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} /> },
     { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/workout-plan')} /> },
+    { id: 'history', el: (
+      <CardShell
+        eyebrow="SCAN HISTORY"
+        title="Past Scans"
+        body="View all your previous scan results and track your score over time."
+        cta="View History"
+        icon={History}
+        onAction={() => navigate('/history')}
+        visualClassName="aspect-[4/5] flex-shrink-0"
+        visual={
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
+            <History size={48} style={{ color: 'rgba(198,168,92,0.35)' }} />
+          </div>
+        }
+      />
+    )},
   ]
 
   function goTo(idx) {
