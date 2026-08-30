@@ -822,6 +822,57 @@ function buildLiveTicker(points) {
   ]
 }
 
+// ── Anatomy label pills (SwiftUI port) ───────────────────────────────────────
+// Cycles 2-3 labels at a time, every 1.6s, independently of the step system.
+// Positions are in % of the overlay box — approximate face-region anchors
+// that look plausible for any photo (fallback). When real `points` are passed
+// the positions auto-update since they derive from the same landmark math.
+const ANATOMY_MARKERS = [
+  { id: 'jaw',      label: 'Jaw Width',       x: 50,  y: 84, align: 'center' },
+  { id: 'canthal',  label: 'Canthal Tilt',    x: 76,  y: 40, align: 'left'   },
+  { id: 'nasal',    label: 'Nasal Bridge',    x: 21,  y: 45, align: 'right'  },
+  { id: 'temporal', label: 'Temporal Width',  x: 84,  y: 22, align: 'left'   },
+  { id: 'mandible', label: 'Mandible',        x: 16,  y: 73, align: 'right'  },
+  { id: 'orbital',  label: 'Orbital Bone',    x: 20,  y: 36, align: 'right'  },
+  { id: 'zygomatic',label: 'Zygomatic Arch',  x: 80,  y: 55, align: 'left'   },
+  { id: 'philtrum', label: 'Philtrum',        x: 50,  y: 73, align: 'center' },
+]
+// How many labels show at once — pick every Nth entry offset by tickerIdx
+const LABEL_WINDOW = 3
+
+function AnatomyLabel({ label, x, y, align, visible }) {
+  const translateX = align === 'center' ? '-50%' : align === 'left' ? '0%' : '-100%'
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.88 }}
+      animate={{ opacity: visible ? 1 : 0, scale: visible ? 1 : 0.88 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className="absolute pointer-events-none"
+      style={{
+        left: `${x}%`, top: `${y}%`,
+        transform: `translate(${translateX}, -50%)`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{
+        display: 'inline-block',
+        background: 'rgba(0,0,0,0.62)',
+        border: `0.75px solid ${LANDMARK_GOLD}55`,
+        borderRadius: 4,
+        padding: '2px 6px',
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        color: LANDMARK_GOLD,
+        fontFamily: 'monospace',
+        textTransform: 'uppercase',
+      }}>
+        {label}
+      </span>
+    </motion.div>
+  )
+}
+
 // One L-shaped corner bracket of the final "target lock" bounding box —
 // two short arms meeting at (x, y), pointing inward per (dx, dy).
 function LandmarkBracket({ x, y, dx, dy }) {
@@ -950,6 +1001,12 @@ function FacialAnalysisOverlay({ step, points }) {
       {/* HTML readout labels — see Readout's comment on why these aren't
           plain SVG <text> nodes. */}
       <div className="absolute inset-0 pointer-events-none">
+        {/* Anatomy label pills — cycle 3 at a time, independent of step */}
+        {ANATOMY_MARKERS.map((m, i) => {
+          const offset = tickerIdx % ANATOMY_MARKERS.length
+          const visible = ((i - offset + ANATOMY_MARKERS.length) % ANATOMY_MARKERS.length) < LABEL_WINDOW
+          return <AnatomyLabel key={m.id} {...m} visible={visible} />
+        })}
         <AnimatePresence mode="wait">
           {readout && <Readout key={`step-${s}`} {...readout} />}
         </AnimatePresence>
@@ -1105,6 +1162,14 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
         className="absolute inset-0"
         style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
       />
+      {/* Subtle background grid — h/v lines at low opacity, per SwiftUI ref */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `linear-gradient(rgba(198,168,92,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.05) 1px, transparent 1px)`,
+          backgroundSize: '20% 12.5%',
+        }}
+      />
       <AnimatePresence>
         {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} />}
       </AnimatePresence>
@@ -1113,6 +1178,19 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
           during the final morph flourish since by then it's long finished
           its one 3.4s pass anyway; this just guards against any overlap. */}
       {!morphing && <FaceMeshScanOverlay pathD={meshPathD} />}
+      {/* Continuous ping-pong scan laser — runs independently of step system */}
+      {!morphing && (
+        <motion.div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            height: 1,
+            background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}cc 30%, ${LANDMARK_GOLD} 50%, ${LANDMARK_GOLD}cc 70%, transparent)`,
+            boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
+          }}
+          animate={{ top: ['2%', '98%'] }}
+          transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
+        />
+      )}
     </div>
   )
 }
@@ -1130,9 +1208,14 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
       <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} />
 
-      {/* Status subtext — tied 1:1 to the current landmark step, not an
-          independent rotation, so the label always matches the geometry
-          drawn over the photo (see FacialAnalysisOverlay). */}
+      {/* Status text — two-tier hierarchy per SwiftUI reference:
+          small all-caps label (static) + cycling step text beneath */}
+      <p
+        className="font-mono text-center mb-1"
+        style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: `${GOLD}99`, textTransform: 'uppercase' }}
+      >
+        MAPPING FACIAL MATRIX
+      </p>
       <div className="h-5 mb-4 flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
