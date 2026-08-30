@@ -130,7 +130,7 @@ function BackBtn({ onBack }) {
       onClick={onBack}
       aria-label="Go back"
       className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 28px)' }}
     >
       <ChevronLeft size={18} style={{ color: DIM }} />
     </button>
@@ -868,11 +868,14 @@ function StepAuth({ onNext }) {
     setLoading('apple')
     try {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-      const appleResult = await SignInWithApple.authorize({
-        clientId: 'com.ascendus.app',
-        scopes: 'email name',
-        nonce: Math.random().toString(36).substring(2, 15),
-      })
+      const appleResult = await Promise.race([
+        SignInWithApple.authorize({
+          clientId: 'com.ascendus.app',
+          scopes: 'email name',
+          nonce: Math.random().toString(36).substring(2, 15),
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+      ])
       const identityToken = appleResult?.response?.identityToken
       if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
 
@@ -902,14 +905,10 @@ function StepAuth({ onNext }) {
       onNext()
     } catch (err) {
       const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
-        || err?.name === 'AbortError' && false // AbortError IS our timeout — fall through
         || err?.message?.toLowerCase().includes('cancel')
         || err?.message?.toLowerCase().includes('dismissed')
       if (!isCancelled) {
-        const msg = err?.name === 'AbortError'
-          ? 'Sign in timed out. Please check your connection and try again.'
-          : (err.message || 'Sign in failed. Please try again.')
-        setError(msg)
+        setError(err.message || 'Sign in failed. Please try again.')
       }
     } finally {
       setLoading(null)
@@ -1012,14 +1011,6 @@ function StepAuth({ onNext }) {
           <p className="text-center font-body text-[12px]" style={{ color: '#E85D9E' }}>{error}</p>
         ) : null}
 
-        {import.meta.env.DEV && (
-          <button
-            onClick={() => { triggerHaptic(); onNext() }}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', marginTop: 8, textDecoration: 'underline' }}
-          >
-            Skip for now (dev only)
-          </button>
-        )}
       </div>
     </div>
   )
@@ -1151,28 +1142,17 @@ function StepHaloEffect({ onNext, onBack }) {
         <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
           Your face decides how the world treats you.
         </h1>
-        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-          Science proves it — people instantly judge your intelligence, confidence, and success based on your looks alone.
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>
+          Science proves it. People instantly judge your intelligence, confidence, and success based on your looks alone.
         </p>
-        <div style={{ borderRadius: 14, overflow: 'hidden', border: `1.5px solid ${G_BORDER}` }}>
+        <div style={{ borderRadius: 14, overflow: 'hidden', margin: '0 -16px', border: '1.5px solid rgba(255,255,255,0.18)' }}>
           <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%' }} />
         </div>
-        <p className="font-body text-[11.5px] text-center mt-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
-          Same person. Different first impression. Science calls it the Halo Effect.
-        </p>
       </div>
 
-      {/* Bottom card */}
+      {/* Bottom button */}
       <div style={{ flexShrink: 0, padding: '0 16px 28px' }}>
-        <div style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <h2 className="font-heading font-bold text-[18px]" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
-            Why You Need to Looksmax
-          </h2>
-          <p className="font-body text-[12.5px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
-            Better-looking people earn more, get hired faster, and are trusted immediately. Looksmaxing is not vanity — it is giving yourself every structural advantage life rewards.
-          </p>
-          <GoldBtn label="Next" onClick={onNext} />
-        </div>
+        <GoldBtn label="Next" onClick={onNext} />
       </div>
     </div>
   )
@@ -1242,24 +1222,24 @@ function StepWhyAppearance({ onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-10 pb-4">
+      <div className="flex-1 flex flex-col justify-start pt-20 pb-4">
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-3" style={{ color: G }}>
           THE SCIENCE
         </p>
         <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Appearance isn't shallow. It's strategic.
         </h1>
-        <p className="font-body text-[14px] leading-snug mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <p className="font-body text-[14px] leading-snug mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>
           Research consistently shows that physical appearance affects how you're perceived — in dating, career, and social life.
         </p>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           {stats.map(s => (
-            <div key={s.value} className="rounded-2xl px-5 py-5" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center gap-4">
-                <span className="font-heading font-bold text-[26px] shrink-0 w-14 text-center" style={{ color: G }}>{s.value}</span>
+            <div key={s.value} className="rounded-2xl px-6 py-7" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-5">
+                <span className="font-heading font-bold text-[32px] shrink-0 w-16 text-center" style={{ color: G }}>{s.value}</span>
                 <div className="flex flex-col">
-                  <span className="font-body text-[15px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
-                  <p className="font-body text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.cite}</p>
+                  <span className="font-body text-[18px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
+                  <p className="font-body text-[12px] mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.cite}</p>
                 </div>
               </div>
             </div>
@@ -1313,8 +1293,8 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-5" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-16 pb-4">
-        <div className="mb-7">
+      <div className="flex-1 flex flex-col justify-start pt-20 pb-4">
+        <div className="mb-8">
           <h1
             className="font-heading font-bold text-[26px] leading-tight mb-2"
             style={{ color: TEXT, letterSpacing: '-0.02em' }}
@@ -1326,7 +1306,7 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-5">
           {PRIMARY_GOAL_OPTIONS.map(({ key, emoji, label, desc }) => {
             const isSelected = selected === key
             return (
@@ -1334,21 +1314,21 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
                 key={key}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => pick(key)}
-                className="flex items-start gap-4 px-4 py-4 rounded-2xl text-left transition-all duration-150"
+                className="flex items-start gap-4 px-5 py-5 rounded-2xl text-left transition-all duration-150"
                 style={{
                   background: isSelected ? 'rgba(198,168,92,0.10)' : SURFACE,
                   border: `1.5px solid ${isSelected ? G : BORDER}`,
                 }}
               >
-                <span className="text-[26px] leading-none mt-0.5 flex-shrink-0">{emoji}</span>
+                <span className="text-[28px] leading-none mt-0.5 flex-shrink-0">{emoji}</span>
                 <div className="flex-1 min-w-0">
                   <p
-                    className="font-heading font-semibold text-[15px] leading-snug mb-1"
+                    className="font-heading font-semibold text-[17px] leading-snug mb-1"
                     style={{ color: isSelected ? G : TEXT }}
                   >
                     {label}
                   </p>
-                  <p className="font-body text-[12px] leading-snug" style={{ color: DIM }}>
+                  <p className="font-body text-[13px] leading-snug" style={{ color: DIM }}>
                     {desc}
                   </p>
                 </div>
@@ -2624,29 +2604,7 @@ export default function PremiumOnboarding() {
       className="relative flex flex-col h-full overflow-hidden dark"
       style={{ background: '#0a0a0a', '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {/* Umax-style story progress bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 'env(safe-area-inset-top, 0px)',
-          left: 0, right: 0,
-          display: 'flex',
-          gap: 4,
-          padding: '12px 16px 0',
-          zIndex: 20,
-        }}
-      >
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <div
-            key={i}
-            style={{
-              flex: 1, height: 3, borderRadius: 99,
-              background: i <= step ? '#ffffff' : 'rgba(255,255,255,0.25)',
-              transition: 'background 0.3s',
-            }}
-          />
-        ))}
-      </div>
+      {/* progress bar removed */}
 
       <AnimatePresence mode="wait" custom={dir}>
         <motion.div
