@@ -834,8 +834,11 @@ const ANATOMY_MARKERS = [
   { id: 'temporal', label: 'Temporal Width',  x: 84,  y: 22, align: 'left'   },
   { id: 'mandible', label: 'Mandible',        x: 16,  y: 73, align: 'right'  },
   { id: 'orbital',  label: 'Orbital Bone',    x: 20,  y: 36, align: 'right'  },
-  { id: 'zygomatic',label: 'Zygomatic Arch',  x: 80,  y: 55, align: 'left'   },
-  { id: 'philtrum', label: 'Philtrum',        x: 50,  y: 73, align: 'center' },
+  { id: 'zygomatic',label: 'Zygomatic Arch',   x: 80,  y: 55, align: 'left'   },
+  { id: 'philtrum', label: 'Philtrum',         x: 50,  y: 73, align: 'center' },
+  { id: 'zygomatic_w', label: 'Zygomatic Width', x: 15, y: 60, align: 'right' },
+  { id: 'orbital_vec', label: 'Orbital Vector',  x: 78, y: 36, align: 'left'  },
+  { id: 'brow_ridge',  label: 'Brow Ridge',      x: 50, y: 26, align: 'center'},
 ]
 // How many labels show at once — pick every Nth entry offset by tickerIdx
 const LABEL_WINDOW = 3
@@ -1200,9 +1203,57 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
 // Step 3 is set when the API call actually completes — the only real signal.
 const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
 
-export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null, meshPathD = null }) {
+function buildDiagnosticLines(scanResult) {
+  const subs = scanResult?.faceSubScores
+  if (!subs) return []
+  const add = (v, pos, neg) => (v ?? 0) >= 7 ? pos : neg
+  return [
+    add(subs.symmetry,          'Strong bilateral symmetry detected',     'Symmetry variance analysis complete'),
+    add(subs.jawlineDefinition, 'Angular jawline geometry confirmed',      'Jawline definition path identified'),
+    add(subs.skinClarity,       'High skin texture clarity measured',      'Skin clarity optimization detected'),
+    add(subs.facialProportions, 'Golden ratio alignment confirmed',        'Proportion calibration opportunity found'),
+    add(subs.eyeArea,           'Eye area geometry favorable',             'Eye area potential identified'),
+    add(subs.facialHarmony,     'High facial harmony index confirmed',     'Harmony calibration in progress'),
+  ]
+}
+
+export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null, meshPathD = null, scanResult = null }) {
   const stepIndex = Math.min(currentStep, 4)
   const progressPct = STEP_PROGRESS_PCT[stepIndex]
+
+  // Diagnostic feed — cycles through sub-score lines once real result arrives
+  const diagLines = useMemo(() => buildDiagnosticLines(scanResult), [scanResult])
+  const [feedIdx, setFeedIdx] = useState(0)
+  useEffect(() => {
+    if (!diagLines.length) return
+    setFeedIdx(0)
+    const id = setInterval(() => setFeedIdx(i => (i + 1) % diagLines.length), 1300)
+    return () => clearInterval(id)
+  }, [diagLines])
+
+  // Score ticker — rapidly cycles from 0 to real score over ~1.2s then settles
+  const targetScore = scanResult?.overallScore ?? null
+  const [displayScore, setDisplayScore] = useState(null)
+  useEffect(() => {
+    if (targetScore == null) return
+    let current = 0
+    const steps = 28
+    const increment = targetScore / steps
+    const intervalMs = 1200 / steps
+    setDisplayScore(0)
+    let count = 0
+    const id = setInterval(() => {
+      count++
+      if (count >= steps) {
+        setDisplayScore(targetScore)
+        clearInterval(id)
+      } else {
+        current += increment
+        setDisplayScore(Math.round(current * 10) / 10)
+      }
+    }, intervalMs)
+    return () => clearInterval(id)
+  }, [targetScore])
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
@@ -1216,7 +1267,7 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
       >
         MAPPING FACIAL MATRIX
       </p>
-      <div className="h-5 mb-4 flex items-center justify-center">
+      <div className="h-5 mb-2 flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.3 }}
@@ -1225,6 +1276,25 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
           >
             {ANALYSIS_STEP_LABELS[stepIndex]}
           </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* Real-time diagnostic feed — appears once sub-scores arrive */}
+      <div className="h-4 mb-3 flex items-center justify-center overflow-hidden">
+        <AnimatePresence mode="wait">
+          {diagLines.length > 0 && (
+            <motion.p
+              key={feedIdx}
+              initial={{ opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={{ duration: 0.25 }}
+              className="font-mono text-center"
+              style={{ fontSize: 9, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.45)' }}
+            >
+              {'> '}{diagLines[feedIdx]}
+            </motion.p>
+          )}
         </AnimatePresence>
       </div>
 
@@ -1250,6 +1320,28 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
           animate={{ width: `${progressPct}%` }}
           transition={{ duration: 0.9, ease: 'easeOut' }}
         />
+      </div>
+
+      {/* Score ticker reveal — appears once result arrives, number cycles to real score */}
+      <div className="h-8 mt-3 flex items-center justify-center">
+        <AnimatePresence>
+          {displayScore != null && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-baseline gap-1.5"
+            >
+              <span className="font-mono" style={{ fontSize: 9, letterSpacing: '0.14em', color: `${GOLD}77`, textTransform: 'uppercase' }}>SCORE</span>
+              <span
+                className="font-heading font-bold tabular-nums"
+                style={{ fontSize: 22, color: GOLD, letterSpacing: '-0.02em', lineHeight: 1 }}
+              >
+                {displayScore.toFixed(1)}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -1364,6 +1456,7 @@ export default function Scan() {
   const [scanCapReached, setScanCapReached] = useState(false)
   const [scanCapPlan, setScanCapPlan]     = useState('free')
   const [showConsent, setShowConsent]     = useState(false) // consent modal removed
+  const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
   const rateLimitInitial  = useRef(30)
@@ -1555,6 +1648,7 @@ export default function Scan() {
             setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
           )
           aiResult = await Promise.race([scoreCall, timeoutCall])
+          setAnalysisResult(aiResult)
 
         } finally {
           setScanInFlight(false)
@@ -1987,7 +2081,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} meshPathD={meshPathD} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} meshPathD={meshPathD} scanResult={analysisResult} />
             </motion.div>
           )}
         </AnimatePresence>
