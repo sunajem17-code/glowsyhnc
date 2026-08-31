@@ -1820,6 +1820,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [sidePhoto, setSidePhoto]       = useState(null)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [slowAnalysis, setSlowAnalysis] = useState(false)
+  const [liveAnalysisResult, setLiveAnalysisResult] = useState(null)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
   const [quotaExhausted, setQuotaExhausted] = useState(false)
@@ -1874,6 +1875,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setPhase('analyzing')
     setError('')
     setAnalysisStep(0)
+    setLiveAnalysisResult(null)
 
     // Start the visual progress timer immediately so the bar advances as soon as
     // the analyzing screen appears — not after toBase64 finishes (which can take
@@ -1907,6 +1909,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setSlowAnalysis(false)
       }
 
+      setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
       await new Promise(r => setTimeout(r, 350))
       setAnalysisStep(4)
@@ -2033,7 +2036,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} scanResult={liveAnalysisResult} />
       </div>
     )
   }
