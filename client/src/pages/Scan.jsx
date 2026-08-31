@@ -822,56 +822,201 @@ function buildLiveTicker(points) {
   ]
 }
 
-// ── Anatomy label pills (SwiftUI port) ───────────────────────────────────────
-// Cycles 2-3 labels at a time, every 1.6s, independently of the step system.
-// Positions are in % of the overlay box — approximate face-region anchors
-// that look plausible for any photo (fallback). When real `points` are passed
-// the positions auto-update since they derive from the same landmark math.
-const ANATOMY_MARKERS = [
-  { id: 'jaw',      label: 'Jaw Width',       x: 50,  y: 84, align: 'center' },
-  { id: 'canthal',  label: 'Canthal Tilt',    x: 76,  y: 40, align: 'left'   },
-  { id: 'nasal',    label: 'Nasal Bridge',    x: 21,  y: 45, align: 'right'  },
-  { id: 'temporal', label: 'Temporal Width',  x: 84,  y: 22, align: 'left'   },
-  { id: 'mandible', label: 'Mandible',        x: 16,  y: 73, align: 'right'  },
-  { id: 'orbital',  label: 'Orbital Bone',    x: 20,  y: 36, align: 'right'  },
-  { id: 'zygomatic',label: 'Zygomatic Arch',   x: 80,  y: 55, align: 'left'   },
-  { id: 'philtrum', label: 'Philtrum',         x: 50,  y: 73, align: 'center' },
-  { id: 'zygomatic_w', label: 'Zygomatic Width', x: 15, y: 60, align: 'right' },
-  { id: 'orbital_vec', label: 'Orbital Vector',  x: 78, y: 36, align: 'left'  },
-  { id: 'brow_ridge',  label: 'Brow Ridge',      x: 50, y: 26, align: 'center'},
-]
-// How many labels show at once — pick every Nth entry offset by tickerIdx
-const LABEL_WINDOW = 3
+// ── Anatomy label chips ───────────────────────────────────────────────────────
+// ONE chip visible at a time, cycling every LABEL_CYCLE_MS.
+// anchorFn(pts) → {x, y} in 0-1 space derived from REAL MediaPipe landmarks.
+// valueFn(pts, scanResult) → formatted string from REAL computed / API data.
+// When pts is null (landmarks not yet resolved) the fallback position is used
+// and value shows '—'. Values are NEVER hardcoded example numbers.
+//
+// Anatomical substitutions (where exact landmark doesn't exist in our set):
+//   Rhinion (mid-dorsum) → nose tip #1 — closest available
+//   True gonion           → jawL #172 / jawR #397 (lateral jaw, gonion area)
+//   Orbital vector depth  → no 2D proxy; value derived from API eyeArea sub-score
+//   Brow ridge            → forehead #10 (upper mesh boundary, not true supraorbital)
 
-function AnatomyLabel({ label, x, y, align, visible }) {
-  const translateX = align === 'center' ? '-50%' : align === 'left' ? '0%' : '-100%'
+// ── Geometry helpers ─────────────────────────────────────────────────────────
+function _vecAngleDeg(v1, v2) {
+  const dot = v1.x * v2.x + v1.y * v2.y
+  const mag = Math.sqrt(v1.x ** 2 + v1.y ** 2) * Math.sqrt(v2.x ** 2 + v2.y ** 2)
+  return mag < 1e-10 ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI)
+}
+// Average tilt of inner→outer canthus line vs. horizontal, both eyes.
+// Positive = outer corner higher than inner (favorable / hunter eyes).
+function _canthalTiltDeg(pts) {
+  const eyeTilt = (inner, outer) => {
+    const dx = Math.abs(outer.x - inner.x)
+    const dy = inner.y - outer.y   // positive when outer is above inner (y↓)
+    return Math.atan2(dy, dx) * (180 / Math.PI)
+  }
+  return (eyeTilt(pts.eyeInnerL, pts.eyeOuterL) + eyeTilt(pts.eyeInnerR, pts.eyeOuterR)) / 2
+}
+// Approximate gonial angle at both jaw corners: angle between ramus (jaw→temple)
+// and body (jaw→chin) directions, averaged L+R.
+function _gonialAngleDeg(pts) {
+  const angle = (jaw, temple, chin) => _vecAngleDeg(
+    { x: temple.x - jaw.x, y: temple.y - jaw.y },
+    { x: chin.x   - jaw.x, y: chin.y   - jaw.y },
+  )
+  return (angle(pts.jawL, pts.templeL, pts.chin) + angle(pts.jawR, pts.templeR, pts.chin)) / 2
+}
+
+const ANATOMY_LABELS = [
+  {
+    id: 'canthal',
+    title: 'CANTHAL TILT',
+    // Exact anchor: midpoint of outer canthi — these ARE the lateral canthus
+    anchorFn: pts => ({
+      x: (pts.eyeOuterL.x + pts.eyeOuterR.x) / 2,
+      y: (pts.eyeOuterL.y + pts.eyeOuterR.y) / 2 - 0.08,
+    }),
+    fallback: { x: 0.50, y: 0.28 },
+    valueFn: (pts, _scan) => {
+      const deg = _canthalTiltDeg(pts)
+      return deg >= 3 ? 'Strong' : deg >= 1 ? 'Moderate' : deg >= 0 ? 'Neutral' : 'Negative Tilt'
+    },
+  },
+  {
+    id: 'mandible',
+    title: 'MANDIBULAR ANGLE',
+    // Proxy anchor: jawL #172 (lateral jaw, closest to gonion)
+    anchorFn: pts => ({ x: pts.jawL.x - 0.05, y: pts.jawL.y }),
+    fallback: { x: 0.13, y: 0.76 },
+    valueFn: (pts, _scan) => {
+      const deg = _gonialAngleDeg(pts)
+      return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
+    },
+  },
+  {
+    id: 'zygomatic',
+    title: 'ZYGOMATIC ARCH',
+    // Exact anchor: cheekR #454 = right lateral zygomatic prominence
+    anchorFn: pts => ({ x: pts.cheekR.x + 0.06, y: pts.cheekR.y }),
+    fallback: { x: 0.86, y: 0.50 },
+    valueFn: (pts, _scan) => {
+      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
+      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
+      if (bigon < 0.01) return '—'
+      const ratio = bizygo / bigon
+      return ratio > 1.30 ? 'High Projection' : ratio > 1.20 ? 'Prominent' : ratio > 1.10 ? 'Moderate' : 'Low Relief'
+    },
+  },
+  {
+    id: 'orbital',
+    title: 'ORBITAL VECTOR',
+    // Substitution: no orbital depth in 2D. Anchor = eyeOuterR.
+    // Value = API eyeArea sub-score (0-10) mapped to categorical.
+    anchorFn: pts => ({ x: pts.eyeOuterR.x + 0.07, y: pts.eyeOuterR.y - 0.04 }),
+    fallback: { x: 0.84, y: 0.33 },
+    valueFn: (_pts, scan) => {
+      const s = scan?.faceSubScores?.eyeArea
+      if (s == null) return '—'
+      return s >= 7.5 ? 'Favorable Support' : s >= 5.5 ? 'Neutral Vector' : 'Suboptimal Depth'
+    },
+  },
+  {
+    id: 'nasal',
+    title: 'NASAL BRIDGE',
+    // Proxy anchor: nose #1 (tip — true rhinion is mid-dorsum, not in our set)
+    anchorFn: pts => ({
+      x: pts.nose.x + 0.12,
+      y: (pts.nose.y + pts.noseBase.y) / 2,
+    }),
+    fallback: { x: 0.64, y: 0.46 },
+    // Value: intercanthal / bizygomatic ratio → width category
+    valueFn: (pts, _scan) => {
+      const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
+      const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const ratio = ic / bizygo
+      return ratio < 0.28 ? 'Narrow' : ratio < 0.34 ? 'Proportionate' : 'Wide'
+    },
+  },
+  {
+    id: 'temporal',
+    title: 'TEMPORAL WIDTH',
+    // Exact anchor: templeR #356
+    anchorFn: pts => ({ x: pts.templeR.x + 0.05, y: pts.templeR.y }),
+    fallback: { x: 0.85, y: 0.22 },
+    valueFn: (pts, _scan) => {
+      const bitemporal = Math.abs(pts.templeR.x - pts.templeL.x)
+      const bizygo     = Math.abs(pts.cheekR.x  - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const ratio = bitemporal / bizygo
+      return ratio > 1.05 ? 'Broad' : ratio > 0.95 ? 'Balanced' : 'Narrow'
+    },
+  },
+  {
+    id: 'jaw',
+    title: 'JAW WIDTH',
+    // Proxy anchor: midpoint of jawL/jawR (bigonion region)
+    anchorFn: pts => ({
+      x: (pts.jawL.x + pts.jawR.x) / 2,
+      y: Math.max(pts.jawL.y, pts.jawR.y) + 0.04,
+    }),
+    fallback: { x: 0.50, y: 0.86 },
+    valueFn: (pts, _scan) => {
+      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
+      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const pct = bigon / bizygo
+      return pct > 0.85 ? 'Wide' : pct > 0.72 ? 'Proportionate' : 'Narrow'
+    },
+  },
+  {
+    id: 'harmony',
+    title: 'FACIAL HARMONY',
+    // Anchor: above forehead center
+    anchorFn: pts => ({ x: pts.forehead.x, y: pts.forehead.y - 0.07 }),
+    fallback: { x: 0.50, y: 0.13 },
+    // Value: API facialHarmony sub-score — no geometric proxy for this
+    valueFn: (_pts, scan) => {
+      const s = scan?.faceSubScores?.facialHarmony
+      if (s == null) return '—'
+      return s >= 8 ? 'Elite' : s >= 7 ? 'Strong' : s >= 5.5 ? 'Moderate' : 'Developing'
+    },
+  },
+]
+
+const LABEL_CYCLE_MS = 2200
+const CHIP_W = 176  // px — wide enough for longest subtext
+const CHIP_H = 46   // px — two lines + padding
+const CHIP_MARGIN = 10 // px — min distance from any container edge
+
+function AnatomyLabel({ title, value, anchorX, anchorY, containerW, containerH, visible }) {
+  const left = Math.max(CHIP_MARGIN, Math.min(containerW - CHIP_W - CHIP_MARGIN, anchorX * containerW - CHIP_W / 2))
+  const top  = Math.max(CHIP_MARGIN, Math.min(containerH - CHIP_H - CHIP_MARGIN, anchorY * containerH - CHIP_H / 2))
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.88 }}
-      animate={{ opacity: visible ? 1 : 0, scale: visible ? 1 : 0.88 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: visible ? 1 : 0, scale: visible ? 1 : 0.9 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className="absolute pointer-events-none"
-      style={{
-        left: `${x}%`, top: `${y}%`,
-        transform: `translate(${translateX}, -50%)`,
-        whiteSpace: 'nowrap',
-      }}
+      style={{ left, top, width: CHIP_W }}
     >
-      <span style={{
-        display: 'inline-block',
-        background: 'rgba(0,0,0,0.62)',
-        border: `0.75px solid ${LANDMARK_GOLD}55`,
-        borderRadius: 4,
-        padding: '2px 6px',
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
-        color: LANDMARK_GOLD,
-        fontFamily: 'monospace',
-        textTransform: 'uppercase',
+      <div style={{
+        background: 'rgba(0,0,0,0.82)',
+        border: `0.75px solid ${LANDMARK_GOLD}99`,
+        borderRadius: 6,
+        padding: '5px 9px',
+        backdropFilter: 'blur(4px)',
       }}>
-        {label}
-      </span>
+        <div style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: '0.12em',
+          color: LANDMARK_GOLD, fontFamily: 'monospace', textTransform: 'uppercase',
+          lineHeight: 1.3, whiteSpace: 'nowrap',
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontSize: 9, fontWeight: 500, letterSpacing: '0.04em',
+          color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace',
+          lineHeight: 1.3, marginTop: 2, whiteSpace: 'nowrap',
+        }}>
+          {value}
+        </div>
+      </div>
     </motion.div>
   )
 }
@@ -907,7 +1052,7 @@ function Readout({ x, y, text, align = 'center' }) {
   )
 }
 
-function FacialAnalysisOverlay({ step, points }) {
+function FacialAnalysisOverlay({ step, points, scanResult }) {
   const s = Math.min(step, 4)
 
   // Real landmarks (usually resolved within a fraction of a second of this
@@ -930,6 +1075,28 @@ function FacialAnalysisOverlay({ step, points }) {
     return () => clearInterval(id)
   }, [tickerMeasurements])
   const ticker = tickerMeasurements[tickerIdx % tickerMeasurements.length]
+
+  // Single anatomy label — cycles independently through ANATOMY_LABELS
+  const [labelIdx, setLabelIdx] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setLabelIdx(i => (i + 1) % ANATOMY_LABELS.length), LABEL_CYCLE_MS)
+    return () => clearInterval(id)
+  }, [])
+
+  // Measure the actual rendered container size so pixel positions are exact
+  const labelLayerRef = useRef(null)
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = labelLayerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        setContainerSize({ w: e.contentRect.width, h: e.contentRect.height })
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <>
@@ -1003,12 +1170,25 @@ function FacialAnalysisOverlay({ step, points }) {
 
       {/* HTML readout labels — see Readout's comment on why these aren't
           plain SVG <text> nodes. */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Anatomy label pills — cycle 3 at a time, independent of step */}
-        {ANATOMY_MARKERS.map((m, i) => {
-          const offset = tickerIdx % ANATOMY_MARKERS.length
-          const visible = ((i - offset + ANATOMY_MARKERS.length) % ANATOMY_MARKERS.length) < LABEL_WINDOW
-          return <AnatomyLabel key={m.id} {...m} visible={visible} />
+      <div ref={labelLayerRef} className="absolute inset-0 pointer-events-none">
+        {/* Single anatomy label chip — one at a time, pixel-clamped to never clip */}
+        {containerSize.w > 0 && ANATOMY_LABELS.map((label, i) => {
+          // Resolve anchor: real landmark position when pts are available, else fallback
+          const anchor = points ? label.anchorFn(points) : label.fallback
+          // Resolve value: real computed metric when pts (and optionally scanResult) available
+          const value = points ? label.valueFn(points, scanResult) : '—'
+          return (
+            <AnatomyLabel
+              key={label.id}
+              title={label.title}
+              value={value}
+              anchorX={anchor.x}
+              anchorY={anchor.y}
+              containerW={containerSize.w}
+              containerH={containerSize.h}
+              visible={i === labelIdx}
+            />
+          )
         })}
         <AnimatePresence mode="wait">
           {readout && <Readout key={`step-${s}`} {...readout} />}
@@ -1147,7 +1327,7 @@ function FaceMeshScanOverlay({ pathD }) {
 // exactly the "not on the person's face" bug this fixes. `aspectRatio`
 // only kicks in as a fallback for the (normally unreachable) case where
 // there's no photo yet, so the box doesn't collapse to zero height.
-function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
+function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD, scanResult }) {
   return (
     <div
       className="relative w-full rounded-3xl overflow-hidden mb-5"
@@ -1174,7 +1354,7 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD }) {
         }}
       />
       <AnimatePresence>
-        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} />}
+        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} scanResult={scanResult} />}
       </AnimatePresence>
       {/* Plays once, on top of whichever step is currently showing, the
           moment the real mesh is ready — see FaceMeshScanOverlay. Suppressed
@@ -1257,7 +1437,7 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} />
+      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} scanResult={scanResult} />
 
       {/* Status text — two-tier hierarchy per SwiftUI reference:
           small all-caps label (static) + cycling step text beneath */}

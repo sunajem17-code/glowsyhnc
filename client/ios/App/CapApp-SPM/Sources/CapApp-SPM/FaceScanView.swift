@@ -19,6 +19,7 @@ struct FaceScanView: View {
     @StateObject private var scanController = FaceScanController()
     @State private var capturedResult: FaceScanCapture?
     @State private var trackingUnavailable = false
+    @State private var isScanning = false
 
     // When presented by the plugin (the only real path the app uses), the
     // numbers-heavy results card used to show immediately after capture —
@@ -75,6 +76,7 @@ struct FaceScanView: View {
             FaceScanARViewRepresentable(
                 controllerHolder: scanController,
                 onCapture: { result in
+                    isScanning = false
                     if let onComplete {
                         // Plugin mode — save straight to the app, no intermediate
                         // numbers screen. Scan.jsx shows its own lightweight
@@ -90,19 +92,43 @@ struct FaceScanView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Text("Center your face in frame")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.cyan)
+            // Diagnostic overlay anchored to real landmark projections.
+            // In live-capture mode landmarks2D is empty until capture fires,
+            // so the overlay runs in chip-free mode (just feed + sweep line)
+            // during the scan window, which is intentional — chips appear on
+            // the results photo view once capture.landmarks2D is populated.
+            FaceDiagnosticOverlay(
+                landmarks2D: [:],
+                metrics: .zero,
+                isScanning: $isScanning
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
 
-                Button(action: { scanController.capture() }) {
-                    Text("SCAN")
+            VStack(spacing: 12) {
+                if !isScanning {
+                    Text("Center your face in frame")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.cyan)
+                }
+
+                Button(action: {
+                    guard !isScanning else { return }
+                    isScanning = true
+                    // Give the diagnostic animation a moment to start, then capture
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        scanController.capture()
+                    }
+                }) {
+                    Text(isScanning ? "SCANNING..." : "SCAN")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.black)
                         .frame(width: 140, height: 48)
-                        .background(Color.cyan)
+                        .background(isScanning ? Color.yellow : Color.cyan)
                         .clipShape(Capsule())
+                        .animation(.easeInOut(duration: 0.3), value: isScanning)
                 }
+                .disabled(isScanning)
             }
             .padding(.bottom, 48)
         }
