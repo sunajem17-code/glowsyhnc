@@ -866,56 +866,51 @@ const ANATOMY_LABELS = [
 
 const LABEL_CYCLE_MS = 850
 
-// pos is a fixed screen region approximating where the feature sits on a
-// generic face — not tracking real user coordinates, just a layout approximation.
-// CSS clamp() keeps the chip center far enough from each edge that the chip
-// body (max 220px wide, ~56px tall) never clips outside the frame.
-function AnatomyLabel({ title, value, pos, visible }) {
+// Chip for a single anatomy metric. Rendered by FacialAnalysisOverlay's
+// AnimatePresence — this component itself has no animation wrapper.
+// Horizontal clamp uses 115px (> half of maxWidth 220px) so the chip body
+// never clips the frame edge. Vertical uses 60px top / 100px bottom.
+function AnatomyLabel({ title, value, pos }) {
   return (
-    <AnimatePresence mode="wait">
-      {visible && (
-        <motion.div
-          key={title}
-          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -6, scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
-          className="absolute pointer-events-none"
-          style={{
-            left: `clamp(90px, ${pos.left}, calc(100% - 90px))`,
-            top: `clamp(60px, ${pos.top}, calc(100% - 100px))`,
-            transform: 'translate(-50%, -50%)',
-            minWidth: 172,
-            maxWidth: 220,
-          }}
-        >
-          <div style={{
-            background: 'rgba(0,0,0,0.88)',
-            border: `1px solid ${LANDMARK_GOLD}55`,
-            borderRadius: 10,
-            padding: '8px 16px',
-            textAlign: 'center',
-            backdropFilter: 'blur(8px)',
-            whiteSpace: 'nowrap',
-          }}>
-            <div style={{
-              fontSize: 11, fontWeight: 800, letterSpacing: '0.13em',
-              color: LANDMARK_GOLD, fontFamily: 'monospace', textTransform: 'uppercase',
-              lineHeight: 1.3,
-            }}>
-              {title}
-            </div>
-            <div style={{
-              fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
-              color: 'rgba(255,255,255,0.68)', fontFamily: 'monospace',
-              lineHeight: 1.4, marginTop: 3,
-            }}>
-              {value}
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
+      className="absolute pointer-events-none"
+      style={{
+        left: `clamp(115px, ${pos.left}, calc(100% - 115px))`,
+        top: `clamp(60px, ${pos.top}, calc(100% - 100px))`,
+        transform: 'translate(-50%, -50%)',
+        minWidth: 172,
+        maxWidth: 220,
+      }}
+    >
+      <div style={{
+        background: 'rgba(0,0,0,0.88)',
+        border: `1px solid ${LANDMARK_GOLD}55`,
+        borderRadius: 10,
+        padding: '8px 16px',
+        textAlign: 'center',
+        backdropFilter: 'blur(8px)',
+        whiteSpace: 'nowrap',
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 800, letterSpacing: '0.13em',
+          color: LANDMARK_GOLD, fontFamily: 'monospace', textTransform: 'uppercase',
+          lineHeight: 1.3,
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
+          color: 'rgba(255,255,255,0.68)', fontFamily: 'monospace',
+          lineHeight: 1.4, marginTop: 3,
+        }}>
+          {value}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -951,27 +946,29 @@ function Readout({ x, y, text, align = 'center' }) {
 }
 
 function FacialAnalysisOverlay({ step, points, scanResult }) {
-  // Single anatomy label — cycles independently through ANATOMY_LABELS
   const [labelIdx, setLabelIdx] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setLabelIdx(i => (i + 1) % ANATOMY_LABELS.length), LABEL_CYCLE_MS)
     return () => clearInterval(id)
   }, [])
 
+  const label = ANATOMY_LABELS[labelIdx]
+  const value = points ? label.valueFn(points, scanResult) : '—'
+
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {ANATOMY_LABELS.map((label, i) => {
-        const value = points ? label.valueFn(points, scanResult) : '—'
-        return (
-          <AnatomyLabel
-            key={label.id}
-            title={label.title}
-            value={value}
-            pos={label.pos}
-            visible={i === labelIdx}
-          />
-        )
-      })}
+      {/* Single AnimatePresence here so mode="wait" actually coordinates the
+          exit of the outgoing chip with the entry of the incoming one — having
+          one AnimatePresence per chip (previously) made them independent and
+          caused overlap that looked like repeating labels. */}
+      <AnimatePresence mode="wait">
+        <AnatomyLabel
+          key={label.id}
+          title={label.title}
+          value={value}
+          pos={label.pos}
+        />
+      </AnimatePresence>
     </div>
   )
 }
