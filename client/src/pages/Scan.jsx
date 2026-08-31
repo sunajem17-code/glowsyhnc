@@ -862,23 +862,14 @@ const ANATOMY_LABELS = [
       return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
     },
   },
-  {
-    id: 'ramus',
-    title: 'RAMUS HEIGHT',
-    pos: { top: '55%', left: '28%' },
-    // API: extendedMetrics.lowerThird.ramus — only available post-scan
-    valueFn: (_pts, scan) => {
-      const s = scan?.extendedMetrics?.lowerThird?.ramus?.score
-      if (s == null) return '—'
-      return s >= 7.5 ? 'Tall' : s >= 5.5 ? 'Average' : 'Short'
-    },
-  },
 ]
 
 const LABEL_CYCLE_MS = 850
 
 // pos is a fixed screen region approximating where the feature sits on a
 // generic face — not tracking real user coordinates, just a layout approximation.
+// CSS clamp() keeps the chip center far enough from each edge that the chip
+// body (max 220px wide, ~56px tall) never clips outside the frame.
 function AnatomyLabel({ title, value, pos, visible }) {
   return (
     <AnimatePresence mode="wait">
@@ -891,8 +882,8 @@ function AnatomyLabel({ title, value, pos, visible }) {
           transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
           className="absolute pointer-events-none"
           style={{
-            left: pos.left,
-            top: pos.top,
+            left: `clamp(90px, ${pos.left}, calc(100% - 90px))`,
+            top: `clamp(60px, ${pos.top}, calc(100% - 100px))`,
             transform: 'translate(-50%, -50%)',
             minWidth: 172,
             maxWidth: 220,
