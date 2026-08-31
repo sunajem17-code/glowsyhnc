@@ -777,19 +777,23 @@ function _gonialAngleDeg(pts) {
   return (angle(pts.jawL, pts.templeL, pts.chin) + angle(pts.jawR, pts.templeR, pts.chin)) / 2
 }
 
-// Curated 5-checkpoint set. pos gives a fixed screen region that approximates
-// where the feature sits on a generic face — not tracked to the specific user.
-// valueFn returns the qualifier tier computed from real scan data.
-// '—' shows until data (points or scan result) is available.
-// Fixed screen regions per feature — approximate facial zones on a generic
-// face, not tracked to this user's real landmark positions.
-// Four distinct vertical bands: eye (30%), cheekbone (44%), nose (53%), jaw (71%).
+// Seven metrics with real backing data, positioned in fixed facial zones.
+// Not live-tracked; purely a static positional layout.
+//
+// Data sources (in order of when they become available during analysis):
+//   pts      — MediaPipe geometry, resolves ~2-5s after analyzing screen mounts
+//   scan     — core API faceSubScores, resolves after AI call (~8-15s)
+//   extended — extendedMetrics, loaded async post-scan (not available during overlay)
+//
+// '—' shows for any metric whose data source hasn't resolved yet.
 const ANATOMY_LABELS = [
   {
     id: 'canthal',
     title: 'CANTHAL TILT',
-    pos: { top: '30%', left: '50%' },
+    pos: { top: '32%', left: '70%' },
+    // Geometry: outer corner angle relative to inner corner, averaged L+R
     valueFn: (pts, _scan) => {
+      if (!pts) return '—'
       const deg = _canthalTiltDeg(pts)
       return deg >= 3 ? 'Strong' : deg >= 1 ? 'Moderate' : deg >= 0 ? 'Neutral' : 'Negative Tilt'
     },
@@ -797,30 +801,21 @@ const ANATOMY_LABELS = [
   {
     id: 'orbital',
     title: 'ORBITAL VECTOR',
-    pos: { top: '30%', left: '50%' },
+    pos: { top: '32%', left: '30%' },
+    // API: eye area sub-score (shape, spacing, periorbital hollowing)
     valueFn: (_pts, scan) => {
       const s = scan?.faceSubScores?.eyeArea
       if (s == null) return '—'
-      return s >= 7.5 ? 'Favorable Support' : s >= 5.5 ? 'Neutral Vector' : 'Suboptimal Depth'
-    },
-  },
-  {
-    id: 'zygomatic',
-    title: 'ZYGOMATIC ARCH',
-    pos: { top: '44%', left: '50%' },
-    valueFn: (pts, _scan) => {
-      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
-      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
-      if (bigon < 0.01) return '—'
-      const ratio = bizygo / bigon
-      return ratio > 1.30 ? 'High Projection' : ratio > 1.20 ? 'Prominent' : ratio > 1.10 ? 'Moderate' : 'Low Relief'
+      return s >= 7.5 ? 'Favorable' : s >= 5.5 ? 'Neutral' : 'Suboptimal'
     },
   },
   {
     id: 'nasal',
     title: 'NASAL BRIDGE',
-    pos: { top: '53%', left: '50%' },
+    pos: { top: '45%', left: '50%' },
+    // Geometry: intercanthal / bizygomatic ratio
     valueFn: (pts, _scan) => {
+      if (!pts) return '—'
       const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
       const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
       if (bizygo < 0.01) return '—'
@@ -829,17 +824,58 @@ const ANATOMY_LABELS = [
     },
   },
   {
+    id: 'zygomatic',
+    title: 'ZYGOMATIC ARCH',
+    pos: { top: '48%', left: '75%' },
+    // Geometry: bizygomatic / bigonial ratio
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
+      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
+      if (bigon < 0.01) return '—'
+      const ratio = bizygo / bigon
+      return ratio > 1.30 ? 'High Projection' : ratio > 1.20 ? 'Prominent' : ratio > 1.10 ? 'Moderate' : 'Low Relief'
+    },
+  },
+  {
+    id: 'bigonial',
+    title: 'BIGONIAL BREADTH',
+    pos: { top: '62%', left: '72%' },
+    // Geometry: jaw width (bigon) relative to cheekbone width (bizygo)
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
+      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const ratio = bigon / bizygo
+      return ratio > 0.90 ? 'Wide' : ratio > 0.80 ? 'Balanced' : ratio > 0.70 ? 'Tapered' : 'Narrow'
+    },
+  },
+  {
     id: 'mandible',
     title: 'MANDIBULAR ANGLE',
-    pos: { top: '71%', left: '50%' },
+    pos: { top: '68%', left: '30%' },
+    // Geometry: gonial angle from jaw/temple/chin landmark triangle
     valueFn: (pts, _scan) => {
+      if (!pts) return '—'
       const deg = _gonialAngleDeg(pts)
       return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
     },
   },
+  {
+    id: 'ramus',
+    title: 'RAMUS HEIGHT',
+    pos: { top: '55%', left: '28%' },
+    // API: extendedMetrics.lowerThird.ramus — only available post-scan
+    valueFn: (_pts, scan) => {
+      const s = scan?.extendedMetrics?.lowerThird?.ramus?.score
+      if (s == null) return '—'
+      return s >= 7.5 ? 'Tall' : s >= 5.5 ? 'Average' : 'Short'
+    },
+  },
 ]
 
-const LABEL_CYCLE_MS = 900   // fast enough to feel active, readable before cycling
+const LABEL_CYCLE_MS = 850
 
 // pos is a fixed screen region approximating where the feature sits on a
 // generic face — not tracking real user coordinates, just a layout approximation.
@@ -849,10 +885,10 @@ function AnatomyLabel({ title, value, pos, visible }) {
       {visible && (
         <motion.div
           key={title}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
           className="absolute pointer-events-none"
           style={{
             left: pos.left,
