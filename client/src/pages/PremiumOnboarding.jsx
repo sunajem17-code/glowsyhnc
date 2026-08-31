@@ -7,7 +7,7 @@ import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import hypergamyChart from '../assets/hypergamy-chart.png'
 import haloEffectImg from '../assets/halo-effect.webp'
-import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
+import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS, extractScanOverlayPoints } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
@@ -1821,6 +1821,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [analysisStep, setAnalysisStep] = useState(0)
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [liveAnalysisResult, setLiveAnalysisResult] = useState(null)
+  const [analysisPoints, setAnalysisPoints] = useState(null)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
   const [quotaExhausted, setQuotaExhausted] = useState(false)
@@ -1876,6 +1877,19 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setError('')
     setAnalysisStep(0)
     setLiveAnalysisResult(null)
+    setAnalysisPoints(null)
+
+    // Fire MediaPipe landmark detection in parallel with the AI call so
+    // FacialAnalysisOverlay gets real per-user coordinates instead of null.
+    if (face) {
+      import('../utils/faceLandmarks.js')
+        .then(({ getLandmarks }) => getLandmarks(face))
+        .then(lm => {
+          const pts = extractScanOverlayPoints(lm)
+          if (pts) setAnalysisPoints(pts)
+        })
+        .catch(err => console.warn('[PremiumOnboarding] Landmark detection failed (non-fatal):', err?.message))
+    }
 
     // Start the visual progress timer immediately so the bar advances as soon as
     // the analyzing screen appears — not after toBase64 finishes (which can take
@@ -2036,7 +2050,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} scanResult={liveAnalysisResult} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} scanResult={liveAnalysisResult} points={analysisPoints} />
       </div>
     )
   }
