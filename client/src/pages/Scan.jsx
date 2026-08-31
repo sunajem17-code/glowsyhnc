@@ -777,32 +777,24 @@ function _gonialAngleDeg(pts) {
   return (angle(pts.jawL, pts.templeL, pts.chin) + angle(pts.jawR, pts.templeR, pts.chin)) / 2
 }
 
-// Curated 5-checkpoint set. anchorFn kept for geometry math (drives valueFn)
-// but no longer drives position — chips render centered/fixed instead.
-// valueFn returns the REAL qualifier tier for THIS user's scan, never a
-// static phrase identical for everyone. '—' shows until data is available.
+// Curated 5-checkpoint set. pos gives a fixed screen region that approximates
+// where the feature sits on a generic face — not tracked to the specific user.
+// valueFn returns the qualifier tier computed from real scan data.
+// '—' shows until data (points or scan result) is available.
 const ANATOMY_LABELS = [
   {
     id: 'canthal',
     title: 'CANTHAL TILT',
+    pos: { top: '33%', left: '50%' },   // eye level, center
     valueFn: (pts, _scan) => {
       const deg = _canthalTiltDeg(pts)
       return deg >= 3 ? 'Strong' : deg >= 1 ? 'Moderate' : deg >= 0 ? 'Neutral' : 'Negative Tilt'
     },
   },
   {
-    id: 'mandible',
-    title: 'MANDIBULAR ANGLE',
-    // Proxy: jawL #172 / jawR #397 (lateral jaw, closest to gonion)
-    valueFn: (pts, _scan) => {
-      const deg = _gonialAngleDeg(pts)
-      return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
-    },
-  },
-  {
     id: 'orbital',
     title: 'ORBITAL VECTOR',
-    // Substitution: no 2D depth proxy — value from API eyeArea sub-score
+    pos: { top: '33%', left: '50%' },   // eye level, center
     valueFn: (_pts, scan) => {
       const s = scan?.faceSubScores?.eyeArea
       if (s == null) return '—'
@@ -812,7 +804,7 @@ const ANATOMY_LABELS = [
   {
     id: 'nasal',
     title: 'NASAL BRIDGE',
-    // Intercanthal / bizygomatic ratio → width tier
+    pos: { top: '50%', left: '50%' },   // center of frame
     valueFn: (pts, _scan) => {
       const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
       const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
@@ -824,7 +816,7 @@ const ANATOMY_LABELS = [
   {
     id: 'zygomatic',
     title: 'ZYGOMATIC ARCH',
-    // Bizygomatic / bigonial ratio → projection tier
+    pos: { top: '50%', left: '50%' },   // mid-face, center
     valueFn: (pts, _scan) => {
       const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
       const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
@@ -833,16 +825,22 @@ const ANATOMY_LABELS = [
       return ratio > 1.30 ? 'High Projection' : ratio > 1.20 ? 'Prominent' : ratio > 1.10 ? 'Moderate' : 'Low Relief'
     },
   },
+  {
+    id: 'mandible',
+    title: 'MANDIBULAR ANGLE',
+    pos: { top: '70%', left: '50%' },   // jaw level
+    valueFn: (pts, _scan) => {
+      const deg = _gonialAngleDeg(pts)
+      return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
+    },
+  },
 ]
 
 const LABEL_CYCLE_MS = 900   // fast enough to feel active, readable before cycling
-// Chip layout: fixed centered-horizontal, anchored at 72% from top (mid-face)
-const CHIP_FIXED_Y_FRAC = 0.72
 
-function AnatomyLabel({ title, value, containerW, containerH, visible }) {
-  // Centered horizontally; fixed vertical at 72% of container height.
-  // AnimatePresence drives fade — we only render the visible chip, so
-  // transitions are clean (no scale jitter from toggling opacity on 5 nodes).
+// pos is a fixed screen region approximating where the feature sits on a
+// generic face — not tracking real user coordinates, just a layout hint.
+function AnatomyLabel({ title, value, pos, visible }) {
   return (
     <AnimatePresence mode="wait">
       {visible && (
@@ -854,8 +852,8 @@ function AnatomyLabel({ title, value, containerW, containerH, visible }) {
           transition={{ duration: 0.18, ease: 'easeOut' }}
           className="absolute pointer-events-none"
           style={{
-            left: '50%',
-            top: `${CHIP_FIXED_Y_FRAC * 100}%`,
+            left: pos.left,
+            top: pos.top,
             transform: 'translate(-50%, -50%)',
             minWidth: 160,
           }}
@@ -929,32 +927,16 @@ function FacialAnalysisOverlay({ step, points, scanResult }) {
     return () => clearInterval(id)
   }, [])
 
-  // Measure the actual rendered container size so pixel positions are exact
-  const labelLayerRef = useRef(null)
-  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
-  useEffect(() => {
-    const el = labelLayerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(entries => {
-      for (const e of entries) {
-        setContainerSize({ w: e.contentRect.width, h: e.contentRect.height })
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
   return (
-    <div ref={labelLayerRef} className="absolute inset-0 pointer-events-none">
-      {containerSize.w > 0 && ANATOMY_LABELS.map((label, i) => {
+    <div className="absolute inset-0 pointer-events-none">
+      {ANATOMY_LABELS.map((label, i) => {
         const value = points ? label.valueFn(points, scanResult) : '—'
         return (
           <AnatomyLabel
             key={label.id}
             title={label.title}
             value={value}
-            containerW={containerSize.w}
-            containerH={containerSize.h}
+            pos={label.pos}
             visible={i === labelIdx}
           />
         )
