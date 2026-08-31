@@ -781,11 +781,14 @@ function _gonialAngleDeg(pts) {
 // where the feature sits on a generic face — not tracked to the specific user.
 // valueFn returns the qualifier tier computed from real scan data.
 // '—' shows until data (points or scan result) is available.
+// Fixed screen regions per feature — approximate facial zones on a generic
+// face, not tracked to this user's real landmark positions.
+// Four distinct vertical bands: eye (30%), cheekbone (44%), nose (53%), jaw (71%).
 const ANATOMY_LABELS = [
   {
     id: 'canthal',
     title: 'CANTHAL TILT',
-    pos: { top: '33%', left: '50%' },   // eye level, center
+    pos: { top: '30%', left: '50%' },
     valueFn: (pts, _scan) => {
       const deg = _canthalTiltDeg(pts)
       return deg >= 3 ? 'Strong' : deg >= 1 ? 'Moderate' : deg >= 0 ? 'Neutral' : 'Negative Tilt'
@@ -794,7 +797,7 @@ const ANATOMY_LABELS = [
   {
     id: 'orbital',
     title: 'ORBITAL VECTOR',
-    pos: { top: '33%', left: '50%' },   // eye level, center
+    pos: { top: '30%', left: '50%' },
     valueFn: (_pts, scan) => {
       const s = scan?.faceSubScores?.eyeArea
       if (s == null) return '—'
@@ -802,21 +805,9 @@ const ANATOMY_LABELS = [
     },
   },
   {
-    id: 'nasal',
-    title: 'NASAL BRIDGE',
-    pos: { top: '50%', left: '50%' },   // center of frame
-    valueFn: (pts, _scan) => {
-      const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
-      const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
-      if (bizygo < 0.01) return '—'
-      const ratio = ic / bizygo
-      return ratio < 0.28 ? 'Narrow' : ratio < 0.34 ? 'Proportionate' : 'Wide'
-    },
-  },
-  {
     id: 'zygomatic',
     title: 'ZYGOMATIC ARCH',
-    pos: { top: '50%', left: '50%' },   // mid-face, center
+    pos: { top: '44%', left: '50%' },
     valueFn: (pts, _scan) => {
       const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
       const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
@@ -826,9 +817,21 @@ const ANATOMY_LABELS = [
     },
   },
   {
+    id: 'nasal',
+    title: 'NASAL BRIDGE',
+    pos: { top: '53%', left: '50%' },
+    valueFn: (pts, _scan) => {
+      const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
+      const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const ratio = ic / bizygo
+      return ratio < 0.28 ? 'Narrow' : ratio < 0.34 ? 'Proportionate' : 'Wide'
+    },
+  },
+  {
     id: 'mandible',
     title: 'MANDIBULAR ANGLE',
-    pos: { top: '70%', left: '50%' },   // jaw level
+    pos: { top: '71%', left: '50%' },
     valueFn: (pts, _scan) => {
       const deg = _gonialAngleDeg(pts)
       return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
@@ -839,45 +842,46 @@ const ANATOMY_LABELS = [
 const LABEL_CYCLE_MS = 900   // fast enough to feel active, readable before cycling
 
 // pos is a fixed screen region approximating where the feature sits on a
-// generic face — not tracking real user coordinates, just a layout hint.
+// generic face — not tracking real user coordinates, just a layout approximation.
 function AnatomyLabel({ title, value, pos, visible }) {
   return (
     <AnimatePresence mode="wait">
       {visible && (
         <motion.div
           key={title}
-          initial={{ opacity: 0, y: 4 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
           className="absolute pointer-events-none"
           style={{
             left: pos.left,
             top: pos.top,
             transform: 'translate(-50%, -50%)',
-            minWidth: 160,
+            minWidth: 172,
+            maxWidth: 220,
           }}
         >
           <div style={{
-            background: 'rgba(0,0,0,0.90)',
-            border: `1px solid ${LANDMARK_GOLD}66`,
-            borderRadius: 8,
-            padding: '7px 14px',
+            background: 'rgba(0,0,0,0.88)',
+            border: `1px solid ${LANDMARK_GOLD}55`,
+            borderRadius: 10,
+            padding: '8px 16px',
             textAlign: 'center',
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'blur(8px)',
             whiteSpace: 'nowrap',
           }}>
             <div style={{
-              fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
+              fontSize: 11, fontWeight: 800, letterSpacing: '0.13em',
               color: LANDMARK_GOLD, fontFamily: 'monospace', textTransform: 'uppercase',
-              lineHeight: 1.4,
+              lineHeight: 1.3,
             }}>
               {title}
             </div>
             <div style={{
-              fontSize: 10, fontWeight: 500, letterSpacing: '0.03em',
-              color: 'rgba(255,255,255,0.72)', fontFamily: 'monospace',
-              lineHeight: 1.4, marginTop: 2,
+              fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
+              color: 'rgba(255,255,255,0.68)', fontFamily: 'monospace',
+              lineHeight: 1.4, marginTop: 3,
             }}>
               {value}
             </div>
