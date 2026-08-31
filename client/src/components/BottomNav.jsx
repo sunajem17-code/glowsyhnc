@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Camera, Grid2x2, TrendingUp, Users } from 'lucide-react'
+import { Camera, Grid2x2, Bot, Users } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GOLD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -7,7 +7,7 @@ import { triggerHaptic } from '../utils/haptics'
 const navItems = [
   { to: '/scan',      icon: Camera,    label: 'Scan' },
   { to: '/extras',   icon: Grid2x2,   label: 'Extras' },
-  { to: '/progress', icon: TrendingUp, label: 'Progress' },
+  { to: '/progress', icon: Bot,        label: 'AI Coach' },
   { to: '/community',icon: Users,     label: 'Community' },
 ]
 

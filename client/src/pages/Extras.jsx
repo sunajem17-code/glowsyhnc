@@ -1,16 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Scissors, CheckSquare, CalendarCheck, Settings, Sparkles } from 'lucide-react'
+import { Scissors, CheckSquare, CalendarCheck, Settings, TrendingUp } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const CARDS = [
   {
-    to: '/coach',
-    icon: Sparkles,
-    title: 'AI Coach',
-    subtitle: 'Ask anything — get direct, no-fluff advice',
+    to: '/timeline',
+    icon: TrendingUp,
+    title: 'Progress',
+    subtitle: 'Timeline of your recent scans and ratings',
     accent: '#C6A85C',
   },
   {

@@ -1,533 +1,263 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Lock, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown, Settings } from 'lucide-react'
+import { Send, Sparkles, Lock, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import PageHeader from '../components/PageHeader'
-import ProLock from '../components/ProLock'
-import FaceMetricsExplorer from '../components/FaceMetricsExplorer'
 import { api } from '../utils/api'
-import { GOLD, EASE_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-const METRIC_TABS = [
-  { key: 'glowScore',     label: 'Overall',  color: GOLD },
-  { key: 'faceScore',     label: 'Face',     color: '#F5A623' },
-  { key: 'groomingScore', label: 'Grooming', color: '#E07A5F' },
+const FREE_LIMIT = 3
+
+const STARTER_PROMPTS = [
+  "What's my #1 area to improve?",
+  'How do I improve my jawline?',
+  'Give me a morning skincare routine',
+  'What does my score mean?',
+  'How do I get to a 7+?',
+  'What should I focus on first?',
 ]
 
-// ── Canvas share card ─────────────────────────────────────────────────────────
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + w - r, y)
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-  ctx.lineTo(x + w, y + h - r)
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-  ctx.lineTo(x + r, y + h)
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-  ctx.lineTo(x, y + r)
-  ctx.quadraticCurveTo(x, y, x + r, y)
-  ctx.closePath()
-}
-
-function drawShareCard(canvas, firstScan, latestScan) {
-  const W = 600, H = 300
-  canvas.width  = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')
-
-  const diff     = latestScan.overall_score - firstScan.overall_score
-  const diffStr  = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
-  const fmtDate  = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-
-  // Background
-  ctx.fillStyle = '#121212'
-  ctx.fillRect(0, 0, W, H)
-
-  // Gold top bar
-  ctx.fillStyle = GOLD
-  ctx.fillRect(0, 0, W, 5)
-
-  // ── Left card (first scan) ────────────────────────────────────────────────
-  ctx.fillStyle = '#1E1E1E'
-  roundRect(ctx, 18, 18, 220, 222, 14)
-  ctx.fill()
-
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#888'
-  ctx.font = '600 11px Inter, system-ui, sans-serif'
-  ctx.fillText('FIRST SCAN', 128, 52)
-
-  ctx.fillStyle = GOLD
-  ctx.font = 'bold 54px Inter, system-ui, sans-serif'
-  ctx.fillText(firstScan.overall_score.toFixed(1), 128, 118)
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 13px Inter, system-ui, sans-serif'
-  ctx.fillText(firstScan.tier || '', 128, 146)
-
-  ctx.fillStyle = '#666'
-  ctx.font = '11px Inter, system-ui, sans-serif'
-  ctx.fillText(fmtDate(firstScan.created_at), 128, 168)
-
-  // ── Center (improvement) ──────────────────────────────────────────────────
-  ctx.textAlign = 'center'
-
-  // Arrow circle
-  ctx.strokeStyle = GOLD
-  ctx.lineWidth   = 2
-  ctx.beginPath()
-  ctx.arc(300, 100, 30, 0, Math.PI * 2)
-  ctx.stroke()
-
-  ctx.fillStyle = GOLD
-  ctx.font = 'bold 28px Inter, system-ui, sans-serif'
-  ctx.fillText('↑', 300, 112)
-
-  ctx.fillStyle = diff >= 0 ? GOLD : '#E07A5F'
-  ctx.font = 'bold 20px Inter, system-ui, sans-serif'
-  ctx.fillText(diffStr, 300, 156)
-
-  ctx.fillStyle = '#888'
-  ctx.font = '11px Inter, system-ui, sans-serif'
-  ctx.fillText('points', 300, 174)
-
-  // ── Right card (latest scan) ──────────────────────────────────────────────
-  ctx.fillStyle = '#1E1E1E'
-  roundRect(ctx, 362, 18, 220, 222, 14)
-  ctx.fill()
-
-  ctx.textAlign = 'center'
-  ctx.fillStyle = GOLD
-  ctx.font = '600 11px Inter, system-ui, sans-serif'
-  ctx.fillText('NOW', 472, 52)
-
-  ctx.fillStyle = GOLD
-  ctx.font = 'bold 54px Inter, system-ui, sans-serif'
-  ctx.fillText(latestScan.overall_score.toFixed(1), 472, 118)
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 13px Inter, system-ui, sans-serif'
-  ctx.fillText(latestScan.tier || '', 472, 146)
-
-  ctx.fillStyle = '#666'
-  ctx.font = '11px Inter, system-ui, sans-serif'
-  ctx.fillText(fmtDate(latestScan.created_at), 472, 168)
-
-  // ── Bottom branding bar ───────────────────────────────────────────────────
-  ctx.fillStyle = GOLD
-  ctx.fillRect(0, H - 34, W, 34)
-
-  ctx.fillStyle = '#121212'
-  ctx.font = 'bold 12px Inter, system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText('ascendus.store', 18, H - 11)
-
-  ctx.textAlign = 'right'
-  ctx.fillText('Track your glow up ✨', W - 18, H - 11)
-}
-
-// ── ComparisonSlider (kept for premium before/after) ─────────────────────────
-function ComparisonSlider({ before, after }) {
-  const [sliderPos, setSliderPos] = useState(50)
-  const containerRef = useRef()
-
-  function handleMove(e) {
-    const rect = containerRef.current.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const pos = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100))
-    setSliderPos(pos)
+function buildScanContext(scan, userProfile) {
+  if (!scan) return null
+  return {
+    glowScore: scan.glowScore,
+    faceScore: scan.faceScore,
+    presentationScore: scan.presentationScore,
+    faceData: scan.faceData,
+    userProfile,
   }
+}
 
+function TypingIndicator() {
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-col-resize select-none"
-      onMouseMove={handleMove}
-      onTouchMove={handleMove}
-    >
-      <img src={before} alt="before" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-        <img src={after} alt="after" className="absolute inset-0 h-full object-cover"
-          style={{ width: `${100 / (sliderPos / 100)}%` }} />
+    <div className="flex items-end gap-2 mb-4">
+      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
+        <Sparkles size={14} style={{ color: GOLD }} />
       </div>
-      <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
-        style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
-          <ArrowLeftRight size={14} style={{ color: GOLD }} />
-        </div>
-      </div>
-      <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/50 rounded-lg">
-        <p className="text-white text-xs font-body">Before</p>
-      </div>
-      <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/50 rounded-lg">
-        <p className="text-white text-xs font-body">After</p>
+      <div className="px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1.5 items-center"
+        style={{ background: 'rgba(255,255,255,0.06)' }}>
+        {[0, 1, 2].map(i => (
+          <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }}
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export default function Progress() {
-  const navigate  = useNavigate()
-  const { scans, streak, isPremium, token } = useStore()
+function formatMessage(content) {
+  return content.split('\n').map((line, i) => {
+    const parts = line.split(/(\*\*[^*]+\*\*)/g)
+    return (
+      <p key={i} className={i > 0 ? 'mt-2' : ''}>
+        {parts.map((part, j) =>
+          part.startsWith('**') && part.endsWith('**')
+            ? <strong key={j}>{part.slice(2, -2)}</strong>
+            : part
+        )}
+      </p>
+    )
+  })
+}
 
-  const [history, setHistory]   = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [metricTab, setMetricTab] = useState(0)
-  const [sharing, setSharing]   = useState(false)
-  const canvasRef = useRef()
-
-  const isDemo = !token || token === 'demo-token'
-
-  // ── Fetch scan history from API ───────────────────────────────────────────
-  // Uses /supabase/scans (real 'scans' table) rather than the old
-  // /user/scan-history endpoint — that one queried a table name that was
-  // never actually created in Supabase, so it always silently returned an
-  // empty array. /supabase/scans is the same endpoint that already backs
-  // the scan-save flow, and now also carries face_image_url (a signed URL
-  // to the real uploaded photo), which is what powers the thumbnails below.
-  useEffect(() => {
-    if (isDemo) { setLoading(false); return }
-    api.supabase.getScans()
-      .then(({ scans: h }) => setHistory(h || []))
-      .catch(() => setHistory([]))
-      .finally(() => setLoading(false))
-  }, [isDemo])
-
-  // ── Derived chart data (newest → oldest so chart reads left-to-right) ─────
-  const chartData = [...history].reverse().map((s, i) => ({
-    label:        `Scan ${i + 1}`,
-    date:         new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    glowScore:    Number(s.overall_score),
-    faceScore:    s.face_score     != null ? Number(s.face_score)     : null,
-    groomingScore: s.grooming_score != null ? Number(s.grooming_score) : null,
-  }))
-
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  const firstScan  = history.length > 0 ? history[history.length - 1] : null
-  const latestScan = history.length > 0 ? history[0] : null
-  const bestScore  = history.length > 0 ? Math.max(...history.map(h => Number(h.overall_score))) : null
-  const improvement = firstScan && latestScan
-    ? (Number(latestScan.overall_score) - Number(firstScan.overall_score)).toFixed(1)
-    : null
-  const improvementNum = improvement !== null ? parseFloat(improvement) : null
-
-  const hasEnoughData = history.length >= 2
-  const activeMetric  = METRIC_TABS[metricTab]
-
-  // ── Share card handler ────────────────────────────────────────────────────
-  const handleShare = useCallback(async () => {
-    if (!firstScan || !latestScan || sharing) return
-    setSharing(true)
-    try {
-      await document.fonts.ready
-      const canvas = canvasRef.current
-      drawShareCard(canvas, firstScan, latestScan)
-
-      const diff    = Number(latestScan.overall_score) - Number(firstScan.overall_score)
-      const diffStr = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
-
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], 'glow-up.png', { type: 'image/png' })
-        try {
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files:  [file],
-              title:  'My Glow Up',
-              text:   `I improved ${diffStr} points on Ascendus! 🔥 ascendus.store`,
-            })
-          } else {
-            const url = URL.createObjectURL(blob)
-            const a   = document.createElement('a')
-            a.href    = url
-            a.download = 'glow-up.png'
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-        } catch (shareErr) {
-          // User cancelled share — not an error
-          if (shareErr.name !== 'AbortError') console.warn('Share failed:', shareErr)
-        }
-        setSharing(false)
-      }, 'image/png')
-    } catch (err) {
-      console.error('Share card failed:', err)
-      setSharing(false)
-    }
-  }, [firstScan, latestScan, sharing])
-
-  // ── Render ────────────────────────────────────────────────────────────────
+function MessageBubble({ msg }) {
+  const isAI = msg.role === 'assistant'
   return (
-    <MotionPage className="px-4">
-      {/* Hidden canvas used only to generate the share image */}
-      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`flex gap-2 mb-4 ${isAI ? 'items-start' : 'items-end flex-row-reverse'}`}
+    >
+      {isAI && (
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+          style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
+          <Sparkles size={14} style={{ color: GOLD }} />
+        </div>
+      )}
+      <div
+        className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
+        style={isAI
+          ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)', borderRadius: '18px 18px 18px 4px' }
+          : { background: GOLD, color: '#0A0A0A', fontWeight: 600, borderRadius: '18px 18px 4px 18px' }}
+      >
+        {isAI ? formatMessage(msg.content) : msg.content}
+      </div>
+    </motion.div>
+  )
+}
 
-      <PageHeader
-        title="Your Progress"
-        subtitle="Track your glow-up journey"
-        action={
-          <button
-            onClick={() => { triggerHaptic(); navigate('/settings') }}
-            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-            aria-label="Settings"
-          >
-            <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
-          </button>
-        }
-      />
+export default function Progress() {
+  const navigate = useNavigate()
+  const { scans, isPremium, userProfile, freeCoachMessages, incrementFreeCoachMessages } = useStore()
+  const latestScan = scans?.[0] ?? null
+  const scanContext = buildScanContext(latestScan, userProfile)
 
-      <FaceMetricsExplorer />
+  const freeLeft = isPremium ? Infinity : Math.max(0, FREE_LIMIT - (freeCoachMessages ?? 0))
+  const locked = !isPremium && freeLeft <= 0
 
-      {/* ── Overview cards ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        {[
-          { label: 'Total Scans', value: history.length || scans.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} /> },
-          { label: 'Best Score',  value: bestScore != null ? bestScore.toFixed(1) : 'N/A',   icon: <Trophy size={20} style={{ color: GOLD }} /> },
-          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : 'N/A', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
-        ].map(({ label, value, icon }) => (
-          <div key={label} className="card text-center py-3">
-            <div className="flex justify-center mb-0.5">{icon}</div>
-            <p className="font-mono font-bold text-lg text-primary">{value}</p>
-            <p className="text-[10px] text-secondary font-body">{label}</p>
+  const greeting = latestScan
+    ? `Score loaded: **${latestScan.glowScore?.toFixed(1) ?? '—'}/10**. Ask me anything — I'll tell you exactly what to work on.`
+    : `No scan yet. Run a scan first and I can give you personalised advice based on your actual results.`
+
+  const [messages, setMessages] = useState([{ role: 'assistant', content: greeting }])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [chipsVisible, setChipsVisible] = useState(true)
+  const bottomRef = useRef(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  async function send(text) {
+    const txt = (text || input).trim()
+    if (!txt || loading || locked) return
+    setInput('')
+    setChipsVisible(false)
+    if (!isPremium) incrementFreeCoachMessages?.()
+
+    const next = [...messages, { role: 'user', content: txt }]
+    setMessages(next)
+    setLoading(true)
+    try {
+      const data = await api.coach.message({
+        messages: next.map(m => ({ role: m.role, content: m.content })),
+        scanContext,
+      })
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }])
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  function reset() {
+    triggerHaptic()
+    setMessages([{ role: 'assistant', content: greeting }])
+    setChipsVisible(true)
+  }
+
+  return (
+    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-5 flex-shrink-0"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+          paddingBottom: 12,
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
+            <Sparkles size={18} style={{ color: GOLD }} />
           </div>
-        ))}
+          <div>
+            <h1 className="font-heading font-bold text-[18px] text-primary leading-tight">AI Coach</h1>
+            {!isPremium && freeLeft < Infinity && (
+              <p className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {freeLeft > 0 ? `${freeLeft} free message${freeLeft !== 1 ? 's' : ''} left` : 'Upgrade to keep chatting'}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={reset}
+          className="w-8 h-8 flex items-center justify-center rounded-full"
+          style={{ background: 'rgba(255,255,255,0.06)' }}
+        >
+          <RotateCcw size={15} style={{ color: 'rgba(255,255,255,0.5)' }} />
+        </button>
       </div>
 
-      {/* ── Chart / Empty state ───────────────────────────────────────────── */}
-      {loading ? (
-        <div className="card mb-4 flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: GOLD, borderTopColor: 'transparent' }} />
-        </div>
-      ) : !hasEnoughData ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ease: EASE_STANDARD }}
-          className="card mb-4 flex flex-col items-center gap-3 py-10 text-center"
-        >
-          <TrendingUp size={40} style={{ color: GOLD }} />
-          <p className="font-heading font-bold text-base text-primary">
-            {history.length === 0
-              ? 'Complete your first scan to start tracking your glow up'
-              : 'Take one more scan to unlock your progress chart'}
-          </p>
-          <p className="text-xs text-secondary font-body max-w-[220px]">
-            Your score history will appear here after two scans
-          </p>
-          <button
-            onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
-            className="mt-1 px-5 py-2 rounded-xl text-sm font-heading font-bold text-white"
-            style={{ background: GOLD }}
-          >
-            Start a Scan
-          </button>
-        </motion.div>
-      ) : (
-        <>
-          {isPremium ? (
-            <>
-              {/* Stats row — Pro */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {[
-                  { label: 'First Score',  value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
-                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} /> },
-                  {
-                    label: 'Improvement',
-                    value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
-                    icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: GOLD }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
-                    colorClass: improvementNum >= 0 ? '' : 'text-warning',
-                    colorStyle: improvementNum >= 0 ? { color: GOLD } : undefined,
-                  },
-                ].map(({ label, value, icon, colorClass, colorStyle }) => (
-                  <div key={label} className="card text-center py-3">
-                    <div className="flex justify-center mb-0.5">{icon}</div>
-                    <p className={`font-mono font-bold text-lg ${colorClass || 'text-primary'}`} style={colorStyle}>{value}</p>
-                    <p className="text-[10px] text-secondary font-body">{label}</p>
-                  </div>
-                ))}
-              </div>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 pt-4">
+        {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+        {loading && <TypingIndicator />}
 
-              {/* Chart — Pro */}
-              <div className="card mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
-                  <span
-                    className={`text-xs font-heading font-bold px-2 py-1 rounded-lg ${improvementNum >= 0 ? '' : 'bg-red-50 text-warning dark:bg-red-900/20'}`}
-                    style={improvementNum >= 0 ? { background: `${GOLD}1A`, color: GOLD } : undefined}
-                  >
-                    {improvementNum >= 0 ? '+' : ''}{improvement} pts
-                  </span>
-                </div>
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  {METRIC_TABS.map((m, i) => (
-                    <button
-                      key={m.key}
-                      onClick={() => { triggerHaptic(); setMetricTab(i) }}
-                      className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all ${
-                        metricTab === i ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-secondary'
-                      }`}
-                      style={metricTab === i ? { background: m.color } : {}}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor={activeMetric.color} stopOpacity={0.25} />
-                        <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }} formatter={(v) => [v != null ? Number(v).toFixed(1) : 'N/A', activeMetric.label]} />
-                    <Area type="monotone" dataKey={activeMetric.key} stroke={activeMetric.color} strokeWidth={2.5} fill="url(#areaGrad)" connectNulls dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6, fill: activeMetric.color }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Share My Glow Up — Pro */}
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }} className="card mb-4 overflow-hidden">
-                <div className="h-1 -mx-4 -mt-4 mb-4" style={{ background: `linear-gradient(90deg, ${GOLD}, #F5D98E)` }} />
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${GOLD}1A` }}>
-                    <Share2 size={20} style={{ color: GOLD }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
-                    <p className="text-xs text-secondary font-body truncate">
-                      {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
-                    </p>
-                  </div>
-                  <button onClick={() => { triggerHaptic(); handleShare() }} disabled={sharing} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0" style={{ background: GOLD }}>
-                    {sharing ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Download size={13} />Share</>}
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          ) : (
-            /* Free users: locked progress graph + share card */
-            <ProLock
-              solid
-              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Progress Graph & Share Card"
-              description="Track your score over time and share your glow-up with Pro."
-              className="mb-4"
-            />
-          )}
-        </>
-      )}
-
-      {/* ── Photo timeline (real photos from Supabase Storage, newest first —
-          local `scans` store has photos stripped after a reload to avoid a
-          localStorage quota crash, so this reads from the cloud instead) ─ */}
-      {history.length > 0 && (
-        <div className="mb-4">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
-            <Calendar size={16} className="text-secondary" />
-            Scan History
-          </h2>
-          {isPremium ? (
-            <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
-              {history.map((scan, i) => (
-                <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden border-2 border-transparent">
-                  <div className="relative">
-                    <img
-                      src={scan.face_image_url || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
-                      alt={`Scan ${i + 1}`}
-                      className="w-24 h-24 object-cover"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
-                      <p className="text-white text-[9px] font-mono font-bold">
-                        {scan.overall_score != null ? Number(scan.overall_score).toFixed(1) : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-card px-1.5 py-1">
-                    <p className="text-[9px] text-secondary font-body text-center">
-                      {new Date(scan.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
+        {/* Starter chips */}
+        <AnimatePresence>
+          {chipsVisible && !loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-wrap gap-2 pb-4"
+            >
+              {STARTER_PROMPTS.map(chip => (
+                <button
+                  key={chip}
+                  onClick={() => { triggerHaptic(); send(chip) }}
+                  disabled={locked}
+                  className="text-[12px] font-body px-3 py-1.5 rounded-full"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'rgba(255,255,255,0.6)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  {chip}
+                </button>
               ))}
-            </div>
-          ) : (
-            <ProLock
-              solid
-              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Scan History"
-              description="All your scan photos and score history, in one place."
-            />
+            </motion.div>
           )}
+        </AnimatePresence>
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input / paywall */}
+      {locked ? (
+        <div className="flex-shrink-0 px-4 pb-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
+          <button
+            onClick={() => { triggerHaptic(); navigate('/premium') }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
+          >
+            <Lock size={15} /> Unlock Unlimited Coaching
+          </button>
+        </div>
+      ) : (
+        <div
+          className="flex-shrink-0 flex items-center gap-3 px-4"
+          style={{
+            paddingTop: 10,
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+          }}
+        >
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+            placeholder="Ask your coach…"
+            className="flex-1 bg-transparent text-[14px] font-body text-primary outline-none placeholder:text-white/30"
+          />
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => { triggerHaptic(); send() }}
+            disabled={!input.trim() || loading}
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{
+              background: input.trim() && !loading ? GOLD : 'rgba(255,255,255,0.08)',
+              transition: 'background 0.2s',
+            }}
+          >
+            <Send size={15} style={{ color: input.trim() && !loading ? '#0A0A0A' : 'rgba(255,255,255,0.3)' }} />
+          </motion.button>
         </div>
       )}
-
-      {/* ── Before & After comparison (premium photo slider) ─────────────── */}
-      {history.length >= 2 && (
-        <div className="mb-4">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
-            <ArrowLeftRight size={16} className="text-secondary" />
-            Before &amp; After
-          </h2>
-          {isPremium ? (
-            <ComparisonSlider
-              before={history[history.length - 1]?.face_image_url || 'https://placehold.co/400x400/gray/white?text=Before'}
-              after={history[0]?.face_image_url || 'https://placehold.co/400x400/C6A85C/white?text=After'}
-            />
-          ) : (
-            <ProLock
-              solid
-              onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Before & After Comparison"
-              description="Drag-slider photo comparison of your first scan vs. your latest."
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── Milestones ────────────────────────────────────────────────────── */}
-      {hasEnoughData && (
-        <div className="mb-6">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2"><Trophy size={16} style={{ color: GOLD }} /> Milestones</h2>
-          {[
-            {
-              icon: <Target size={20} style={{ color: GOLD }} />,
-              text: 'First scan completed',
-              date: new Date(firstScan.created_at).toLocaleDateString(),
-            },
-            improvementNum > 0 && {
-              icon: <TrendingUp size={20} style={{ color: '#34C759' }} />,
-              text: `Score improved by ${improvement} points`,
-            },
-            bestScore >= 7.5 && {
-              icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} />,
-              text: `Reached ${bestScore.toFixed(1)}, ${latestScan.tier || 'elite tier'}`,
-            },
-          ].filter(Boolean).map((m, i) => (
-            <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
-              <span className="flex-shrink-0">{m.icon}</span>
-              <div>
-                <p className="text-sm font-body text-primary">{m.text}</p>
-                {m.date && <p className="text-[10px] text-secondary font-body">{m.date}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="pb-8" />
     </MotionPage>
   )
 }
