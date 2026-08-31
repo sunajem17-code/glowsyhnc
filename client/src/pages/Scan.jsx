@@ -723,13 +723,7 @@ export function buildMeshPathD(lm, edges) {
 // in the oval"); startAnalysis fires landmark detection the instant the
 // analyzing screen mounts, so in practice this only ever shows for the
 // first fraction of a second.
-const FALLBACK_STEP_GEOMETRY = {
-  step0: { lineX: 50, topY: 10, botY: 90, guideY: 42, guideX1: 25, guideX2: 75 },
-  step1: { pts: '22,58 50,82 78,58' },
-  step2: { l1: { x1: 25, y1: 43, x2: 42, y2: 40 }, l2: { x1: 58, y1: 40, x2: 75, y2: 43 } },
-  step3: { lineY1: 55, lineY2: 66, lineY3: 82, lineX1: 30, lineX2: 70, guideX: 50, guideY1: 55, guideY2: 82, dotX: 50, dotY: 68.5 },
-  step4: { minX: 18, maxX: 82, minY: 12, maxY: 88 },
-}
+// FALLBACK_STEP_GEOMETRY removed — SVG step geometry no longer rendered.
 // Readouts intentionally carry no text — position-only anchors.
 // Raw numbers were removed: they were hardcoded and identical for every user.
 const FALLBACK_STEP_READOUTS = [null, null, null, null, null]
@@ -740,79 +734,9 @@ const FALLBACK_STEP_READOUTS = [null, null, null, null, null]
 // most of the wait. This keeps fresh geometry + numbers appearing the whole
 // time so the screen reads as "busy" for the full analysis, not just the
 // first few seconds of it.
-// text fields removed — values were hardcoded and identical for every user.
-// Lines still render as measurement geometry; only the numeric labels are gone.
-const FALLBACK_TICKER_MEASUREMENTS = [
-  { line: { x1: 30, y1: 20, x2: 70, y2: 20 } },
-  { line: { x1: 22, y1: 30, x2: 22, y2: 46 } },
-  { line: { x1: 78, y1: 30, x2: 78, y2: 46 } },
-  { line: { x1: 38, y1: 46, x2: 38, y2: 60 } },
-  { line: { x1: 62, y1: 46, x2: 62, y2: 60 } },
-  { line: { x1: 40, y1: 76, x2: 60, y2: 76 } },
-  { line: { x1: 20, y1: 66, x2: 80, y2: 66 } },
-]
+// buildLiveStepGeometry, FALLBACK_TICKER_MEASUREMENTS, and buildLiveTicker
+// removed — SVG step geometry and ticker lines no longer rendered.
 
-// Builds the same-shaped geometry/readout/ticker objects as the fallback
-// constants above, but from `points` (real, normalized 0–1 coordinates) —
-// converted to 0–100 viewBox/percent units here. Every line, bracket and
-// dot below traces an actual landmark on THIS face instead of an assumed
-// generic position.
-function buildLiveStepGeometry(points) {
-  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
-  const forehead = pc('forehead'), nose = pc('nose'), noseBase = pc('noseBase'), chin = pc('chin')
-  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
-  const jawL = pc('jawL'), jawR = pc('jawR')
-  const eyeOuterL = pc('eyeOuterL'), eyeOuterR = pc('eyeOuterR')
-  const templeL = pc('templeL'), templeR = pc('templeR')
-  const eyeY = (eyeOuterL.y + eyeOuterR.y) / 2
-  const lowerThirdMidY = (noseBase.y + chin.y) / 2
-  const pad = 5
-  const minX = Math.min(cheekL.x, jawL.x, templeL.x) - pad
-  const maxX = Math.max(cheekR.x, jawR.x, templeR.x) + pad
-  const minY = forehead.y - pad
-  const maxY = chin.y + pad
-
-  return {
-    step0: { lineX: nose.x, topY: forehead.y, botY: chin.y, guideY: eyeY, guideX1: eyeOuterL.x, guideX2: eyeOuterR.x },
-    step1: { pts: `${jawL.x},${jawL.y} ${chin.x},${chin.y} ${jawR.x},${jawR.y}` },
-    step2: {
-      l1: { x1: pc('eyeInnerL').x, y1: pc('eyeInnerL').y, x2: eyeOuterL.x, y2: eyeOuterL.y },
-      l2: { x1: pc('eyeInnerR').x, y1: pc('eyeInnerR').y, x2: eyeOuterR.x, y2: eyeOuterR.y },
-    },
-    step3: {
-      lineY1: eyeY, lineY2: noseBase.y, lineY3: chin.y, lineX1: cheekL.x, lineX2: cheekR.x,
-      guideX: nose.x, guideY1: eyeY, guideY2: chin.y, dotX: nose.x, dotY: lowerThirdMidY,
-    },
-    step4: { minX, maxX, minY, maxY },
-  }
-}
-
-// Returns null entries — positions are no longer needed since readout text
-// was removed (values were hardcoded and identical for every user).
-function buildLiveReadouts(_points) {
-  return [null, null, null, null, null]
-}
-
-// text fields removed — values were hardcoded and identical for every user.
-// Lines still trace real landmark positions; only the numeric labels are gone.
-function buildLiveTicker(points) {
-  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
-  const templeL = pc('templeL'), templeR = pc('templeR')
-  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
-  const jawMidL = pc('jawMidL'), jawChinL = pc('jawChinL'), jawMidR = pc('jawMidR'), jawChinR = pc('jawChinR')
-  const mouthL = pc('mouthL'), mouthR = pc('mouthR')
-  const eyeInnerL = pc('eyeInnerL'), eyeInnerR = pc('eyeInnerR')
-  const bitemporalY = (templeL.y + templeR.y) / 2
-  return [
-    { line: { x1: templeL.x, y1: bitemporalY,  x2: templeR.x,  y2: bitemporalY } },
-    { line: { x1: cheekL.x,  y1: cheekL.y - 8, x2: cheekL.x,   y2: cheekL.y + 8 } },
-    { line: { x1: cheekR.x,  y1: cheekR.y - 8, x2: cheekR.x,   y2: cheekR.y + 8 } },
-    { line: { x1: jawMidL.x, y1: jawMidL.y,    x2: jawChinL.x, y2: jawChinL.y } },
-    { line: { x1: jawMidR.x, y1: jawMidR.y,    x2: jawChinR.x, y2: jawChinR.y } },
-    { line: { x1: mouthL.x,  y1: mouthL.y,     x2: mouthR.x,   y2: mouthR.y } },
-    { line: { x1: eyeInnerL.x, y1: eyeInnerL.y, x2: eyeInnerR.x, y2: eyeInnerR.y } },
-  ]
-}
 
 // ── Anatomy label chips ───────────────────────────────────────────────────────
 // ONE chip visible at a time, cycling every LABEL_CYCLE_MS.
@@ -998,29 +922,6 @@ function Readout({ x, y, text, align = 'center' }) {
 }
 
 function FacialAnalysisOverlay({ step, points, scanResult }) {
-  const s = Math.min(step, 4)
-
-  // Real landmarks (usually resolved within a fraction of a second of this
-  // mounting — see startAnalysis) replace every fallback coordinate below
-  // with one measured from THIS photo. useMemo so a re-render mid-step
-  // doesn't recompute/rebuild these on every tick.
-  const G = useMemo(() => (points ? buildLiveStepGeometry(points) : FALLBACK_STEP_GEOMETRY), [points])
-  const readouts = useMemo(() => (points ? buildLiveReadouts(points) : FALLBACK_STEP_READOUTS), [points])
-  const tickerMeasurements = useMemo(() => (points ? buildLiveTicker(points) : FALLBACK_TICKER_MEASUREMENTS), [points])
-  const readout = readouts[s]
-
-  // Ticker runs on its own clock the whole time this component is mounted —
-  // it never depends on `step`, so it keeps cycling through step 4's long
-  // hold instead of freezing once the main 5-step choreography finishes.
-  const [tickerIdx, setTickerIdx] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTickerIdx(i => (i + 1) % tickerMeasurements.length)
-    }, 1400)
-    return () => clearInterval(id)
-  }, [tickerMeasurements])
-  const ticker = tickerMeasurements[tickerIdx % tickerMeasurements.length]
-
   // Single anatomy label — cycles independently through ANATOMY_LABELS
   const [labelIdx, setLabelIdx] = useState(0)
   useEffect(() => {
@@ -1044,96 +945,21 @@ function FacialAnalysisOverlay({ step, points, scanResult }) {
   }, [])
 
   return (
-    <>
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        style={{ filter: `drop-shadow(0 0 3px ${LANDMARK_GLOW})` }}
-      >
-        <g fill="none" stroke={LANDMARK_GOLD} strokeWidth={LANDMARK_STROKE} strokeLinecap="round" vectorEffect="non-scaling-stroke">
-          <AnimatePresence>
-            {s === 0 && (
-              <motion.g key="step-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line x1={G.step0.lineX} y1={G.step0.topY} x2={G.step0.lineX} y2={G.step0.botY} />
-                <line x1={G.step0.guideX1} y1={G.step0.guideY} x2={G.step0.guideX2} y2={G.step0.guideY} stroke={LANDMARK_GUIDE} strokeWidth={0.8} />
-              </motion.g>
-            )}
-            {s === 1 && (
-              <motion.g key="step-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <polyline points={G.step1.pts} />
-              </motion.g>
-            )}
-            {s === 2 && (
-              <motion.g key="step-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line {...G.step2.l1} />
-                <line {...G.step2.l2} />
-              </motion.g>
-            )}
-            {s === 3 && (
-              <motion.g key="step-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <line x1={G.step3.lineX1} y1={G.step3.lineY1} x2={G.step3.lineX2} y2={G.step3.lineY1} />
-                <line x1={G.step3.lineX1} y1={G.step3.lineY2} x2={G.step3.lineX2} y2={G.step3.lineY2} />
-                <line x1={G.step3.lineX1} y1={G.step3.lineY3} x2={G.step3.lineX2} y2={G.step3.lineY3} />
-                <line x1={G.step3.guideX} y1={G.step3.guideY1} x2={G.step3.guideX} y2={G.step3.guideY2} stroke={LANDMARK_GUIDE} strokeWidth={0.8} strokeDasharray="3 3" />
-                <motion.circle
-                  cx={G.step3.dotX} cy={G.step3.dotY} r="1" fill={LANDMARK_GOLD} stroke="none"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              </motion.g>
-            )}
-            {s === 4 && (
-              <motion.g key="step-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <motion.g animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
-                  <LandmarkBracket x={G.step4.minX} y={G.step4.minY} dx={1} dy={1} />
-                  <LandmarkBracket x={G.step4.maxX} y={G.step4.minY} dx={-1} dy={1} />
-                  <LandmarkBracket x={G.step4.minX} y={G.step4.maxY} dx={1} dy={-1} />
-                  <LandmarkBracket x={G.step4.maxX} y={G.step4.maxY} dx={-1} dy={-1} />
-                </motion.g>
-              </motion.g>
-            )}
-          </AnimatePresence>
-
-          {/* Continuously-cycling secondary measurement — thinner still,
-              dimmer, so it reads as background activity rather than
-              competing with whichever main step is currently front-and-center. */}
-          <AnimatePresence mode="wait">
-            <motion.line
-              key={tickerIdx}
-              {...ticker.line}
-              strokeWidth={0.7}
-              stroke={LANDMARK_GUIDE}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.9, 0.9, 0] }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.35, ease: 'easeInOut' }}
-            />
-          </AnimatePresence>
-        </g>
-      </svg>
-
-      {/* HTML readout labels — see Readout's comment on why these aren't
-          plain SVG <text> nodes. */}
-      <div ref={labelLayerRef} className="absolute inset-0 pointer-events-none">
-        {/* Single anatomy label chip — one at a time, pixel-clamped to never clip */}
-        {containerSize.w > 0 && ANATOMY_LABELS.map((label, i) => {
-          const value = points ? label.valueFn(points, scanResult) : '—'
-          return (
-            <AnatomyLabel
-              key={label.id}
-              title={label.title}
-              value={value}
-              containerW={containerSize.w}
-              containerH={containerSize.h}
-              visible={i === labelIdx}
-            />
-          )
-        })}
-        {/* Readout text and ticker text intentionally removed —
-            values were hardcoded and identical for every user. */}
-      </div>
-    </>
+    <div ref={labelLayerRef} className="absolute inset-0 pointer-events-none">
+      {containerSize.w > 0 && ANATOMY_LABELS.map((label, i) => {
+        const value = points ? label.valueFn(points, scanResult) : '—'
+        return (
+          <AnatomyLabel
+            key={label.id}
+            title={label.title}
+            value={value}
+            containerW={containerSize.w}
+            containerH={containerSize.h}
+            visible={i === labelIdx}
+          />
+        )
+      })}
+    </div>
   )
 }
 
