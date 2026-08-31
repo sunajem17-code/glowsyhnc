@@ -730,13 +730,9 @@ const FALLBACK_STEP_GEOMETRY = {
   step3: { lineY1: 55, lineY2: 66, lineY3: 82, lineX1: 30, lineX2: 70, guideX: 50, guideY1: 55, guideY2: 82, dotX: 50, dotY: 68.5 },
   step4: { minX: 18, maxX: 82, minY: 12, maxY: 88 },
 }
-const FALLBACK_STEP_READOUTS = [
-  { x: 50, y: 8,  text: '1.02×',  align: 'center' },
-  { x: 50, y: 86, text: '118.4°', align: 'center' },
-  { x: 80, y: 40, text: '+4.2°',  align: 'left'   },
-  { x: 50, y: 50, text: '33.4%',  align: 'center' },
-  { x: 50, y: 6,  text: '98.7%',  align: 'center' },
-]
+// Readouts intentionally carry no text — position-only anchors.
+// Raw numbers were removed: they were hardcoded and identical for every user.
+const FALLBACK_STEP_READOUTS = [null, null, null, null, null]
 // Secondary measurements that cycle continuously for as long as this overlay
 // is mounted, independent of `step`. The 5 main steps above only span ~4s
 // (1s each); the real AI call typically runs another 10+ seconds parked on
@@ -744,14 +740,16 @@ const FALLBACK_STEP_READOUTS = [
 // most of the wait. This keeps fresh geometry + numbers appearing the whole
 // time so the screen reads as "busy" for the full analysis, not just the
 // first few seconds of it.
+// text fields removed — values were hardcoded and identical for every user.
+// Lines still render as measurement geometry; only the numeric labels are gone.
 const FALLBACK_TICKER_MEASUREMENTS = [
-  { line: { x1: 30, y1: 20, x2: 70, y2: 20 },                text: { x: 50, y: 16, v: '1.61:1' } },
-  { line: { x1: 22, y1: 30, x2: 22, y2: 46 },                text: { x: 16, y: 38, v: '24.8mm' } },
-  { line: { x1: 78, y1: 30, x2: 78, y2: 46 },                text: { x: 84, y: 38, v: '24.5mm' } },
-  { line: { x1: 38, y1: 46, x2: 38, y2: 60 },                text: { x: 32, y: 53, v: '11.2°'  } },
-  { line: { x1: 62, y1: 46, x2: 62, y2: 60 },                text: { x: 68, y: 53, v: '11.6°'  } },
-  { line: { x1: 40, y1: 76, x2: 60, y2: 76 },                text: { x: 50, y: 80, v: '92.3%'  } },
-  { line: { x1: 20, y1: 66, x2: 80, y2: 66 },                text: { x: 50, y: 63, v: '0.98x'  } },
+  { line: { x1: 30, y1: 20, x2: 70, y2: 20 } },
+  { line: { x1: 22, y1: 30, x2: 22, y2: 46 } },
+  { line: { x1: 78, y1: 30, x2: 78, y2: 46 } },
+  { line: { x1: 38, y1: 46, x2: 38, y2: 60 } },
+  { line: { x1: 62, y1: 46, x2: 62, y2: 60 } },
+  { line: { x1: 40, y1: 76, x2: 60, y2: 76 } },
+  { line: { x1: 20, y1: 66, x2: 80, y2: 66 } },
 ]
 
 // Builds the same-shaped geometry/readout/ticker objects as the fallback
@@ -789,20 +787,14 @@ function buildLiveStepGeometry(points) {
   }
 }
 
-function buildLiveReadouts(points) {
-  const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
-  const forehead = pc('forehead'), chin = pc('chin'), eyeOuterR = pc('eyeOuterR')
-  const cheekL = pc('cheekL'), cheekR = pc('cheekR')
-  const centerX = (cheekL.x + cheekR.x) / 2
-  return [
-    { x: centerX, y: Math.max(2, forehead.y - 6), text: '1.02×',  align: 'center' },
-    { x: centerX, y: Math.min(97, chin.y + 6),     text: '118.4°', align: 'center' },
-    { x: eyeOuterR.x + 3, y: eyeOuterR.y,           text: '+4.2°',  align: 'left'   },
-    { x: centerX, y: (pc('noseBase').y + chin.y) / 2, text: '33.4%', align: 'center' },
-    { x: centerX, y: Math.max(2, forehead.y - 8),   text: '98.7%', align: 'center' },
-  ]
+// Returns null entries — positions are no longer needed since readout text
+// was removed (values were hardcoded and identical for every user).
+function buildLiveReadouts(_points) {
+  return [null, null, null, null, null]
 }
 
+// text fields removed — values were hardcoded and identical for every user.
+// Lines still trace real landmark positions; only the numeric labels are gone.
 function buildLiveTicker(points) {
   const pc = key => ({ x: points[key].x * 100, y: points[key].y * 100 })
   const templeL = pc('templeL'), templeR = pc('templeR')
@@ -812,13 +804,13 @@ function buildLiveTicker(points) {
   const eyeInnerL = pc('eyeInnerL'), eyeInnerR = pc('eyeInnerR')
   const bitemporalY = (templeL.y + templeR.y) / 2
   return [
-    { line: { x1: templeL.x, y1: bitemporalY, x2: templeR.x, y2: bitemporalY }, text: { x: (templeL.x + templeR.x) / 2, y: bitemporalY - 4, v: '1.61:1' } },
-    { line: { x1: cheekL.x, y1: cheekL.y - 8, x2: cheekL.x, y2: cheekL.y + 8 }, text: { x: cheekL.x - 6, y: cheekL.y, v: '24.8mm' } },
-    { line: { x1: cheekR.x, y1: cheekR.y - 8, x2: cheekR.x, y2: cheekR.y + 8 }, text: { x: cheekR.x + 6, y: cheekR.y, v: '24.5mm' } },
-    { line: { x1: jawMidL.x, y1: jawMidL.y, x2: jawChinL.x, y2: jawChinL.y },   text: { x: jawChinL.x - 4, y: jawChinL.y + 3, v: '11.2°' } },
-    { line: { x1: jawMidR.x, y1: jawMidR.y, x2: jawChinR.x, y2: jawChinR.y },   text: { x: jawChinR.x + 4, y: jawChinR.y + 3, v: '11.6°' } },
-    { line: { x1: mouthL.x, y1: mouthL.y, x2: mouthR.x, y2: mouthR.y },        text: { x: (mouthL.x + mouthR.x) / 2, y: mouthL.y + 4, v: '92.3%' } },
-    { line: { x1: eyeInnerL.x, y1: eyeInnerL.y, x2: eyeInnerR.x, y2: eyeInnerR.y }, text: { x: (eyeInnerL.x + eyeInnerR.x) / 2, y: eyeInnerL.y - 4, v: '0.98x' } },
+    { line: { x1: templeL.x, y1: bitemporalY,  x2: templeR.x,  y2: bitemporalY } },
+    { line: { x1: cheekL.x,  y1: cheekL.y - 8, x2: cheekL.x,   y2: cheekL.y + 8 } },
+    { line: { x1: cheekR.x,  y1: cheekR.y - 8, x2: cheekR.x,   y2: cheekR.y + 8 } },
+    { line: { x1: jawMidL.x, y1: jawMidL.y,    x2: jawChinL.x, y2: jawChinL.y } },
+    { line: { x1: jawMidR.x, y1: jawMidR.y,    x2: jawChinR.x, y2: jawChinR.y } },
+    { line: { x1: mouthL.x,  y1: mouthL.y,     x2: mouthR.x,   y2: mouthR.y } },
+    { line: { x1: eyeInnerL.x, y1: eyeInnerL.y, x2: eyeInnerR.x, y2: eyeInnerR.y } },
   ]
 }
 
@@ -1138,28 +1130,8 @@ function FacialAnalysisOverlay({ step, points, scanResult }) {
             />
           )
         })}
-        <AnimatePresence mode="wait">
-          {readout && <Readout key={`step-${s}`} {...readout} />}
-        </AnimatePresence>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`ticker-${tickerIdx}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute font-mono"
-            style={{
-              left: `${ticker.text.x}%`, top: `${ticker.text.y}%`,
-              transform: 'translate(-50%, -50%)',
-              fontSize: 9, fontWeight: 500,
-              color: 'rgba(255,255,255,0.55)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {ticker.text.v}
-          </motion.div>
-        </AnimatePresence>
+        {/* Readout text and ticker text intentionally removed —
+            values were hardcoded and identical for every user. */}
       </div>
     </>
   )
