@@ -126,14 +126,16 @@ function ConsentMicroText() {
 
 function BackBtn({ onBack }) {
   return (
-    <button
-      onClick={onBack}
-      aria-label="Go back"
-      className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 28px)' }}
-    >
-      <ChevronLeft size={18} style={{ color: DIM }} />
-    </button>
+    <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)', paddingLeft: 20, paddingBottom: 8, flexShrink: 0 }}>
+      <button
+        onClick={onBack}
+        aria-label="Go back"
+        className="w-9 h-9 rounded-full flex items-center justify-center"
+        style={{ background: 'rgba(255,255,255,0.06)' }}
+      >
+        <ChevronLeft size={18} style={{ color: DIM }} />
+      </button>
+    </div>
   )
 }
 
@@ -513,7 +515,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Welcome back.
         </h1>
@@ -1134,7 +1136,7 @@ function StepHaloEffect({ onNext, onBack }) {
     <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Scrollable top */}
       {/* Scrollable top */}
-      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '72px 16px 16px' }}>
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '0 16px 16px' }}>
         <BackBtn onBack={onBack} />
         <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
           THE HALO EFFECT
@@ -1166,7 +1168,7 @@ function StepHypergamy({ onNext, onBack }) {
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A' }}>
       {/* Header + chart — padded so card doesn't overlap */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '56px 24px 12px' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '0 24px 12px' }}>
         <BackBtn onBack={onBack} />
         <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
           EVOLUTIONARY BIOLOGY
@@ -1222,7 +1224,7 @@ function StepWhyAppearance({ onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-start pt-20 pb-4">
+      <div className="flex-1 flex flex-col justify-start pb-4">
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-3" style={{ color: G }}>
           THE SCIENCE
         </p>
@@ -1293,7 +1295,7 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-5" style={{ background: BG }}>
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-start pt-20 pb-4">
+      <div className="flex-1 flex flex-col justify-start pb-4">
         <div className="mb-8">
           <h1
             className="font-heading font-bold text-[26px] leading-tight mb-2"
@@ -1376,7 +1378,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <div className="mb-5">
           <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
             What would you most want to improve?
@@ -1477,7 +1479,7 @@ function StepSocialProof({ onNext, onBack }) {
       <BackBtn onBack={onBack} />
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 pt-20 pb-4">
+      <div className="flex-1 overflow-y-auto px-6 pb-4">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -1549,7 +1551,7 @@ function StepHeight({ data, onChange, onNext, onBack, units }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How tall are you?
         </h1>
@@ -1595,7 +1597,7 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How much do you weigh?
         </h1>
@@ -1698,7 +1700,7 @@ function StepBMI({ data, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center overflow-y-auto">
 
         {/* BMI value */}
         <motion.div
@@ -1777,7 +1779,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
   return (
     <div className="flex flex-col h-full" style={{ background: '#080808' }}>
       <BackBtn onBack={onBack} />
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      <div className="px-6">
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
           {stepLabel}
         </p>
