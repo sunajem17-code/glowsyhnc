@@ -1233,10 +1233,7 @@ function StepWhyAppearance({ onNext, onBack }) {
         <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Appearance isn't shallow. It's strategic.
         </h1>
-        <p className="font-body text-[14px] leading-snug mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Research consistently shows that physical appearance affects how you're perceived — in dating, career, and social life.
-        </p>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 mt-8">
           {stats.map(s => (
             <div key={s.value} className="rounded-2xl px-6 py-7" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center gap-5">
