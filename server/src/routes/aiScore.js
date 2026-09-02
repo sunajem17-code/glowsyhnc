@@ -322,7 +322,7 @@ PERCEIVED ETHNICITY — classify the most visually apparent ethnic background fr
 - "mixed"         → Clearly mixed or ambiguous — cannot confidently assign one group
 Base this only on visual facial features visible in the photo. If uncertain, use "mixed".
 
-FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe:
+FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"):
 - jawline: sharpness, gonial angle definition, and visible edge clarity
 - cheekbones: height, prominence, and forward projection of the malar bones
 - symmetry: left-right balance of features, spacing, and facial midline
@@ -404,7 +404,7 @@ async function getExtendedMetrics(faceBase64, faceMediaType, gender) {
 
 SCORE DISTRIBUTION — every score is 1.0–10.0, a bell curve across the general population: 5.0 = true average (most people), 3.0 = below average (common, not rare), 7.0 = above average (a real, achievable good score), 9.0 = genuinely exceptional (rare, top few percent). Use the full range — do not compress everyone into 6–8.
 
-EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
+EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"). Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
 
 eyes:
 - orbital_depth: depth-set vs. protruding position of the eye socket relative to the brow and cheekbone plane

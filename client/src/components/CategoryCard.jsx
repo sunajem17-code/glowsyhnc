@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Lock, Eye, Smile, ScanFace, Scissors, Layers } from 'lucide-react'
 import { GOLD, EASE_STANDARD } from '../utils/theme'
+import { getMetricInsight } from '../utils/metricInsights'
 
 // Fixed fill for every locked tile's progress bar, identical regardless of
 // the real score — a real (but non-computed) percentage so the bar reads as
@@ -47,7 +48,7 @@ const DIM  = 'var(--text-secondary)'
 export function CardShell({ badge, icon: Icon, children, facePhotoUrl }) {
   return (
     <div className="h-full flex flex-col overflow-y-auto"
-         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
+         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       <div className="flex flex-col px-6 pb-2">
         {/* Badge row — with optional face photo avatar */}
         <div className="flex items-center gap-2.5 mb-6 flex-shrink-0">
@@ -182,7 +183,7 @@ export const EXTENDED_CATEGORIES = [
 // (via direct import) OverallCard/Card1Score's own 6-metric grids, so all
 // three places render byte-identical boxes instead of three hand-tuned
 // copies that can drift out of sync with each other.
-export function MetricTile({ label, value, unit, pct, locked, isPending = false }) {
+export function MetricTile({ label, value, unit, pct, locked, isPending = false, descriptor, insight }) {
   return (
     <div
       className="rounded-2xl p-4 flex flex-col"
@@ -254,6 +255,20 @@ export function MetricTile({ label, value, unit, pct, locked, isPending = false 
           <ProgressBarFill pct={pct} />
         )}
       </div>
+      {!locked && (descriptor || insight) && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {descriptor && (
+            <p className="text-[11px] font-semibold leading-[1.35] italic" style={{ color: 'rgba(198,168,92,0.75)' }}>
+              "{descriptor}"
+            </p>
+          )}
+          {insight && (
+            <p className="text-[11px] leading-[1.45]" style={{ color: DIM }}>
+              {insight}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -268,20 +283,22 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
   const teaserKey = TEASER_KEYS[categoryKey]
 
   const tiles = metrics.map(({ key, label }) => {
-    const score = data[key]?.score ?? null
+    const score      = data[key]?.score      ?? null
+    const descriptor = data[key]?.descriptor ?? null
+    const isLocked   = !isPremium && key !== teaserKey
     return {
       // metricKey (not `key`) — a plain `key` field here would leak into the
       // {...tile} spread below and collide with JSX's own reserved `key`
       // prop (React warns "key prop being spread into JSX" even though the
       // explicit key={tile.label} below is what actually gets used).
-      metricKey: key,
+      metricKey:  key,
       label,
-      value:  score != null ? score.toFixed(1) : 'N/A',
-      unit:   score != null ? '/10' : '',
-      pct:    score != null ? Math.min(100, (score / 10) * 100) : 0,
-      // Non-premium: every tile locks except the one designated teaser for
-      // this category. Premium: everything unlocks, teaser map is irrelevant.
-      locked: !isPremium && key !== teaserKey,
+      value:      score != null ? score.toFixed(1) : 'N/A',
+      unit:       score != null ? '/10' : '',
+      pct:        score != null ? Math.min(100, (score / 10) * 100) : 0,
+      locked:     isLocked,
+      descriptor: isPremium ? descriptor : null,
+      insight:    isPremium ? getMetricInsight(key, score) : null,
     }
   })
 
@@ -290,11 +307,6 @@ export function CategoryCard({ scan, categoryKey, badge, icon, metrics, isPremiu
       <div className="grid grid-cols-2 gap-3 mb-3">
         {tiles.map(tile => <MetricTile key={tile.label} {...tile} isPending={isPending} />)}
       </div>
-      {isPremium && (
-        <p className="text-center font-body text-[11px] mt-1 mb-3" style={{ color: 'rgba(198,168,92,0.45)' }}>
-          Continue for more insight
-        </p>
-      )}
     </CardShell>
   )
 }

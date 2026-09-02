@@ -757,10 +757,12 @@ function StepNotifications({ onNext }) {
     setLoading(true)
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
-      const result = await PushNotifications.requestPermissions()
-      if (result.receive === 'granted') await PushNotifications.register()
-    } catch {
-      // not available on web or permission unavailable — proceed anyway
+      const status = await PushNotifications.requestPermissions()
+      if (status.receive === 'granted') {
+        await PushNotifications.register()
+      }
+    } catch (err) {
+      console.warn('[Notifications] requestPermissions failed (non-fatal):', err?.message)
     }
     setLoading(false)
     onNext()
@@ -1303,9 +1305,6 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
           >
             What do you want to fix or improve first?
           </h1>
-          <p className="font-body text-[14px]" style={{ color: DIM }}>
-            Pick your main goal so we can customize your score and action plan.
-          </p>
         </div>
 
         <div className="flex flex-col gap-5">
@@ -1351,6 +1350,10 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
             )
           })}
         </div>
+
+        <p className="mt-6 text-center font-body text-[12px] italic" style={{ color: 'rgba(255,255,255,0.28)' }}>
+          *This affects your 12 week plan*
+        </p>
       </div>
     </div>
   )
