@@ -838,20 +838,6 @@ const ANATOMY_LABELS = [
     },
   },
   {
-    id: 'bigonial',
-    title: 'BIGONIAL BREADTH',
-    pos: { top: '62%', left: '72%' },
-    // Geometry: jaw width (bigon) relative to cheekbone width (bizygo)
-    valueFn: (pts, _scan) => {
-      if (!pts) return '—'
-      const bigon  = Math.abs(pts.jawR.x   - pts.jawL.x)
-      const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
-      if (bizygo < 0.01) return '—'
-      const ratio = bigon / bizygo
-      return ratio > 0.90 ? 'Wide' : ratio > 0.80 ? 'Balanced' : ratio > 0.70 ? 'Tapered' : 'Narrow'
-    },
-  },
-  {
     id: 'mandible',
     title: 'MANDIBULAR ANGLE',
     pos: { top: '68%', left: '30%' },
@@ -864,13 +850,15 @@ const ANATOMY_LABELS = [
   },
 ]
 
-const LABEL_CYCLE_MS = 850
+// 1.8s per label — deliberate pace that reads as real biometric computation,
+// not a flicker. Supersedes the earlier 0.65s speed-up request.
+const LABEL_CYCLE_MS = 1800
 
-// Chip for a single anatomy metric. Rendered by FacialAnalysisOverlay's
-// AnimatePresence — this component itself has no animation wrapper.
-// Horizontal clamp uses 115px (> half of maxWidth 220px) so the chip body
-// never clips the frame edge. Vertical uses 60px top / 100px bottom.
-function AnatomyLabel({ title, value, pos }) {
+// Chip for a single anatomy metric. title + qualifier are always coupled
+// inside one object so they can never be indexed independently and desync.
+// whiteSpace: normal + maxWidth 260px prevents mid-word truncation on narrow
+// frames; the chip grows vertically rather than clipping horizontally.
+function AnatomyLabel({ title, qualifier, pos }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8, scale: 0.95 }}
@@ -879,11 +867,11 @@ function AnatomyLabel({ title, value, pos }) {
       transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
       className="absolute pointer-events-none"
       style={{
-        left: `clamp(115px, ${pos.left}, calc(100% - 115px))`,
-        top: `clamp(60px, ${pos.top}, calc(100% - 100px))`,
+        left: `clamp(100px, ${pos.left}, calc(100% - 100px))`,
+        top: `clamp(80px, ${pos.top}, calc(100% - 140px))`,
         transform: 'translate(-50%, -50%)',
         minWidth: 172,
-        maxWidth: 220,
+        maxWidth: 260,
       }}
     >
       <div style={{
@@ -893,7 +881,8 @@ function AnatomyLabel({ title, value, pos }) {
         padding: '8px 16px',
         textAlign: 'center',
         backdropFilter: 'blur(8px)',
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
       }}>
         <div style={{
           fontSize: 11, fontWeight: 800, letterSpacing: '0.13em',
@@ -907,7 +896,7 @@ function AnatomyLabel({ title, value, pos }) {
           color: 'rgba(255,255,255,0.68)', fontFamily: 'monospace',
           lineHeight: 1.4, marginTop: 3,
         }}>
-          {value}
+          {qualifier}
         </div>
       </div>
     </motion.div>
@@ -946,14 +935,15 @@ function Readout({ x, y, text, align = 'center' }) {
 }
 
 function FacialAnalysisOverlay({ step, points, scanResult }) {
-  const [labelIdx, setLabelIdx] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setLabelIdx(i => (i + 1) % ANATOMY_LABELS.length), LABEL_CYCLE_MS)
-    return () => clearInterval(id)
-  }, [])
-
+  // Drive label directly from step (0–4), not from an independent timer loop.
+  // The step is already paced externally by startAnalysis's 1s-per-step ticker,
+  // so this gives a single, progressive, non-repeating sequence that stays
+  // locked to the progress bar rather than cycling on its own clock.
+  const labelIdx = Math.min(step, ANATOMY_LABELS.length - 1)
   const label = ANATOMY_LABELS[labelIdx]
-  const value = points ? label.valueFn(points, scanResult) : '—'
+  // title + qualifier always come from the same label object — they can never
+  // be indexed independently or desync.
+  const qualifier = points ? label.valueFn(points, scanResult) : '—'
 
   return (
     <div className="absolute inset-0 pointer-events-none">
@@ -965,7 +955,7 @@ function FacialAnalysisOverlay({ step, points, scanResult }) {
         <AnatomyLabel
           key={label.id}
           title={label.title}
-          value={value}
+          qualifier={qualifier}
           pos={label.pos}
         />
       </AnimatePresence>
@@ -1127,7 +1117,7 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD, scanR
             boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
           }}
           animate={{ top: ['2%', '98%'] }}
-          transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
+          transition={{ duration: 2.8, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
         />
       )}
     </div>
@@ -1258,27 +1248,6 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
         />
       </div>
 
-      {/* Score ticker reveal — appears once result arrives, number cycles to real score */}
-      <div className="h-8 mt-3 flex items-center justify-center">
-        <AnimatePresence>
-          {displayScore != null && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-baseline gap-1.5"
-            >
-              <span className="font-mono" style={{ fontSize: 9, letterSpacing: '0.14em', color: `${GOLD}77`, textTransform: 'uppercase' }}>SCORE</span>
-              <span
-                className="font-heading font-bold tabular-nums"
-                style={{ fontSize: 22, color: GOLD, letterSpacing: '-0.02em', lineHeight: 1 }}
-              >
-                {displayScore.toFixed(1)}
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </div>
   )
 }
