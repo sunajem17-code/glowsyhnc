@@ -1150,11 +1150,11 @@ export default function Results() {
           <div className="flex items-center gap-3 px-4 py-3">
             <GlowScoreRing score={glowScore} size="medium" animated />
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <p className="font-mono font-bold text-[28px] text-white leading-none">{glowScore?.toFixed(1) ?? '—'}</p>
-                <p className="text-[11px] text-secondary font-body">/ 10</p>
+              <div className="flex items-baseline gap-1.5 min-w-0">
+                <p className="font-mono font-bold text-[28px] text-white leading-none flex-shrink-0">{glowScore?.toFixed(1) ?? '—'}</p>
+                <p className="text-[11px] text-secondary font-body flex-shrink-0">/ 10</p>
                 {tier && (
-                  <div className="ml-1 px-2.5 py-0.5 rounded-full font-heading font-bold text-[9px] uppercase tracking-widest flex-shrink-0"
+                  <div className="ml-1 px-2.5 py-0.5 rounded-full font-heading font-bold text-[9px] uppercase tracking-widest flex-shrink truncate"
                     style={{ background: `${tierColor}15`, border: `1px solid ${tierColor}40`, color: tierColor }}>
                     {tier}
                   </div>
