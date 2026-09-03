@@ -681,6 +681,10 @@ const OVERLAY_LM_INDICES = {
   eyeOuterL: 33, eyeOuterR: 263, eyeInnerL: 133, eyeInnerR: 362,
   templeL: 127, templeR: 356,
   mouthL: 61, mouthR: 291,
+  // Alar base (nose wing lateral edges) — used for alar base width label
+  noseTipL: 129, noseTipR: 358,
+  // Brow midpoint — used for forehead proportion label
+  browMidL: 66,
 }
 
 // Raw MediaPipe landmarks (468 points, {x,y,z} normalized 0–1 to the source
@@ -777,7 +781,7 @@ function _gonialAngleDeg(pts) {
   return (angle(pts.jawL, pts.templeL, pts.chin) + angle(pts.jawR, pts.templeR, pts.chin)) / 2
 }
 
-// Seven metrics with real backing data, positioned in fixed facial zones.
+// 14 metrics with real backing data, positioned in fixed facial zones.
 // Not live-tracked; purely a static positional layout.
 //
 // Data sources (in order of when they become available during analysis):
@@ -790,8 +794,7 @@ const ANATOMY_LABELS = [
   {
     id: 'canthal',
     title: 'CANTHAL TILT',
-    pos: { top: '32%', left: '70%' },
-    // Geometry: outer corner angle relative to inner corner, averaged L+R
+    pos: { top: '30%', left: '68%' },
     valueFn: (pts, _scan) => {
       if (!pts) return '—'
       const deg = _canthalTiltDeg(pts)
@@ -801,8 +804,7 @@ const ANATOMY_LABELS = [
   {
     id: 'orbital',
     title: 'ORBITAL VECTOR',
-    pos: { top: '32%', left: '30%' },
-    // API: eye area sub-score (shape, spacing, periorbital hollowing)
+    pos: { top: '30%', left: '32%' },
     valueFn: (_pts, scan) => {
       const s = scan?.faceSubScores?.eyeArea
       if (s == null) return '—'
@@ -810,10 +812,43 @@ const ANATOMY_LABELS = [
     },
   },
   {
+    id: 'hairline',
+    title: 'HAIRLINE RECESSION',
+    pos: { top: '12%', left: '50%' },
+    valueFn: (_pts, _scan) => '—',
+  },
+  {
+    id: 'forehead',
+    title: 'FOREHEAD PROPORTION',
+    pos: { top: '20%', left: '66%' },
+    // Geometry: forehead height (tip → brow) / face height (tip → chin)
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const fhH   = Math.abs(pts.forehead.y - pts.browMidL.y)
+      const faceH = Math.abs(pts.forehead.y - pts.chin.y)
+      if (faceH < 0.01) return '—'
+      const ratio = fhH / faceH
+      return ratio < 0.28 ? 'Compact' : ratio < 0.36 ? 'Proportionate' : 'High'
+    },
+  },
+  {
+    id: 'ipd',
+    title: 'INTERPUPILLARY DIST',
+    pos: { top: '36%', left: '50%' },
+    // Geometry: interpupillary width / bizygomatic width
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const ipd    = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
+      const bizygo = Math.abs(pts.cheekR.x    - pts.cheekL.x)
+      if (bizygo < 0.01) return '—'
+      const ratio = ipd / bizygo
+      return ratio < 0.27 ? 'Close-set' : ratio < 0.35 ? 'Ideal' : 'Wide-set'
+    },
+  },
+  {
     id: 'nasal',
     title: 'NASAL BRIDGE',
-    pos: { top: '45%', left: '50%' },
-    // Geometry: intercanthal / bizygomatic ratio
+    pos: { top: '44%', left: '50%' },
     valueFn: (pts, _scan) => {
       if (!pts) return '—'
       const ic     = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
@@ -824,10 +859,33 @@ const ANATOMY_LABELS = [
     },
   },
   {
+    id: 'nose_proj',
+    title: 'NOSE PROJECTION',
+    pos: { top: '52%', left: '68%' },
+    valueFn: (_pts, scan) => {
+      const s = scan?.faceSubScores?.facialProportions
+      if (s == null) return '—'
+      return s >= 7.5 ? 'Well-projected' : s >= 5.5 ? 'Moderate' : 'Low Projection'
+    },
+  },
+  {
+    id: 'alar',
+    title: 'ALAR BASE WIDTH',
+    pos: { top: '57%', left: '32%' },
+    // Geometry: alar width relative to intercanthal distance
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const alar = Math.abs(pts.noseTipR.x - pts.noseTipL.x)
+      const ic   = Math.abs(pts.eyeInnerR.x - pts.eyeInnerL.x)
+      if (ic < 0.01) return '—'
+      const ratio = alar / ic
+      return ratio < 0.88 ? 'Narrow' : ratio < 1.12 ? 'Ideal' : 'Wide'
+    },
+  },
+  {
     id: 'zygomatic',
     title: 'ZYGOMATIC ARCH',
-    pos: { top: '48%', left: '75%' },
-    // Geometry: bizygomatic / bigonial ratio
+    pos: { top: '48%', left: '72%' },
     valueFn: (pts, _scan) => {
       if (!pts) return '—'
       const bizygo = Math.abs(pts.cheekR.x - pts.cheekL.x)
@@ -838,21 +896,64 @@ const ANATOMY_LABELS = [
     },
   },
   {
+    id: 'lip',
+    title: 'LIP FULLNESS',
+    pos: { top: '67%', left: '60%' },
+    valueFn: (_pts, scan) => {
+      const s = scan?.faceSubScores?.facialHarmony
+      if (s == null) return '—'
+      return s >= 7.5 ? 'Full' : s >= 5.5 ? 'Moderate' : 'Thin'
+    },
+  },
+  {
     id: 'mandible',
     title: 'MANDIBULAR ANGLE',
-    pos: { top: '68%', left: '30%' },
-    // Geometry: gonial angle from jaw/temple/chin landmark triangle
+    pos: { top: '67%', left: '30%' },
     valueFn: (pts, _scan) => {
       if (!pts) return '—'
       const deg = _gonialAngleDeg(pts)
       return deg < 115 ? 'Very Sharp' : deg < 122 ? 'Sharp' : deg < 130 ? 'Balanced' : 'Rounded'
     },
   },
+  {
+    id: 'gonial',
+    title: 'GONIAL ANGLE',
+    pos: { top: '74%', left: '70%' },
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const deg = _gonialAngleDeg(pts)
+      return deg < 118 ? 'Angular' : deg < 128 ? 'Defined' : 'Soft'
+    },
+  },
+  {
+    id: 'chin',
+    title: 'CHIN–PHILTRUM RATIO',
+    pos: { top: '78%', left: '50%' },
+    valueFn: (_pts, scan) => {
+      const s = scan?.faceSubScores?.jawlineDefinition
+      if (s == null) return '—'
+      return s >= 7.5 ? 'Ideal' : s >= 5.5 ? 'Acceptable' : 'Off-ratio'
+    },
+  },
+  {
+    id: 'ramus',
+    title: 'RAMUS HEIGHT',
+    pos: { top: '60%', left: '28%' },
+    // Geometry: vertical distance from jaw corner to temple, relative to face height
+    valueFn: (pts, _scan) => {
+      if (!pts) return '—'
+      const ramusH = Math.abs(pts.jawL.y - pts.templeL.y)
+      const faceH  = Math.abs(pts.forehead.y - pts.chin.y)
+      if (faceH < 0.01) return '—'
+      const ratio = ramusH / faceH
+      return ratio > 0.50 ? 'Tall' : ratio > 0.38 ? 'Average' : 'Short'
+    },
+  },
 ]
 
-// 1.8s per label — deliberate pace that reads as real biometric computation,
-// not a flicker. Supersedes the earlier 0.65s speed-up request.
-const LABEL_CYCLE_MS = 1800
+// 1.4s per label — paced to feel like real biometric computation across the
+// full scan duration (14 labels × 1.4s = ~19.6s total coverage).
+const LABEL_CYCLE_MS = 1400
 
 // Chip for a single anatomy metric. title + qualifier are always coupled
 // inside one object so they can never be indexed independently and desync.
@@ -867,8 +968,8 @@ function AnatomyLabel({ title, qualifier, pos }) {
       transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
       className="absolute pointer-events-none"
       style={{
-        left: `clamp(100px, ${pos.left}, calc(100% - 100px))`,
-        top: `clamp(80px, ${pos.top}, calc(100% - 140px))`,
+        left: `clamp(140px, ${pos.left}, calc(100% - 140px))`,
+        top: `clamp(72px, ${pos.top}, calc(100% - 100px))`,
         transform: 'translate(-50%, -50%)',
         minWidth: 172,
         maxWidth: 260,
@@ -934,15 +1035,24 @@ function Readout({ x, y, text, align = 'center' }) {
   )
 }
 
-function FacialAnalysisOverlay({ step, points, scanResult }) {
-  // Drive label directly from step (0–4), not from an independent timer loop.
-  // The step is already paced externally by startAnalysis's 1s-per-step ticker,
-  // so this gives a single, progressive, non-repeating sequence that stays
-  // locked to the progress bar rather than cycling on its own clock.
-  const labelIdx = Math.min(step, ANATOMY_LABELS.length - 1)
+function FacialAnalysisOverlay({ step: _step, points, scanResult }) {
+  // Internal monotonic timer: advances labelIdx forward by 1 every LABEL_CYCLE_MS,
+  // clamps at the last label and stops — never loops. This gives continuous,
+  // non-repeating coverage across the full scan duration regardless of how
+  // long the API takes. The `step` prop controls the progress bar externally
+  // and is no longer used to drive the label index.
+  const [labelIdx, setLabelIdx] = useState(0)
+  useEffect(() => {
+    let idx = 0
+    const id = setInterval(() => {
+      idx += 1
+      if (idx >= ANATOMY_LABELS.length) { clearInterval(id); return }
+      setLabelIdx(idx)
+    }, LABEL_CYCLE_MS)
+    return () => clearInterval(id)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const label = ANATOMY_LABELS[labelIdx]
-  // title + qualifier always come from the same label object — they can never
-  // be indexed independently or desync.
   const qualifier = points ? label.valueFn(points, scanResult) : '—'
 
   return (
@@ -1117,7 +1227,7 @@ function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD, scanR
             boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
           }}
           animate={{ top: ['2%', '98%'] }}
-          transition={{ duration: 2.8, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
+          transition={{ duration: 2.0, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
         />
       )}
     </div>
@@ -1482,9 +1592,9 @@ export default function Scan() {
         triggerHaptic()
         return prev + 1
       })
-    }, 1000)
+    }, 800)
     const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
-    const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 5000))
+    const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 4000))
 
     try {
       const faceB64    = await toBase64(facePhoto)
