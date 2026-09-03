@@ -1147,24 +1147,27 @@ export default function Results() {
 
         {/* ── Fixed hero ──────────────────────────────────────────────── */}
         <div style={{ paddingTop: 'env(safe-area-inset-top)', background: '#0A0A0A', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-          <div className="flex items-center gap-3 px-4 py-3">
-            <GlowScoreRing score={glowScore} size="medium" animated />
+          <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+            {/* Score (small variant: number + scale bar, no internal label) */}
+            <div className="flex-shrink-0" style={{ width: 88 }}>
+              <GlowScoreRing score={glowScore} size="small" animated />
+            </div>
+            {/* Tier + meta */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-1.5 min-w-0">
-                <p className="font-mono font-bold text-[28px] text-white leading-none flex-shrink-0">{glowScore?.toFixed(1) ?? '—'}</p>
-                <p className="text-[11px] text-secondary font-body flex-shrink-0">/ 10</p>
+              <div className="flex items-center gap-2 min-w-0 mb-0.5">
                 {tier && (
-                  <div className="ml-1 px-2.5 py-0.5 rounded-full font-heading font-bold text-[9px] uppercase tracking-widest flex-shrink truncate"
+                  <div className="px-2.5 py-0.5 rounded-full font-heading font-bold text-[9px] uppercase tracking-widest flex-shrink-0"
                     style={{ background: `${tierColor}15`, border: `1px solid ${tierColor}40`, color: tierColor }}>
                     {tier}
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-secondary font-body mt-0.5 truncate">
+              <p className="text-[10px] text-secondary font-body truncate">
                 {new Date(currentScan.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 {gender && ` · ${gender.charAt(0).toUpperCase() + gender.slice(1)}`}
               </p>
             </div>
+            {/* Share — isolated, never overlaps content */}
             <button onClick={() => setShowShareCard(true)}
               className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
