@@ -1150,7 +1150,7 @@ function StepHaloEffect({ onNext, onBack }) {
           Science proves it. People instantly judge your intelligence, confidence, and success based on your looks alone.
         </p>
         <div style={{ overflow: 'hidden', margin: '0 -16px' }}>
-          <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%' }} />
+          <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%', transform: 'scale(1.18)', transformOrigin: 'center center', filter: 'invert(1) brightness(0.96) invert(1)' }} />
         </div>
       </div>
 
