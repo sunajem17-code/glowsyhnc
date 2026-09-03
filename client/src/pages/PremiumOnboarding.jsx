@@ -1149,7 +1149,7 @@ function StepHaloEffect({ onNext, onBack }) {
         <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>
           Science proves it. People instantly judge your intelligence, confidence, and success based on your looks alone.
         </p>
-        <div style={{ borderRadius: 14, overflow: 'hidden', margin: '0 -16px', border: '1.5px solid rgba(255,255,255,0.18)' }}>
+        <div style={{ overflow: 'hidden', margin: '0 -16px' }}>
           <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%' }} />
         </div>
       </div>

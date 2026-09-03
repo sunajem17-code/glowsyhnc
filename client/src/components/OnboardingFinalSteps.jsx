@@ -253,7 +253,7 @@ function OverallCard({ scan }) {
 // any offering yet, purchaseDiscountedAnnual() resolves reason:'not_configured'
 // and handleClaimOffer below shows that as a real, honest "not available yet"
 // message instead of pretending the purchase happened.
-function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
+export function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}

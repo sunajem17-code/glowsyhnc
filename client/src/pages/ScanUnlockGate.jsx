@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
-import { isNative, purchasePro } from '../utils/iap'
+import { isNative, purchasePro, purchaseDiscountedAnnual } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
@@ -9,6 +9,7 @@ import {
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
+import { AnnualDiscountOfferModal } from '../components/OnboardingFinalSteps'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
@@ -1254,6 +1255,13 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
   const [containerW, setContainerW] = useState(0)
   const [totalScans, setTotalScans] = useState(null)
 
+  // Exit-intent discount offer state
+  const [showDiscount, setShowDiscount]       = useState(false)
+  const [discountLoading, setDiscountLoading] = useState(false)
+  const [discountError, setDiscountError]     = useState('')
+  const setIsPremium = useStore(s => s.setIsPremium)
+  const updateUser   = useStore(s => s.updateUser)
+
   // Pull real scan count from server — no hardcoded numbers
   useEffect(() => {
     api.scan.stats().then(d => { if (d?.totalScans != null) setTotalScans(d.totalScans) }).catch(() => {})
@@ -1278,6 +1286,51 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
     else animate(x, -cardIdx * containerW, { type: 'tween', duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
   }
 
+  // X button → show discount first; decline → actually close the paywall.
+  // Shown every time (no "already seen" gate) — same policy as StepScoresWaiting.
+  function handleCloseAttempt() {
+    triggerHaptic()
+    setDiscountError('')
+    setShowDiscount(true)
+  }
+
+  function handleDeclineDiscount() {
+    triggerHaptic()
+    setShowDiscount(false)
+    onClose()   // actually exit the paywall
+  }
+
+  async function handleClaimDiscount() {
+    triggerHaptic()
+    if (!isNative()) {
+      setDiscountError('This offer is only available in the app right now.')
+      return
+    }
+    setDiscountLoading(true)
+    setDiscountError('')
+    try {
+      const result = await purchaseDiscountedAnnual()
+      if (result?.success) {
+        const rcUserId = result.customerInfo?.originalAppUserId
+        api.payments.syncRc(rcUserId).catch(() => {})
+        setIsPremium(true)
+        updateUser?.({ isPremium: true })
+        setShowDiscount(false)
+        onClose()
+        return
+      }
+      if (result?.reason === 'not_configured') {
+        setDiscountError("This offer isn't set up yet. Please try again shortly.")
+      } else if (result?.reason !== 'cancelled') {
+        setDiscountError('Unable to complete purchase. Please try again.')
+      }
+    } catch {
+      setDiscountError('Unable to complete purchase. Please try again.')
+    } finally {
+      setDiscountLoading(false)
+    }
+  }
+
   // Dynamic score gap — only shown if we have a real computed score
   const userScore = scan?.umaxScore ?? scan?.glowScore ?? null
   const scoreGap  = userScore != null ? Math.max(0, Math.round(100 - userScore)) : null
@@ -1291,7 +1344,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
     >
       {/* Header */}
       <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 4 }}>
-        <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
+        <button onClick={handleCloseAttempt} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
           <X size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
         </button>
 
@@ -1370,6 +1423,17 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
       </div>
 
       <SocialProofTicker />
+
+      <AnimatePresence>
+        {showDiscount && (
+          <AnnualDiscountOfferModal
+            onClaim={handleClaimDiscount}
+            onDecline={handleDeclineDiscount}
+            loading={discountLoading}
+            error={discountError}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
