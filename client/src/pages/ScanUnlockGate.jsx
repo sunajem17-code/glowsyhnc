@@ -1147,44 +1147,47 @@ const PAYWALL_CARDS = [
 ]
 
 // ── Social proof ticker ───────────────────────────────────────────────────────
-const SP_NAMES = [
-  'Alex','James','Noah','Liam','Mason','Ethan','Logan','Lucas','Aiden','Jackson',
-  'Sebastian','Mateo','Jack','Owen','Theodore','Amir','Rayan','Yusuf','Kai','Finn',
-  'Marcus','Tyler','Ryan','Jordan','Dylan','Cole','Blake','Hunter','Caleb','Nathan',
-]
+// Names are region-authentic — each entry carries its own name pool so the
+// pairing always feels local. No back-to-back duplicate country or name.
 const SP_ENTRIES = [
-  { flag: '🇺🇸', country: 'United States' },
-  { flag: '🇬🇧', country: 'United Kingdom' },
-  { flag: '🇦🇺', country: 'Australia' },
-  { flag: '🇨🇦', country: 'Canada' },
-  { flag: '🇩🇪', country: 'Germany' },
-  { flag: '🇫🇷', country: 'France' },
-  { flag: '🇮🇹', country: 'Italy' },
-  { flag: '🇸🇪', country: 'Sweden' },
-  { flag: '🇳🇱', country: 'Netherlands' },
-  { flag: '🇳🇴', country: 'Norway' },
-  { flag: '🇩🇰', country: 'Denmark' },
-  { flag: '🇦🇪', country: 'UAE' },
-  { flag: '🇸🇬', country: 'Singapore' },
-  { flag: '🇧🇷', country: 'Brazil' },
-  { flag: '🇲🇽', country: 'Mexico' },
-  { flag: '🇳🇿', country: 'New Zealand' },
-  { flag: '🇵🇱', country: 'Poland' },
-  { flag: '🇧🇪', country: 'Belgium' },
-  { flag: '🇨🇭', country: 'Switzerland' },
-  { flag: '🇦🇹', country: 'Austria' },
+  { flag: '🇺🇸', country: 'United States',  names: ['Tyler','Mason','Logan','Ethan','Jake','Chase','Ryan','Cole','Brady','Hunter'] },
+  { flag: '🇬🇧', country: 'United Kingdom', names: ['Oliver','Alfie','George','Harry','Archie','Jack','Charlie','Theo','Freddie','Liam'] },
+  { flag: '🇦🇺', country: 'Australia',       names: ['Lachlan','Cooper','Riley','Flynn','Angus','Hugo','Toby','Hamish','Ollie','Archer'] },
+  { flag: '🇨🇦', country: 'Canada',          names: ['Ethan','Noah','Liam','Owen','Nathan','Caleb','Jayden','Evan','Brody','Miles'] },
+  { flag: '🇩🇪', country: 'Germany',         names: ['Leon','Lukas','Jonas','Finn','Ben','Maximilian','Felix','Jan','Philipp','Moritz'] },
+  { flag: '🇫🇷', country: 'France',          names: ['Lucas','Hugo','Nathan','Tom','Mathis','Enzo','Théo','Axel','Romain','Antoine'] },
+  { flag: '🇮🇹', country: 'Italy',           names: ['Matteo','Lorenzo','Francesco','Alessandro','Gabriele','Riccardo','Davide','Marco','Andrea','Luca'] },
+  { flag: '🇸🇪', country: 'Sweden',          names: ['Elias','William','Oscar','Lucas','Alexander','Hugo','Axel','Oliver','Erik','Isak'] },
+  { flag: '🇳🇱', country: 'Netherlands',     names: ['Daan','Sem','Finn','Levi','Noah','Jesse','Luuk','Bram','Thijs','Lars'] },
+  { flag: '🇳🇴', country: 'Norway',          names: ['Emil','Mathias','Tobias','Sander','Jonas','Kristoffer','Eirik','Markus','Anders','Henrik'] },
+  { flag: '🇩🇰', country: 'Denmark',         names: ['Mikkel','Frederik','Magnus','Rasmus','Oliver','Christian','Nikolaj','Kasper','Jonas','Mads'] },
+  { flag: '🇦🇪', country: 'UAE',             names: ['Omar','Khalid','Hamdan','Saif','Rashid','Zayed','Mansoor','Sultan','Faisal','Yousef'] },
+  { flag: '🇸🇦', country: 'Saudi Arabia',    names: ['Abdullah','Faisal','Khalid','Turki','Salman','Majed','Bandar','Rayan','Saud','Nasser'] },
+  { flag: '🇸🇬', country: 'Singapore',       names: ['Ethan','Marcus','Ryan','Darren','Ian','Leon','Wei','Jun','Zach','Joel'] },
+  { flag: '🇧🇷', country: 'Brazil',          names: ['Gabriel','Lucas','Mateus','Pedro','Rafael','Guilherme','Felipe','Bruno','Eduardo','Vinicius'] },
+  { flag: '🇲🇽', country: 'Mexico',          names: ['Santiago','Mateo','Sebastián','Miguel','Alejandro','Diego','Emiliano','Rodrigo','Andrés','Carlos'] },
+  { flag: '🇳🇿', country: 'New Zealand',     names: ['Liam','Oliver','Jack','Noah','James','Sam','Ethan','Henry','Charlie','Ben'] },
+  { flag: '🇵🇱', country: 'Poland',          names: ['Jakub','Mateusz','Kacper','Piotr','Michał','Bartosz','Tomasz','Kamil','Filip','Dawid'] },
+  { flag: '🇨🇭', country: 'Switzerland',     names: ['Nils','Luca','Linus','Marco','Fabian','Simon','Florian','Patrick','Tim','Kevin'] },
+  { flag: '🇹🇷', country: 'Turkey',          names: ['Mehmet','Ahmet','Mustafa','Emre','Burak','Kerem','Arda','Sercan','Ozan','Berk'] },
 ]
 
-function pick(arr, excludeFn) {
-  const candidates = arr.filter(x => !excludeFn(x))
-  return candidates[Math.floor(Math.random() * candidates.length)]
+function _pickEntry(prevCountry) {
+  const pool = prevCountry ? SP_ENTRIES.filter(e => e.country !== prevCountry) : SP_ENTRIES
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
 function randomNotif(prev) {
-  const entry = pick(SP_ENTRIES, e => prev && e.country === prev.country)
-  const name  = pick(SP_NAMES,  n => prev && n === prev.name)
-  return { name, ...entry }
+  const entry = _pickEntry(prev?.country)
+  const namePool = prev?.name ? entry.names.filter(n => n !== prev.name) : entry.names
+  const name = namePool[Math.floor(Math.random() * namePool.length)]
+  return { flag: entry.flag, country: entry.country, name }
 }
+
+// Dwell: 4 000ms fully visible. Transition: 600ms cross-fade (opacity only —
+// no y-shift so the card doesn't twitch while stationary text is being read).
+const SP_DWELL_MS      = 4000
+const SP_FADE_MS       = 600   // exit fade duration; entry matches
 
 function SocialProofTicker() {
   const [notif, setNotif] = useState(() => randomNotif(null))
@@ -1192,40 +1195,49 @@ function SocialProofTicker() {
   const prevRef = useRef(notif)
 
   useEffect(() => {
-    let showTimer, hideTimer
+    let dwellTimer, gapTimer
     function cycle() {
-      // wait 3.5s visible, then hide for 1.8s, then show next
-      showTimer = setTimeout(() => {
+      dwellTimer = setTimeout(() => {
         setVisible(false)
-        hideTimer = setTimeout(() => {
+        // wait for exit fade to finish, then swap content and fade back in
+        gapTimer = setTimeout(() => {
           const next = randomNotif(prevRef.current)
           prevRef.current = next
           setNotif(next)
           setVisible(true)
           cycle()
-        }, 600)
-      }, 3500)
+        }, SP_FADE_MS + 80)   // +80ms buffer so content swap isn't visible
+      }, SP_DWELL_MS)
     }
     cycle()
-    return () => { clearTimeout(showTimer); clearTimeout(hideTimer) }
+    return () => { clearTimeout(dwellTimer); clearTimeout(gapTimer) }
   }, [])
 
   return (
-    <div className="absolute left-0 right-0 flex justify-center pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 20px) + 90px)', zIndex: 50, paddingInline: 16 }}>
+    <div
+      className="absolute left-0 right-0 flex justify-center pointer-events-none"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 20px) + 90px)', zIndex: 50, paddingInline: 16 }}
+    >
       <AnimatePresence mode="wait">
         {visible && (
           <motion.div
             key={notif.country + notif.name}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
-            style={{ background: 'rgba(18,18,18,0.82)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(198,168,92,0.18)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: SP_FADE_MS / 1000, ease: 'easeInOut' }}
+            className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5"
+            style={{
+              background: 'rgba(14,14,14,0.86)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: '1px solid rgba(198,168,92,0.20)',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.45)',
+            }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>{notif.flag}</span>
-            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.72)', whiteSpace: 'nowrap' }}>
-              <span style={{ color: 'rgba(198,168,92,0.9)', fontWeight: 600 }}>{notif.name}</span>
+            <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{notif.flag}</span>
+            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'rgba(198,168,92,0.92)', fontWeight: 600 }}>{notif.name}</span>
               {' from '}{notif.country}{' just unlocked their results'}
             </p>
           </motion.div>

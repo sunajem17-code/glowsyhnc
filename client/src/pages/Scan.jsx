@@ -814,13 +814,13 @@ const ANATOMY_LABELS = [
   {
     id: 'hairline',
     title: 'HAIRLINE RECESSION',
-    pos: { top: '12%', left: '50%' },
+    pos: { top: '10%', left: '50%' },
     valueFn: (_pts, _scan) => '—',
   },
   {
     id: 'forehead',
     title: 'FOREHEAD PROPORTION',
-    pos: { top: '20%', left: '66%' },
+    pos: { top: '19%', left: '65%' },
     // Geometry: forehead height (tip → brow) / face height (tip → chin)
     valueFn: (pts, _scan) => {
       if (!pts) return '—'
@@ -955,38 +955,56 @@ const ANATOMY_LABELS = [
 // full scan duration (14 labels × 1.4s = ~19.6s total coverage).
 const LABEL_CYCLE_MS = 1400
 
+// Fixed chip width — critical for the bounds calculation below. By fixing
+// this we know exactly how far each edge extends and can guarantee no clipping
+// without depending on the runtime element width (which CSS clamp can't see).
+const CHIP_W = 188
+const CHIP_HALF = CHIP_W / 2   // = 94px
+const CHIP_MARGIN = 10          // minimum px from container edge
+
 // Chip for a single anatomy metric. title + qualifier are always coupled
 // inside one object so they can never be indexed independently and desync.
-// whiteSpace: normal + maxWidth 260px prevents mid-word truncation on narrow
-// frames; the chip grows vertically rather than clipping horizontally.
+//
+// Positioning strategy: instead of `left: X% + translateX(-50%)` (where CSS
+// clamp can't account for the runtime chip width), we fix the chip width at
+// CHIP_W px and compute the LEFT EDGE position directly:
+//
+//   chip_left = pos.left_px - CHIP_HALF
+//   clamped   = clamp(CHIP_MARGIN, chip_left, containerWidth - CHIP_W - CHIP_MARGIN)
+//
+// Written as CSS: clamp(10px, calc(pos.left - 94px), calc(100% - 198px))
+//   • min 10px → chip left edge ≥ 10px from left wall
+//   • max calc(100% - 198px) → chip right edge ≤ 10px from right wall
+// No transform needed, no interaction between transform and clamp.
 function AnatomyLabel({ title, qualifier, pos }) {
+  // Derive the LEFT EDGE anchor from the conceptual center position
+  const leftEdge = `calc(${pos.left} - ${CHIP_HALF}px)`
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.8 }}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 28, mass: 0.75 }}
       className="absolute pointer-events-none"
       style={{
-        left: `clamp(140px, ${pos.left}, calc(100% - 140px))`,
-        top: `clamp(72px, ${pos.top}, calc(100% - 100px))`,
-        transform: 'translate(-50%, -50%)',
-        minWidth: 172,
-        maxWidth: 260,
+        left: `clamp(${CHIP_MARGIN}px, ${leftEdge}, calc(100% - ${CHIP_W + CHIP_MARGIN}px))`,
+        top: `clamp(60px, ${pos.top}, calc(100% - 76px))`,
+        width: CHIP_W,
+        // translateY only — no X shift needed since left edge is pre-computed
+        transform: 'translateY(-50%)',
       }}
     >
       <div style={{
-        background: 'rgba(0,0,0,0.88)',
+        background: 'rgba(0,0,0,0.90)',
         border: `1px solid ${LANDMARK_GOLD}55`,
         borderRadius: 10,
-        padding: '8px 16px',
+        padding: '7px 14px',
         textAlign: 'center',
-        backdropFilter: 'blur(8px)',
-        whiteSpace: 'normal',
-        wordBreak: 'break-word',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
       }}>
         <div style={{
-          fontSize: 11, fontWeight: 800, letterSpacing: '0.13em',
+          fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
           color: LANDMARK_GOLD, fontFamily: 'monospace', textTransform: 'uppercase',
           lineHeight: 1.3,
         }}>
@@ -994,8 +1012,9 @@ function AnatomyLabel({ title, qualifier, pos }) {
         </div>
         <div style={{
           fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
-          color: 'rgba(255,255,255,0.68)', fontFamily: 'monospace',
-          lineHeight: 1.4, marginTop: 3,
+          color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace',
+          lineHeight: 1.4, marginTop: 2,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {qualifier}
         </div>
