@@ -2541,20 +2541,46 @@ function Slide3() {
 
 const SLIDE_COMPONENTS = [Slide1, Slide2, Slide3]
 
-function IntroSlides({ onDone }) {
+function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
   const [slide, setSlide] = useState(0)
   const [dir, setDir] = useState(1)
+  const [authLoading, setAuthLoading] = useState(null) // 'apple' | 'google' | null
+  const [authError, setAuthError] = useState('')
   const total = SLIDE_COMPONENTS.length
+  const isLast = slide === total - 1
 
   function next() {
     if (slide < total - 1) { setDir(1); setSlide(s => s + 1) }
     else onDone()
   }
 
+  async function handleApple() {
+    triggerHaptic()
+    setAuthError('')
+    setAuthLoading('apple')
+    try {
+      await onAppleSignIn()
+    } catch (err) {
+      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
+        || err?.message?.toLowerCase().includes('cancel')
+        || err?.message?.toLowerCase().includes('dismissed')
+      if (!isCancelled) setAuthError(err?.message || 'Sign in failed. Please try again.')
+    } finally {
+      setAuthLoading(null)
+    }
+  }
+
+  function handleGoogle() {
+    triggerHaptic()
+    setAuthError('Google Sign In coming soon.')
+  }
+
   const SlideContent = SLIDE_COMPONENTS[slide]
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: '#0A0A0A' }}>
+      <AnimatePresence>{authLoading && <ProcessingOverlay key="proc" />}</AnimatePresence>
+
       {/* Skip */}
       <button
         onClick={onDone}
@@ -2592,26 +2618,102 @@ function IntroSlides({ onDone }) {
         </motion.div>
       </AnimatePresence>
 
-      {/* CTA */}
-      <div className="px-6 pb-12 flex-shrink-0">
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={next}
-          className="w-full py-4 font-heading font-bold text-[15px]"
-          style={{
-            background: slide < total - 1
-              ? `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`
-              : SLIDE_GOLD,
-            color: '#000000',
-            borderRadius: slide < total - 1 ? 16 : 12,
-            boxShadow: slide < total - 1
-              ? '0 4px 20px rgba(198,168,92,0.3)'
-              : '0 2px 12px rgba(198,168,92,0.5)',
-            letterSpacing: '0.02em',
-          }}
-        >
-          {slide < total - 1 ? 'Continue' : "Let's Get Started"}
-        </motion.button>
+      {/* CTA area */}
+      <div className="px-6 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+        <AnimatePresence mode="wait">
+          {isLast ? (
+            <motion.div
+              key="auth-buttons"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              {authError ? (
+                <p style={{ textAlign: 'center', color: '#EF4444', fontSize: 13, marginBottom: 4 }}>{authError}</p>
+              ) : null}
+
+              {/* Google */}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleGoogle}
+                disabled={!!authLoading}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 50,
+                  background: '#ffffff', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: 'pointer', opacity: authLoading === 'apple' ? 0.5 : 1,
+                }}
+              >
+                {authLoading === 'google' ? (
+                  <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                )}
+                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#000', letterSpacing: '-0.01em' }}>
+                  {authLoading === 'google' ? 'Signing in…' : 'Sign in with Google'}
+                </span>
+              </motion.button>
+
+              {/* Apple */}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleApple}
+                disabled={!!authLoading}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 50,
+                  background: '#0a0a0a', border: '1.5px solid rgba(255,255,255,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: authLoading ? 'not-allowed' : 'pointer', opacity: authLoading === 'google' ? 0.5 : 1,
+                }}
+              >
+                {authLoading === 'apple' ? (
+                  <Loader2 size={22} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.81 3.22.82.94-.17 1.83-.89 3.13-.96 1.69-.09 2.96.64 3.78 1.82-3.47 2.08-2.67 6.62.87 7.89-.62 1.48-1.46 2.94-3 3.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                )}
+                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#fff', letterSpacing: '-0.01em' }}>
+                  {authLoading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+                </span>
+              </motion.button>
+
+              {/* Already have an account / continue quiz */}
+              <button
+                onClick={onDone}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'inherit', paddingTop: 4 }}
+              >
+                Continue without signing in →
+              </button>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="continue-btn"
+              whileTap={{ scale: 0.97 }}
+              onClick={next}
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full py-4 font-heading font-bold text-[15px]"
+              style={{
+                background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
+                color: '#000000',
+                borderRadius: 16,
+                boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+                letterSpacing: '0.02em',
+                border: 'none', cursor: 'pointer',
+              }}
+            >
+              Continue
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -2801,9 +2903,43 @@ export default function PremiumOnboarding() {
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
   const TOTAL_STEPS = 9
 
+  // Apple sign-in handler used from both IntroSlides and StepAuth
+  async function handleAppleSignInFromSlide() {
+    if (!Capacitor.isNativePlatform()) throw new Error('Apple Sign In is only available on iOS.')
+    const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+    const result = await Promise.race([
+      SignInWithApple.authorize({
+        clientId: 'com.ascendus.app',
+        scopes: 'email name',
+        nonce: Math.random().toString(36).substring(2, 15),
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+    ])
+    const token = result?.response?.identityToken
+    if (!token) throw new Error('Apple Sign In did not return a valid token')
+    const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
+    const res = await fetch(`${API_BASE}/api/auth/apple`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Authentication failed')
+    setAuth(data.user, data.token)
+    clearDraft()
+    setHasOnboarded()
+    navigate('/')
+  }
+
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
-    return <IntroSlides onDone={() => setIntroDone(true)} />
+    return (
+      <IntroSlides
+        onDone={() => setIntroDone(true)}
+        onAppleSignIn={handleAppleSignInFromSlide}
+        onGoogleSignIn={() => {}}
+      />
+    )
   }
 
   // Sign in mode
