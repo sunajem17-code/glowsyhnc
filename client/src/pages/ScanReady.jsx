@@ -6,31 +6,36 @@ import useStore from '../store/useStore'
 const MESSAGES = [
   'You didn\'t choose your genetics…',
   'But you chose to show up and check.',
-  'That already puts you ahead of most people who never do.',
-  'Now let’s see what you’re working with.',
+  'Now let's see what you're working with.',
 ]
 
-// Total display duration in ms. Long enough to read each message comfortably.
-const TOTAL_MS = 4200
+// Bar completes in 2600ms (faster overall progress feel).
+const BAR_MS = 2600
+
+// Message appearance times in absolute ms from start.
+// Intentionally decoupled from the bar so the post-genetics
+// messages dwell longer than bar progress alone would suggest.
+//   0ms  → msg 0 ("genetics" — quick setup line, 700ms)
+//   700ms → msg 1 ("chose to show up" — 1100ms, pacing slows here)
+//   1800ms → msg 2 ("now let's see" — stays ~1600ms until navigate)
+const MSG_BREAKS = [0, 700, 1800]
 
 export default function ScanReady() {
-  const navigate        = useNavigate()
-  const isPremium       = useStore(s => s.isPremium)
-  const currentScan     = useStore(s => s.currentScan)
-  const destination     = isPremium ? '/results' : '/unlock'
+  const navigate    = useNavigate()
+  const isPremium   = useStore(s => s.isPremium)
+  const currentScan = useStore(s => s.currentScan)
+  const destination = isPremium ? '/results' : '/unlock'
 
-  const [progress,    setProgress]    = useState(0)
-  const [msgIndex,    setMsgIndex]    = useState(0)
-  const [exiting,     setExiting]     = useState(false)
-  const startRef      = useRef(null)
-  const rafRef        = useRef(null)
-  const doneRef       = useRef(false)
+  const [progress, setProgress] = useState(0)
+  const [msgIndex, setMsgIndex] = useState(0)
+  const [exiting,  setExiting]  = useState(false)
+  const startRef = useRef(null)
+  const rafRef   = useRef(null)
+  const doneRef  = useRef(false)
 
-  // If somehow we land here with no scan (edge case), go straight through.
+  // Edge case: no scan in store yet — skip straight through.
   useEffect(() => {
-    if (!currentScan) {
-      navigate(destination, { replace: true })
-    }
+    if (!currentScan) navigate(destination, { replace: true })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -40,21 +45,25 @@ export default function ScanReady() {
 
     function tick(now) {
       const elapsed = now - startRef.current
-      const raw     = Math.min(elapsed / TOTAL_MS, 1)
 
-      // Ease-out-quart so the bar starts fast and settles smoothly at 100%
-      const eased = 1 - Math.pow(1 - raw, 4)
+      // ── Bar ──────────────────────────────────────────────────────────
+      const raw   = Math.min(elapsed / BAR_MS, 1)
+      const eased = 1 - Math.pow(1 - raw, 4) // ease-out-quart
       setProgress(Math.round(eased * 100))
 
-      // Advance message in four equal bands
-      setMsgIndex(Math.min(3, Math.floor(raw / 0.25)))
+      // ── Messages (own schedule, independent of bar) ───────────────────
+      let mi = 0
+      for (let i = 0; i < MSG_BREAKS.length; i++) {
+        if (elapsed >= MSG_BREAKS[i]) mi = i
+      }
+      setMsgIndex(mi)
 
       if (raw < 1) {
         rafRef.current = requestAnimationFrame(tick)
       } else {
         if (doneRef.current) return
         doneRef.current = true
-        // Hold at 100% for a beat, then fade out and navigate
+        // Hold at 100% briefly, then fade and navigate.
         setTimeout(() => {
           setExiting(true)
           setTimeout(() => navigate(destination, { replace: true }), 480)
@@ -110,38 +119,27 @@ export default function ScanReady() {
 
       {/* Progress track */}
       <div style={{ width: '100%', maxWidth: 280 }}>
-        <div
-          style={{
-            height:       3,
-            borderRadius: 2,
-            background:   'rgba(255,255,255,0.08)',
-            overflow:     'hidden',
-          }}
-        >
+        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
           <motion.div
             style={{
-              height:       '100%',
+              height:     '100%',
               borderRadius: 2,
-              background:   'linear-gradient(90deg, #A8894A 0%, #C6A85C 60%, #E2C97E 100%)',
-              width:        `${progress}%`,
-              boxShadow:    '0 0 8px rgba(198,168,92,0.5)',
+              background: 'linear-gradient(90deg, #A8894A 0%, #C6A85C 60%, #E2C97E 100%)',
+              width:      `${progress}%`,
+              boxShadow:  '0 0 8px rgba(198,168,92,0.5)',
             }}
             transition={{ duration: 0.05, ease: 'linear' }}
           />
         </div>
-
-        {/* Percentage */}
-        <p
-          style={{
-            marginTop:   10,
-            textAlign:   'center',
-            fontFamily:  'var(--font-mono, "Space Grotesk", monospace)',
-            fontSize:    12,
-            fontWeight:  600,
-            color:       'rgba(198,168,92,0.7)',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <p style={{
+          marginTop:     10,
+          textAlign:     'center',
+          fontFamily:    'var(--font-mono, "Space Grotesk", monospace)',
+          fontSize:      12,
+          fontWeight:    600,
+          color:         'rgba(198,168,92,0.7)',
+          letterSpacing: '0.08em',
+        }}>
           {progress}%
         </p>
       </div>
