@@ -1835,8 +1835,9 @@ export default function Scan() {
       setMorphing(true)
       await new Promise(r => setTimeout(r, 950))
 
-      // Premium users see full results immediately; free users hit the unlock gate
-      navigate(isPremium ? '/results' : '/unlock')
+      // Transition through the scan-ready screen (progress bar + affirming
+      // messages) before landing on results or the unlock gate.
+      navigate('/scan/ready')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
       if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {

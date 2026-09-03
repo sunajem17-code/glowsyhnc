@@ -36,6 +36,7 @@ const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
 const Community      = lazy(() => import('./pages/Community'))
 const SettingsScreen = lazy(() => import('./pages/Settings'))
 const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
+const ScanReady      = lazy(() => import('./pages/ScanReady'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
 const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
 const ScanTimeline   = lazy(() => import('./pages/ScanTimeline'))
@@ -204,6 +205,7 @@ export default function App() {
                 <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="unlock" element={<ScanUnlockGate />} />
+                <Route path="scan/ready" element={<ScanReady />} />
               </Route>
             </>
           )}

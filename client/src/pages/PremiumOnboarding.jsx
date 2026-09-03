@@ -748,6 +748,269 @@ function StepReferral({ onNext }) {
   )
 }
 
+// ── STEP CONSEQUENCES ────────────────────────────────────────────────────────
+const CONSEQUENCES = [
+  {
+    icon:  '⚠️',
+    color: '#EF4444',
+    text:  'A limited dating life — your pool narrows every year you let this slide.',
+  },
+  {
+    icon:  '🔁',
+    color: '#F97316',
+    text:  'The confidence spiral: rejection → insecurity → less effort → more rejection.',
+  },
+  {
+    icon:  '📉',
+    color: '#EF4444',
+    text:  'Studies show appearance directly impacts perceived competence and hireability.',
+  },
+  {
+    icon:  '⏳',
+    color: '#F97316',
+    text:  'Your peak window is now. The habits you build in your 20s define your 30s.',
+  },
+]
+
+function StepConsequences({ onNext }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: '#0a0a0a',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', color: '#EF4444', textTransform: 'uppercase', marginBottom: 10 }}>
+            REALITY CHECK
+          </p>
+          <h1
+            className="font-heading font-bold leading-tight"
+            style={{ fontSize: 27, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: 8 }}
+          >
+            What staying the same actually costs you
+          </h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+            Most people know something is off. Few do anything about it.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Consequence list */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px', gap: 12 }}>
+        {CONSEQUENCES.map((c, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.08 + i * 0.09, duration: 0.32, ease: 'easeOut' }}
+            style={{
+              display:      'flex',
+              gap:          14,
+              alignItems:   'flex-start',
+              background:   `${c.color}0D`,
+              border:       `1px solid ${c.color}28`,
+              borderRadius: 14,
+              padding:      '14px 16px',
+            }}
+          >
+            <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.5, margin: 0 }}>
+              {c.text}
+            </p>
+          </motion.div>
+        ))}
+
+        {/* Divider callout */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.35 }}
+          style={{
+            marginTop: 4,
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: 'rgba(198,168,92,0.06)',
+            border: '1px solid rgba(198,168,92,0.22)',
+            textAlign: 'center',
+          }}
+        >
+          <p style={{ fontSize: 13, color: '#C6A85C', fontWeight: 600, margin: 0, lineHeight: 1.45 }}>
+            Ascendus shows you exactly where you are — and the fastest path to where you want to be.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onNext() }}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: GOLD_GRADIENT,
+            border: 'none', cursor: 'pointer',
+            color: '#000000', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+          }}
+        >
+          I'm ready to change this
+        </motion.button>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP TESTIMONIALS ────────────────────────────────────────────────────────
+const TESTIMONIALS = [
+  {
+    handle:  '@samhakimii',
+    rating:  5,
+    quote:   'Insane face gains in 3 months. The daily protocol actually works.',
+    initials:'SH',
+    color:   '#C6A85C',
+  },
+  {
+    handle:  '@kylejordan_',
+    rating:  5,
+    quote:   'Went from a 6.1 to a 7.4 after following the jawline and grooming plan.',
+    initials:'KJ',
+    color:   '#60A5FA',
+  },
+  {
+    handle:  '@marcov.fit',
+    rating:  5,
+    quote:   'Finally an app that gives real feedback, not just generic advice.',
+    initials:'MV',
+    color:   '#34C759',
+  },
+]
+
+function StarRow({ n = 5 }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 2 }}>
+      {Array.from({ length: n }).map((_, i) => (
+        <Star key={i} size={12} fill="#F5A623" stroke="none" />
+      ))}
+    </span>
+  )
+}
+
+function StepTestimonials({ onNext }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: '#0a0a0a',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          {/* Star cluster */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ display: 'inline-flex', gap: 3 }}>
+              {[0,1,2,3,4].map(i => <Star key={i} size={18} fill="#F5A623" stroke="none" />)}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#F5A623', fontFamily: 'inherit' }}>4.9</span>
+          </div>
+
+          <h1
+            className="font-heading font-bold leading-tight"
+            style={{ fontSize: 28, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: 6 }}
+          >
+            Join 10,000+ users already ascending
+          </h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 0 }}>
+            Real results from real people.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Cards */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px', gap: 12 }}>
+        {TESTIMONIALS.map((t, i) => (
+          <motion.div
+            key={t.handle}
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 + i * 0.1, duration: 0.35, ease: 'easeOut' }}
+            style={{
+              background:   '#141414',
+              border:       '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 16,
+              padding:      '16px 18px',
+              display:      'flex',
+              gap:          14,
+              alignItems:   'flex-start',
+            }}
+          >
+            {/* Avatar */}
+            <div style={{
+              width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+              background: `${t.color}22`,
+              border:     `1.5px solid ${t.color}55`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: t.color, fontFamily: 'inherit' }}>
+                {t.initials}
+              </span>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', fontFamily: 'inherit' }}>
+                  {t.handle}
+                </span>
+                <StarRow n={t.rating} />
+              </div>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, margin: 0 }}>
+                "{t.quote}"
+              </p>
+            </div>
+          </motion.div>
+        ))}
+
+        {/* Trust badge */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.46, duration: 0.35 }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 0 0',
+          }}
+        >
+          <Shield size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
+            Ascendus is the #1 rated looksmaxxing app on the App Store
+          </span>
+        </motion.div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onNext() }}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: GOLD_GRADIENT,
+            border: 'none', cursor: 'pointer',
+            color: '#000000', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+          }}
+        >
+          Continue
+        </motion.button>
+      </div>
+    </div>
+  )
+}
+
 // ── STEP NOTIFICATIONS ───────────────────────────────────────────────────────
 function StepNotifications({ onNext }) {
   const [loading, setLoading] = useState(false)
@@ -2536,7 +2799,7 @@ export default function PremiumOnboarding() {
   }
 
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
-  const TOTAL_STEPS = 7
+  const TOTAL_STEPS = 9
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
@@ -2606,7 +2869,7 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=referral, 5=notifications, 6=auth
+  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=referral, 5=notifications, 6=consequences, 7=testimonials, 8=auth
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
     <StepHaloEffect key="haloEffect" onNext={goNext} onBack={goBack} />,
@@ -2614,6 +2877,8 @@ export default function PremiumOnboarding() {
     <StepPrimaryGoal key="primaryGoal" data={formData} onChange={updateField} onNext={goNext} onBack={goBack} />,
     <StepReferral key="referral" onNext={goNext} />,
     <StepNotifications key="notifications" onNext={goNext} />,
+    <StepConsequences key="consequences" onNext={goNext} />,
+    <StepTestimonials key="testimonials" onNext={goNext} />,
     <StepAuth key="auth" onNext={handleFinalDone} />,
   ]
 
