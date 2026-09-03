@@ -144,7 +144,7 @@ function Card1Score({ scan, isPremium = false }) {
       }} />
 
       <div className="flex-1 flex flex-col px-6 overflow-y-auto"
-           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 88px)' }}>
+           style={{ paddingTop: 16 }}>
 
         {/* Badge row — same icon+label pattern CardShell gives every other
             card in this carousel. This card used to hand-roll its own plain
@@ -761,6 +761,24 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
         pointerEvents: 'none',
       }} />
 
+      {/* Dot pagination — sits at top below safe area so it's always visible */}
+      <div
+        className="flex items-center justify-center gap-1.5 flex-shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)', paddingBottom: 6 }}
+      >
+        {cards.map((_, i) => (
+          <div
+            key={i}
+            onClick={() => goTo(i)}
+            style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: i === cardIdx ? 'rgba(198,168,92,1)' : 'rgba(255,255,255,0.25)',
+              cursor: 'pointer',
+            }}
+          />
+        ))}
+      </div>
+
       {/* Sliding rail — all cards stay mounted (progress bars never reset).
           Pixel-based constraints + dragElastic=0 → true 1:1 finger tracking.
           Tween settle (no spring) → symmetric, predictable snap in both directions. */}
@@ -779,21 +797,6 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
             </div>
           ))}
         </motion.div>
-      </div>
-
-      {/* Dot pagination */}
-      <div className="flex items-center justify-center gap-1.5 py-3 flex-shrink-0">
-        {cards.map((_, i) => (
-          <div
-            key={i}
-            onClick={() => goTo(i)}
-            style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: i === cardIdx ? 'rgba(198,168,92,1)' : 'rgba(255,255,255,0.25)',
-              cursor: 'pointer',
-            }}
-          />
-        ))}
       </div>
 
       {/* Fixed CTA */}
@@ -1143,6 +1146,95 @@ const PAYWALL_CARDS = [
   { title: 'Daily To-Do',              content: () => <PaywallDailyTodoCard /> },
 ]
 
+// ── Social proof ticker ───────────────────────────────────────────────────────
+const SP_NAMES = [
+  'Alex','James','Noah','Liam','Mason','Ethan','Logan','Lucas','Aiden','Jackson',
+  'Sebastian','Mateo','Jack','Owen','Theodore','Amir','Rayan','Yusuf','Kai','Finn',
+  'Marcus','Tyler','Ryan','Jordan','Dylan','Cole','Blake','Hunter','Caleb','Nathan',
+]
+const SP_ENTRIES = [
+  { flag: '🇺🇸', country: 'United States' },
+  { flag: '🇬🇧', country: 'United Kingdom' },
+  { flag: '🇦🇺', country: 'Australia' },
+  { flag: '🇨🇦', country: 'Canada' },
+  { flag: '🇩🇪', country: 'Germany' },
+  { flag: '🇫🇷', country: 'France' },
+  { flag: '🇮🇹', country: 'Italy' },
+  { flag: '🇸🇪', country: 'Sweden' },
+  { flag: '🇳🇱', country: 'Netherlands' },
+  { flag: '🇳🇴', country: 'Norway' },
+  { flag: '🇩🇰', country: 'Denmark' },
+  { flag: '🇦🇪', country: 'UAE' },
+  { flag: '🇸🇬', country: 'Singapore' },
+  { flag: '🇧🇷', country: 'Brazil' },
+  { flag: '🇲🇽', country: 'Mexico' },
+  { flag: '🇳🇿', country: 'New Zealand' },
+  { flag: '🇵🇱', country: 'Poland' },
+  { flag: '🇧🇪', country: 'Belgium' },
+  { flag: '🇨🇭', country: 'Switzerland' },
+  { flag: '🇦🇹', country: 'Austria' },
+]
+
+function pick(arr, excludeFn) {
+  const candidates = arr.filter(x => !excludeFn(x))
+  return candidates[Math.floor(Math.random() * candidates.length)]
+}
+
+function randomNotif(prev) {
+  const entry = pick(SP_ENTRIES, e => prev && e.country === prev.country)
+  const name  = pick(SP_NAMES,  n => prev && n === prev.name)
+  return { name, ...entry }
+}
+
+function SocialProofTicker() {
+  const [notif, setNotif] = useState(() => randomNotif(null))
+  const [visible, setVisible] = useState(true)
+  const prevRef = useRef(notif)
+
+  useEffect(() => {
+    let showTimer, hideTimer
+    function cycle() {
+      // wait 3.5s visible, then hide for 1.8s, then show next
+      showTimer = setTimeout(() => {
+        setVisible(false)
+        hideTimer = setTimeout(() => {
+          const next = randomNotif(prevRef.current)
+          prevRef.current = next
+          setNotif(next)
+          setVisible(true)
+          cycle()
+        }, 600)
+      }, 3500)
+    }
+    cycle()
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer) }
+  }, [])
+
+  return (
+    <div className="absolute left-0 right-0 flex justify-center pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 20px) + 90px)', zIndex: 50, paddingInline: 16 }}>
+      <AnimatePresence mode="wait">
+        {visible && (
+          <motion.div
+            key={notif.country + notif.name}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
+            style={{ background: 'rgba(18,18,18,0.82)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(198,168,92,0.18)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+          >
+            <span style={{ fontSize: 18, lineHeight: 1 }}>{notif.flag}</span>
+            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.72)', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'rgba(198,168,92,0.9)', fontWeight: 600 }}>{notif.name}</span>
+              {' from '}{notif.country}{' just unlocked their results'}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
@@ -1264,6 +1356,8 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           ))}
         </div>
       </div>
+
+      <SocialProofTicker />
     </motion.div>
   )
 }
