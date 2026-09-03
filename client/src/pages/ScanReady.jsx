@@ -6,7 +6,7 @@ import useStore from '../store/useStore'
 const MESSAGES = [
   'You didn\'t choose your genetics…',
   'But you chose to show up and check.',
-  'Now let's see what you're working with.',
+  "Now let’s see what you’re working with.",
 ]
 
 // Bar completes in 2600ms (faster overall progress feel).
