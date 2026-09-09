@@ -12,7 +12,7 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
 
-function buildSystemPrompt(scanContext) {
+function buildSystemPrompt(scanContext, isPro) {
   const { glowScore, faceScore, presentationScore, faceData, presentationData, userProfile } = scanContext || {}
 
   let prompt = `You are the Ascendus AI Coach. You help people improve their physical appearance through direct, specific, actionable advice.
@@ -21,10 +21,10 @@ STRICT RULES:
 - Never use em dashes (the -- character). Use commas, periods, or colons instead.
 - No fluff, no filler, no preamble. Get straight to the answer.
 - Be specific: say "Vitamin D3 4000IU with K2 100mcg daily" not "take vitamins".
-- Short responses only. 3-6 lines max. Every line counts.
-- Reference their scan scores when relevant.
+- Short responses only. 2-4 lines max. Every word counts. Do not pad.
 - No encouragement padding. Just the information.
-- Never say "Great question" or any opener. Start with the answer.
+- Never say "Great question", "Sure!", "Absolutely", or any opener. Start with the answer.
+- No closing remarks, no "let me know if you have questions". Just end after the last point.
 
 FORMAT:
 - One point per line.
@@ -69,7 +69,7 @@ POSTURE PROTOCOL (use when posture score < 7 or user mentions posture):
 - Chin tucks 3x15 — fixes forward head posture (adds 1-2 inches perceived height)
 - Thoracic extension over foam roller 2 min daily`
 
-  if (glowScore != null) {
+  if (isPro && glowScore != null) {
     prompt += `\n\nUSER'S SCAN DATA (use this to give personalized advice):
 Overall Score: ${glowScore}/10
 Face Score: ${faceScore}/10 | Presentation Score: ${presentationScore}/10`
@@ -95,9 +95,12 @@ Face Score: ${faceScore}/10 | Presentation Score: ${presentationScore}/10`
     if (userProfile?.goal) {
       prompt += `\nUser goal: ${userProfile.goal}`
     }
+
+    prompt += `\n\nCite the user's actual scan scores when relevant. Never invent data not shown above.`
+  } else {
+    prompt += `\n\nNEVER reveal or mention any specific score numbers to this user. Give general advice only based on their questions.`
   }
 
-  prompt += `\n\nIMPORTANT: Always cite the user's actual scan scores when giving advice. If their jawline is 5.8, say "your jawline scored 5.8". If their posture is 6.5, reference that number. Never invent data not shown above.`
   return prompt
 }
 
@@ -129,11 +132,11 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
 
   try {
     const client = getClient()
-    const systemPrompt = buildSystemPrompt(scanContext)
+    const systemPrompt = buildSystemPrompt(scanContext, req.isPro)
 
     const response = await withRetry(() => client.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 400,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 220,
       system: systemPrompt,
       messages: recentMessages.map(m => ({
         role: m.role,
