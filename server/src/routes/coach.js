@@ -147,8 +147,8 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     const text = response.content[0]?.text || ''
     res.json({ message: text })
   } catch (err) {
-    console.error('Coach API error:', err.message)
-    res.status(500).json({ error: 'Coach unavailable. Try again.' })
+    console.error('Coach API error:', err.status, err.message, JSON.stringify(err.error || {}))
+    res.status(500).json({ error: `Coach unavailable: ${err.message}` })
   }
 })
 
