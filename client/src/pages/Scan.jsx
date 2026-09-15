@@ -159,6 +159,19 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
     setReady(false)
     try {
+      // On native iOS, getUserMedia won't trigger the system permission dialog —
+      // the Capacitor Camera plugin must request it first.
+      if (isNative()) {
+        const { Camera: CapCamera } = await import('@capacitor/camera')
+        try {
+          const perm = await CapCamera.requestPermissions({ permissions: ['camera'] })
+          console.log('[CameraOverlay] iOS perm:', JSON.stringify(perm))
+          if (perm?.camera === 'denied') {
+            setError('Camera access denied. Go to Settings → Privacy → Camera and enable access for this app.')
+            return
+          }
+        } catch (e) { console.warn('[CameraOverlay] requestPermissions non-fatal:', e) }
+      }
       // Request highest available resolution — mobile cameras will cap naturally
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: mode, width: { ideal: 3840 }, height: { ideal: 2160 } },
@@ -1551,16 +1564,72 @@ export default function Scan() {
     return Promise.race([convert, timeout])
   }
 
-  // Auto-advance from face photo step to side profile once facePhoto is set
-  useEffect(() => {
-    if (step !== 1 || !facePhoto) return
-    const t = setTimeout(() => { setStep(2); setError('') }, 600)
-    return () => clearTimeout(t)
-  }, [step, facePhoto])
+  // Transition from front face → side profile.
+  // Runs quality validation during the ProcessingOverlay loading state so the
+  // check works for BOTH camera captures and library uploads (both call this).
+  // FAIL-CLOSED: any error during validation blocks the scan, never silently passes.
+  async function transitionToSide(url) {
+    console.log('[ASCENDUS SCAN] 1. Scan started')
+    console.log('[ASCENDUS SCAN] 2. Image captured/selected — type:', url ? url.slice(0, 40) : 'null')
+
+    setFacePhoto(url)
+    setError('')
+    setCameraOpen(false)
+    setPreviewPhoto(null)
+    setTransitioning(true)  // show loading overlay immediately
+
+    console.log('[ASCENDUS SCAN] 3. Image converted successfully')
+
+    let passed = false
+    let issues = []
+    try {
+      const { validateScanQuality } = await import('../utils/scanQuality.js')
+      const result = await validateScanQuality(url)
+      passed = result.passed
+      issues = result.issues
+    } catch (err) {
+      // Fail-CLOSED: if the validator itself throws, block the scan
+      console.error('[Scan] Quality check error (fail-closed):', err?.message)
+      passed = false
+      issues = [{ code: 'validation_error', title: 'Could not validate photo — please try again', advice: 'Please try again.', severity: 'critical' }]
+    }
+
+    if (!passed) {
+      setTransitioning(false)
+      navigate('/scan/quality-fail', { state: { issues } })
+      return
+    }
+
+    console.log('[ASCENDUS SCAN] 9. Starting facial analysis')
+    setStep(2)
+    setTransitioning(false)
+  }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
+
+    // Belt-and-suspenders: re-validate the face photo before analysis starts.
+    // The result is cached in scanQuality.js so this is instant (no re-run).
+    // Fail-CLOSED: any error blocks analysis.
+    if (facePhoto) {
+      let qPassed = false
+      let qIssues = []
+      try {
+        const { validateScanQuality } = await import('../utils/scanQuality.js')
+        const qResult = await validateScanQuality(facePhoto)
+        qPassed = qResult.passed
+        qIssues = qResult.issues
+      } catch (err) {
+        console.error('[Scan] startAnalysis quality gate error (fail-closed):', err?.message)
+        qPassed = false
+        qIssues = [{ code: 'validation_error', title: 'Could not validate photo', advice: 'Please try again.', severity: 'critical' }]
+      }
+      if (!qPassed) {
+        navigate('/scan/quality-fail', { state: { issues: qIssues } })
+        return
+      }
+    }
 
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
@@ -1739,6 +1808,14 @@ export default function Scan() {
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
       recordProScan()
+
+      // Mark calibration complete after first successful scan — subsequent
+      // scans will use the fast local MediaPipe path instead of the AI API.
+      // Also release the original capture blob URL (privacy: no longer needed).
+      import('../utils/scanQuality.js').then(({ markCalibrated, releaseValidationImage }) => {
+        markCalibrated()
+        releaseValidationImage(facePhoto) // facePhoto may be blob: URL from camera/upload
+      }).catch(() => {})
 
       // Fire-and-forget: run MediaPipe client-side to extract named landmarks
       // and explorer metrics for FaceMetricsExplorer on the Progress screen.
@@ -1923,9 +2000,10 @@ export default function Scan() {
             <button
               onClick={() => {
                 triggerHaptic()
-                if (cameraOpen) { setCameraOpen(false) }
+                if (transitioning) { setTransitioning(false); setFacePhoto(null); setStep(1) }
+                else if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
-                else if (step === 2) { setStep(1) }
+                else if (step === 2) { setFacePhoto(null); setStep(1) }
                 else { setScanLaunching(true); navigate(-1) }
               }}
               aria-label="Go back"
@@ -1960,8 +2038,8 @@ export default function Scan() {
             </motion.div>
           )}
           {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
-            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6 gap-5">
-              <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: step === 1 ? '4/5' : '3/4', border: '1px solid rgba(198,168,92,0.35)' }}>
+            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6">
+              <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: step === 1 ? '4/5' : '3/4' }}>
                 <img
                   src={step === 1
                     ? (gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto)
@@ -1971,15 +2049,6 @@ export default function Scan() {
                   className="w-full h-full object-cover"
                 />
               </div>
-              {/* Single Begin Scan button — tap opens the take/upload choice sheet */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
-                className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-                style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-              >
-                Begin Scan
-              </motion.button>
 
               {/* iOS-style action sheet — appears over the guide content */}
               <AnimatePresence>
@@ -2024,7 +2093,7 @@ export default function Scan() {
                               })
                             }
                             if (url) {
-                              if (step === 1) { setFacePhoto(url); setError(''); setStep(2) }
+                              if (step === 1) { transitionToSide(url) }
                               else { setTransitioning(true); setSidePhoto(url); setError(''); setTimeout(() => { setStep(3); setTransitioning(false); setTimeout(() => startAnalysisRef.current?.(), 50) }, 300) }
                             }
                           } catch {}
@@ -2070,8 +2139,7 @@ export default function Scan() {
                     triggerHaptic()
                     const { url, forStep } = previewPhoto
                     if (forStep === 1) {
-                      setPreviewPhoto(null)
-                      setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
+                      transitionToSide(url)
                     } else {
                       setTransitioning(true)
                       setSidePhoto(url); setError(''); setCameraOpen(false)
@@ -2099,7 +2167,7 @@ export default function Scan() {
                 onCapture={(url, blob) => {
                   triggerHaptic()
                   if (step === 1) {
-                    setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
+                    transitionToSide(url)
                   } else {
                     setTransitioning(true)
                     setSidePhoto(url); setError(''); setCameraOpen(false)
@@ -2122,9 +2190,14 @@ export default function Scan() {
         </AnimatePresence>
       </div>
 
-      {/* Processing overlay — brief gap between preview Continue and analyzing screen */}
+      {/* Processing overlay — shown between front face confirm → side profile, and side confirm → analyzing */}
       <AnimatePresence>
-        {transitioning && <ProcessingOverlay key="scan-transition" />}
+        {transitioning && (
+          <ProcessingOverlay
+            key="scan-transition"
+            label="Processing"
+          />
+        )}
       </AnimatePresence>
 
       {/* Scan-cap upgrade modal */}
@@ -2246,38 +2319,19 @@ export default function Scan() {
         </div>
       )}
 
-      {/* CTAs */}
-      {!isAnalyzing && (
-        <div className="px-4 pb-8 pt-2">
-
-          {/* Step 0 (gender) has no CTA here — GenderSelector auto-advances
-              300ms after a tap, matching PremiumOnboarding.jsx's StepGender. */}
-
-          {/* Step 1 (face) has no CTA here anymore — PhotoUploadStep's own
-              button handles capture/scan, and the useEffect above advances
-              to step 2 automatically once facePhoto + geometrySatisfied are
-              both true. See that effect for why it isn't just this button
-              turned into an auto-fire — retakes need the faceScanBusy gate
-              too. */}
-
-          {/* Step 2: side profile → this is now the last capture step, so its
-              "Continue" fires the actual analysis directly instead of
-              advancing to a body step. geometrySatisfied is already
-              guaranteed true by the time anyone reaches here (step 1's gate
-              requires it), and there's no Live Face Scan action offered here
-              anymore — so the only real requirement left is a photo. Skip
-              Side Profile remains the escape hatch since this step is
-              optional; it also fires analysis directly, just without the
-              side image. */}
-          {step === 2 && cameraOpen && sidePhoto && (
-            <button
-              onClick={() => startAnalysis(false)}
-              className="btn-amber"
+      {/* CTAs — pinned at bottom, same position/size on every step */}
+      {!isAnalyzing && !cameraOpen && !previewPhoto && (
+        <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
+          {(step === 1 || step === 2) && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
+              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >
-              ✦ Full Scan: Analyze Now
-            </button>
+              Begin Scan
+            </motion.button>
           )}
-
         </div>
       )}
     </div>

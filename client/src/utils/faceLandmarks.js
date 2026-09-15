@@ -17,33 +17,141 @@ function locateFile(file) {
   return `/mediapipe/${file}`
 }
 
+// Run once on first init: log WebAssembly + file reachability so we know
+// exactly what environment we're running in.
+async function _logEnvironmentDiagnostics() {
+  console.log('[FaceDetector] platform: iOS WKWebView (Capacitor)')
+  console.log('[FaceDetector] library: @mediapipe/face_mesh v0.4.1633559619')
+  console.log('[FaceDetector] locateFile base: /mediapipe/<file>')
+
+  // WebAssembly
+  const wasmAvail = typeof WebAssembly !== 'undefined' && typeof WebAssembly.instantiate === 'function'
+  console.log('[FaceDetector] WebAssembly available:', wasmAvail)
+  if (!wasmAvail) return
+
+  // SIMD detection (tiny SIMD test binary — same check MediaPipe uses internally)
+  try {
+    // 11-byte minimal SIMD WASM module
+    const simdTest = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,253,15,253,15,26,11])
+    const ok = WebAssembly.validate(simdTest)
+    console.log('[FaceDetector] WASM SIMD supported:', ok)
+  } catch (e) {
+    console.warn('[FaceDetector] WASM SIMD check error:', e?.message)
+  }
+
+  // File reachability — check if the WASM binaries can actually be fetched
+  for (const f of ['face_mesh_solution_wasm_bin.wasm', 'face_mesh_solution_wasm_bin.js', 'face_mesh.binarypb']) {
+    try {
+      const r = await fetch(`/mediapipe/${f}`, { method: 'HEAD' })
+      console.log(`[FaceDetector] /mediapipe/${f} → HTTP ${r.status} content-type: ${r.headers.get('content-type')}`)
+    } catch (e) {
+      console.error(`[FaceDetector] /mediapipe/${f} → FETCH FAILED: ${e?.message}`)
+    }
+  }
+}
+
 export async function initFaceMesh() {
   if (_mesh) return _mesh
-  if (_initPromise) return _initPromise
+  // Guard: if a pending init is already in flight, await it.
+  // If it fails, fall through and retry from scratch — never
+  // permanently return a previously-rejected promise.
+  if (_initPromise) {
+    try { return await _initPromise } catch { /* fall through to retry */ }
+  }
 
   _initPromise = (async () => {
-    const { FaceMesh } = await import('@mediapipe/face_mesh')
-    const mesh = new FaceMesh({ locateFile })
-    mesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: false,
-      minDetectionConfidence: 0.4,
-      minTrackingConfidence: 0.4,
-    })
+    console.log('[FaceDetector] initialization started')
+    await _logEnvironmentDiagnostics()
 
-    // Pre-warm: send a blank canvas to trigger WASM + model loading
-    // This avoids the first real scan taking 10–15s to load the 5MB model
-    await new Promise((resolve) => {
-      mesh.onResults(resolve)
-      const blank = document.createElement('canvas')
-      blank.width = 128
-      blank.height = 128
-      mesh.send({ image: blank }).catch(resolve) // resolve even if no face found
-    })
+    // ── Step 1: import the module ──────────────────────────────────────────────
+    let FaceMesh
+    try {
+      console.log('[FaceDetector] importing @mediapipe/face_mesh…')
+      const mod = await import('@mediapipe/face_mesh')
+      FaceMesh = mod.FaceMesh
+      console.log('[FaceDetector] import OK — FaceMesh type:', typeof FaceMesh)
+    } catch (err) {
+      console.error('[FaceDetector] import FAILED:', err?.message, err?.stack?.split('\n')[1])
+      console.error('[FaceDetector] initialization error: import_failed —', err?.message)
+      throw err
+    }
 
+    // ── Step 2: construct instance ─────────────────────────────────────────────
+    let mesh
+    try {
+      console.log('[FaceDetector] constructing FaceMesh({ locateFile })…')
+      mesh = new FaceMesh({ locateFile })
+      console.log('[FaceDetector] construction OK')
+    } catch (err) {
+      console.error('[FaceDetector] construction FAILED:', err?.message)
+      console.error('[FaceDetector] initialization error: construction_failed —', err?.message)
+      throw err
+    }
+
+    // ── Step 3: setOptions ─────────────────────────────────────────────────────
+    try {
+      mesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.4,
+        minTrackingConfidence: 0.4,
+      })
+      console.log('[FaceDetector] setOptions OK')
+    } catch (err) {
+      console.error('[FaceDetector] setOptions FAILED:', err?.message)
+      console.error('[FaceDetector] initialization error: setoptions_failed —', err?.message)
+      throw err
+    }
+
+    // ── Step 4: initialize() — the proper API that forces WASM + model load ────
+    // MediaPipe exposes mesh.initialize() for exactly this purpose.
+    // It returns a Promise that resolves when WASM is compiled and the model
+    // is loaded. Calling it here means errors surface during init, not later.
+    if (typeof mesh.initialize === 'function') {
+      try {
+        console.log('[FaceDetector] calling mesh.initialize() — loading WASM + model…')
+        await Promise.race([
+          mesh.initialize(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('initialize() timed out after 30s')), 30_000)),
+        ])
+        console.log('[FaceDetector] mesh.initialize() succeeded — WASM + model ready')
+      } catch (err) {
+        console.error('[FaceDetector] mesh.initialize() FAILED:', err?.message)
+        console.error('[FaceDetector] initialization error: initialize_failed —', err?.message)
+        throw err
+      }
+    } else {
+      // Older MediaPipe builds without initialize(): fall back to the warmup
+      // pattern but protect it fully so a warmup error is non-fatal.
+      console.log('[FaceDetector] no initialize() method — using warmup send() fallback')
+      try {
+        await Promise.race([
+          new Promise((resolve) => {
+            mesh.onResults(resolve)
+            const blank = document.createElement('canvas')
+            blank.width = 128
+            blank.height = 128
+            try {
+              const p = mesh.send({ image: blank })
+              if (p && typeof p.catch === 'function') p.catch(resolve)
+            } catch { resolve() }
+          }),
+          new Promise(resolve => setTimeout(resolve, 15_000)),
+        ])
+        console.log('[FaceDetector] warmup fallback complete')
+      } catch (e) {
+        console.warn('[FaceDetector] warmup fallback error (non-fatal):', e?.message)
+      }
+    }
+
+    console.log('[FaceDetector] initialization succeeded — plugin available: N/A (JS library)')
+    console.log('[FaceDetector] model/resource available: YES (bundled in /mediapipe/)')
     _mesh = mesh
     return mesh
   })()
+
+  // Clear on failure so the next call can retry instead of re-rejecting forever
+  _initPromise.catch(() => { _initPromise = null })
 
   return _initPromise
 }

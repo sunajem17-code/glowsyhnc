@@ -569,7 +569,7 @@ function shapeExtendedMetrics(em) {
 }
 
 // ── CALL 2: Physique Scoring (optional — only when bodyImage provided) ────────
-async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', bodyGeometry = null) {
+async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', bodyGeometry = null, height = null, weight = null) {
   const client = getClient()
   const isFemale = gender === 'female'
 
@@ -638,7 +638,7 @@ Return ONLY this JSON — no markdown, nothing else:
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
-        { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique. Return ONLY the JSON.` },
+        { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique.${height ? ` Height: ${height}.` : ''}${weight ? ` Weight: ${weight}.` : ''} Use height and weight to calibrate frame and leanness expectations — a heavier person at the same visible leanness scores differently than a lighter one. Return ONLY the JSON.` },
       ],
     }],
   })
@@ -988,7 +988,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { bodyImage, gender = 'male', bodyGeometry } = req.body
+    const { bodyImage, gender = 'male', bodyGeometry, height, weight } = req.body
     if (!bodyImage) {
       return res.status(400).json({ error: 'Body image is required' })
     }
@@ -996,12 +996,12 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
     const bodyMediaType = getMediaType(bodyImage)
     const bodyBase64    = stripPrefix(bodyImage)
 
-    console.log('[aiScore:physique-only] Inputs — gender:', gender)
+    console.log('[aiScore:physique-only] Inputs — gender:', gender, 'height:', height, 'weight:', weight)
 
     await acquireSlot()
     let physiqueResult
     try {
-      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique-only')
+      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry, height, weight), 'physique-only')
       console.log('[aiScore:physique-only] OK — overall:', physiqueResult.overall)
     } finally {
       releaseSlot()
@@ -1188,6 +1188,85 @@ Respond ONLY with valid JSON — no extra text:
   } catch (err) {
     console.error('[workout-plan] error:', err.message)
     res.status(500).json({ error: 'Plan generation failed', fallback: true })
+  }
+})
+
+// ── POST /api/ai/validate-scan ────────────────────────────────────────────────
+// First-scan face validation using Claude vision.
+// Returns { valid, faceCount, issues: [{type, message}] }.
+// The image is NEVER stored, cached, logged, or used for model training.
+// Rate-limited separately from scoring (validations are cheap; haiku model).
+router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async (req, res) => {
+  const { imageB64 } = req.body
+  if (!imageB64 || typeof imageB64 !== 'string') {
+    return res.status(400).json({ error: 'imageB64 is required' })
+  }
+
+  // Strip data URL header — Claude needs raw base64
+  const commaIdx  = imageB64.indexOf(',')
+  const base64Data = commaIdx >= 0 ? imageB64.slice(commaIdx + 1) : imageB64
+  const header     = commaIdx >= 0 ? imageB64.slice(0, commaIdx) : ''
+  const mediaType  = (/image\/(jpeg|png|webp)/.exec(header) ?? [])[0] || 'image/jpeg'
+
+  try {
+    const client = getClient()
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64Data },
+          },
+          {
+            type: 'text',
+            text: `Analyze this image and determine if it is suitable for a facial analysis scan.
+
+Return ONLY a JSON object — no markdown, no explanation, just raw JSON:
+
+{
+  "valid": boolean,
+  "faceCount": number,
+  "issues": [{"type": string, "message": string}]
+}
+
+Rules:
+- valid=true ONLY when ALL conditions are met: exactly 1 clearly visible human face, face is large enough to fill a reasonable portion of the frame, not severely cropped, image is not severely blurry, lighting is sufficient to see facial features
+- valid=false for: 0 faces, >1 person, flowers, landscapes, waterfalls, animals, objects, extreme blur, extreme darkness, face cropped at edges, face too tiny/distant
+- faceCount: integer, count of human faces (0 for non-person images)
+- issues: [] when valid=true; specific issues when valid=false
+- issue type values: "no_face", "not_a_person", "multiple_faces", "too_far", "too_close", "face_cropped", "too_dark", "too_blurry"
+- issue messages: short and actionable (e.g. "No face detected", "Move closer to the camera")
+- DO NOT reject for: glasses, slight head angle, moderate shadows, normal indoor lighting, dark skin, facial hair, makeup, minor tilt`
+          },
+        ],
+      }],
+    })
+
+    const text = (response.content[0]?.text ?? '').trim()
+    let result
+    try {
+      // Strip any accidental markdown fencing Claude might add despite instructions
+      const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/, '').trim()
+      result = JSON.parse(jsonStr)
+    } catch {
+      console.error('[validate-scan] Non-JSON from Claude:', text.slice(0, 200))
+      return res.json({ valid: false, faceCount: 0, issues: [{ type: 'validation_error', message: 'Could not analyze photo. Please try again.' }] })
+    }
+
+    // Sanitize — never trust raw model output shape
+    return res.json({
+      valid:     result.valid === true,
+      faceCount: Number.isInteger(result.faceCount) ? Math.max(0, result.faceCount) : 0,
+      issues:    Array.isArray(result.issues)
+        ? result.issues.slice(0, 5).map(i => ({ type: String(i.type || 'unknown'), message: String(i.message || '') }))
+        : [],
+    })
+  } catch (err) {
+    console.error('[validate-scan] error:', err?.message)
+    return res.status(503).json({ error: 'Validation service temporarily unavailable. Please try again.', retryable: true })
   }
 })
 
