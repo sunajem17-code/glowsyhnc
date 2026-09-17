@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { isNative, purchasePro, purchaseDiscountedAnnual } from '../utils/iap'
 import {
@@ -1019,11 +1019,11 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 
 // ── Pro Paywall (full-screen modal, opens when "Get Ascendus Pro" is tapped) ──
 function PaywallRatingsCard() {
-  // Red→green bar color based on score percentage
   const barColor = pct => {
-    const r = Math.round(255 * (1 - pct / 100))
-    const g = Math.round(200 * (pct / 100))
-    return `rgb(${Math.min(255, r + 40)},${g},30)`
+    // red at 0-40, yellow around 60, green at 100
+    const mapped = Math.max(0, (pct - 40) / 60) // 0→0, 40→0, 100→1
+    const hue = Math.round(mapped * 120) // 0=red, 60=yellow, 120=green
+    return `hsl(${hue}, 85%, 45%)`
   }
   const items = [
     { label: 'Overall',      pct: 61 },
@@ -1053,9 +1053,10 @@ function PaywallRatingsCard() {
 // Physique ratings — parallel to face ratings but body metrics
 function PaywallPhysiqueCard() {
   const barColor = pct => {
-    const r = Math.round(255 * (1 - pct / 100))
-    const g = Math.round(200 * (pct / 100))
-    return `rgb(${Math.min(255, r + 40)},${g},30)`
+    // red at 0-40, yellow around 60, green at 100
+    const mapped = Math.max(0, (pct - 40) / 60) // 0→0, 40→0, 100→1
+    const hue = Math.round(mapped * 120) // 0=red, 60=yellow, 120=green
+    return `hsl(${hue}, 85%, 45%)`
   }
   const items = [
     { label: 'Overall',       pct: 66 },
@@ -1095,7 +1096,7 @@ function PaywallDailyTodoCard() {
     },
     {
       icon: '💪', label: 'Exercise',
-      items: ['Mark today\'s exercises complete'],
+      items: ['Mark today\'s gym routine', 'Today\'s jaw exercises'],
       done: [false],
     },
   ]
@@ -1174,8 +1175,12 @@ const SP_ENTRIES = [
 ]
 
 function _pickEntry(prevCountry) {
-  const pool = prevCountry ? SP_ENTRIES.filter(e => e.country !== prevCountry) : SP_ENTRIES
-  return pool[Math.floor(Math.random() * pool.length)]
+  const all = prevCountry ? SP_ENTRIES.filter(e => e.country !== prevCountry) : SP_ENTRIES
+  // Weight USA and Canada 4x more likely
+  const weighted = all.flatMap(e =>
+    (e.country === 'United States' || e.country === 'Canada') ? [e, e, e, e] : [e]
+  )
+  return weighted[Math.floor(Math.random() * weighted.length)]
 }
 
 function randomNotif(prev) {
@@ -1185,10 +1190,13 @@ function randomNotif(prev) {
   return { flag: entry.flag, country: entry.country, name }
 }
 
-// Dwell: 4 000ms fully visible. Transition: 600ms cross-fade (opacity only —
-// no y-shift so the card doesn't twitch while stationary text is being read).
-const SP_DWELL_MS      = 4000
-const SP_FADE_MS       = 600   // exit fade duration; entry matches
+// Dwell: randomised 9–16s so it never feels mechanical. Fade: 900ms.
+const SP_FADE_MS = 900
+
+function _randomDwell() {
+  // Between 9000ms and 16000ms — feels like real async events arriving
+  return 9000 + Math.floor(Math.random() * 7000)
+}
 
 function SocialProofTicker() {
   const [notif, setNotif] = useState(() => randomNotif(null))
@@ -1198,6 +1206,7 @@ function SocialProofTicker() {
   useEffect(() => {
     let dwellTimer, gapTimer
     function cycle() {
+      const dwell = _randomDwell()
       dwellTimer = setTimeout(() => {
         setVisible(false)
         // wait for exit fade to finish, then swap content and fade back in
@@ -1208,7 +1217,7 @@ function SocialProofTicker() {
           setVisible(true)
           cycle()
         }, SP_FADE_MS + 80)   // +80ms buffer so content swap isn't visible
-      }, SP_DWELL_MS)
+      }, dwell)
     }
     cycle()
     return () => { clearTimeout(dwellTimer); clearTimeout(gapTimer) }
@@ -1216,8 +1225,8 @@ function SocialProofTicker() {
 
   return (
     <div
-      className="absolute left-0 right-0 flex justify-center pointer-events-none"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom, 20px) + 90px)', zIndex: 50, paddingInline: 16 }}
+      className="flex justify-center pointer-events-none"
+      style={{ paddingInline: 16 }}
     >
       <AnimatePresence mode="wait">
         {visible && (
@@ -1226,7 +1235,7 @@ function SocialProofTicker() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: SP_FADE_MS / 1000, ease: 'easeInOut' }}
+            transition={{ duration: SP_FADE_MS / 1000, ease: [0.4, 0, 0.2, 1] }}
             className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5"
             style={{
               background: 'rgba(14,14,14,0.86)',
@@ -1342,11 +1351,27 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
       className="absolute inset-0 z-40 flex flex-col"
       style={{ background: '#0A0A0A' }}
     >
+      {/* Close button — pinned to top-left in safe area */}
+      <button
+        onClick={handleCloseAttempt}
+        aria-label="Close"
+        className="absolute flex items-center justify-center"
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+          right: 20,
+          width: 34,
+          height: 34,
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          zIndex: 10,
+        }}
+      >
+        <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
+      </button>
+
       {/* Header */}
-      <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 4 }}>
-        <button onClick={handleCloseAttempt} className="w-8 h-8 flex items-center justify-center" aria-label="Close">
-          <X size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
-        </button>
+      <div className="flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 96px)', paddingBottom: 4 }}>
 
         {/* Live scan counter — only rendered when real data is available */}
         {totalScans != null && (
@@ -1358,14 +1383,11 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           </div>
         )}
 
-        <h1 className="font-heading font-bold text-[26px] leading-tight mt-2 mb-1.5" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          {scoreGap != null && scoreGap > 0
-            ? `You're leaving ${scoreGap} points of facial potential untapped. Stop guessing and unlock your custom growth plan.`
-            : "You're leaving facial potential untapped. Stop guessing and unlock your custom growth plan."
-          }
+        <h1 className="font-heading font-bold text-[36px] leading-tight mt-2 mb-1.5 text-center" style={{ color: '#C6A85C', letterSpacing: '-0.02em', textShadow: '0 0 20px rgba(198,168,92,0.5), 0 0 50px rgba(198,168,92,0.3), 0 0 90px rgba(198,168,92,0.15)', fontWeight: 900 }}>
+          ASCEND WITH US
         </h1>
-        <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
-          Less than the cost of one protein shake a month to completely upgrade your look.
+        <p className="font-body text-[15px] text-center" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          Proven to change your life
         </p>
       </div>
 
@@ -1409,20 +1431,15 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
-        <p className="text-center font-body text-[12px] mt-2 mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          No commitment. Cancel with one tap in your settings anytime.
-        </p>
-        <p className="text-center font-body text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.2)' }}>
-          $4.99 for 1 week · then billed monthly
-        </p>
+        <div className="mt-3 mb-2">
+          <SocialProofTicker />
+        </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
             <button key={label} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</button>
           ))}
         </div>
       </div>
-
-      <SocialProofTicker />
 
       <AnimatePresence>
         {showDiscount && (
@@ -1474,8 +1491,8 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
         <div className="flex items-center justify-between px-6 pt-4 pb-1">
           <div className="w-10 h-1 rounded-full absolute left-1/2 -translate-x-1/2 top-3" style={{ background: 'rgba(255,255,255,0.12)' }} />
           <div />
-          <button onClick={() => { triggerHaptic(); onClose() }} className="w-8 h-8 flex items-center justify-center ml-auto">
-            <X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />
+          <button onClick={() => { triggerHaptic(); onClose() }} className="flex items-center justify-center ml-auto" style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
           </button>
         </div>
 
@@ -1518,7 +1535,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, error }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, isPurchasing, error }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
@@ -1543,8 +1560,8 @@ function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, e
 
         {/* Close button */}
         <div className="w-full flex justify-end mb-3">
-          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="w-8 h-8 flex items-center justify-center">
-            <X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />
+          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="flex items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
           </button>
         </div>
 
@@ -1552,9 +1569,15 @@ function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, e
         <h1 className="font-heading font-bold text-[26px] text-center leading-tight mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
           Reveal your ratings
         </h1>
-        <p className="font-body text-[13px] text-center mb-5 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <p className="font-body text-[13px] text-center mb-3 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
           Invite 3 friends or get Ascendus Max to view your results
         </p>
+        {referralCode && (
+          <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-xl" style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)' }}>
+            <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>Your code:</span>
+            <span className="font-heading font-bold text-[15px] tracking-widest" style={{ color: '#C6A85C' }}>{referralCode}</span>
+          </div>
+        )}
 
         {/* Face circle overlapping card — Umax layout */}
         <div className="relative w-full">
@@ -1620,9 +1643,10 @@ function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, e
 export default function ScanUnlockGate() {
   const navigate = useNavigate()
   const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
-  const [showPaywall, setShowPaywall]       = useState(false)
+  const [showPaywall, setShowPaywall]       = useState(searchParams.get('paywall') === '1')
   const [showPromo, setShowPromo]           = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
   const justUnlockedRef = useRef(false)
@@ -1639,7 +1663,7 @@ export default function ScanUnlockGate() {
   }, [isPremium])
 
   useEffect(() => {
-    if (!currentScan) navigate('/scan', { replace: true })
+    if (!currentScan && searchParams.get('paywall') !== '1') navigate('/scan', { replace: true })
   }, [currentScan])
 
   useEffect(() => {
@@ -1649,7 +1673,11 @@ export default function ScanUnlockGate() {
       .catch(() => {})
   }, [])
 
-  if (!currentScan) return null
+  // When arriving from paywall=1 (e.g. daily check-in tap), show the paywall
+  // even without a scan. Without this guard, the component returns null and the
+  // paywall sheet—already set to open via useState—never renders.
+  const isPaywallRedirect = searchParams.get('paywall') === '1'
+  if (!currentScan && !isPaywallRedirect) return null
 
   if (isPremium && !justUnlocked) return null
 
@@ -1725,15 +1753,18 @@ export default function ScanUnlockGate() {
           error={purchaseError}
           isPremium={isPremium}
         />
-      ) : (
+      ) : currentScan ? (
         <LockedRevealScreen
           scan={currentScan}
+          referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
           isPurchasing={isPurchasing}
           error={purchaseError}
         />
-      )}
+      ) : null}
+
+      {/* paywall=1 redirect: showPaywall already true from useState init */}
 
       <AnimatePresence>
         {isPurchasing && <ProcessingOverlay key="purchasing" />}
@@ -1743,7 +1774,7 @@ export default function ScanUnlockGate() {
         {showPaywall && !isPremium && (
           <ProPaywall
             scan={currentScan}
-            onClose={() => setShowPaywall(false)}
+            onClose={() => searchParams.get('paywall') === '1' ? navigate(-1) : setShowPaywall(false)}
             onPurchase={handleAscend}
             isPurchasing={isPurchasing}
           />

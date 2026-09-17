@@ -164,6 +164,7 @@ export const api = {
     syncRc: (rcUserId) => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({ rcUserId }) }),
   },
   ai: {
+    validateScan: (imageB64) => request('/ai/validate-scan', { method: 'POST', body: JSON.stringify({ imageB64 }) }),
     score: (data) => request('/ai/score', { method: 'POST', body: JSON.stringify(data) }),
     scorePhysique: (data) => request('/ai/score/physique', { method: 'POST', body: JSON.stringify(data) }),
     scoreExtendedMetrics: (data) => request('/ai/score/extended-metrics', { method: 'POST', body: JSON.stringify(data) }),

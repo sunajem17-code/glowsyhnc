@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
 import { scheduleStreakReminder } from './utils/notifications'
@@ -7,7 +7,7 @@ import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
 import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
-import Splash from './pages/Splash'
+import Splash, { CinematicIntro } from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import PremiumSplash from './pages/PremiumSplash'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
@@ -37,12 +37,24 @@ const Community      = lazy(() => import('./pages/Community'))
 const SettingsScreen = lazy(() => import('./pages/Settings'))
 const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
 const ScanReady      = lazy(() => import('./pages/ScanReady'))
+const ScanQualityFail = lazy(() => import('./pages/ScanQualityFail'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
+const PhysiqueScan      = lazy(() => import('./pages/PhysiqueScan'))
+const PhysiqueResults   = lazy(() => import('./pages/PhysiqueResults'))
 const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
 const ScanTimeline   = lazy(() => import('./pages/ScanTimeline'))
 const AnalysisInspector = import.meta.env.DEV ? lazy(() => import('./pages/AnalysisInspector')) : null
 
 const SESSION_KEY = 'asc_pro_splash_shown'
+
+// Stores the referral code from /r/:code links and redirects to onboarding
+function ReferralRedirect() {
+  const { code } = useParams()
+  useEffect(() => {
+    if (code) sessionStorage.setItem('asc_ref_code', code.toUpperCase())
+  }, [code])
+  return <Navigate to="/" replace />
+}
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
@@ -76,6 +88,9 @@ export default function App() {
   const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
   const setShowUnlockSlideshow  = useStore(s => s.setShowUnlockSlideshow)
   const currentScan             = useStore(s => s.currentScan)
+  const [cinematicDone, setCinematicDone] = useState(
+    () => !!sessionStorage.getItem('asc_cinematic_shown')
+  )
   const [splashDone, setSplashDone] = useState(false)
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
@@ -142,8 +157,18 @@ export default function App() {
     )
   }
 
+  // ── GATE 0: Cinematic intro — plays once per session for everyone ──
+  if (!cinematicDone) {
+    return (
+      <CinematicIntro onDone={() => {
+        sessionStorage.setItem('asc_cinematic_shown', '1')
+        setCinematicDone(true)
+      }} />
+    )
+  }
+
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (!splashDone && isAuthenticated) {
+  if (!splashDone) {
     return <Splash onDone={handleSplashDone} />
   }
 
@@ -172,6 +197,7 @@ export default function App() {
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/landing" element={<Landing />} />
           {AnalysisInspector && <Route path="/dev/analysis-inspector" element={<AnalysisInspector />} />}
+          <Route path="/r/:code" element={<ReferralRedirect />} />
 
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
@@ -194,7 +220,7 @@ export default function App() {
                 <Route path="progress" element={<Progress />} />
                 <Route path="checkin" element={<DailyCheckin />} />
                 <Route path="profile" element={<Profile />} />
-                <Route path="premium" element={<Premium />} />
+                <Route path="premium" element={<Navigate to="/unlock?paywall=1" replace />} />
                 <Route path="hairmaxx" element={<HairMaxx />} />
                 <Route path="leaderboard" element={<Leaderboard />} />
                 <Route path="compare" element={<Compare />} />
@@ -206,8 +232,11 @@ export default function App() {
                 <Route path="community" element={<Community />} />
                 <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
+                <Route path="physique-scan" element={<PhysiqueScan />} />
+                <Route path="physique-results" element={<PhysiqueResults />} />
                 <Route path="unlock" element={<ScanUnlockGate />} />
                 <Route path="scan/ready" element={<ScanReady />} />
+                <Route path="scan/quality-fail" element={<ScanQualityFail />} />
               </Route>
             </>
           )}

@@ -1596,7 +1596,7 @@ export default function Scan() {
 
     if (!passed) {
       setTransitioning(false)
-      navigate('/scan/quality-fail', { state: { issues } })
+      navigate('/scan/quality-fail', { state: { issues, photoUrl: url } })
       return
     }
 
@@ -1626,7 +1626,7 @@ export default function Scan() {
         qIssues = [{ code: 'validation_error', title: 'Could not validate photo', advice: 'Please try again.', severity: 'critical' }]
       }
       if (!qPassed) {
-        navigate('/scan/quality-fail', { state: { issues: qIssues } })
+        navigate('/scan/quality-fail', { state: { issues: qIssues, photoUrl: facePhoto } })
         return
       }
     }

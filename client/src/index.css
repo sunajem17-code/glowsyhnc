@@ -136,7 +136,7 @@ input, textarea, [contenteditable] {
 
   /* Gold — signature CTA */
   .btn-primary {
-    @apply w-full py-4 rounded-2xl font-heading font-bold text-[15px] tracking-wide transition-all duration-200 active:scale-[0.97];
+    @apply w-full py-5 rounded-full font-heading font-bold text-[17px] tracking-wide transition-all duration-200 active:scale-[0.97];
     color: #0A0A0A;
     background: linear-gradient(135deg, #D4AF6A 0%, #C6A85C 45%, #A8893A 100%);
     box-shadow: var(--shadow-gold);

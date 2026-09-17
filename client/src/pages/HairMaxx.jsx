@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, X, Lock, Copy, Check,
   Scissors, Star, StarOff, Camera, Upload, Loader2,
-  Sparkles, RotateCcw, Lightbulb,
+  Sparkles, RotateCcw, Zap,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -20,20 +19,11 @@ import {
   MAINTENANCE_COLORS,
   MAINTENANCE_LABELS,
 } from '../utils/haircuts'
-import { GOLD, SPRING_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-// ─── Design tokens ─────────────────────────────────────────────────────────────
-const GOLD_DIM  = '#8A7140'
-const SURFACE   = '#141414'
-const SURFACE_2 = '#1C1C1C'
-const SURFACE_3 = '#242424'
-const BORDER    = '#2A2A2A'
-const TEXT_PRI  = '#F0EDE6'
-const TEXT_SEC  = '#7A7772'
-const RED       = '#E07A5F'
+const RED = '#E07A5F'
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : ''
 }
@@ -42,7 +32,7 @@ async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
-      const result = reader.result // data:image/jpeg;base64,...
+      const result = reader.result
       const base64 = result.split(',')[1]
       resolve({ base64, mediaType: file.type || 'image/jpeg' })
     }
@@ -51,103 +41,126 @@ async function fileToBase64(file) {
   })
 }
 
-// ─── Step bar (manual flow) ────────────────────────────────────────────────────
-const STEPS = ['Face Shape', 'Hair Details', 'Your Cuts']
-
-function StepBar({ step }) {
-  return (
-    <div className="flex items-center gap-2 mb-8">
-      {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-2 flex-1">
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold transition-all duration-300"
-              style={{
-                background: i <= step ? GOLD : SURFACE_3,
-                color: i <= step ? '#0A0A0A' : TEXT_SEC,
-                border: `1px solid ${i <= step ? GOLD : BORDER}`,
-              }}
-            >
-              {i + 1}
-            </div>
-            <span className="text-[9px] font-body whitespace-nowrap" style={{ color: i <= step ? GOLD : TEXT_SEC }}>
-              {label}
-            </span>
-          </div>
-          {i < STEPS.length - 1 && (
-            <div className="flex-1 h-px mb-4" style={{ background: i < step ? GOLD : BORDER }} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Mode selector (entry) ────────────────────────────────────────────────────
+// ─── Mode selector ─────────────────────────────────────────────────────────────
 function ModeSelector({ onAI, onManual }) {
   return (
-    <div className="flex flex-col gap-4 pt-4">
-      <div className="mb-2">
-        <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>
-          How do you want to start?
-        </h2>
-        <p className="text-sm font-body" style={{ color: TEXT_SEC }}>
-          AI Scan gives you instant, personalized results from a photo.
-        </p>
+    <div className="flex flex-col gap-5">
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+        className="rounded-3xl overflow-hidden relative"
+        style={{ background: 'rgba(198,168,92,0.07)', border: '1.5px solid rgba(198,168,92,0.2)' }}
+      >
+        {/* Grid texture */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: `linear-gradient(rgba(198,168,92,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.04) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+        }} />
+        <div className="relative px-5 pt-6 pb-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="font-body text-[10px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>AI-Powered</p>
+              <h2 className="font-heading font-bold text-[26px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>HairMaxx</h2>
+              <p className="font-body text-[13px] text-secondary mt-1">Find your perfect cut based on your head shape</p>
+            </div>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.3)' }}>
+              <Scissors size={26} style={{ color: GOLD }} />
+            </div>
+          </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: '12+', label: 'Cut Styles' },
+              { value: '6', label: 'Head Shapes' },
+              { value: 'AI', label: 'Powered' },
+            ].map(({ value, label }) => (
+              <div key={label} className="rounded-xl px-3 py-2.5 text-center"
+                style={{ background: 'rgba(0,0,0,0.25)' }}>
+                <p className="font-heading font-bold text-[16px]" style={{ color: GOLD }}>{value}</p>
+                <p className="font-body text-[10px] text-secondary">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Section label */}
+      <div>
+        <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-3">Choose how to start</p>
+
+        {/* AI scan — primary */}
+        <motion.button
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.3 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onAI() }}
+          className="w-full flex items-center gap-4 p-5 rounded-2xl text-left mb-3"
+          style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 24px rgba(198,168,92,0.28)' }}
+        >
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <Sparkles size={20} color="#0A0A0A" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="font-heading font-bold text-[15px]" style={{ color: '#0A0A0A' }}>AI Head Shape Scan</p>
+              <span className="text-[8px] font-heading font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+                style={{ background: 'rgba(0,0,0,0.2)', color: '#0A0A0A' }}>NEW</span>
+            </div>
+            <p className="font-body text-[12px]" style={{ color: 'rgba(0,0,0,0.6)' }}>Photo scan → instant personalized cuts</p>
+          </div>
+          <ChevronRight size={18} style={{ color: 'rgba(0,0,0,0.5)' }} />
+        </motion.button>
+
+        {/* Manual — secondary */}
+        <motion.button
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14, duration: 0.3 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onManual() }}
+          className="w-full flex items-center gap-4 p-5 rounded-2xl text-left"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+        >
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.07)' }}>
+            <Scissors size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
+          </div>
+          <div className="flex-1">
+            <p className="font-heading font-bold text-[15px] text-primary mb-0.5">Select Manually</p>
+            <p className="font-body text-[12px] text-secondary">Choose your face shape yourself</p>
+          </div>
+          <ChevronRight size={18} style={{ color: 'rgba(255,255,255,0.25)' }} />
+        </motion.button>
       </div>
 
-      {/* AI Scan option */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onAI() }}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
-        style={{ background: `${GOLD}12`, border: `1.5px solid ${GOLD}50` }}
+      {/* How it works */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.3 }}
+        className="rounded-2xl px-5 py-4"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
       >
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `${GOLD}20` }}
-        >
-          <Sparkles size={22} style={{ color: GOLD }} />
+        <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-3">How it works</p>
+        <div className="flex flex-col gap-3">
+          {[
+            { n: '1', text: 'Take or upload a front-facing photo' },
+            { n: '2', text: 'AI detects your head shape instantly' },
+            { n: '3', text: 'Get your top haircuts + barber scripts' },
+          ].map(({ n, text }) => (
+            <div key={n} className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 font-heading font-bold text-[11px]"
+                style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>
+                {n}
+              </div>
+              <p className="font-body text-[13px] text-primary">{text}</p>
+            </div>
+          ))}
         </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-0.5">
-            <p className="font-heading font-bold text-[15px]" style={{ color: TEXT_PRI }}>AI Head Shape Scan</p>
-            <span
-              className="text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
-              style={{ background: GOLD, color: '#0A0A0A' }}
-            >
-              NEW
-            </span>
-          </div>
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>
-            Take or upload a photo. AI detects your head shape and picks your best cuts
-          </p>
-        </div>
-        <ChevronRight size={18} style={{ color: GOLD }} />
-      </motion.button>
-
-      {/* Manual option */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onManual() }}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
-        style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
-      >
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: SURFACE_3 }}>
-          <Scissors size={22} style={{ color: TEXT_SEC }} />
-        </div>
-        <div className="flex-1">
-          <p className="font-heading font-bold text-[15px] mb-0.5" style={{ color: TEXT_PRI }}>Select Manually</p>
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>Choose your face shape and hair details yourself</p>
-        </div>
-        <ChevronRight size={18} style={{ color: TEXT_SEC }} />
-      </motion.button>
+      </motion.div>
     </div>
   )
 }
 
 // ─── Photo Capture ─────────────────────────────────────────────────────────────
-function PhotoCapture({ onPhoto, onBack }) {
+function PhotoCapture({ onPhoto, error }) {
   const [preview, setPreview] = useState(null)
   const [file, setFile] = useState(null)
   const uploadRef = useRef(null)
@@ -160,101 +173,89 @@ function PhotoCapture({ onPhoto, onBack }) {
 
   async function handleCamera() {
     if (isNative()) {
-      try {
-        const dataUrl = await takePhoto()
-        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
+      try { const d = await takePhoto(); if (d) { setPreview(d); setFile(d) } } catch {}
+    } else { uploadRef.current?.click() }
   }
 
   async function handleUpload() {
     if (isNative()) {
-      try {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
+      try { const d = await pickPhoto(); if (d) { setPreview(d); setFile(d) } } catch {}
+    } else { uploadRef.current?.click() }
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <div>
-        <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>
-          Take or upload a photo
-        </h2>
-        <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_SEC }}>
-          Face forward, pull hair back if possible, good lighting.
-        </p>
+        <h2 className="font-heading font-bold text-[22px] text-primary mb-1">Take a photo</h2>
+        <p className="font-body text-[13px] text-secondary">Face forward, good lighting, hair visible.</p>
       </div>
 
-      {/* Preview */}
-      {preview ? (
-        <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1/1' }}>
-          <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-          <button
-            onClick={() => { triggerHaptic(); setPreview(null); setFile(null) }}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.7)' }}
-          >
-            <X size={14} style={{ color: '#fff' }} />
-          </button>
-        </div>
-      ) : (
-        <div
-          className="rounded-2xl flex flex-col items-center justify-center gap-3 py-10"
-          style={{ background: SURFACE_2, border: `1.5px dashed ${BORDER}` }}
-        >
-          <Camera size={32} style={{ color: TEXT_SEC }} />
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>No photo selected</p>
+      {error && (
+        <div className="px-4 py-3 rounded-xl" style={{ background: `${RED}12`, border: `1px solid ${RED}30` }}>
+          <p className="font-body text-[12px]" style={{ color: RED }}>{error}</p>
         </div>
       )}
 
-      {/* Buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
+      {/* Photo area */}
+      {preview ? (
+        <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '4/5' }}>
+          <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.7))' }} />
+          <button
+            onClick={() => { triggerHaptic(); setPreview(null); setFile(null) }}
+            className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
+          >
+            <X size={16} color="#fff" />
+          </button>
+          <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: GOLD }}>
+              <Check size={12} color="#0A0A0A" />
+            </div>
+            <p className="font-heading font-semibold text-[13px] text-white">Photo ready</p>
+          </div>
+        </div>
+      ) : (
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={() => { triggerHaptic(); handleCamera() }}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
-          style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
+          className="w-full flex flex-col items-center justify-center gap-4 rounded-2xl"
+          style={{ aspectRatio: '4/5', background: 'rgba(255,255,255,0.03)', border: '2px dashed rgba(255,255,255,0.1)' }}
         >
-          <Camera size={16} style={{ color: GOLD }} />
-          Camera
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
+            <Camera size={28} style={{ color: GOLD }} />
+          </div>
+          <div className="text-center px-8">
+            <p className="font-heading font-bold text-[15px] text-primary mb-1">Tap to take a photo</p>
+            <p className="font-body text-[12px] text-secondary">or use the buttons below to upload</p>
+          </div>
+        </motion.button>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => { triggerHaptic(); handleCamera() }}
+          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-[13px] text-primary"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+          <Camera size={15} style={{ color: GOLD }} /> Camera
         </button>
-        <button
-          onClick={() => { triggerHaptic(); handleUpload() }}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
-          style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
-        >
-          <Upload size={16} style={{ color: GOLD }} />
-          Upload
+        <button onClick={() => { triggerHaptic(); handleUpload() }}
+          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-[13px] text-primary"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+          <Upload size={15} style={{ color: GOLD }} /> Upload
         </button>
       </div>
 
       <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
 
-      {/* Tip */}
-      <div className="px-4 py-3 rounded-xl" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-        <p className="text-xs font-body leading-relaxed" style={{ color: GOLD_DIM }}>
-          <Lightbulb size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Tips for best results: good front-facing lighting, hair pulled back from forehead, neutral expression
-        </p>
-      </div>
-
-      {/* Analyze CTA */}
       <motion.button
         whileTap={{ scale: 0.97 }}
-        onClick={() => { if (file) triggerHaptic(); onPhoto(file) }}
+        onClick={() => { if (file) { triggerHaptic(); onPhoto(file) } }}
         disabled={!file}
-        className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2"
-        style={{
-          background: file ? GOLD : SURFACE_3,
-          color: file ? '#0A0A0A' : TEXT_SEC,
-        }}
+        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+        style={{ background: file ? GOLD_GRADIENT : 'rgba(255,255,255,0.06)', color: file ? '#0A0A0A' : 'rgba(255,255,255,0.2)', boxShadow: file ? '0 4px 20px rgba(198,168,92,0.28)' : 'none' }}
       >
-        <Sparkles size={16} />
-        Analyze My Head Shape
+        <Sparkles size={16} /> Analyze My Head Shape
       </motion.button>
     </div>
   )
@@ -262,17 +263,46 @@ function PhotoCapture({ onPhoto, onBack }) {
 
 // ─── AI Loading ────────────────────────────────────────────────────────────────
 function AILoading() {
+  const steps = ['Reading head shape…', 'Matching cut styles…', 'Building your results…']
+  const [idx, setIdx] = useState(0)
+  useState(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % steps.length), 1600)
+    return () => clearInterval(id)
+  })
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 gap-5">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-        style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}30` }}
-      >
-        <Loader2 size={28} style={{ color: GOLD }} className="animate-spin" />
+    <div className="flex flex-col items-center justify-center py-20 gap-6">
+      <div className="relative">
+        <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
+          style={{ background: 'rgba(198,168,92,0.1)', border: '1.5px solid rgba(198,168,92,0.25)' }}>
+          <Scissors size={32} style={{ color: GOLD }} />
+        </div>
+        <motion.div
+          className="absolute -inset-2 rounded-3xl"
+          style={{ border: `1.5px solid ${GOLD}`, opacity: 0.4 }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0, 0.4] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </div>
       <div className="text-center">
-        <p className="font-heading font-bold text-base mb-1" style={{ color: TEXT_PRI }}>Analyzing your head shape…</p>
-        <p className="text-xs font-body" style={{ color: TEXT_SEC }}>This takes about 10–15 seconds</p>
+        <p className="font-heading font-bold text-[18px] text-primary mb-2">Analyzing…</p>
+        <AnimatePresence mode="wait">
+          <motion.p key={idx}
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25 }}
+            className="font-body text-[13px] text-secondary">
+            {steps[idx]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+      <div className="flex gap-1.5">
+        {[0, 1, 2].map(i => (
+          <motion.div key={i} className="w-1.5 h-1.5 rounded-full"
+            style={{ background: GOLD }}
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+          />
+        ))}
       </div>
     </div>
   )
@@ -289,131 +319,106 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
     setTimeout(() => setCopiedIdx(null), 2000)
   }
 
-  const shapeLabel = capitalize(result.headShape) + ' Head Shape'
-  const hairTypeLabel = capitalize(result.hairType)
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Head shape hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl px-5 py-5"
-        style={{ background: `${GOLD}10`, border: `1.5px solid ${GOLD}40` }}
-      >
-        <p className="text-[10px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>AI Detected</p>
-        <h2 className="font-heading font-bold text-2xl mb-2" style={{ color: GOLD }}>{shapeLabel}</h2>
-        <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_PRI }}>{result.headShapeDescription}</p>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl px-5 py-5 relative overflow-hidden"
+        style={{ background: 'rgba(198,168,92,0.08)', border: '1.5px solid rgba(198,168,92,0.3)' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: `linear-gradient(rgba(198,168,92,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.03) 1px, transparent 1px)`,
+          backgroundSize: '20px 20px',
+        }} />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="font-body text-[10px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>AI Detected</p>
+            <h2 className="font-heading font-bold text-[22px] mb-2" style={{ color: GOLD }}>{capitalize(result.headShape)} Shape</h2>
+            <p className="font-body text-[12px] text-primary leading-relaxed">{result.headShapeDescription}</p>
+          </div>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(198,168,92,0.15)' }}>
+            <Sparkles size={20} style={{ color: GOLD }} />
+          </div>
+        </div>
       </motion.div>
 
       {/* Hair type */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="flex items-center gap-3 px-4 py-3 rounded-xl"
-        style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
-      >
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: SURFACE_3 }}>
-          <Scissors size={15} style={{ color: GOLD }} />
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }}
+        className="flex items-center gap-3 px-4 py-3.5 rounded-xl"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(198,168,92,0.1)' }}>
+          <Scissors size={16} style={{ color: GOLD }} />
         </div>
         <div>
-          <p className="text-[10px] font-body uppercase tracking-widest" style={{ color: TEXT_SEC }}>Hair Type Detected</p>
-          <p className="font-heading font-bold text-sm" style={{ color: TEXT_PRI }}>{hairTypeLabel}</p>
+          <p className="font-body text-[10px] uppercase tracking-widest text-secondary">Detected Hair Type</p>
+          <p className="font-heading font-bold text-[14px] text-primary">{capitalize(result.hairType)}</p>
         </div>
       </motion.div>
 
-      {/* Top 3 haircuts */}
+      {/* Recommendations */}
       <div>
-        <p className="text-[10px] font-body uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>
-          Top 3 Haircuts for Your Shape
-        </p>
-
+        <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-3">Top Haircuts for Your Shape</p>
         <div className="relative">
-          {/* Recommendations */}
-          <div className="space-y-4" style={{ filter: isPremium ? 'none' : undefined }}>
+          <div className="space-y-3">
             {result.recommendations?.map((rec, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: isPremium ? 1 : i === 0 ? 1 : 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.07 }}
+              <motion.div key={i}
+                initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 + i * 0.06 }}
                 className="rounded-2xl overflow-hidden"
                 style={{
-                  background: SURFACE_2,
-                  border: `1px solid ${i === 0 ? GOLD + '60' : BORDER}`,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${i === 0 ? 'rgba(198,168,92,0.4)' : 'rgba(255,255,255,0.08)'}`,
                   filter: !isPremium && i > 0 ? 'blur(5px)' : 'none',
                   userSelect: !isPremium && i > 0 ? 'none' : 'auto',
                 }}
               >
-                {/* Top bar */}
-                <div
-                  className="px-4 py-3 flex items-center gap-2"
-                  style={{ background: i === 0 ? `${GOLD}12` : SURFACE_3, borderBottom: `1px solid ${BORDER}` }}
-                >
+                <div className="px-4 py-2.5 flex items-center gap-2"
+                  style={{ background: i === 0 ? 'rgba(198,168,92,0.08)' : 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   {i === 0 && (
-                    <span className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: GOLD, color: '#0A0A0A' }}>
-                      Best Match
-                    </span>
+                    <span className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                      style={{ background: GOLD, color: '#0A0A0A' }}>Best Match</span>
                   )}
-                  <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>#{i + 1}</span>
+                  <span className="font-body text-[10px] text-secondary">#{i + 1}</span>
                 </div>
-
                 <div className="px-4 py-4 space-y-3">
-                  <h3 className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>{rec.name}</h3>
-
-                  {/* Why it works */}
-                  <div className="px-3 py-2.5 rounded-xl" style={{ background: SURFACE_3 }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Why it works</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{rec.whyItWorks}</p>
+                  <h3 className="font-heading font-bold text-[15px] text-primary">{rec.name}</h3>
+                  <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <p className="font-body text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>Why it works</p>
+                    <p className="font-body text-[12px] text-primary leading-relaxed">{rec.whyItWorks}</p>
                   </div>
-
-                  {/* How to ask */}
-                  <div className="px-3 py-2.5 rounded-xl" style={{ background: `${GOLD}08`, border: `1px solid ${GOLD}25` }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>How to ask at the barber</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{rec.howToAsk}</p>
-                    <button
-                      onClick={() => copyScript(rec.howToAsk, i)}
+                  <div className="px-3 py-2.5 rounded-xl"
+                    style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}>
+                    <p className="font-body text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>Say this at the barber</p>
+                    <p className="font-body text-[12px] text-primary leading-relaxed">{rec.howToAsk}</p>
+                    <button onClick={() => copyScript(rec.howToAsk, i)}
                       className="mt-2 flex items-center gap-1.5 text-[10px] font-heading font-semibold px-2.5 py-1.5 rounded-lg"
-                      style={{ background: copiedIdx === i ? `${GOLD}20` : SURFACE_3, color: copiedIdx === i ? GOLD : TEXT_SEC }}
-                    >
+                      style={{ background: copiedIdx === i ? 'rgba(198,168,92,0.2)' : 'rgba(255,255,255,0.06)', color: copiedIdx === i ? GOLD : 'rgba(255,255,255,0.4)' }}>
                       {copiedIdx === i ? <Check size={11} /> : <Copy size={11} />}
                       {copiedIdx === i ? 'Copied' : 'Copy script'}
                     </button>
                   </div>
-
-                  {/* Avoid */}
-                  <div className="px-3 py-2 rounded-xl" style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: RED }}>Avoid with this cut</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>{rec.avoid}</p>
+                  <div className="px-3 py-2 rounded-xl"
+                    style={{ background: `${RED}0F`, border: `1px solid ${RED}25` }}>
+                    <p className="font-body text-[9px] uppercase tracking-widest mb-1" style={{ color: RED }}>Avoid</p>
+                    <p className="font-body text-[12px] leading-relaxed" style={{ color: `${RED}CC` }}>{rec.avoid}</p>
                   </div>
-
                 </div>
               </motion.div>
             ))}
           </div>
 
-          {/* Pro lock overlay for cuts 2 & 3 */}
           {!isPremium && (
-            <div
-              className="absolute inset-x-0 flex flex-col items-center justify-end pb-4"
-              style={{ top: '38%', background: 'linear-gradient(to bottom, transparent 0%, #141414 35%)' }}
-            >
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-                style={{ background: `${GOLD}20`, border: `1px solid ${GOLD}` }}
-              >
+            <div className="absolute inset-x-0 flex flex-col items-center justify-end pb-4"
+              style={{ top: '38%', background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 35%)' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+                style={{ background: 'rgba(198,168,92,0.15)', border: `1px solid ${GOLD}` }}>
                 <Lock size={20} style={{ color: GOLD }} />
               </div>
-              <p className="font-heading font-bold text-sm mb-1" style={{ color: TEXT_PRI }}>Unlock All Recommendations</p>
-              <p className="text-xs font-body mb-4 text-center px-8" style={{ color: TEXT_SEC }}>
-                See all 3 haircuts with barber scripts
-              </p>
-              <button
-                onClick={() => { triggerHaptic(); onUpgrade() }}
-                className="px-6 py-2.5 rounded-xl font-heading font-bold text-sm"
-                style={{ background: GOLD, color: '#0A0A0A' }}
-              >
+              <p className="font-heading font-bold text-[14px] text-primary mb-1">Unlock All Recommendations</p>
+              <p className="font-body text-[12px] text-secondary mb-4 text-center px-8">See all 3 haircuts with barber scripts</p>
+              <button onClick={() => { triggerHaptic(); onUpgrade() }}
+                className="px-6 py-3 rounded-2xl font-heading font-bold text-[14px]"
+                style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}>
                 Upgrade to Pro
               </button>
             </div>
@@ -421,80 +426,66 @@ function AIResults({ result, isPremium, onUpgrade, onRescan }) {
         </div>
       </div>
 
-      {/* What to avoid */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="rounded-xl px-4 py-4"
-        style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}
-      >
-        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>
-          What to avoid, and why
-        </p>
-        <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>
-          {result.whatToAvoid}
-        </p>
-      </motion.div>
+      {result.whatToAvoid && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
+          className="rounded-xl px-4 py-4"
+          style={{ background: `${RED}0F`, border: `1px solid ${RED}25` }}>
+          <p className="font-body text-[9px] uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid</p>
+          <p className="font-body text-[12px] leading-relaxed" style={{ color: `${RED}CC` }}>{result.whatToAvoid}</p>
+        </motion.div>
+      )}
 
-      {/* Rescan */}
-      <button
-        onClick={() => { triggerHaptic(); onRescan() }}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-heading font-semibold text-sm"
-        style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}
-      >
-        <RotateCcw size={14} />
-        Scan Again
+      <button onClick={() => { triggerHaptic(); onRescan() }}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-heading font-semibold text-[13px]"
+        style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <RotateCcw size={14} /> Scan Again
       </button>
-
     </div>
   )
 }
 
-// ─── Existing manual flow components (unchanged) ───────────────────────────────
+// ─── Manual flow ───────────────────────────────────────────────────────────────
 export function FaceShapeSelector({ selected, onSelect }) {
   return (
     <div>
-      <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>Select your face shape</h2>
-      <p className="text-sm font-body mb-6" style={{ color: TEXT_SEC }}>The foundation of every good cut.</p>
+      <h2 className="font-heading font-bold text-[22px] text-primary mb-1">Your face shape</h2>
+      <p className="font-body text-[13px] text-secondary mb-5">The foundation of every great cut.</p>
       <div className="grid grid-cols-3 gap-3">
         {FACE_SHAPES.map(shape => {
-          const isActive = selected === shape.id
+          const active = selected === shape.id
           return (
-            <motion.button
-              key={shape.id}
-              whileTap={{ scale: 0.96 }}
+            <motion.button key={shape.id} whileTap={{ scale: 0.95 }}
               onClick={() => { triggerHaptic(); onSelect(shape.id) }}
-              className="flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-200"
-              style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-            >
-              <svg viewBox="0 0 100 100" width={52} height={52}>
-                <path
-                  d={shape.svgPath}
-                  fill={isActive ? `${GOLD}25` : `${TEXT_SEC}15`}
-                  stroke={isActive ? GOLD : TEXT_SEC}
-                  strokeWidth="2"
-                />
+              className="flex flex-col items-center gap-2 py-4 px-2 rounded-2xl transition-all duration-200"
+              style={{
+                background: active ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
+                border: `1.5px solid ${active ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                boxShadow: active ? '0 0 16px rgba(198,168,92,0.15)' : 'none',
+              }}>
+              <svg viewBox="0 0 100 100" width={54} height={54}>
+                <path d={shape.svgPath}
+                  fill={active ? 'rgba(198,168,92,0.2)' : 'rgba(255,255,255,0.05)'}
+                  stroke={active ? GOLD : 'rgba(255,255,255,0.25)'}
+                  strokeWidth="2.5" />
               </svg>
-              <span className="text-xs font-heading font-semibold" style={{ color: isActive ? GOLD : TEXT_PRI }}>
+              <span className="font-heading font-semibold text-[11px]" style={{ color: active ? GOLD : 'rgba(255,255,255,0.6)' }}>
                 {shape.label}
               </span>
             </motion.button>
           )
         })}
       </div>
-      {selected && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 px-4 py-3 rounded-xl"
-          style={{ background: SURFACE_2, borderLeft: `3px solid ${GOLD}` }}
-        >
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_SEC }}>
-            {FACE_SHAPES.find(s => s.id === selected)?.description}
-          </p>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {selected && (
+          <motion.div initial={{ opacity: 0, y: 8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="mt-4 px-4 py-3 rounded-xl overflow-hidden"
+            style={{ background: 'rgba(255,255,255,0.04)', borderLeft: `3px solid ${GOLD}` }}>
+            <p className="font-body text-[12px] text-secondary leading-relaxed">
+              {FACE_SHAPES.find(s => s.id === selected)?.description}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -502,37 +493,43 @@ export function FaceShapeSelector({ selected, onSelect }) {
 function HairDetailsSelector({ density, hairline, onDensity, onHairline }) {
   return (
     <div>
-      <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>Hair details</h2>
-      <p className="text-sm font-body mb-6" style={{ color: TEXT_SEC }}>For precise recommendations.</p>
+      <h2 className="font-heading font-bold text-[22px] text-primary mb-1">Hair details</h2>
+      <p className="font-body text-[13px] text-secondary mb-5">Helps us give you precise recommendations.</p>
       <div className="mb-6">
-        <p className="text-xs font-heading font-semibold uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>Hair Density</p>
+        <p className="font-heading font-semibold text-[10px] uppercase tracking-widest text-secondary mb-3">Hair Density</p>
         <div className="grid grid-cols-3 gap-3">
           {HAIR_DENSITIES.map(d => {
-            const isActive = density === d.id
+            const active = density === d.id
             return (
               <button key={d.id} onClick={() => { triggerHaptic(); onDensity(d.id) }}
-                className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-              >
-                <span className="text-sm font-heading font-bold" style={{ color: isActive ? GOLD : TEXT_PRI }}>{d.label}</span>
-                <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>{d.sub}</span>
+                className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl transition-all"
+                style={{
+                  background: active ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: `1.5px solid ${active ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: active ? '0 0 16px rgba(198,168,92,0.12)' : 'none',
+                }}>
+                <span className="font-heading font-bold text-[14px]" style={{ color: active ? GOLD : 'rgba(255,255,255,0.85)' }}>{d.label}</span>
+                <span className="font-body text-[10px] text-secondary">{d.sub}</span>
               </button>
             )
           })}
         </div>
       </div>
       <div>
-        <p className="text-xs font-heading font-semibold uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>Hairline</p>
+        <p className="font-heading font-semibold text-[10px] uppercase tracking-widest text-secondary mb-3">Hairline</p>
         <div className="grid grid-cols-2 gap-3">
           {HAIRLINES.map(h => {
-            const isActive = hairline === h.id
+            const active = hairline === h.id
             return (
               <button key={h.id} onClick={() => { triggerHaptic(); onHairline(h.id) }}
-                className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-              >
-                <span className="text-sm font-heading font-bold" style={{ color: isActive ? GOLD : TEXT_PRI }}>{h.label}</span>
-                <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>{h.sub}</span>
+                className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl transition-all"
+                style={{
+                  background: active ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: `1.5px solid ${active ? 'rgba(198,168,92,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: active ? '0 0 16px rgba(198,168,92,0.12)' : 'none',
+                }}>
+                <span className="font-heading font-bold text-[14px]" style={{ color: active ? GOLD : 'rgba(255,255,255,0.85)' }}>{h.label}</span>
+                <span className="font-body text-[10px] text-secondary">{h.sub}</span>
               </button>
             )
           })}
@@ -551,35 +548,32 @@ function BarberScriptModal({ cut, onClose }) {
     setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ background: 'rgba(0,0,0,0.85)' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.8)' }}
+      onClick={onClose}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={SPRING_STANDARD}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl p-6"
-        style={{ background: SURFACE_2 }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: BORDER }} />
-        <div className="flex items-start justify-between mb-4">
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-3xl p-6"
+        style={{ background: 'var(--bg)', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.12)' }} />
+        <div className="flex items-start justify-between mb-5">
           <div>
-            <p className="text-[10px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Barber Script</p>
-            <h3 className="font-heading font-bold text-lg" style={{ color: TEXT_PRI }}>{cut.name}</h3>
+            <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-1">Barber Script</p>
+            <h3 className="font-heading font-bold text-[18px] text-primary">{cut.name}</h3>
           </div>
-          <button onClick={() => { triggerHaptic(); onClose() }} className="p-1.5 rounded-lg" style={{ background: SURFACE_3 }}>
-            <X size={16} style={{ color: TEXT_SEC }} />
+          <button onClick={() => { triggerHaptic(); onClose() }}
+            className="p-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <X size={15} style={{ color: 'rgba(255,255,255,0.5)' }} />
           </button>
         </div>
-        <div className="rounded-2xl p-4 mb-4" style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}>
-          <p className="text-[10px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Say exactly this:</p>
-          <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.barberScript.say}</p>
-          <button onClick={handleCopy} className="mt-3 flex items-center gap-2 text-xs font-heading font-semibold px-3 py-2 rounded-xl transition-all"
-            style={{ background: copied ? `${GOLD}20` : SURFACE_2, color: copied ? GOLD : TEXT_SEC }}>
-            {copied ? <Check size={13} /> : <Copy size={13} />}
+        <div className="rounded-2xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-2">Say exactly this:</p>
+          <p className="font-body text-[13px] text-primary leading-relaxed">{cut.barberScript.say}</p>
+          <button onClick={handleCopy}
+            className="mt-3 flex items-center gap-2 text-[11px] font-heading font-semibold px-3 py-2 rounded-xl transition-all"
+            style={{ background: copied ? 'rgba(198,168,92,0.18)' : 'rgba(255,255,255,0.06)', color: copied ? GOLD : 'rgba(255,255,255,0.4)' }}>
+            {copied ? <Check size={12} /> : <Copy size={12} />}
             {copied ? 'Copied' : 'Copy script'}
           </button>
         </div>
@@ -590,23 +584,25 @@ function BarberScriptModal({ cut, onClose }) {
             { label: 'Top Length', value: cut.barberScript.topLength },
             { label: 'Blend Style', value: cut.barberScript.blendStyle },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl p-3" style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}>
-              <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: TEXT_SEC }}>{label}</p>
-              <p className="text-xs font-heading font-semibold" style={{ color: TEXT_PRI }}>{value}</p>
+            <div key={label} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="font-body text-[9px] uppercase tracking-widest text-secondary mb-1">{label}</p>
+              <p className="font-heading font-semibold text-[12px] text-primary">{value}</p>
             </div>
           ))}
         </div>
-        <div className="rounded-xl p-3" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}30` }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Styling at home</p>
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.barberScript.styling}</p>
+        <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.2)' }}>
+          <p className="font-body text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>Styling at home</p>
+          <p className="font-body text-[12px] text-primary leading-relaxed">{cut.barberScript.styling}</p>
         </div>
         {cut.products?.length > 0 && (
-          <div className="mt-3">
-            <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Products needed</p>
+          <div>
+            <p className="font-body text-[9px] uppercase tracking-widest text-secondary mb-2">Products</p>
             <div className="flex flex-wrap gap-2">
               {cut.products.map(p => (
-                <span key={p} className="text-[10px] font-body px-2.5 py-1 rounded-full"
-                  style={{ background: SURFACE_3, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>{p}</span>
+                <span key={p} className="font-body text-[10px] px-3 py-1 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {p}
+                </span>
               ))}
             </div>
           </div>
@@ -619,49 +615,56 @@ function BarberScriptModal({ cut, onClose }) {
 function CutCard({ cut, rank, saved, onSave, onScript, delay = 0 }) {
   const mainColor = MAINTENANCE_COLORS[cut.maintenance] ?? GOLD
   const mainLabel = MAINTENANCE_LABELS[cut.maintenance] ?? ''
+  const isBest = rank === 0
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
       className="rounded-2xl overflow-hidden"
-      style={{ background: SURFACE_2, border: `1px solid ${rank === 0 ? GOLD + '60' : BORDER}` }}
-    >
-      <div className="px-4 py-3 flex items-center justify-between"
-        style={{ background: rank === 0 ? `${GOLD}12` : SURFACE_3, borderBottom: `1px solid ${BORDER}` }}>
+      style={{
+        background: 'rgba(255,255,255,0.05)',
+        border: `1px solid ${isBest ? 'rgba(198,168,92,0.4)' : 'rgba(255,255,255,0.08)'}`,
+      }}>
+      <div className="px-4 py-2.5 flex items-center justify-between"
+        style={{ background: isBest ? 'rgba(198,168,92,0.08)' : 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-2">
-          {rank === 0 && <span className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: GOLD, color: '#0A0A0A' }}>Best Match</span>}
-          <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>#{rank + 1}</span>
+          {isBest && (
+            <span className="font-heading font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider"
+              style={{ background: GOLD, color: '#0A0A0A' }}>Best Match</span>
+          )}
+          <span className="font-body text-[10px] text-secondary">#{rank + 1}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-bold" style={{ color: GOLD }}>{cut.matchScore}% match</span>
-          <button onClick={() => { triggerHaptic(); onSave(cut.id) }} className="p-1.5 rounded-lg transition-colors"
-            style={{ background: saved ? `${GOLD}20` : SURFACE_2 }}>
-            {saved ? <Star size={13} style={{ color: GOLD }} fill={GOLD} /> : <StarOff size={13} style={{ color: TEXT_SEC }} />}
+          <span className="font-heading font-bold text-[11px]" style={{ color: GOLD }}>{cut.matchScore}%</span>
+          <button onClick={() => { triggerHaptic(); onSave(cut.id) }}
+            className="p-1.5 rounded-lg" style={{ background: saved ? 'rgba(198,168,92,0.15)' : 'rgba(255,255,255,0.05)' }}>
+            {saved ? <Star size={13} style={{ color: GOLD }} fill={GOLD} /> : <StarOff size={13} style={{ color: 'rgba(255,255,255,0.35)' }} />}
           </button>
         </div>
       </div>
       <div className="px-4 py-4">
-        <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <h3 className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>{cut.name}</h3>
-            <p className="text-xs font-body" style={{ color: TEXT_SEC }}>{cut.vibe}</p>
+            <h3 className="font-heading font-bold text-[15px] text-primary">{cut.name}</h3>
+            <p className="font-body text-[12px] text-secondary">{cut.vibe}</p>
           </div>
-          <span className="text-[9px] font-heading font-semibold px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0"
-            style={{ background: `${mainColor}18`, color: mainColor, border: `1px solid ${mainColor}30` }}>{mainLabel}</span>
+          <span className="font-heading font-semibold text-[9px] px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0"
+            style={{ background: `${mainColor}15`, color: mainColor, border: `1px solid ${mainColor}25` }}>
+            {mainLabel}
+          </span>
         </div>
-        <div className="mt-3 px-3 py-2.5 rounded-xl" style={{ background: SURFACE_3 }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Why it fits you</p>
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.why}</p>
+        <div className="px-3 py-2.5 rounded-xl mb-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <p className="font-body text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(198,168,92,0.6)' }}>Why it fits you</p>
+          <p className="font-body text-[12px] text-primary leading-relaxed">{cut.why}</p>
         </div>
         {(cut.hairlineNote || cut.densityNote) && (
-          <div className="mt-2 px-3 py-2 rounded-xl" style={{ background: `${RED}15`, border: `1px solid ${RED}30` }}>
-            <p className="text-xs font-body leading-relaxed" style={{ color: RED }}>{cut.hairlineNote || cut.densityNote}</p>
+          <div className="px-3 py-2 rounded-xl mb-2"
+            style={{ background: `${RED}0F`, border: `1px solid ${RED}25` }}>
+            <p className="font-body text-[12px] leading-relaxed" style={{ color: RED }}>{cut.hairlineNote || cut.densityNote}</p>
           </div>
         )}
         <button onClick={() => { triggerHaptic(); onScript(cut) }}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-heading font-semibold text-sm transition-all active:scale-98"
-          style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}>
-          <Scissors size={14} />
-          View Barber Script
+          className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-heading font-semibold text-[13px]"
+          style={{ background: 'rgba(198,168,92,0.08)', color: GOLD, border: '1px solid rgba(198,168,92,0.25)' }}>
+          <Scissors size={14} /> View Barber Script
         </button>
       </div>
     </motion.div>
@@ -677,45 +680,34 @@ export function ManualResultsView({ faceShape, density, hairline, savedCuts, onS
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-[10px] font-body uppercase tracking-widest mb-0.5" style={{ color: GOLD_DIM }}>{faceLabel} Face</p>
-          <h2 className="font-heading font-bold text-xl" style={{ color: TEXT_PRI }}>Your Cuts</h2>
+          <p className="font-body text-[10px] uppercase tracking-widest text-secondary mb-0.5">{faceLabel} Face</p>
+          <h2 className="font-heading font-bold text-[22px] text-primary">Your Cuts</h2>
         </div>
-        <button onClick={() => { triggerHaptic(); onReset() }} className="text-xs font-heading font-semibold px-3 py-1.5 rounded-xl"
-          style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>Start over</button>
+        <button onClick={() => { triggerHaptic(); onReset() }}
+          className="font-heading font-semibold text-[12px] px-3 py-1.5 rounded-xl text-secondary"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          Start over
+        </button>
       </div>
-      <div className="rounded-xl px-4 py-3 mb-5" style={{ background: SURFACE_2, borderLeft: `3px solid ${GOLD}` }}>
-        <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_SEC }}>{profile.summary}</p>
+      <div className="rounded-xl px-4 py-3 mb-4" style={{ background: 'rgba(255,255,255,0.04)', borderLeft: `3px solid ${GOLD}` }}>
+        <p className="font-body text-[12px] text-secondary leading-relaxed">{profile.summary}</p>
       </div>
-      <div className="mb-5 rounded-xl px-4 py-3" style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}>
-        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid, and why</p>
-        <p className="text-[11px] font-body leading-relaxed mb-2" style={{ color: `${RED}90` }}>{profile.avoid.reason}</p>
+      <div className="mb-4 rounded-xl px-4 py-3" style={{ background: `${RED}0F`, border: `1px solid ${RED}25` }}>
+        <p className="font-body text-[9px] uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid</p>
+        <p className="font-body text-[12px] leading-relaxed mb-2" style={{ color: `${RED}90` }}>{profile.avoid.reason}</p>
         <div className="flex flex-wrap gap-1.5">
           {profile.avoid.cuts.map(cut => (
-            <span key={cut} className="text-[10px] font-body px-2 py-0.5 rounded-full"
-              style={{ background: `${RED}18`, color: RED, border: `1px solid ${RED}25` }}>{cut}</span>
+            <span key={cut} className="font-body text-[10px] px-2 py-0.5 rounded-full"
+              style={{ background: `${RED}15`, color: RED, border: `1px solid ${RED}25` }}>{cut}</span>
           ))}
         </div>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {recommendations.map((cut, i) => (
           <CutCard key={cut.id} cut={cut} rank={i} saved={savedCuts.includes(cut.id)}
-            onSave={onSave} onScript={setScriptCut} delay={i * 0.07} />
+            onSave={onSave} onScript={setScriptCut} delay={i * 0.06} />
         ))}
       </div>
-      {savedCuts.length > 0 && (
-        <div className="mt-4 px-4 py-3 rounded-xl" style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Saved ({savedCuts.length})</p>
-          <div className="flex flex-wrap gap-2">
-            {savedCuts.map(id => {
-              const rec = recommendations.find(r => r.id === id)
-              return rec ? (
-                <span key={id} className="text-[10px] font-body px-2.5 py-1 rounded-full"
-                  style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}>{rec.name}</span>
-              ) : null
-            })}
-          </div>
-        </div>
-      )}
       <AnimatePresence>
         {scriptCut && <BarberScriptModal cut={scriptCut} onClose={() => setScriptCut(null)} />}
       </AnimatePresence>
@@ -723,18 +715,15 @@ export function ManualResultsView({ faceShape, density, hairline, savedCuts, onS
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export default function HairMaxx() {
   const navigate = useNavigate()
   const { isPremium } = useStore()
 
-  // AI flow state
-  const [mode, setMode]         = useState(null) // null | 'ai' | 'manual'
-  const [aiStep, setAiStep]     = useState('capture') // 'capture' | 'loading' | 'results'
+  const [mode, setMode]         = useState(null)
+  const [aiStep, setAiStep]     = useState('capture')
   const [aiResult, setAiResult] = useState(null)
   const [aiError, setAiError]   = useState(null)
-
-  // Manual flow state
   const [manualStep, setManualStep] = useState(0)
   const [faceShape, setFaceShape]   = useState(null)
   const [density, setDensity]       = useState(null)
@@ -751,7 +740,6 @@ export default function HairMaxx() {
     try {
       let base64, mediaType
       if (typeof file === 'string' && file.startsWith('data:')) {
-        // Native camera returns a dataUrl
         const [header, data] = file.split(',')
         base64 = data
         mediaType = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
@@ -772,7 +760,7 @@ export default function HairMaxx() {
   function handleBack() {
     if (mode === 'ai') {
       if (aiStep === 'results' || aiStep === 'loading') { setAiStep('capture'); setAiResult(null) }
-      else { setMode(null) }
+      else setMode(null)
     } else if (mode === 'manual') {
       if (manualStep > 0) setManualStep(s => s - 1)
       else setMode(null)
@@ -781,142 +769,91 @@ export default function HairMaxx() {
     }
   }
 
-  function handleManualNext() {
-    if (manualStep === 0 && canNext0) setManualStep(1)
-    else if (manualStep === 1 && canNext1) setManualStep(2)
-  }
-
   function resetAll() {
-    setMode(null)
-    setAiStep('capture')
-    setAiResult(null)
-    setAiError(null)
-    setManualStep(0)
-    setFaceShape(null)
-    setDensity(null)
-    setHairline(null)
+    setMode(null); setAiStep('capture'); setAiResult(null); setAiError(null)
+    setManualStep(0); setFaceShape(null); setDensity(null); setHairline(null)
   }
 
-  function toggleSave(id) {
-    setSavedCuts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
+  const showBack = mode !== null
+  const showNext = mode === 'manual' && manualStep < 2
+  const nextEnabled = manualStep === 0 ? canNext0 : canNext1
 
   return (
     <>
-    <MotionPage style={{ background: SURFACE }}>
-      <Helmet>
-        <title>AI Hair Analysis &amp; Hairmaxx Guide | Ascendus</title>
-        <meta name="description" content="Scan your hair type with AI and get a personalized hairmaxx routine. Identify your curl pattern, porosity, and the exact products to maximize your hair's potential." />
-        <meta name="keywords" content="hairmaxx, hair analysis, AI hair type scanner, looksmax hair, hair glow up, curl type identifier, hair routine" />
-      </Helmet>
+    <MotionPage style={{ background: 'var(--bg)' }}>
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 pb-4"
-        style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-        <button onClick={() => { triggerHaptic(); handleBack() }} className="p-2 -ml-2 rounded-xl" style={{ color: TEXT_SEC }}>
-          <ChevronLeft size={22} />
-        </button>
+      <div className="sticky top-0 z-20 flex items-center justify-between px-5 pb-4"
+        style={{ background: 'var(--bg)', borderBottom: mode !== null ? '1px solid rgba(255,255,255,0.06)' : 'none', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+        {showBack ? (
+          <button onClick={() => { triggerHaptic(); handleBack() }}
+            className="p-2 -ml-2 rounded-xl" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <ChevronLeft size={22} />
+          </button>
+        ) : <div className="w-9" />}
         <div className="text-center">
-          <p className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>HairMaxx</p>
-          <p className="text-[9px] font-body uppercase tracking-widest" style={{ color: GOLD_DIM }}>Haircut Intelligence</p>
+          {mode !== null && <p className="font-heading font-bold text-[16px] text-primary">HairMaxx</p>}
+          {mode === 'manual' && manualStep < 2 && (
+            <p className="font-body text-[10px] text-secondary">Step {manualStep + 1} of 2</p>
+          )}
         </div>
-        <div className="w-8" />
+        <div className="w-9" />
       </div>
 
-      <div className="px-4 pt-6 pb-32">
-        {/* Manual flow step bar */}
-        {mode === 'manual' && manualStep < 2 && <StepBar step={manualStep} />}
-
+      <div className="px-5 pt-4 pb-32">
         <AnimatePresence mode="wait">
-
-          {/* ── Mode selector ── */}
           {mode === null && (
             <motion.div key="mode" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
               <ModeSelector onAI={() => setMode('ai')} onManual={() => setMode('manual')} />
             </motion.div>
           )}
-
-          {/* ── AI: Photo Capture ── */}
           {mode === 'ai' && aiStep === 'capture' && (
             <motion.div key="ai-capture" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              {aiError && (
-                <div className="mb-4 px-4 py-3 rounded-xl" style={{ background: `${RED}10`, border: `1px solid ${RED}30` }}>
-                  <p className="text-xs font-body" style={{ color: RED }}>{aiError}</p>
-                </div>
-              )}
-              <PhotoCapture onPhoto={handlePhotoSubmit} onBack={() => setMode(null)} />
+              <PhotoCapture onPhoto={handlePhotoSubmit} error={aiError} />
             </motion.div>
           )}
-
-          {/* ── AI: Loading ── */}
           {mode === 'ai' && aiStep === 'loading' && (
             <motion.div key="ai-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <AILoading />
             </motion.div>
           )}
-
-          {/* ── AI: Results ── */}
           {mode === 'ai' && aiStep === 'results' && aiResult && (
             <motion.div key="ai-results" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <AIResults
-                result={aiResult}
-                isPremium={isPremium}
-                onUpgrade={() => navigate('/premium')}
-                onRescan={() => { setAiStep('capture'); setAiResult(null) }}
-              />
+              <AIResults result={aiResult} isPremium={isPremium}
+                onUpgrade={() => navigate('/unlock?paywall=1')}
+                onRescan={() => { setAiStep('capture'); setAiResult(null) }} />
             </motion.div>
           )}
-
-          {/* ── Manual: Face Shape ── */}
           {mode === 'manual' && manualStep === 0 && (
             <motion.div key="manual-0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
               <FaceShapeSelector selected={faceShape} onSelect={setFaceShape} />
             </motion.div>
           )}
-
-          {/* ── Manual: Hair Details ── */}
           {mode === 'manual' && manualStep === 1 && (
             <motion.div key="manual-1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
               <HairDetailsSelector density={density} hairline={hairline} onDensity={setDensity} onHairline={setHairline} />
             </motion.div>
           )}
-
-          {/* ── Manual: Results ── */}
           {mode === 'manual' && manualStep === 2 && (
             <motion.div key="manual-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <ManualResultsView
-                faceShape={faceShape} density={density} hairline={hairline}
-                savedCuts={savedCuts} onSave={toggleSave}
-                isPremium={isPremium} onUpgrade={() => navigate('/premium')}
-                onReset={resetAll}
-              />
+              <ManualResultsView faceShape={faceShape} density={density} hairline={hairline}
+                savedCuts={savedCuts} onSave={id => setSavedCuts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                isPremium={isPremium} onUpgrade={() => navigate('/unlock?paywall=1')}
+                onReset={resetAll} />
             </motion.div>
           )}
-
         </AnimatePresence>
       </div>
     </MotionPage>
 
-    {/* Manual flow next button — kept outside MotionPage: framer-motion's
-        transform on the animated container would turn this fixed-position
-        button into one positioned relative to that container instead of
-        the viewport. */}
-    {mode === 'manual' && manualStep < 2 && (
-      <div className="fixed bottom-0 left-0 right-0 px-4 pt-4"
-        style={{
-          background: `linear-gradient(to top, ${SURFACE} 60%, transparent)`,
-          paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))',
-        }}>
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); handleManualNext() }}
-          disabled={manualStep === 0 ? !canNext0 : !canNext1}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: (manualStep === 0 ? canNext0 : canNext1) ? GOLD : SURFACE_3,
-            color: (manualStep === 0 ? canNext0 : canNext1) ? '#0A0A0A' : TEXT_SEC,
-          }}
-        >
-          {manualStep === 1 ? <><Scissors size={16} />Get My Cuts</> : <>Next<ChevronRight size={16} /></>}
+    {showNext && (
+      <div className="fixed bottom-0 left-0 right-0 px-5 pt-4"
+        style={{ background: 'linear-gradient(to top, var(--bg) 60%, transparent)', paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))' }}>
+        <motion.button whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); if (manualStep === 0 && canNext0) setManualStep(1); else if (manualStep === 1 && canNext1) setManualStep(2) }}
+          disabled={!nextEnabled}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 transition-all"
+          style={{ background: nextEnabled ? GOLD_GRADIENT : 'rgba(255,255,255,0.06)', color: nextEnabled ? '#0A0A0A' : 'rgba(255,255,255,0.2)', boxShadow: nextEnabled ? '0 4px 20px rgba(198,168,92,0.28)' : 'none' }}>
+          {manualStep === 1 ? <><Scissors size={16} />Get My Cuts</> : <>Next <ChevronRight size={16} /></>}
         </motion.button>
       </div>
     )}

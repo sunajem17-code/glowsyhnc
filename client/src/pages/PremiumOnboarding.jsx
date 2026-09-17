@@ -6,7 +6,7 @@ import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import hypergamyChart from '../assets/hypergamy-chart.png'
-import haloEffectImg from '../assets/halo-effect.webp'
+import haloEffectImg from '../assets/halo-effect-new.png'
 import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS, extractScanOverlayPoints } from './Scan'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
@@ -126,16 +126,23 @@ function ConsentMicroText() {
 
 function BackBtn({ onBack }) {
   return (
-    <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)', paddingLeft: 20, paddingBottom: 8, flexShrink: 0 }}>
-      <button
-        onClick={onBack}
-        aria-label="Go back"
-        className="w-9 h-9 rounded-full flex items-center justify-center"
-        style={{ background: 'rgba(255,255,255,0.06)' }}
-      >
-        <ChevronLeft size={18} style={{ color: DIM }} />
-      </button>
-    </div>
+    <button
+      onClick={onBack}
+      aria-label="Go back"
+      className="absolute flex items-center justify-center"
+      style={{
+        top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+        left: 20,
+        width: 34,
+        height: 34,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        zIndex: 10,
+      }}
+    >
+      <ChevronLeft size={18} style={{ color: 'rgba(255,255,255,0.6)' }} />
+    </button>
   )
 }
 
@@ -610,8 +617,8 @@ const UMAX_PURPLE = 'linear-gradient(180deg, #9D4EDD 0%, #7B2FBE 100%)'
 function StepGender({ data, onChange, onNext }) {
   const [selected, setSelected] = useState(null)
 
-  const MALE_BLUE   = '#4A90E2'
-  const FEMALE_PINK = '#E85D9E'
+  const MALE_BLUE   = '#FFFFFF'
+  const FEMALE_PINK = '#FFFFFF'
 
   function pick(gender) {
     triggerHaptic()
@@ -623,12 +630,10 @@ function StepGender({ data, onChange, onNext }) {
   const cardStyle = (gender) => ({
     width: 288, height: 288,
     borderRadius: 22,
-    border: '1.5px solid #262626',
+    border: `1.5px solid ${selected === gender ? '#C6A85C' : '#262626'}`,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
-    background: selected === gender
-      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
-      : '#141414',
+    cursor: 'pointer', transition: 'background 0.2s, border 0.2s', flexShrink: 0,
+    background: selected === gender ? 'rgba(198,168,92,0.10)' : '#141414',
   })
 
   return (
@@ -638,10 +643,10 @@ function StepGender({ data, onChange, onNext }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="px-6"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}
       >
-        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>
-          Are you male or female?
+        <h1 className="font-heading font-bold text-[28px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em', textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          What's Your Gender
         </h1>
       </motion.div>
 
@@ -656,7 +661,7 @@ function StepGender({ data, onChange, onNext }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <MarsIcon color={MALE_BLUE} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
+            <div style={{ color: selected === 'male' ? '#C6A85C' : '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
           </div>
         </motion.div>
 
@@ -670,7 +675,7 @@ function StepGender({ data, onChange, onNext }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <VenusIcon color={FEMALE_PINK} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
+            <div style={{ color: selected === 'female' ? '#C6A85C' : '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
           </div>
         </motion.div>
       </div>
@@ -727,7 +732,7 @@ function StepReferral({ onNext }) {
         </motion.div>
       </div>
 
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleContinue}
@@ -842,7 +847,7 @@ function StepConsequences({ onNext }) {
       </div>
 
       {/* CTA */}
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => { triggerHaptic(); onNext() }}
@@ -868,21 +873,21 @@ const TESTIMONIALS = [
   {
     handle:  '@samhakimii',
     rating:  5,
-    quote:   'Insane face gains in 3 months. The daily protocol actually works.',
+    quote:   'My face looks so different after only 2 weeks. Almost have hollow cheeks now.',
     initials:'SH',
     color:   '#C6A85C',
   },
   {
     handle:  '@kylejordan_',
     rating:  5,
-    quote:   'Went from a 6.1 to a 7.4 after following the jawline and grooming plan.',
+    quote:   'Went from a 6.1 to a 7.4 after my 12 week plan.',
     initials:'KJ',
     color:   '#60A5FA',
   },
   {
     handle:  '@marcov.fit',
     rating:  5,
-    quote:   'Finally an app that gives real feedback, not just generic advice.',
+    quote:   'The only app that helps me take action instead of just pointing out flaws.',
     initials:'MV',
     color:   '#34C759',
   },
@@ -892,7 +897,7 @@ function StarRow({ n = 5 }) {
   return (
     <span style={{ display: 'inline-flex', gap: 2 }}>
       {Array.from({ length: n }).map((_, i) => (
-        <Star key={i} size={12} fill="#F5A623" stroke="none" />
+        <Star key={i} size={12} fill="#C6A85C" stroke="none" />
       ))}
     </span>
   )
@@ -910,16 +915,16 @@ function StepTestimonials({ onNext }) {
           {/* Star cluster */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
             <span style={{ display: 'inline-flex', gap: 3 }}>
-              {[0,1,2,3,4].map(i => <Star key={i} size={18} fill="#F5A623" stroke="none" />)}
+              {[0,1,2,3,4].map(i => <Star key={i} size={18} fill="#C6A85C" stroke="none" />)}
             </span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#F5A623', fontFamily: 'inherit' }}>4.9</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#C6A85C', fontFamily: 'inherit' }}>4.9</span>
           </div>
 
           <h1
             className="font-heading font-bold leading-tight"
             style={{ fontSize: 28, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: 6 }}
           >
-            Join 10,000+ users already ascending
+            See why thousands are ascending
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 0 }}>
             Real results from real people.
@@ -982,15 +987,11 @@ function StepTestimonials({ onNext }) {
             padding: '10px 0 0',
           }}
         >
-          <Shield size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
-            Ascendus is the #1 rated looksmaxxing app on the App Store
-          </span>
         </motion.div>
       </div>
 
       {/* CTA */}
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => { triggerHaptic(); onNext() }}
@@ -1056,7 +1057,7 @@ function StepNotifications({ onNext }) {
         </motion.div>
       </div>
 
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleEnable}
@@ -1083,7 +1084,7 @@ function StepNotifications({ onNext }) {
 
 
 // ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
-function StepAuth({ onNext }) {
+function StepAuth({ onNext, onSkip }) {
   const [loading, setLoading]       = useState(null) // 'apple' | 'google' | 'email' | null
   const [error, setError]           = useState('')
   const [titleTaps, setTitleTaps]   = useState(0)
@@ -1160,6 +1161,7 @@ function StepAuth({ onNext }) {
             email: appleResult.response.email,
             fullName: appleResult.response.fullName,
             guestUserId: isGuest ? user?.id : undefined,
+            refCode: sessionStorage.getItem('asc_ref_code') || undefined,
           }),
           signal: controller.signal,
         })
@@ -1190,10 +1192,11 @@ function StepAuth({ onNext }) {
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', position: 'relative' }}>
       <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
           <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>Create your account</h1>
         </motion.div>
+        <button onClick={onNext} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', paddingTop: 6 }}>Skip</button>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
@@ -1393,32 +1396,133 @@ function HaloEffectDiagram() {
 }
 
 // ── STEP: Halo Effect / Why Looksmax ─────────────────────────────────────────
+const HALO_LINES = [
+  "People judge your character\nbased on your face in 3 seconds",
+  "Make every second count",
+]
+
+function HaloTypewriter({ start }) {
+  const [lineIdx, setLineIdx] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const idx = useRef(0)
+
+  useEffect(() => {
+    if (!start) return
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
+    setLineIdx(0)
+  }, [start])
+
+  useEffect(() => {
+    if (!start) return
+    const text = HALO_LINES[lineIdx]
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
+    const id = setInterval(() => {
+      if (idx.current < text.length) {
+        setDisplayed(text.slice(0, idx.current + 1))
+        idx.current++
+      } else {
+        clearInterval(id)
+        if (lineIdx === 0) {
+          setTimeout(() => {
+            setDisplayed('')
+            setTimeout(() => setLineIdx(1), 300)
+          }, 1200)
+        } else {
+          setDone(true)
+        }
+      }
+    }, 28)
+    return () => clearInterval(id)
+  }, [start, lineIdx])
+
+  const cursor = start && !done ? (
+    <motion.span
+      animate={{ opacity: [1, 0] }}
+      transition={{ duration: 0.5, repeat: Infinity }}
+      style={{ color: '#C6A85C', marginLeft: 1 }}
+    >|</motion.span>
+  ) : null
+  const displayLines = displayed.split('\n')
+  return (
+    <span style={{ whiteSpace: 'pre-line' }}>
+      {displayLines.map((line, i) => (
+        <span key={i}>
+          {line}
+          {i === displayLines.length - 1 ? cursor : '\n'}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function HaloSubTypewriter({ start }) {
+  const text = 'What impression are you making?'
+  const [displayed, setDisplayed] = useState('')
+  const idx = useRef(0)
+
+  useEffect(() => {
+    if (!start) return
+    // delay until main typewriter is roughly done (~2 lines × chars × 28ms + pauses ≈ 3.5s)
+    const delay = setTimeout(() => {
+      idx.current = 0
+      setDisplayed('')
+      const id = setInterval(() => {
+        idx.current++
+        setDisplayed(text.slice(0, idx.current))
+        if (idx.current >= text.length) clearInterval(id)
+      }, 24)
+      return () => clearInterval(id)
+    }, 200)
+    return () => clearTimeout(delay)
+  }, [start])
+
+  return <span>{displayed}</span>
+}
+
 function StepHaloEffect({ onNext, onBack }) {
   const G = '#C6A85C'
-  const G_BORDER = 'rgba(198,168,92,0.28)'
   const TEXT = '#FFFFFF'
+  const [imgLoaded, setImgLoaded] = useState(false)
+  useEffect(() => {
+    const img = new Image()
+    img.src = haloEffectImg
+  }, [])
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Scrollable top */}
-      {/* Scrollable top */}
-      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '0 16px 16px' }}>
-        <BackBtn onBack={onBack} />
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
-          THE HALO EFFECT
-        </p>
-        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
-          Your face decides how the world treats you.
+    <div
+      style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
+      {/* Content */}
+      <div style={{ flex: '1 1 0', minHeight: 0, overflow: 'hidden', padding: '0 24px 0', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <h1 className="font-heading font-bold text-[28px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          Your face<br />speaks before you do
         </h1>
-        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>
-          Science proves it. People instantly judge your intelligence, confidence, and success based on your looks alone.
-        </p>
-        <div style={{ overflow: 'hidden', margin: '0 -16px' }}>
-          <img src={haloEffectImg} alt="The Halo Effect" style={{ display: 'block', width: '100%', transform: 'scale(1.18)', transformOrigin: 'center center', filter: 'invert(1) brightness(0.96) invert(1)' }} />
+        <div style={{ margin: '-200px -24px 0', paddingTop: '5%', paddingBottom: '5%' }}>
+          <img
+            src={haloEffectImg}
+            alt="The Halo Effect"
+            onLoad={() => setImgLoaded(true)}
+            style={{ display: 'block', width: '91%', margin: '0 auto', mixBlendMode: 'screen' }}
+          />
         </div>
       </div>
 
+      {/* Gold text */}
+      <div style={{ flexShrink: 0, padding: '8px 24px', transform: 'translateY(-60px) scale(1.45)', transformOrigin: 'center' }}>
+        <p
+          className="font-heading font-extrabold text-[16px] leading-snug"
+          style={{ color: G, textAlign: 'center', textShadow: `0 0 24px rgba(198,168,92,0.8)`, letterSpacing: '-0.01em' }}
+        >
+          <HaloSubTypewriter start={true} />
+        </p>
+      </div>
+
       {/* Bottom button */}
-      <div style={{ flexShrink: 0, padding: '0 16px 28px' }}>
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <GoldBtn label="Next" onClick={onNext} />
       </div>
     </div>
@@ -1435,9 +1539,6 @@ function StepHypergamy({ onNext, onBack }) {
       {/* Header + chart — padded so card doesn't overlap */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '0 24px 12px' }}>
         <BackBtn onBack={onBack} />
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em]" style={{ color: G, marginBottom: 8, marginTop: 4 }}>
-          EVOLUTIONARY BIOLOGY
-        </p>
         <h1 className="font-heading font-bold text-[24px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
           Dating apps changed the rules.
         </h1>
@@ -1482,35 +1583,38 @@ function StepWhyAppearance({ onNext, onBack }) {
   const TEXT = '#FFFFFF'
   const BG = '#0A0A0A'
   const stats = [
-    { value: '12%', label: 'more income earned by attractive people on average', cite: 'Hamermesh & Biddle, 1994' },
-    { value: '72%', label: 'of people say appearance affects their first impression within seconds', cite: 'Princeton Social Cognition Lab' },
-    { value: '3×', label: 'more likely to be seen as competent, trustworthy, and likeable', cite: 'Physical Attractiveness Research' },
+    { value: '12%', label: 'Higher average earnings', sub: 'Reported among more attractive workers', cite: 'Hamermesh & Biddle, 1994' },
+    { value: '72%', label: 'Say appearance affects first impressions', sub: 'Within seconds', cite: 'OnePoll Survey, 2019' },
+    { value: '3×', label: 'More likely to be rated positively in competence, trust & likeability', sub: '', cite: 'Dion, Berscheid & Walster, 1972' },
   ]
   return (
     <div className="flex flex-col h-full px-6" style={{ background: BG }}>
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-start pb-4">
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-3" style={{ color: G }}>
-          THE SCIENCE
-        </p>
-        <h1 className="font-heading font-bold text-[26px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Appearance isn't shallow. It's strategic.
-        </h1>
-        <div className="flex flex-col gap-6 mt-8">
-          {stats.map(s => (
-            <div key={s.value} className="rounded-2xl px-6 py-7" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center gap-5">
-                <span className="font-heading font-bold text-[32px] shrink-0 w-16 text-center" style={{ color: G }}>{s.value}</span>
-                <div className="flex flex-col">
-                  <span className="font-body text-[18px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
-                  <p className="font-body text-[12px] mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.cite}</p>
+      <div className="flex-1 flex flex-col justify-start pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="font-heading font-bold text-[28px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}
+        >
+          Appearance isn't shallow, it's strategic
+        </motion.h1>
+        <div className="flex flex-col gap-3 mt-5">
+          {stats.map((s, i) => (
+            <motion.div
+              key={s.value}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut', delay: 0.25 + i * 0.1 }}
+              className="rounded-2xl px-6 py-4" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)', height: 150, display: 'flex', alignItems: 'center' }}>
+              <div className="flex items-center gap-5" style={{ width: '100%' }}>
+                <span className="font-heading font-bold text-[36px] shrink-0 w-20 text-center" style={{ color: G, textShadow: `0 0 18px rgba(198,168,92,0.7), 0 0 40px rgba(198,168,92,0.35)` }}>{s.value}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-heading font-semibold text-[16px] leading-snug" style={{ color: 'rgba(255,255,255,0.9)' }}>{s.label}</span>
+                  {s.sub ? <span className="font-heading font-semibold text-[16px] leading-snug" style={{ color: 'rgba(255,255,255,0.9)' }}>{s.sub}</span> : null}
+                  {s.cite ? <p className="font-heading font-bold text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em' }}>{s.cite}</p> : null}
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
-      <div className="pb-8">
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <GoldBtn label="Next" onClick={onNext} />
       </div>
     </div>
@@ -1518,33 +1622,212 @@ function StepWhyAppearance({ onNext, onBack }) {
 }
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
+// ── STEP: Cinematic Closer ────────────────────────────────────────────────────
+function useTypewriter(text, speed = 38) {
+  const [displayed, setDisplayed] = useState('')
+  useEffect(() => {
+    setDisplayed('')
+    if (!text) return
+    let i = 0
+    const iv = setInterval(() => {
+      i++
+      setDisplayed(text.slice(0, i))
+      if (i >= text.length) clearInterval(iv)
+    }, speed)
+    return () => clearInterval(iv)
+  }, [text, speed])
+  return displayed
+}
+
+function StepCinematic({ onNext }) {
+  const lines = [
+    { text: 'Looks shape how the world sees you', gold: false },
+    { text: 'They can shape first impressions', gold: false },
+    { text: "Now it's time to see where you stand", gold: false },
+    { text: 'Scan your face and...', gold: false },
+    { text: 'ASCEND WITH US', gold: true },
+  ]
+  const [lineIdx, setLineIdx] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  const displayed = useTypewriter(lines[lineIdx]?.text, 55)
+
+  useEffect(() => {
+    let cancelled = false
+    const line = lines[lineIdx]
+    const dur = line?.text.length * 55 + 1600
+    const t = setTimeout(() => {
+      if (cancelled) return
+      if (lineIdx < lines.length - 1) {
+        triggerHaptic()
+        setLineIdx(i => i + 1)
+      } else {
+        setLeaving(true)
+        setTimeout(() => { if (!cancelled) onNext() }, 700)
+      }
+    }, dur)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [lineIdx, onNext])
+
+  function handleTap() {
+    if (lineIdx < lines.length - 1) {
+      triggerHaptic()
+      setLineIdx(i => i + 1)
+    } else {
+      onNext()
+    }
+  }
+
+  return (
+    <motion.div
+      onClick={handleTap}
+      animate={{ opacity: leaving ? 0 : 1 }}
+      transition={{ duration: 0.6, ease: 'easeIn' }}
+      style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 50% 40%, #1a1a1a 0%, #000000 70%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '0 36px', cursor: 'pointer',
+      }}
+    >
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={lineIdx}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.35 } }}
+          className="font-heading font-bold text-center"
+          style={{
+            fontSize: lines[lineIdx]?.gold ? 36 : 32,
+            whiteSpace: 'normal',
+            lineHeight: 1.25,
+            letterSpacing: lines[lineIdx]?.gold ? '0.04em' : '-0.02em',
+            color: lines[lineIdx]?.gold ? '#C6A85C' : '#ffffff',
+            textShadow: lines[lineIdx]?.gold
+              ? '0 0 30px rgba(198,168,92,0.7), 0 0 60px rgba(198,168,92,0.3)'
+              : '0 0 20px rgba(198,168,92,0.25)',
+          }}
+        >
+          {displayed}
+        </motion.p>
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 // ── STEP: Primary Goal ───────────────────────────────────────────────────────
+const GoalIconDating = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>
+    <path d="M7.5 9.5c0 .687.265 1.383.697 1.844l3.009 3.264a1.14 1.14 0 0 0 .407.314 1 1 0 0 0 .783-.004 1.14 1.14 0 0 0 .398-.31l3.008-3.264A2.77 2.77 0 0 0 16.5 9.5 2.5 2.5 0 0 0 12 8a2.5 2.5 0 0 0-4.5 1.5"/>
+  </svg>
+)
+const GoalIconJawline = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5c.28 0 .5.22.5.5a2.5 2.5 0 1 0 5 0c0-.81-.7-1.8 0-2.5Z"/>
+  </svg>
+)
+const GoalIconSkin = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/>
+    <path d="M20 2v4"/><path d="M22 4h-4"/>
+    <circle cx="4" cy="20" r="2"/>
+  </svg>
+)
+const GoalIconGlow = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
+    <path d="M5 21h14"/>
+  </svg>
+)
+
 const PRIMARY_GOAL_OPTIONS = [
   {
     key: 'dating',
-    emoji: '💬',
+    Icon: GoalIconDating,
     label: 'Dating & Social Confidence',
-    desc: 'Look better in photos, on dating apps, and in person.',
+    desc: 'Feel more confident in photos, dating apps, and in person',
   },
   {
     key: 'jawline',
-    emoji: '🦷',
+    Icon: GoalIconJawline,
     label: 'Jawline & Face Shape',
-    desc: 'Get a sharper jaw, better lower face structure, and stronger facial posture.',
+    desc: 'Define your jawline, improve lower face structure, and optimize facial posture',
   },
   {
     key: 'skin',
-    emoji: '✨',
+    Icon: GoalIconSkin,
     label: 'Skin Quality & Tone',
-    desc: 'Clear up acne, fix texture, and build a simple high-impact skincare routine.',
+    desc: 'Clear up acne, fix texture, and build a simple high-impact skincare routine',
   },
   {
     key: 'glow',
-    emoji: '🏆',
+    Icon: GoalIconGlow,
     label: 'Total Glow-Up & Symmetry',
-    desc: 'Get a complete breakdown of your facial ratios and find out your maximum potential score.',
+    desc: 'Get a complete breakdown of your facial features and discover where to focus first',
   },
 ]
+
+// ── STEP: Attractiveness Impact ───────────────────────────────────────────────
+function StepAttractivenessImpact({ onNext, onBack }) {
+  const bars = [
+    { label: 'Dating',       pct: 80, gold: true },
+    { label: 'Popularity',   pct: 65 },
+    { label: 'Career Oppt.', pct: 40 },
+    { label: 'Income',       pct: 30 },
+  ]
+  const touchStartX = useRef(null)
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX }
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (dx < -50) onNext()
+    else if (dx > 50) onBack()
+  }
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ background: '#0A0A0A', display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
+      {/* Top text — same position as every other page */}
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 22px)' }}>
+        <h1 className="font-heading font-bold text-[28px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em', textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          How looks shape your life
+        </h1>
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          99 out of 100 people don't realize how much attractiveness affects them in their day to day life
+        </p>
+      </div>
+
+      {/* Bars — fill remaining space */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '24px 24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', flex: 1 }}>
+          {bars.map(({ label, pct, gold }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span className="font-heading font-semibold text-[17px]" style={{ width: 110, color: gold ? G : 'rgba(255,255,255,0.75)', flexShrink: 0 }}>{label}</span>
+              <div style={{ flex: 1, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  borderRadius: 6,
+                  background: gold ? 'linear-gradient(90deg, #D4AF6A 0%, #C6A85C 100%)' : 'rgba(255,255,255,0.9)',
+                  boxShadow: gold ? '0 0 20px rgba(198,168,92,1), 0 0 50px rgba(198,168,92,0.6), 0 0 80px rgba(198,168,92,0.3)' : 'none',
+                }} />
+              </div>
+              <span className="font-heading font-bold text-[17px]" style={{ width: 44, textAlign: 'right', color: gold ? G : 'rgba(255,255,255,0.75)', flexShrink: 0 }}>{pct}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom button — same position as every other page */}
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <GoldBtn label="Next" onClick={onNext} />
+      </div>
+    </div>
+  )
+}
 
 function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
   const selected = data.primaryGoal || ''
@@ -1555,65 +1838,48 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
   }
 
   return (
-    <div className="flex flex-col h-full px-5" style={{ background: BG }}>
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-start pb-4">
-        <div className="mb-8">
-          <h1
-            className="font-heading font-bold text-[26px] leading-tight mb-2"
-            style={{ color: TEXT, letterSpacing: '-0.02em' }}
-          >
-            What do you want to fix or improve first?
-          </h1>
-        </div>
+    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+      <div className="flex-1 flex flex-col justify-start pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="font-heading font-bold text-[28px] leading-tight"
+          style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}
+        >
+          What do you want to improve first?
+        </motion.h1>
 
-        <div className="flex flex-col gap-5">
-          {PRIMARY_GOAL_OPTIONS.map(({ key, emoji, label, desc }) => {
+        <div className="flex flex-col gap-3 mt-6">
+          {PRIMARY_GOAL_OPTIONS.map(({ key, Icon, label, desc }, i) => {
             const isSelected = selected === key
             return (
               <motion.button
                 key={key}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => pick(key)}
-                className="flex items-start gap-4 px-5 py-5 rounded-2xl text-left transition-all duration-150"
+                className="flex items-center gap-4 px-5 rounded-2xl text-left transition-all duration-150"
                 style={{
+                  height: 130,
                   background: isSelected ? 'rgba(198,168,92,0.10)' : SURFACE,
                   border: `1.5px solid ${isSelected ? G : BORDER}`,
                 }}
               >
-                <span className="text-[28px] leading-none mt-0.5 flex-shrink-0">{emoji}</span>
+                <span className="leading-none flex-shrink-0" style={{ color: '#fff' }}><Icon /></span>
                 <div className="flex-1 min-w-0">
                   <p
-                    className="font-heading font-semibold text-[17px] leading-snug mb-1"
-                    style={{ color: isSelected ? G : TEXT }}
+                    className="font-heading font-extrabold text-[17px] leading-snug mb-0.5"
+                    style={{ color: G, textShadow: '0 0 18px rgba(198,168,92,0.6)' }}
                   >
                     {label}
                   </p>
-                  <p className="font-body text-[13px] leading-snug" style={{ color: DIM }}>
+                  <p className="font-body font-bold text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.85)' }}>
                     {desc}
                   </p>
-                </div>
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-1"
-                  style={{
-                    background: isSelected ? G : 'transparent',
-                    border: isSelected ? 'none' : '1.5px solid rgba(255,255,255,0.15)',
-                  }}
-                >
-                  {isSelected && (
-                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                      <path d="M1 3.5L3.5 6L8 1" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
                 </div>
               </motion.button>
             )
           })}
         </div>
 
-        <p className="mt-6 text-center font-body text-[12px] italic" style={{ color: 'rgba(255,255,255,0.28)' }}>
-          *This affects your 12 week plan*
-        </p>
       </div>
     </div>
   )
@@ -2619,7 +2885,7 @@ function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
       </AnimatePresence>
 
       {/* CTA area */}
-      <div className="px-6 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div className="px-6 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <AnimatePresence mode="wait">
           {isLast ? (
             <motion.div
@@ -2921,7 +3187,7 @@ export default function PremiumOnboarding() {
     const res = await fetch(`${API_BASE}/api/auth/apple`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName }),
+      body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName, refCode: sessionStorage.getItem('asc_ref_code') || undefined }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Authentication failed')
@@ -3005,17 +3271,15 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=referral, 5=notifications, 6=consequences, 7=testimonials, 8=auth
+  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=notifications, 5=testimonials, 6=cinematic
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
     <StepHaloEffect key="haloEffect" onNext={goNext} onBack={goBack} />,
     <StepWhyAppearance key="whyAppearance" onNext={goNext} onBack={goBack} />,
     <StepPrimaryGoal key="primaryGoal" data={formData} onChange={updateField} onNext={goNext} onBack={goBack} />,
-    <StepReferral key="referral" onNext={goNext} />,
     <StepNotifications key="notifications" onNext={goNext} />,
-    <StepConsequences key="consequences" onNext={goNext} />,
     <StepTestimonials key="testimonials" onNext={goNext} />,
-    <StepAuth key="auth" onNext={handleFinalDone} />,
+    <StepCinematic key="cinematic" onNext={handleFinalDone} />,
   ]
 
   return (
@@ -3024,7 +3288,16 @@ export default function PremiumOnboarding() {
       className="relative flex flex-col h-full overflow-hidden dark"
       style={{ background: '#0a0a0a', '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {/* progress bar removed */}
+      {/* Progress bar — hidden on cinematic (last) step */}
+      {step < steps.length - 1 && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0' }}>
+            {steps.slice(0, -1).map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? '#FFFFFF' : 'rgba(255,255,255,0.15)', transition: 'background 0.3s' }} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence mode="wait" custom={dir}>
         <motion.div

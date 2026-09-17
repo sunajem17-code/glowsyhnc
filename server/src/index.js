@@ -70,11 +70,15 @@ app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
     if (origin.startsWith('http://localhost:')) return callback(null, true)
+    // Local network IPs for live-reload on physical device (192.168.x.x, 10.x.x.x)
+    if (/^http:\/\/(192\.168\.|10\.)[\d.]+:\d+$/.test(origin)) return callback(null, true)
     if (/^https:\/\/glowsyhnc(-[a-z0-9]+)?\.vercel\.app$/.test(origin)) return callback(null, true)
     if (origin === 'https://ascendus.store' || origin === 'https://www.ascendus.store') return callback(null, true)
     if (origin === 'capacitor://localhost' || origin === 'ionic://localhost') return callback(null, true)
     if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true)
-    callback(new Error(`CORS blocked: ${origin}`))
+    // Return false (proper 403) instead of throwing — throwing causes a 500 on preflight
+    console.warn('[CORS] blocked origin:', origin)
+    callback(null, false)
   },
   credentials: true,
 }))

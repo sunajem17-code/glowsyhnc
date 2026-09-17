@@ -338,10 +338,10 @@ export default function Results() {
   useEffect(() => {
     if (isPremium || !currentScan || paywallDismissed.current) return
     if (isNewScan) {
-      if (revealDone) setShowPaywall(true)
+      if (revealDone) navigate('/unlock?paywall=1')
     } else {
       paywallTimer.current = setTimeout(() => {
-        setShowPaywall(true)
+        navigate('/unlock?paywall=1')
         paywallTimer.current = null
       }, 3000)
       return () => { clearTimeout(paywallTimer.current); paywallTimer.current = null }
@@ -562,7 +562,7 @@ export default function Results() {
           const score  = worstPillar[1]
           const impact = Math.min(1.5, (7.5 - score) * 0.15).toFixed(1)
           return (
-            <button type="button" onClick={() => setShowPaywall(true)}
+            <button type="button" onClick={() => navigate('/unlock?paywall=1')}
               className="w-full mb-4 px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-left active:opacity-70 transition-opacity"
               style={{ background: 'rgba(224,122,95,0.08)', border: '1px solid rgba(224,122,95,0.2)' }}>
               <AlertTriangle size={15} className="flex-shrink-0" style={{ color: '#E07A5F' }} />
@@ -1214,7 +1214,7 @@ export default function Results() {
       </motion.div>
 
       {/* ── Free user sticky bottom CTA ──────────────────────────────── */}
-      {!isPremium && !showPaywall && (
+      {!isPremium && (
         <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pt-3"
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)', background: 'linear-gradient(to top, rgba(8,6,4,0.98) 70%, rgba(8,6,4,0))', backdropFilter: 'blur(12px)' }}>
           <div className="grid gap-2" style={{ gridTemplateColumns: 'auto 1fr 1fr' }}>
@@ -1228,7 +1228,7 @@ export default function Results() {
               style={{ background: 'rgba(198,168,92,0.10)', border: '1px solid rgba(198,168,92,0.30)', color: '#C6A85C' }}>
               <Gift size={14} /> Share 3 Friends
             </button>
-            <button onClick={() => setShowPaywall(true)}
+            <button onClick={() => navigate('/unlock?paywall=1')}
               className="py-3.5 rounded-2xl font-heading font-bold text-[13px] flex items-center justify-center gap-1.5 text-black"
               style={{ background: 'linear-gradient(135deg, #D4B96A 0%, #C6A85C 45%, #A8893A 100%)', boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}>
               Get Ascendus Pro
@@ -1255,14 +1255,6 @@ export default function Results() {
         )}
       </AnimatePresence>
 
-      {/* ── Paywall (free users) ──────────────────────────────────────── */}
-      <AnimatePresence>
-        {showPaywall && !isPremium && (
-          <PaywallModal scan={currentScan} gender={gender ?? 'male'}
-            onClose={() => { sessionStorage.setItem('asc_paywall_dismissed', '1'); paywallDismissed.current = true; setShowPaywall(false) }}
-            onPurchaseSuccess={() => setShowPaywall(false)} />
-        )}
-      </AnimatePresence>
     </>
   )
 }

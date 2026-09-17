@@ -177,15 +177,17 @@ const useStore = create(
       lastScanDate: null,
       setLastScanDate: (d) => set({ lastScanDate: d }),
 
-      // Pro Scan daily cap: 3 scans per calendar day (local device time)
+      // Pro Scan daily cap: 3 scans per 24h window starting from first scan of the day
       proScanCount: 0,
-      proScanDate: null,
+      proScanDate: null,       // kept for backward compat (unused now)
+      proScanFirstAt: null,    // ISO timestamp of the first scan in the current window
       recordProScan: () => set(state => {
-        const today = new Date().toDateString()
-        const sameDay = state.proScanDate === today
+        const now = Date.now()
+        const windowStart = state.proScanFirstAt ? new Date(state.proScanFirstAt).getTime() : null
+        const inWindow = windowStart && (now - windowStart) < 24 * 60 * 60 * 1000
         return {
-          proScanCount: sameDay ? state.proScanCount + 1 : 1,
-          proScanDate: today,
+          proScanCount: inWindow ? state.proScanCount + 1 : 1,
+          proScanFirstAt: inWindow ? state.proScanFirstAt : new Date().toISOString(),
         }
       }),
 

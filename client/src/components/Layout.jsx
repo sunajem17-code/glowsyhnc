@@ -67,7 +67,7 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-full bg-page">
       <AnimatePresence>
-        {scanLaunching && <ProcessingOverlay key="scan-launch" label="Loading…" />}
+        {scanLaunching && <ProcessingOverlay key="scan-launch" label="Processing" />}
       </AnimatePresence>
       <AchievementToast />
       <main className="flex-1 overflow-hidden relative">

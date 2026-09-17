@@ -34,6 +34,12 @@ export default function DailyCheckin() {
   const token         = useStore(s => s.token)
   const addCheckin    = useStore(s => s.addCheckin)
   const updateStreak  = useStore(s => s.updateStreak)
+  const isPremium     = useStore(s => s.isPremium)
+
+  function requirePremium(fn) {
+    if (!isPremium) { navigate('/unlock?paywall=1'); return }
+    fn()
+  }
 
   const today = new Date().toDateString()
   const alreadyDone = todayCheckin?.date === today
@@ -169,7 +175,7 @@ export default function DailyCheckin() {
               {Array.from({ length: WATER_GOAL }, (_, i) => (
                 <button
                   key={i}
-                  onClick={() => { triggerHaptic(); setWater(i < water ? i : i + 1) }}
+                  onClick={() => requirePremium(() => { triggerHaptic(); setWater(i < water ? i : i + 1) })}
                   className="flex flex-col items-center"
                 >
                   <motion.div
@@ -203,14 +209,14 @@ export default function DailyCheckin() {
             <div className="flex gap-3">
               <ToggleButton
                 checked={skincareAm}
-                onToggle={() => setSkincareAm(v => !v)}
+                onToggle={() => requirePremium(() => setSkincareAm(v => !v))}
                 label="AM Routine"
                 icon={Sun}
                 color="amber"
               />
               <ToggleButton
                 checked={skincarePm}
-                onToggle={() => setSkincarePm(v => !v)}
+                onToggle={() => requirePremium(() => setSkincarePm(v => !v))}
                 label="PM Routine"
                 icon={Moon}
                 color="teal"
@@ -225,7 +231,7 @@ export default function DailyCheckin() {
               <h3 className="font-heading font-bold text-sm text-primary">Exercise</h3>
             </div>
             <button
-              onClick={() => { triggerHaptic(); setExerciseDone(v => !v) }}
+              onClick={() => requirePremium(() => { triggerHaptic(); setExerciseDone(v => !v) })}
               className={`w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 transition-all ${
                 exerciseDone ? '' : 'border-gray-200 dark:border-gray-700'
               }`}
@@ -258,7 +264,7 @@ export default function DailyCheckin() {
               ].map(({ val, Icon, label, color }) => (
                 <button
                   key={val}
-                  onClick={() => { triggerHaptic(); setMood(val) }}
+                  onClick={() => requirePremium(() => { triggerHaptic(); setMood(val) })}
                   className="flex flex-col items-center gap-1"
                 >
                   <motion.div
@@ -289,7 +295,7 @@ export default function DailyCheckin() {
           </div>
 
           <button
-            onClick={() => { triggerHaptic(); handleSubmit() }}
+            onClick={() => requirePremium(() => { triggerHaptic(); handleSubmit() })}
             disabled={completionScore === 0}
             className={`btn-primary mb-8 ${completionScore === 0 ? 'opacity-50' : ''}`}
           >

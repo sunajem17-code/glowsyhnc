@@ -55,20 +55,23 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, vis
 }
 
 function FaceScanCard({ onBegin, limitMessage }) {
+  const navigate = useNavigate()
   if (limitMessage) {
     return (
       <CardShell
         eyebrow="DAILY LIMIT REACHED"
         title="3 Scans Done"
         body={limitMessage}
-        cta="Got It"
-        icon={Moon}
-        onAction={() => triggerHaptic()}
+        cta="View History"
+        onAction={() => navigate('/history')}
         visualClassName="aspect-[4/5] flex-shrink-0"
         visual={
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
-            <Moon size={56} style={{ color: `${GOLD}55` }} />
-          </div>
+          <>
+            <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
+              <Moon size={56} style={{ color: `${GOLD}55` }} />
+            </div>
+            <FaceScanOverlay loop showDots={false} />
+          </>
         }
       />
     )
@@ -78,7 +81,7 @@ function FaceScanCard({ onBegin, limitMessage }) {
     <CardShell
       eyebrow="NEW FACE SCAN"
       title="Begin Scan"
-      body="Start your scan"
+      body="Get your personalized analysis"
       cta="Start Your Scan"
       onAction={onBegin}
       visualClassName="aspect-[4/5] flex-shrink-0"
@@ -99,7 +102,7 @@ function PhysiqueScanCard({ onBegin }) {
     <CardShell
       eyebrow="NEW PHYSIQUE SCAN"
       title="Begin Scan"
-      body="Start your scan"
+      body="Get your personalized analysis"
       cta="Start Your Scan"
       onAction={onBegin}
       visualClassName="aspect-[4/5] flex-shrink-0"
@@ -194,10 +197,23 @@ export default function ScanHome() {
   const isPremium = useStore(isPremiumSelector)
   const streak = useStore(s => s.streak)
   const proScanCount = useStore(s => s.proScanCount)
-  const proScanDate = useStore(s => s.proScanDate)
+  const proScanFirstAt = useStore(s => s.proScanFirstAt)
   const setScanLaunching = useStore(setScanLaunchingSelector)
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
+  const [showHint, setShowHint] = useState(() => {
+    try { return !sessionStorage.getItem('asc_scan_hint_shown') } catch { return false }
+  })
+
+  function dismissHint() {
+    try { sessionStorage.setItem('asc_scan_hint_shown', '1') } catch {}
+    setShowHint(false)
+  }
+
+  // Hide permanently once the user has completed their first scan
+  useEffect(() => {
+    if (scans?.length > 0) dismissHint()
+  }, [scans?.length])
 
   useEffect(() => { setScanLaunching(false) }, [])
 
@@ -209,8 +225,9 @@ export default function ScanHome() {
 
   const latestScan = scans?.[0] ?? null
 
-  const today = new Date().toDateString()
-  const atLimit = proScanDate === today && proScanCount >= DAILY_SCAN_LIMIT
+  const windowStart = proScanFirstAt ? new Date(proScanFirstAt).getTime() : null
+  const inWindow = windowStart && (Date.now() - windowStart) < 24 * 60 * 60 * 1000
+  const atLimit = inWindow && proScanCount >= DAILY_SCAN_LIMIT
 
   const limitMessage = atLimit
     ? (streak.current > 0
@@ -218,11 +235,13 @@ export default function ScanHome() {
         : 'Come back tomorrow to start a streak!')
     : null
 
-  // Cards: Face Scan → Physique Scan → History
+  const hasScans = scans?.length > 0
+
+  // Cards: Face Scan → Physique Scan → History (always shown in dots, locked until first scan)
   const cards = [
     { id: 'face',    el: <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} /> },
-    { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/workout-plan')} /> },
-    { id: 'history', el: (
+    { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/physique-scan')} /> },
+    ...(!limitMessage ? [{ id: 'history', el: (
       <CardShell
         eyebrow="SCAN HISTORY"
         title="Past Scans"
@@ -232,12 +251,15 @@ export default function ScanHome() {
         onAction={() => navigate('/history')}
         visualClassName="aspect-[4/5] flex-shrink-0"
         visual={
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
-            <History size={48} style={{ color: 'rgba(198,168,92,0.35)' }} />
-          </div>
+          <>
+            <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
+              <History size={48} style={{ color: 'rgba(198,168,92,0.35)' }} />
+            </div>
+            <FaceScanOverlay loop={false} showDots={false} />
+          </>
         }
       />
-    )},
+    )}] : []),
   ]
 
   function goTo(idx) {
@@ -249,7 +271,8 @@ export default function ScanHome() {
   function handleDragEnd(_, info) {
     const DISTANCE = 60
     const VELOCITY = 400
-    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < cards.length - 1) {
+    const maxIdx = hasScans ? cards.length - 1 : 0
+    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < maxIdx) {
       goTo(cardIdx + 1)
     } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
       goTo(cardIdx - 1)
@@ -279,12 +302,78 @@ export default function ScanHome() {
         </AnimatePresence>
       </div>
 
+      {/* First-time hint overlay */}
+      <AnimatePresence>
+        {showHint && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={dismissHint}
+            style={{
+              position: 'absolute', inset: 0, zIndex: 40,
+              pointerEvents: 'none',
+            }}
+          >
+            {/* Tooltip + arrow — far right, bounce together */}
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: [0, 7, 0] }}
+              transition={{
+                opacity: { delay: 0.2, duration: 0.3 },
+                y: { delay: 0.5, duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
+              }}
+              style={{
+                position: 'absolute',
+                bottom: 140,
+                right: 20,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer',
+              }}
+            >
+              {/* Box */}
+              <div style={{
+                border: '1.5px solid #C6A85C',
+                borderRadius: 9,
+                paddingTop: 6, paddingBottom: 6,
+                paddingLeft: 10, paddingRight: 10,
+                background: 'rgba(0,0,0,0.55)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{
+                  fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
+                  fontWeight: 700, fontSize: 11,
+                  color: '#C6A85C', whiteSpace: 'nowrap',
+                }}>
+                  Find your starting point
+                </span>
+              </div>
+
+              {/* Arrow — chunky outlined shape */}
+              <svg width="22" height="30" viewBox="0 0 22 30" fill="none">
+                <path
+                  d="M7 2 L15 2 L15 20 L20 20 L11 30 L2 20 L7 20 Z"
+                  fill="none"
+                  stroke="#C6A85C"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Dot indicator — fixed size circles, just color change */}
       <div className="flex items-center justify-center gap-2 py-4 flex-shrink-0">
         {cards.map((_, i) => (
           <div
             key={i}
-            onClick={() => goTo(i)}
+            onClick={() => (hasScans || i === 0) && goTo(i)}
             style={{
               width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
               background: i === cardIdx ? GOLD : 'rgba(255,255,255,0.25)',
