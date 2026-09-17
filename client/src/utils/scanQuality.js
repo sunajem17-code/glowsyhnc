@@ -30,36 +30,42 @@ export function releaseValidationImage(url) {
 // ─── Result cache — second call in startAnalysis() is instant ─────────────────
 let _cache = { url: null, result: null }
 
-// ─── Convert any image source to a data URL (base64) ─────────────────────────
+// ─── Resize + convert image to a base64 data URL ─────────────────────────────
+// Downscales to MAX_SIDE on the longest edge before encoding.
+// A 4288×2848 photo → ~800px wide → ~80KB instead of 2.5MB.
+// The AI only needs to see the face clearly, not every pixel.
+const MAX_SIDE = 900   // px — enough for AI face detection, small enough for server
+const JPEG_Q  = 0.88  // quality
+
 async function toBase64DataUrl(imageSource) {
-  // Already a data URL
-  if (typeof imageSource === 'string' && imageSource.startsWith('data:')) {
-    return imageSource
+  // Load into an Image element regardless of source type
+  const imgEl = await new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload  = () => resolve(img)
+    img.onerror = () => reject(new Error('Image failed to load'))
+
+    if (typeof imageSource === 'string') {
+      img.src = imageSource
+    } else if (imageSource instanceof Blob) {
+      img.src = URL.createObjectURL(imageSource)
+    } else {
+      reject(new Error('Unsupported image source type: ' + typeof imageSource))
+    }
+  })
+
+  // Scale down if needed
+  let { naturalWidth: w, naturalHeight: h } = imgEl
+  if (w > MAX_SIDE || h > MAX_SIDE) {
+    const scale = MAX_SIDE / Math.max(w, h)
+    w = Math.round(w * scale)
+    h = Math.round(h * scale)
   }
 
-  // blob: URL or http: URL → fetch → base64
-  if (typeof imageSource === 'string') {
-    const resp = await fetch(imageSource)
-    const blob = await resp.blob()
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload  = () => resolve(reader.result)
-      reader.onerror = () => reject(new Error('FileReader failed'))
-      reader.readAsDataURL(blob)
-    })
-  }
-
-  // Blob or File object
-  if (imageSource instanceof Blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload  = () => resolve(reader.result)
-      reader.onerror = () => reject(new Error('FileReader failed on Blob'))
-      reader.readAsDataURL(imageSource)
-    })
-  }
-
-  throw new Error('Unsupported image source type: ' + typeof imageSource)
+  const canvas = document.createElement('canvas')
+  canvas.width  = w
+  canvas.height = h
+  canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h)
+  return canvas.toDataURL('image/jpeg', JPEG_Q)
 }
 
 // ─── Map AI issue types → user-facing messages ────────────────────────────────
