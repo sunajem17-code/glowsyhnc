@@ -40,6 +40,7 @@ const ScanReady      = lazy(() => import('./pages/ScanReady'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
 const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
 const ScanTimeline   = lazy(() => import('./pages/ScanTimeline'))
+const AnalysisInspector = import.meta.env.DEV ? lazy(() => import('./pages/AnalysisInspector')) : null
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -170,6 +171,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/landing" element={<Landing />} />
+          {AnalysisInspector && <Route path="/dev/analysis-inspector" element={<AnalysisInspector />} />}
 
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
