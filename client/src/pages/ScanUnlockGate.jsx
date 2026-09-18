@@ -1387,7 +1387,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           ASCEND WITH US
         </h1>
         <p className="font-body text-[15px] text-center" style={{ color: 'rgba(255,255,255,0.7)' }}>
-          Proven to change your life
+          Your transformation starts here
         </p>
       </div>
 
@@ -1566,52 +1566,43 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
         </div>
 
         {/* Header */}
-        <h1 className="font-heading font-bold text-[26px] text-center leading-tight mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
           Reveal your ratings
         </h1>
-        <p className="font-body text-[13px] text-center mb-3 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Invite 3 friends or get Ascendus Max to view your results
+        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          See your full facial analysis with Ascendus Max
         </p>
-        {referralCode && (
-          <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-xl" style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)' }}>
-            <span className="font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>Your code:</span>
-            <span className="font-heading font-bold text-[15px] tracking-widest" style={{ color: '#C6A85C' }}>{referralCode}</span>
-          </div>
-        )}
 
-        {/* Face circle overlapping card — Umax layout */}
-        <div className="relative w-full">
-          {/* Circle sits above card, centered */}
-          <div className="flex justify-center" style={{ marginBottom: -48, position: 'relative', zIndex: 2 }}>
-            <div style={{ width: 96, height: 96, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
+        {/* Face circle + card */}
+        <div className="relative w-full" style={{ marginTop: 102 }}>
+          {/* Circle — absolutely positioned, fully detached from card */}
+          <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
+            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
               {facePhoto
                 ? <img src={facePhoto} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
                 : null}
             </div>
           </div>
 
-          {/* Metrics card — same dark as gender selection cards */}
-          <div className="w-full rounded-3xl pt-16 pb-5 px-5" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-            <div className="grid grid-cols-2 gap-x-5" style={{ rowGap: 0 }}>
+          {/* Metrics card */}
+          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+            <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
               {metrics.map(({ label, pct }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 20 : 0 }}>
-                  {/* Label with individual lock icon */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                    <Lock size={11} style={{ color: G, flexShrink: 0 }} />
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
+                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                    <Lock size={13} style={{ color: G, flexShrink: 0 }} />
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
                   </div>
-                  {/* Bright white blurred number */}
-                  <div style={{ width: 60, height: 22, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 8, opacity: 0.9 }} />
-                  {/* Gold bar — blurred content, unlock to see real values */}
-                  <div style={{ height: 5, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
+                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
+                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* CTAs — more space, bigger buttons */}
-        <div className="w-full mt-8 flex flex-col gap-3.5">
+        {/* CTAs */}
+        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
@@ -1623,13 +1614,6 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
           </motion.button>
 
-          <button
-            onClick={() => { triggerHaptic(); onInvite() }}
-            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px]"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
-          >
-            Invite 3 Friends
-          </button>
         </div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
@@ -1753,7 +1737,7 @@ export default function ScanUnlockGate() {
           error={purchaseError}
           isPremium={isPremium}
         />
-      ) : currentScan ? (
+      ) : currentScan && !isPaywallRedirect ? (
         <LockedRevealScreen
           scan={currentScan}
           referralCode={referralCode}

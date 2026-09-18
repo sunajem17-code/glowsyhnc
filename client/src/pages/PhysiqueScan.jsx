@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
+import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -10,10 +10,10 @@ import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
-import sideProfileGuide from '../assets/side-profile-guide.png'
-import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
-import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
-import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
+import sideProfileGuide from '../assets/physique-lower-male.jpg'
+import sideProfileGuideFemale from '../assets/physique-lower-male.jpg'
+import faceGuidePhoto from '../assets/physique-upper-male.jpg'
+import faceGuidePhotoFemale from '../assets/physique-upper-male.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
@@ -33,85 +33,138 @@ async function logAnalyticsEvent(name, params) {
   }
 }
 
-import { ANALYSIS_STEPS, ANALYSIS_STEP_LABELS } from '../utils/analysisSteps'
+export const ANALYSIS_STEPS = [
+  { label: 'Finding your strengths...', Icon: Target },
+  { label: 'Calculating your score...', Icon: Zap },
+  { label: 'Building your roadmap...', Icon: Map },
+]
 
+// ─── Step 2: Height & Weight ─────────────────────────────────────────────────
 
-// ─── Step 0: Gender Selector ─────────────────────────────────────────────────
+// Custom slider — full control over thumb shape + glow without WebKit quirks
+function AscSlider({ min, max, value, onChange }) {
+  const trackRef = useRef()
+  const clamped = Math.max(min, Math.min(max, value))
+  const pct = ((clamped - min) / (max - min)) * 100
 
-// Mars/Venus stroke icons — kept in sync with PremiumOnboarding.jsx's
-// StepGender by design intent (same visual language for gender selection
-// wherever it appears, onboarding or rescan).
-function MarsIcon({ color, size = 96 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
-      <circle cx="55" cy="64" r="26" stroke={color} strokeWidth="7" />
-      <line x1="73" y1="46" x2="101" y2="18" stroke={color} strokeWidth="7" strokeLinecap="round" />
-      <polyline points="77,18 101,18 101,42" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function VenusIcon({ color, size = 96 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 110 110" fill="none" style={{ display: 'block' }}>
-      <circle cx="55" cy="38" r="26" stroke={color} strokeWidth="7" />
-      <line x1="55" y1="64" x2="55" y2="98" stroke={color} strokeWidth="7" strokeLinecap="round" />
-      <line x1="39" y1="82" x2="71" y2="82" stroke={color} strokeWidth="7" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-// Ported from PremiumOnboarding.jsx's StepGender — same big cards, same
-// Mars/Venus icons, same tap-to-advance behavior, so the rescan flow's
-// gender step matches the one users already see on first onboarding instead
-// of the smaller, more cluttered two-icon grid this used to be.
-function GenderSelector({ selected, onSelect, onAdvance }) {
-  const MALE_BLUE   = '#4A90E2'
-  const FEMALE_PINK = '#E85D9E'
-
-  function pick(gender) {
-    onSelect(gender)
-    setTimeout(onAdvance, 300)
+  function getValFromEvent(e) {
+    const rect = trackRef.current.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    return Math.round(ratio * (max - min) + min)
   }
 
-  const cardStyle = (gender) => ({
-    width: '100%', maxWidth: 340, height: 280,
-    borderRadius: 22,
-    border: '1.5px solid var(--border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'background 0.2s',
-    background: selected === gender
-      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
-      : 'var(--card)',
-  })
+  function onPointerDown(e) {
+    e.preventDefault()
+    onChange(getValFromEvent(e))
+    const move = ev => { onChange(getValFromEvent(ev)); triggerHaptic() }
+    const up   = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
+                         window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up) }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    window.addEventListener('touchmove', move, { passive: true })
+    window.addEventListener('touchend', up)
+  }
 
   return (
-    <div className="flex flex-col h-full px-6 items-center justify-center gap-5">
-      <motion.div
-        whileTap={{ scale: 0.97 }}
-        onClick={() => pick('male')}
-        style={cardStyle('male')}
-      >
-        <div className="flex flex-col items-center">
-          <MarsIcon color={MALE_BLUE} size={144} />
-          <p className="font-heading font-bold text-2xl text-primary mt-3">Male</p>
-        </div>
-      </motion.div>
+    <div ref={trackRef} onMouseDown={onPointerDown} onTouchStart={onPointerDown}
+      style={{ position: 'relative', height: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none' }}>
+      {/* Track bg */}
+      <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.1)' }} />
+      {/* Filled track with glow */}
+      <div style={{
+        position: 'absolute', left: 0, width: `${pct}%`, height: 4, borderRadius: 999,
+        background: GOLD,
+        boxShadow: `0 0 10px 2px rgba(198,168,92,0.55), 0 0 24px 4px rgba(198,168,92,0.25)`,
+      }} />
+      {/* Thumb dot */}
+      <div style={{
+        position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
+        width: 26, height: 26, borderRadius: '50%',
+        background: GOLD,
+        boxShadow: `0 0 0 5px rgba(198,168,92,0.22), 0 0 20px rgba(198,168,92,0.7), 0 2px 8px rgba(0,0,0,0.5)`,
+        flexShrink: 0,
+      }} />
+    </div>
+  )
+}
 
-      <motion.div
-        whileTap={{ scale: 0.97 }}
-        onClick={() => pick('female')}
-        style={cardStyle('female')}
-      >
-        <div className="flex flex-col items-center">
-          <VenusIcon color={FEMALE_PINK} size={144} />
-          <p className="font-heading font-bold text-2xl text-primary mt-3">Female</p>
-        </div>
-      </motion.div>
+function HeightWeightSelector({ height, weight, heightUnit, weightUnit, onHeightChange, onWeightChange, onHeightUnitChange, onWeightUnitChange }) {
+  const imperial = heightUnit === 'ft'
+  const cmVal  = height ? Number(height) : 175
+  const kgVal  = weight ? Number(weight) : 75
+  const totalIn = Math.round(cmVal / 2.54)
+  const lbsVal  = Math.round(kgVal * 2.20462)
 
-      <p className="text-center text-[10px] text-secondary font-body mt-2">
-        This only affects tier labels and benchmarks. All analysis is private and on-device.
-      </p>
+  const hMin = imperial ? 48 : 140
+  const hMax = imperial ? 96 : 220
+  const hVal = imperial ? totalIn : cmVal
+  const wMin = imperial ? 88  : 40
+  const wMax = imperial ? 396 : 180
+  const wVal = imperial ? lbsVal : kgVal
+
+  function onHSlide(v) {
+    onHeightChange(String(imperial ? Math.round(v * 2.54) : v))
+  }
+  function onWSlide(v) {
+    onWeightChange(String(imperial ? Math.round(v / 2.20462) : v))
+  }
+  function switchSystem(sys) {
+    triggerHaptic()
+    onHeightUnitChange(sys === 'imperial' ? 'ft' : 'cm')
+    onWeightUnitChange(sys === 'imperial' ? 'lbs' : 'kg')
+  }
+
+  const hDisplay = imperial ? `${Math.floor(totalIn / 12)} ft ${totalIn % 12} in` : cmVal
+  const hUnit    = imperial ? '' : 'cm'
+  const wDisplay = imperial ? lbsVal : kgVal
+  const wUnit    = imperial ? 'lbs' : 'kg'
+
+  return (
+    <div className="flex flex-col px-6 gap-8 h-full justify-center" style={{ paddingBottom: '18%' }}>
+
+      {/* HEIGHT */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-heading font-bold text-[13px] tracking-[0.2em]" style={{ color: '#fff' }}>HEIGHT</p>
+          <div className="flex items-baseline gap-2">
+            <span className="font-heading font-bold" style={{ fontSize: 48, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{hDisplay}</span>
+            {hUnit && <span className="font-heading font-bold text-[20px]" style={{ color: GOLD, textShadow: '0 0 16px rgba(198,168,92,0.6)' }}>{hUnit}</span>}
+          </div>
+        </div>
+        <AscSlider key={`h-${imperial}`} min={hMin} max={hMax} value={hVal} onChange={onHSlide} />
+      </div>
+
+      {/* WEIGHT */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-heading font-bold text-[13px] tracking-[0.2em]" style={{ color: '#fff' }}>WEIGHT</p>
+          <div className="flex items-baseline gap-2">
+            <span className="font-heading font-bold" style={{ fontSize: 48, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{wDisplay}</span>
+            <span className="font-heading font-bold text-[20px]" style={{ color: GOLD, textShadow: '0 0 16px rgba(198,168,92,0.6)' }}>{wUnit}</span>
+          </div>
+        </div>
+        <AscSlider key={`w-${imperial}`} min={wMin} max={wMax} value={wVal} onChange={onWSlide} />
+      </div>
+
+      {/* Metric / Imperial */}
+      <div className="flex gap-3">
+        {['metric', 'imperial'].map(sys => {
+          const active = imperial ? sys === 'imperial' : sys === 'metric'
+          return (
+            <motion.button key={sys} whileTap={{ scale: 0.97 }} onClick={() => switchSystem(sys)}
+              className="flex-1 py-3.5 rounded-2xl font-heading font-bold text-[15px]"
+              style={{
+                background: active ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
+                border: `1.5px solid ${active ? GOLD : 'rgba(255,255,255,0.1)'}`,
+                color: active ? GOLD : 'rgba(255,255,255,0.3)',
+              }}>
+              {sys.charAt(0).toUpperCase() + sys.slice(1)}
+            </motion.button>
+          )
+        })}
+      </div>
+
     </div>
   )
 }
@@ -156,19 +209,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
     setReady(false)
     try {
-      // On native iOS, getUserMedia won't trigger the system permission dialog —
-      // the Capacitor Camera plugin must request it first.
-      if (isNative()) {
-        const { Camera: CapCamera } = await import('@capacitor/camera')
-        try {
-          const perm = await CapCamera.requestPermissions({ permissions: ['camera'] })
-          console.log('[CameraOverlay] iOS perm:', JSON.stringify(perm))
-          if (perm?.camera === 'denied') {
-            setError('Camera access denied. Go to Settings → Privacy → Camera and enable access for this app.')
-            return
-          }
-        } catch (e) { console.warn('[CameraOverlay] requestPermissions non-fatal:', e) }
-      }
       // Request highest available resolution — mobile cameras will cap naturally
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: mode, width: { ideal: 3840 }, height: { ideal: 2160 } },
@@ -268,7 +308,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
           <ChevronLeft size={28} color="#fff" />
         </button>
         <span style={{ color: '#fff', fontWeight: 700, fontSize: 18, fontFamily: 'inherit' }}>
-          {stepNum === 1 ? 'Take your front photo' : 'Take your side photo'}
+          {stepNum === 1 ? 'Take your upper body photo' : 'Now, lower body photo'}
         </span>
         {showLive && !error && (
           <button onClick={() => { setFacingMode(m => m === 'user' ? 'environment' : 'user') }}
@@ -498,11 +538,10 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
           — see the object-fit: cover + object-position: bottom comment below
           for why this specific ratio matters there. */}
       <div
-        className={`relative w-full ${stepNum === 1 ? 'aspect-[4/5]' : 'aspect-[3/4]'} rounded-2xl flex items-center justify-center mt-2 mb-4 pointer-events-none`}
+        className={`relative w-full ${stepNum === 1 ? 'aspect-[4/5]' : 'aspect-[3/4]'} rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none`}
         style={{
-          background: 'transparent',
-          overflow: stepNum === 1 && !photo ? 'visible' : 'hidden',
-          zIndex: stepNum === 1 && !photo ? 10 : 'auto',
+          background: '#000000',
+          // Step 1 (face photo) keeps the gold frame; step 2 (side profile) is borderless.
           ...(stepNum === 1 && {
             border: `1.5px solid ${GOLD}`,
             boxShadow: '0 0 16px rgba(198,168,92,0.25)',
@@ -536,7 +575,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center top', transform: 'scale(1.2)', transformOrigin: 'center top' }}
+            style={{ objectFit: 'cover', objectPosition: 'center top' }}
           />
         ) : stepNum === 1 ? (
           // object-fit: cover + object-position: bottom (not contain) — this
@@ -560,7 +599,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center bottom', transform: 'scale(1.6)', transformOrigin: 'center bottom', position: 'relative', zIndex: 10 }}
+            style={{ objectFit: 'cover', objectPosition: 'center bottom' }}
           />
         ) : (
           <div className="flex flex-col items-center gap-4 p-8">
@@ -665,6 +704,13 @@ const LANDMARK_GOLD  = '#E5C158'
 const LANDMARK_GLOW  = 'rgba(229, 193, 88, 0.85)'
 const LANDMARK_GUIDE = 'rgba(255, 255, 255, 0.25)'
 
+export const ANALYSIS_STEP_LABELS = [
+  'Detecting facial symmetry...',
+  'Measuring jawline angle & ramus height...',
+  'Evaluating canthal tilt & eye canopy...',
+  'Analyzing lower third proportions...',
+  'Finalizing facial matrix...',
+]
 
 // Thin, technical-readout look (was strokeWidth 2.5 — read as thick/bold).
 const LANDMARK_STROKE = 1.1
@@ -1290,11 +1336,36 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
     return () => clearInterval(id)
   }, [diagLines])
 
+  // Score ticker — rapidly cycles from 0 to real score over ~1.2s then settles
+  const targetScore = scanResult?.overallScore ?? null
+  const [displayScore, setDisplayScore] = useState(null)
+  useEffect(() => {
+    if (targetScore == null) return
+    let current = 0
+    const steps = 28
+    const increment = targetScore / steps
+    const intervalMs = 1200 / steps
+    setDisplayScore(0)
+    let count = 0
+    const id = setInterval(() => {
+      count++
+      if (count >= steps) {
+        setDisplayScore(targetScore)
+        clearInterval(id)
+      } else {
+        current += increment
+        setDisplayScore(Math.round(current * 10) / 10)
+      }
+    }, intervalMs)
+    return () => clearInterval(id)
+  }, [targetScore])
+
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
       <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} scanResult={scanResult} />
 
-      {/* Status text */}
+      {/* Status text — two-tier hierarchy per SwiftUI reference:
+          small all-caps label (static) + cycling step text beneath */}
       <p
         className="font-mono text-center mb-1"
         style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: `${GOLD}99`, textTransform: 'uppercase' }}
@@ -1313,7 +1384,7 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
         </AnimatePresence>
       </div>
 
-      {/* Real-time diagnostic feed */}
+      {/* Real-time diagnostic feed — appears once sub-scores arrive */}
       <div className="h-4 mb-3 flex items-center justify-center overflow-hidden">
         <AnimatePresence mode="wait">
           {diagLines.length > 0 && (
@@ -1332,18 +1403,30 @@ export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, po
         </AnimatePresence>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar — pill outline with inset gold fill.
+          Fill amount is simulated (timer-driven steps); step 3 fill is tied
+          to the actual API call completing. No percentage shown. */}
       <div className="w-full" style={{
-        height: 36, borderRadius: 999, border: `2px solid ${GOLD}`,
-        padding: 4, background: 'transparent', boxSizing: 'border-box',
+        height: 36,
+        borderRadius: 999,
+        border: `2px solid ${GOLD}`,
+        padding: 4,
+        background: 'transparent',
+        boxSizing: 'border-box',
       }}>
         <motion.div
-          style={{ height: '100%', borderRadius: 999, background: GOLD, originX: 0 }}
+          style={{
+            height: '100%',
+            borderRadius: 999,
+            background: GOLD,
+            originX: 0,
+          }}
           initial={{ width: '5%' }}
           animate={{ width: `${progressPct}%` }}
           transition={{ duration: 0.9, ease: 'easeOut' }}
         />
       </div>
+
     </div>
   )
 }
@@ -1396,7 +1479,7 @@ function ChecklistRow({ step: s, i, currentStep }) {
 // Only step 0 (gender select) still uses PageHeader's title/subtitle —
 // steps 1 and 2 render their own matching custom header instead (below).
 
-export default function Scan() {
+export default function PhysiqueScan() {
   const navigate = useNavigate()
   const savedGender       = useStore(s => s.gender)
   const scans             = useStore(s => s.scans)
@@ -1425,11 +1508,15 @@ export default function Scan() {
   // Monthly scan gate disabled — server-side Redis limit handles scan caps
   const isFreeScanBlocked = false
 
-  const [step, setStep]                   = useState(1) // skip gender step — already collected in onboarding
+  const [step, setStep]                   = useState(1) // 1=photo, 2=height/weight, 3=analyzing
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
   const [showPhotoChoice, setShowPhotoChoice] = useState(false) // bottom sheet: take vs upload
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
-  const [gender, setLocalGender]          = useState(savedGender ?? null)
+  const [gender, setLocalGender]          = useState(savedGender ?? 'male')
+  const [height, setHeight]               = useState('')
+  const [weight, setWeight]               = useState('')
+  const [heightUnit, setHeightUnit]       = useState('cm')
+  const [weightUnit, setWeightUnit]       = useState('kg')
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
   const [analysisStep, setAnalysisStep]   = useState(0)
@@ -1518,72 +1605,15 @@ export default function Scan() {
     return Promise.race([convert, timeout])
   }
 
-  // Transition from front face → side profile.
-  // Runs quality validation during the ProcessingOverlay loading state so the
-  // check works for BOTH camera captures and library uploads (both call this).
-  // FAIL-CLOSED: any error during validation blocks the scan, never silently passes.
-  async function transitionToSide(url) {
-    console.log('[ASCENDUS SCAN] 1. Scan started')
-    console.log('[ASCENDUS SCAN] 2. Image captured/selected — type:', url ? url.slice(0, 40) : 'null')
-
-    setFacePhoto(url)
-    setError('')
-    setCameraOpen(false)
-    setPreviewPhoto(null)
-    setTransitioning(true)  // show loading overlay immediately
-
-    console.log('[ASCENDUS SCAN] 3. Image converted successfully')
-
-    let passed = false
-    let issues = []
-    try {
-      const { validateScanQuality } = await import('../utils/scanQuality.js')
-      const result = await validateScanQuality(url)
-      passed = result.passed
-      issues = result.issues
-    } catch (err) {
-      // Fail-CLOSED: if the validator itself throws, block the scan
-      console.error('[Scan] Quality check error (fail-closed):', err?.message)
-      passed = false
-      issues = [{ code: 'validation_error', title: 'Could not validate photo — please try again', advice: 'Please try again.', severity: 'critical' }]
-    }
-
-    if (!passed) {
-      setTransitioning(false)
-      navigate('/scan/quality-fail', { state: { issues, photoUrl: url } })
-      return
-    }
-
-    console.log('[ASCENDUS SCAN] 9. Starting facial analysis')
+  // Auto-advance from photo step to height/weight step (no side profile)
+  useEffect(() => {
+    if (step !== 1 || !facePhoto) return
     setStep(2)
-    setTransitioning(false)
-  }
+  }, [step, facePhoto])
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
-
-    // Belt-and-suspenders: re-validate the face photo before analysis starts.
-    // The result is cached in scanQuality.js so this is instant (no re-run).
-    // Fail-CLOSED: any error blocks analysis.
-    if (facePhoto) {
-      let qPassed = false
-      let qIssues = []
-      try {
-        const { validateScanQuality } = await import('../utils/scanQuality.js')
-        const qResult = await validateScanQuality(facePhoto)
-        qPassed = qResult.passed
-        qIssues = qResult.issues
-      } catch (err) {
-        console.error('[Scan] startAnalysis quality gate error (fail-closed):', err?.message)
-        qPassed = false
-        qIssues = [{ code: 'validation_error', title: 'Could not validate photo', advice: 'Please try again.', severity: 'critical' }]
-      }
-      if (!qPassed) {
-        navigate('/scan/quality-fail', { state: { issues: qIssues, photoUrl: facePhoto } })
-        return
-      }
-    }
 
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
@@ -1693,13 +1723,15 @@ export default function Scan() {
       } else {
         try {
           setScanInFlight(true)
-          const lastGlowScore = scans?.[0]?.glowScore ?? null
-          const scoreCall = api.ai.score({
-            faceImage: faceB64,
+          // Convert to metric for the server — server prompt uses cm/kg
+          const heightCm = height ? (heightUnit === 'ft' ? Math.round(parseFloat(height) * 30.48) : parseFloat(height)) : null
+          const weightKg = weight ? (weightUnit === 'lbs' ? Math.round(parseFloat(weight) * 0.453592) : parseFloat(weight)) : null
+          const scoreCall = api.ai.scorePhysique({
+            bodyImage: faceB64,
             ...(sideB64 ? { sideImage: sideB64 } : {}),
-            ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
             gender: g,
-            ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
+            ...(heightCm ? { height: `${heightCm}cm` } : {}),
+            ...(weightKg ? { weight: `${weightKg}kg` } : {}),
           })
           const timeoutCall = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
@@ -1762,14 +1794,6 @@ export default function Scan() {
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
       recordProScan()
-
-      // Mark calibration complete after first successful scan — subsequent
-      // scans will use the fast local MediaPipe path instead of the AI API.
-      // Also release the original capture blob URL (privacy: no longer needed).
-      import('../utils/scanQuality.js').then(({ markCalibrated, releaseValidationImage }) => {
-        markCalibrated()
-        releaseValidationImage(facePhoto) // facePhoto may be blob: URL from camera/upload
-      }).catch(() => {})
 
       // Fire-and-forget: run MediaPipe client-side to extract named landmarks
       // and explorer metrics for FaceMetricsExplorer on the Progress screen.
@@ -1868,7 +1892,7 @@ export default function Scan() {
 
       // Transition through the scan-ready screen (progress bar + affirming
       // messages) before landing on results or the unlock gate.
-      navigate('/scan/ready')
+      navigate('/physique-results')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
       if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {
@@ -1932,7 +1956,7 @@ export default function Scan() {
   return (
     <div className="flex flex-col h-full bg-page">
       <Helmet>
-        <title>AI Face Rating &amp; Looksmax Scan | Ascendus</title>
+        <title>AI Physique Scan | Ascendus</title>
         <meta name="description" content="Upload your photo for an instant AI face rating and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, face analyzer, glow up scan" />
       </Helmet>
@@ -1943,89 +1967,56 @@ export default function Scan() {
           copies that can drift apart. Step 0 (gender select) is the only
           one still using PageHeader. */}
       {!isAnalyzing && (
-        (step === 1 || step === 2) ? (
-          // Ported from PremiumOnboarding.jsx's PhotoStepScreen (its BackBtn +
-          // "STEP X OF 3" tag + big headline treatment) instead of this
-          // screen's old smaller inline chevron+title row, using this file's
-          // own theme-aware tokens (var(--card)/var(--border)/text-primary)
-          // rather than onboarding's hardcoded always-dark colors, since this
-          // screen (unlike onboarding) supports light mode too.
-          <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
-            <button
-              onClick={() => {
-                triggerHaptic()
-                if (transitioning) { setTransitioning(false); setFacePhoto(null); setStep(1) }
-                else if (cameraOpen) { setCameraOpen(false) }
+        <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
+          <button
+            onClick={() => {
+              triggerHaptic()
+              if (step === 2) { setFacePhoto(null); setStep(1) }
+              else if (step === 1) {
+                if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
-                else if (step === 2) { setFacePhoto(null); setStep(1) }
                 else { setScanLaunching(true); navigate(-1) }
-              }}
-              aria-label="Go back"
-              className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
-            >
-              <ChevronLeft size={18} className="text-primary" />
-            </button>
-            <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>
-              STEP {step === 1 ? '1' : '2'} OF 2
-            </p>
-            <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
-              {step === 1 ? 'Take your front photo' : 'Now, your side profile'}
-            </h1>
-          </div>
-        ) : (
-          <PageHeader
-            title="Select Gender"
-            subtitle="For accurate Overall Rating results"
-            back
-            onBack={() => navigate('/scan')}
-          />
-        )
+              } else {
+                setScanLaunching(true); navigate(-1)
+              }
+            }}
+            aria-label="Go back"
+            className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+          >
+            <ChevronLeft size={18} className="text-primary" />
+          </button>
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>
+            PHYSIQUE SCAN
+          </p>
+          <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
+            {step === 2 ? 'Enter your body stats' : 'Take your upper body photo'}
+          </h1>
+        </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
-          {step === 0 && (
-            <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
-              <GenderSelector selected={gender} onSelect={setLocalGender} onAdvance={() => setStep(1)} />
+          {step === 2 && !isAnalyzing && (
+            <motion.div key="stats" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
+              <HeightWeightSelector
+                height={height} weight={weight}
+                heightUnit={heightUnit} weightUnit={weightUnit}
+                onHeightChange={setHeight} onWeightChange={setWeight}
+                onHeightUnitChange={setHeightUnit} onWeightUnitChange={setWeightUnit}
+              />
             </motion.div>
           )}
-          {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
-            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6" style={{ overflow: 'visible' }}>
-              {step === 1 ? (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
-                  <img
-                    src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
-                    alt="Guide"
-                    className="w-full h-full object-cover rounded-2xl"
-                    style={{
-                      transform: 'scale(1.05) translateY(16px)',
-                      transformOrigin: 'center bottom',
-                      objectPosition: 'center bottom',
-                      position: 'relative',
-                      zIndex: 5,
-                      mixBlendMode: 'lighten',
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
-                  <img
-                    src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
-                    alt="Guide"
-                    className="w-full h-full object-cover rounded-2xl"
-                    style={{
-                      transform: 'scale(1.1) translateY(34px)',
-                      transformOrigin: 'center bottom',
-                      objectPosition: 'center bottom',
-                      position: 'relative',
-                      zIndex: 5,
-                      mixBlendMode: 'lighten',
-                    }}
-                  />
-                </div>
-              )}
+          {step === 1 && !cameraOpen && !previewPhoto && (
+            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6">
+              <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '4/5' }}>
+                <img
+                  src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
+                  alt="Guide"
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
               {/* iOS-style action sheet — appears over the guide content */}
               <AnimatePresence>
@@ -2070,7 +2061,7 @@ export default function Scan() {
                               })
                             }
                             if (url) {
-                              if (step === 1) { transitionToSide(url) }
+                              if (step === 1) { setFacePhoto(url); setError(''); setStep(2) }
                               else { setTransitioning(true); setSidePhoto(url); setError(''); setTimeout(() => { setStep(3); setTransitioning(false); setTimeout(() => startAnalysisRef.current?.(), 50) }, 300) }
                             }
                           } catch {}
@@ -2116,7 +2107,8 @@ export default function Scan() {
                     triggerHaptic()
                     const { url, forStep } = previewPhoto
                     if (forStep === 1) {
-                      transitionToSide(url)
+                      setPreviewPhoto(null)
+                      setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
                     } else {
                       setTransitioning(true)
                       setSidePhoto(url); setError(''); setCameraOpen(false)
@@ -2144,7 +2136,7 @@ export default function Scan() {
                 onCapture={(url, blob) => {
                   triggerHaptic()
                   if (step === 1) {
-                    transitionToSide(url)
+                    setFacePhoto(url); setError(''); setCameraOpen(false); setStep(2)
                   } else {
                     setTransitioning(true)
                     setSidePhoto(url); setError(''); setCameraOpen(false)
@@ -2167,14 +2159,9 @@ export default function Scan() {
         </AnimatePresence>
       </div>
 
-      {/* Processing overlay — shown between front face confirm → side profile, and side confirm → analyzing */}
+      {/* Processing overlay — brief gap between preview Continue and analyzing screen */}
       <AnimatePresence>
-        {transitioning && (
-          <ProcessingOverlay
-            key="scan-transition"
-            label="Processing"
-          />
-        )}
+        {transitioning && <ProcessingOverlay key="scan-transition" />}
       </AnimatePresence>
 
       {/* Scan-cap upgrade modal */}
@@ -2296,10 +2283,10 @@ export default function Scan() {
         </div>
       )}
 
-      {/* CTAs — pinned at bottom, same position/size on every step */}
+      {/* Pinned bottom button — identical position/size on every step */}
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {(step === 1 || step === 2) && (
+          {step === 1 && (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
@@ -2307,6 +2294,16 @@ export default function Scan() {
               style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >
               Begin Scan
+            </motion.button>
+          )}
+          {step === 2 && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { triggerHaptic(); startAnalysis(true) }}
+              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+            >
+              Analyze My Physique
             </motion.button>
           )}
         </div>

@@ -27,8 +27,6 @@ export function releaseValidationImage(url) {
   }
 }
 
-// ─── Result cache — second call in startAnalysis() is instant ─────────────────
-let _cache = { url: null, result: null }
 
 // ─── Resize + convert image to a base64 data URL ─────────────────────────────
 // Downscales to MAX_SIDE on the longest edge before encoding.
@@ -93,12 +91,6 @@ function mapIssue(aiIssue) {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 export async function validateScanQuality(imageSource) {
-  // Cache hit — startAnalysis() calls this a second time; return instantly
-  if (_cache.url === imageSource && _cache.result !== null) {
-    console.log('[ASCENDUS SCAN] Cache hit — returning previous validation result')
-    return _cache.result
-  }
-
   console.log('[ASCENDUS SCAN] 4. Starting AI face validation')
 
   // ── Convert image to base64 ──────────────────────────────────────────────────
@@ -134,7 +126,6 @@ export async function validateScanQuality(imageSource) {
       issues: [{ code: 'image_load', title: 'Could not read photo — please try again', advice: 'The photo could not be processed. Try taking another photo.', severity: 'critical' }],
       state: 'ERROR',
     }
-    _cache = { url: imageSource, result }
     return result
   }
 
@@ -152,7 +143,6 @@ export async function validateScanQuality(imageSource) {
       issues: [{ code: 'validation_error', title: 'Could not validate photo — please try again', advice: 'Check your connection and try again.', severity: 'critical' }],
       state: 'ERROR',
     }
-    _cache = { url: imageSource, result }
     return result
   }
 
@@ -164,7 +154,6 @@ export async function validateScanQuality(imageSource) {
   if (aiResponse.valid === true && aiResponse.faceCount === 1) {
     console.log('[ASCENDUS SCAN] ✅ VALIDATION_SUCCESS — proceeding to facial analysis')
     const result = { passed: true, issues: [], state: 'SUCCESS' }
-    _cache = { url: imageSource, result }
     return result
   }
 
@@ -180,6 +169,5 @@ export async function validateScanQuality(imageSource) {
 
   console.log('[ASCENDUS SCAN] ❌ VALIDATION_RESULT — photo issue:', issues[0]?.code)
   const result = { passed: false, issues, state: 'RESULT' }
-  _cache = { url: imageSource, result }
   return result
 }
