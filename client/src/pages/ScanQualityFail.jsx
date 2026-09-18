@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import MotionPage from '../components/MotionPage'
@@ -76,6 +77,7 @@ const DEFAULT_CONTENT = {
 
 export default function ScanQualityFail() {
   const navigate  = useNavigate()
+  const [retrying, setRetrying] = useState(false)
   const { state } = useLocation()
   const photoUrl  = state?.photoUrl ?? null
   const issues    = state?.issues   ?? []
@@ -85,6 +87,26 @@ export default function ScanQualityFail() {
     .sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3))[0]
 
   const content = ISSUE_CONTENT[topIssue?.code] ?? DEFAULT_CONTENT
+  const canRetryPhoto = topIssue?.code === 'validation_error' && !!photoUrl
+
+  async function tryAgain() {
+    triggerHaptic()
+    if (!canRetryPhoto) { navigate('/scan/capture', { replace: true }); return }
+    setRetrying(true)
+    try {
+      const { validateScanQuality } = await import('../utils/scanQuality.js')
+      const result = await validateScanQuality(photoUrl)
+      if (result.passed) {
+        navigate('/scan/capture', { replace: true, state: { recoveredFrontPhoto: photoUrl } })
+      } else if (result.state === 'RESULT') {
+        navigate('/scan/quality-fail', { replace: true, state: { issues: result.issues, photoUrl } })
+      }
+    } catch (err) {
+      console.error('[ScanQualityFail] retry failed:', err?.message)
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   return (
     <MotionPage
@@ -181,11 +203,12 @@ export default function ScanQualityFail() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.28 }}
         whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); navigate('/scan/capture', { replace: true }) }}
+        onClick={tryAgain}
+        disabled={retrying}
         className="flex-shrink-0 w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
         style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
       >
-        Try Again
+        {retrying ? 'Checking Photo…' : canRetryPhoto ? 'Try Again' : 'Retake Photo'}
       </motion.button>
     </MotionPage>
   )

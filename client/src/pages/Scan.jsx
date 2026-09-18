@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
@@ -22,6 +22,8 @@ import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
+import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
+import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 
 // No-op on web — no native bridge, and no web Firebase app configured yet either.
 async function logAnalyticsEvent(name, params) {
@@ -32,8 +34,6 @@ async function logAnalyticsEvent(name, params) {
     // analytics unavailable — not fatal, ignore
   }
 }
-
-import { ANALYSIS_STEPS, ANALYSIS_STEP_LABELS } from '../utils/analysisSteps'
 
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -151,6 +151,9 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const [facingMode, setFacingMode] = useState('user')
   const [error, setError]         = useState('')
   const [capturedUrl, setCapturedUrl] = useState(null) // null = live camera, string = captured photo
+  const [alignmentFrame, setAlignmentFrame] = useState(null)
+  const [trackingAvailable, setTrackingAvailable] = useState(false)
+  const alignment = getAlignment(alignmentFrame, stepNum === 2)
 
   const startCamera = useCallback(async (mode) => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
@@ -189,7 +192,36 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [facingMode, startCamera])
 
+  useEffect(() => {
+    if (!ready || capturedUrl) return
+    let cancelled = false
+    let timer
+    let tracker
+    const sample = document.createElement('canvas')
+    sample.width = 320
+    sample.height = 320
+    createLiveFaceAlignment(frame => {
+      if (!cancelled) setAlignmentFrame(frame)
+    }).then(instance => {
+      if (cancelled) { instance.close(); return }
+      tracker = instance
+      setTrackingAvailable(true)
+      const tick = async () => {
+        if (cancelled) return
+        const video = videoRef.current
+        if (video?.readyState >= 2 && !video.paused) {
+          sample.getContext('2d').drawImage(video, 0, 0, 320, 320)
+          try { await tracker.check(sample) } catch { setTrackingAvailable(false) }
+        }
+        if (!cancelled) timer = setTimeout(tick, 600)
+      }
+      tick()
+    }).catch(() => { if (!cancelled) setTrackingAvailable(false) })
+    return () => { cancelled = true; clearTimeout(timer); tracker?.close() }
+  }, [ready, capturedUrl, facingMode])
+
   function capture() {
+    if (trackingAvailable && !alignment.aligned) return
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
@@ -286,6 +318,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
               <AlertCircle size={40} className="text-warning" />
               <p className="text-white text-sm font-body">{error}</p>
               <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
+              {isNative() && <button onClick={async () => { try { const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
             </div>
           ) : (
             <>
@@ -301,6 +334,14 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   <Loader2 size={36} className="text-white animate-spin" />
                 </div>
               )}
+              {showLive && ready && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
+                  <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: alignment.aligned ? GOLD : '#fff', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
+                    {trackingAvailable ? alignment.label : (stepNum === 2 ? 'Align your side profile' : 'Position your face')}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -311,12 +352,12 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
         <div style={{ padding: '12px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
             onClick={() => { triggerHaptic(); capturedUrl ? handleContinue() : capture() }}
-            disabled={!capturedUrl && !ready}
+            disabled={!capturedUrl && (!ready || (trackingAvailable && !alignment.aligned))}
             style={{
               width: '100%', padding: '18px 0', borderRadius: 50,
               background: GOLD_GRADIENT, border: 'none', cursor: 'pointer',
               color: '#000', fontWeight: 700, fontSize: 18, fontFamily: 'inherit',
-              opacity: (!capturedUrl && !ready) ? 0.5 : 1,
+              opacity: (!capturedUrl && (!ready || (trackingAvailable && !alignment.aligned))) ? 0.5 : 1,
               boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
             }}
           >
@@ -384,21 +425,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
 
   async function handleCameraClick() {
     if (cameraInFlight.current) return
-    cameraInFlight.current = true
-    try {
-      if (isNative()) {
-        const dataUrl = await takePhoto()
-        if (dataUrl) onPhoto(dataUrl, dataUrl)
-      } else {
-        setCameraOpen(true)
-      }
-    } catch (err) {
-      if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-        setError('Camera error: ' + (err?.message || 'Unknown error'))
-      }
-    } finally {
-      cameraInFlight.current = false
-    }
+    setCameraOpen(true)
   }
 
   async function handleUploadClick() {
@@ -680,9 +707,11 @@ const LANDMARK_STROKE = 1.1
 // faceLandmarks.js's computeStructuralMetrics.
 const OVERLAY_LM_INDICES = {
   forehead: 10, nose: 1, noseBase: 2, chin: 152,
+  browL: 105, browR: 334, upperLip: 13, lowerLip: 14,
   cheekL: 234, cheekR: 454,
   jawL: 172, jawR: 397, jawMidL: 136, jawChinL: 148, jawMidR: 365, jawChinR: 378,
   eyeOuterL: 33, eyeOuterR: 263, eyeInnerL: 133, eyeInnerR: 362,
+  eyeTopL: 159, eyeBottomL: 145, eyeTopR: 386, eyeBottomR: 374,
   templeL: 127, templeR: 356,
   mouthL: 61, mouthR: 291,
   // Alar base (nose wing lateral edges) — used for alar base width label
@@ -1106,58 +1135,20 @@ function FacialAnalysisOverlay({ step: _step, points, scanResult }) {
 // roughly that long before navigating so the flourish is never cut off mid-play.
 function MorphWarpOverlay({ photo }) {
   return (
-    <motion.div
-      className="absolute inset-0"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-    >
-      {photo && (
-        <>
-          <motion.img
-            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
-            style={{ mixBlendMode: 'screen', filter: 'sepia(1) saturate(4) hue-rotate(-25deg)' }}
-            initial={{ x: 0, opacity: 0 }}
-            animate={{ x: [0, -3, 2, 0], opacity: [0, 0.5, 0.5, 0] }}
-            transition={{ duration: 0.9, ease: 'easeInOut' }}
-          />
-          <motion.img
-            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
-            style={{ mixBlendMode: 'screen', filter: 'saturate(4) hue-rotate(180deg)' }}
-            initial={{ x: 0, opacity: 0 }}
-            animate={{ x: [0, 3, -2, 0], opacity: [0, 0.5, 0.5, 0] }}
-            transition={{ duration: 0.9, ease: 'easeInOut' }}
-          />
-          <motion.img
-            src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
-            initial={{ scale: 1, filter: 'blur(0px) brightness(0.5)' }}
-            animate={{ scale: [1, 1.06, 0.99, 1], filter: ['blur(0px) brightness(0.5)', 'blur(6px) brightness(1.1)', 'blur(2px) brightness(0.8)', 'blur(0px) brightness(0.9)'] }}
-            transition={{ duration: 0.9, ease: 'easeInOut' }}
-          />
-        </>
-      )}
-      <motion.div
-        className="absolute inset-0"
-        style={{ background: LANDMARK_GOLD, mixBlendMode: 'overlay' }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 0.55, 0] }}
-        transition={{ duration: 0.9, ease: 'easeInOut' }}
-      />
-    </motion.div>
+    <motion.div className="absolute inset-0 pointer-events-none" style={{ background: GOLD, mixBlendMode: 'soft-light' }}
+      initial={{ opacity: 0 }} animate={{ opacity: [0, .34, 0] }} transition={{ duration: .9, ease: 'easeInOut' }} />
   )
 }
 
-const MESH_CYAN = '#4DE8E0'
-const MESH_GLOW = 'rgba(77, 232, 224, 0.85)'
+const MESH_CYAN = GOLD
+const MESH_GLOW = 'rgba(198, 168, 92, 0.85)'
 
 // One-time ~3.4s "mesh lock-on" beat that plays as soon as real landmarks
 // resolve (see startAnalysis) — a dense wireframe (buildMeshPathD, above)
 // fades in over the real detected face, a bright line sweeps top-to-bottom
 // across it once, then it fades out and the normal gold step-by-step
 // overlay (already running underneath the whole time) is what's left.
-// Cyan rather than gold specifically so this reads as its own distinct
-// "tracking locked" moment instead of blending into that later sequence.
+// Gold matches the rest of the Ascendus scanner.
 // Renders nothing until `pathD` exists — see AnalyzingSweepOverlay, which
 // mounts this once per scan, so the animation timing below starts exactly
 // when the real mesh is ready to show, not from an arbitrary earlier time.
@@ -1206,61 +1197,88 @@ function FaceMeshScanOverlay({ pathD }) {
 // exactly the "not on the person's face" bug this fixes. `aspectRatio`
 // only kicks in as a fallback for the (normally unreachable) case where
 // there's no photo yet, so the box doesn't collapse to zero height.
-function AnalyzingSweepOverlay({ photo, step, morphing, points, meshPathD, scanResult }) {
+function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, meshPathD }) {
+  const [elapsed, setElapsed] = useState(0)
+  const frontFeatures = frontFeatureAnchors(points)
+  const profileFeatures = sidePhoto ? profileFeatureAnchors(sidePoints) : []
+  // Timed against the reference: ~1.5s sweep, then chin, eyes, jaw,
+  // cheeks, and structure. The circles at the photo edge accumulate.
+  const introMs = 1550
+  const frontDurations = [2000, 2300, 2200, 2200, 2600]
+  const profileStart = introMs + frontFeatures.reduce((sum, _, i) => sum + frontDurations[i], 0) + 500
+  const showingSide = frontFeatures.length > 0 && profileFeatures.length > 0 && elapsed >= profileStart
+  const features = showingSide ? profileFeatures : frontFeatures
+  const durations = showingSide ? profileFeatures.map(() => 1850) : frontDurations.slice(0, frontFeatures.length)
+  const stageStart = showingSide ? profileStart : introMs
+  let activeCount = 0
+  let activeStart = stageStart
+  while (activeCount < features.length && elapsed >= activeStart) {
+    if (elapsed < activeStart + durations[activeCount]) break
+    activeStart += durations[activeCount]
+    activeCount += 1
+  }
+  if (activeCount < features.length && elapsed >= activeStart) activeCount += 1
+  const activeFeature = features[activeCount - 1]
+  const activeDuration = durations[activeCount - 1] ?? 1
+  const beatProgress = activeFeature ? Math.min(1, Math.max(0, (elapsed - activeStart) / activeDuration)) : 0
+  const photoFlash = activeFeature && beatProgress < .15
+  const displayPhoto = showingSide ? sidePhoto : photo
+  useEffect(() => {
+    setElapsed(0)
+    const started = Date.now()
+    const id = setInterval(() => {
+      const next = Date.now() - started
+      setElapsed(next)
+      if (next > 22000) clearInterval(id)
+    }, 50)
+    return () => clearInterval(id)
+  }, [photo, points])
+  const stageLabel = step >= 4 ? 'COMPILING RESULTS' : activeCount === 0 ? 'DETECTING STRUCTURE' : `ANALYZING · ${activeCount}/${features.length}`
   return (
-    <div
-      className="relative w-full rounded-3xl overflow-hidden mb-5"
-      style={{ background: '#0a0a0a', ...(photo ? {} : { aspectRatio: '2/3' }) }}
-    >
-      {photo && (
-        <img
-          src={photo}
-          alt=""
-          className="block w-full h-auto"
-          style={{ filter: 'brightness(0.5) saturate(0.85)' }}
-        />
-      )}
-      <div
-        className="absolute inset-0"
-        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }}
-      />
-      {/* Subtle background grid — h/v lines at low opacity, per SwiftUI ref */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `linear-gradient(rgba(198,168,92,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.05) 1px, transparent 1px)`,
-          backgroundSize: '20% 12.5%',
-        }}
-      />
-      <AnimatePresence>
-        {morphing ? <MorphWarpOverlay key="morph" photo={photo} /> : <FacialAnalysisOverlay key="overlay" step={step} points={points} scanResult={scanResult} />}
-      </AnimatePresence>
-      {/* Plays once, on top of whichever step is currently showing, the
-          moment the real mesh is ready — see FaceMeshScanOverlay. Suppressed
-          during the final morph flourish since by then it's long finished
-          its one 3.4s pass anyway; this just guards against any overlap. */}
-      {!morphing && <FaceMeshScanOverlay pathD={meshPathD} />}
-      {/* Continuous ping-pong scan laser — runs independently of step system */}
-      {!morphing && (
-        <motion.div
-          className="absolute left-0 right-0 pointer-events-none"
-          style={{
-            height: 1,
-            background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}cc 30%, ${LANDMARK_GOLD} 50%, ${LANDMARK_GOLD}cc 70%, transparent)`,
-            boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
-          }}
-          animate={{ top: ['2%', '98%'] }}
-          transition={{ duration: 2.0, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
-        />
-      )}
+    <div className="w-full flex flex-col items-center mb-5">
+      <div className="rounded-full px-3 py-1 mb-3 font-mono" style={{ border: `1px solid ${GOLD}66`, color: GOLD, background: '#17140c', fontSize: 9, letterSpacing: '0.16em' }}>{stageLabel}</div>
+      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || 5 }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < activeCount ? GOLD : `${GOLD}44` }} />)}</div>
+      <div className="relative mx-auto" style={{ width: 'fit-content', maxWidth: '100%', ...(photo ? {} : { aspectRatio: '2/3', width: '100%' }) }}>
+        <div className="relative rounded-3xl overflow-hidden" style={{ background: '#0a0a0a' }}>
+          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full" style={{ maxHeight: '75dvh', filter: activeCount === 0 || step >= 4 || photoFlash ? 'brightness(.88)' : 'brightness(.43) saturate(.78)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.04),transparent 32%,rgba(0,0,0,.16))' }} />
+          {!morphing && activeCount === 0 && <motion.div className="absolute left-0 right-0 pointer-events-none" style={{ height: 2, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, boxShadow: `0 0 15px 5px ${GOLD}88` }} initial={{ top: '5%' }} animate={{ top: '95%' }} transition={{ duration: 1.35, ease: 'easeInOut' }} />}
+          {morphing && <MorphWarpOverlay photo={displayPhoto} />}
+          {!morphing && activeFeature && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {features.slice(0, activeCount).map((feature, featureIndex) => <g key={feature.id} opacity={featureIndex === activeCount - 1 && beatProgress < .68 ? 1 : .48}>
+              {feature.regions?.filter(Boolean).map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill={GOLD} fillOpacity=".35" stroke={GOLD} strokeOpacity=".6" strokeWidth=".3" />)}
+              {feature.contour && <polyline points={feature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke={GOLD} strokeWidth=".5" opacity=".75" vectorEffect="non-scaling-stroke" />}
+            </g>)}
+          </svg>}
+        </div>
+        {!morphing && activeFeature && <motion.div className="absolute pointer-events-none rounded-full" style={{ x: '-50%', y: '-50%', border: `1.5px solid ${GOLD}`, boxShadow: `0 0 16px ${GOLD}77, inset 0 0 11px ${GOLD}33` }}
+          initial={{ opacity: 0, scale: .5 }} animate={{ left: `${activeFeature.point.x * 100}%`, top: `${activeFeature.point.y * 100}%`, width: activeFeature.radius, height: activeFeature.radius, opacity: beatProgress < .68 ? .78 : 0, scale: beatProgress < .68 ? 1 : 1.25 }}
+          transition={{ left: { duration: .42, ease: 'easeInOut' }, top: { duration: .42, ease: 'easeInOut' }, width: { duration: .42 }, height: { duration: .42 }, opacity: { duration: .25 }, scale: { duration: .32 } }} />}
+        {!morphing && features.slice(0, activeCount).map((feature, i) => {
+          const x = feature.point.x * 100
+          const y = feature.point.y * 100
+          const badgeX = feature.side === 'right' ? 96 : 5
+          const current = i === activeCount - 1 && beatProgress < .68
+          return <motion.div key={`${showingSide ? 'side' : 'front'}-${feature.label}`} className="absolute inset-0 pointer-events-none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .25 }}>
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+              {current
+                ? <motion.path d={`M ${x} ${y} L ${badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1" vectorEffect="non-scaling-stroke" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .5 }} />
+                : <path d={`M ${x} ${y} L ${badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1" vectorEffect="non-scaling-stroke" />}
+              <circle cx={x} cy={y} r=".8" fill={GOLD} />
+              {feature.secondaryPoint && <circle cx={feature.secondaryPoint.x * 100} cy={feature.secondaryPoint.y * 100} r=".8" fill={GOLD} />}
+            </svg>
+            <div className="absolute flex items-center justify-center rounded-full" style={{ left: `${badgeX}%`, top: `${feature.badgeY}%`, transform: 'translate(-50%,-50%)', width: 42, height: 42, border: `1.5px solid ${GOLD}`, background: current ? '#17140c' : GOLD, boxShadow: `0 0 18px ${GOLD}66`, color: current ? GOLD : '#17140c' }}>
+              {current ? <motion.div className="rounded-full" style={{ width: 14, height: 14, border: `2px solid ${GOLD}`, borderTopColor: 'transparent' }} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} /> : <CheckCircle2 size={21} strokeWidth={1.5} />}
+            </div>
+            <span className="absolute font-mono" style={{ left: `${badgeX}%`, top: `calc(${feature.badgeY}% + 25px)`, transform: 'translateX(-50%)', fontSize: 7, fontWeight: 700, color: GOLD, letterSpacing: '.08em', whiteSpace: 'nowrap', textShadow: '0 1px 5px #000' }}>{feature.label}</span>
+          </motion.div>
+        })}
+      </div>
     </div>
   )
 }
 
-// Maps currentStep (0–4) to a fill percentage for the progress bar.
-// Steps 1–3 are timer-driven (setInterval every 1800ms) — simulated progress.
-// Step 3 is set when the API call actually completes — the only real signal.
-const STEP_PROGRESS_PCT = [5, 20, 50, 80, 95]
+const REAL_SCAN_STAGES = ['Preparing images', 'Detecting facial landmarks', 'Analyzing front and side', 'Building results', 'Results ready']
 
 function buildDiagnosticLines(scanResult) {
   const subs = scanResult?.faceSubScores
@@ -1276,74 +1294,13 @@ function buildDiagnosticLines(scanResult) {
   ]
 }
 
-export function AnalyzingScreen({ currentStep, slow, photo, morphing = false, points = null, meshPathD = null, scanResult = null }) {
+export function AnalyzingScreen({ currentStep, slow, photo, sidePhoto = null, morphing = false, points = null, sidePoints = null, meshPathD = null, scanResult = null }) {
   const stepIndex = Math.min(currentStep, 4)
-  const progressPct = STEP_PROGRESS_PCT[stepIndex]
-
-  // Diagnostic feed — cycles through sub-score lines once real result arrives
-  const diagLines = useMemo(() => buildDiagnosticLines(scanResult), [scanResult])
-  const [feedIdx, setFeedIdx] = useState(0)
-  useEffect(() => {
-    if (!diagLines.length) return
-    setFeedIdx(0)
-    const id = setInterval(() => setFeedIdx(i => (i + 1) % diagLines.length), 1300)
-    return () => clearInterval(id)
-  }, [diagLines])
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} step={currentStep} morphing={morphing} points={points} meshPathD={meshPathD} scanResult={scanResult} />
-
-      {/* Status text */}
-      <p
-        className="font-mono text-center mb-1"
-        style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: `${GOLD}99`, textTransform: 'uppercase' }}
-      >
-        MAPPING FACIAL MATRIX
-      </p>
-      <div className="h-5 mb-2 flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.3 }}
-            className="text-xs font-body"
-            style={{ color: slow ? GOLD : 'var(--text-secondary)' }}
-          >
-            {ANALYSIS_STEP_LABELS[stepIndex]}
-          </motion.p>
-        </AnimatePresence>
-      </div>
-
-      {/* Real-time diagnostic feed */}
-      <div className="h-4 mb-3 flex items-center justify-center overflow-hidden">
-        <AnimatePresence mode="wait">
-          {diagLines.length > 0 && (
-            <motion.p
-              key={feedIdx}
-              initial={{ opacity: 0, y: 3 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -3 }}
-              transition={{ duration: 0.25 }}
-              className="font-mono text-center"
-              style={{ fontSize: 9, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.45)' }}
-            >
-              {'> '}{diagLines[feedIdx]}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full" style={{
-        height: 36, borderRadius: 999, border: `2px solid ${GOLD}`,
-        padding: 4, background: 'transparent', boxSizing: 'border-box',
-      }}>
-        <motion.div
-          style={{ height: '100%', borderRadius: 999, background: GOLD, originX: 0 }}
-          initial={{ width: '5%' }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
-        />
-      </div>
+      <AnalyzingSweepOverlay photo={photo} sidePhoto={sidePhoto} step={currentStep} morphing={morphing} points={points} sidePoints={sidePoints} meshPathD={meshPathD} />
+      <span className="sr-only" aria-live="polite">{REAL_SCAN_STAGES[stepIndex]}</span>
     </div>
   )
 }
@@ -1398,6 +1355,8 @@ function ChecklistRow({ step: s, i, currentStep }) {
 
 export default function Scan() {
   const navigate = useNavigate()
+  const { state: routeState } = useLocation()
+  const recoveredFrontPhoto = routeState?.recoveredFrontPhoto ?? null
   const savedGender       = useStore(s => s.gender)
   const scans             = useStore(s => s.scans)
   const isPremium         = useStore(s => s.isPremium)
@@ -1425,12 +1384,12 @@ export default function Scan() {
   // Monthly scan gate disabled — server-side Redis limit handles scan caps
   const isFreeScanBlocked = false
 
-  const [step, setStep]                   = useState(1) // skip gender step — already collected in onboarding
+  const [step, setStep]                   = useState(recoveredFrontPhoto ? 2 : 1) // skip gender step — already collected in onboarding
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
   const [showPhotoChoice, setShowPhotoChoice] = useState(false) // bottom sheet: take vs upload
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
   const [gender, setLocalGender]          = useState(savedGender ?? null)
-  const [facePhoto, setFacePhoto]         = useState(null)
+  const [facePhoto, setFacePhoto]         = useState(recoveredFrontPhoto)
   const [sidePhoto, setSidePhoto]         = useState(null)
   const [analysisStep, setAnalysisStep]   = useState(0)
   const [slowAnalysis, setSlowAnalysis]   = useState(false)
@@ -1446,6 +1405,7 @@ export default function Scan() {
   // instant the analyzing screen mounts. Stays null (fallback, generic
   // centered geometry) until detection resolves, or if it fails outright.
   const [analysisPoints, setAnalysisPoints] = useState(null)
+  const [sideAnalysisPoints, setSideAnalysisPoints] = useState(null)
   // Deduped SVG path string for the ~3.4s mesh-scan beat (FaceMeshScanOverlay)
   // — built from the same detection call as analysisPoints above, see
   // startAnalysis. null until that resolves (the beat simply doesn't play).
@@ -1592,6 +1552,7 @@ export default function Scan() {
     setError('')
     setAnalysisStep(0)
     setAnalysisPoints(null) // clear any previous scan's points before detecting this one's
+    setSideAnalysisPoints(null)
     setMeshPathD(null)      // same for the mesh-scan beat — don't replay the last scan's mesh
 
     // Kick off real face-landmark detection the instant the analyzing screen
@@ -1605,8 +1566,10 @@ export default function Scan() {
     // mesh beat entirely — never blocks or breaks the actual scan. The
     // 16-18s typical API wait gives this ample time even accounting for
     // MediaPipe's cold-start model load on the very first scan of a session.
+    let frontLandmarksPromise = Promise.resolve()
     if (facePhoto) {
-      import('../utils/faceLandmarks.js')
+      setAnalysisStep(1)
+      frontLandmarksPromise = import('../utils/faceLandmarks.js')
         .then(({ getLandmarks }) => getLandmarks(facePhoto))
         .then(lm => {
           const pts = extractScanOverlayPoints(lm)
@@ -1621,28 +1584,21 @@ export default function Scan() {
         .catch(err => console.warn('[Scan] Analyzing-screen landmark detection failed (non-fatal, overlay falls back to generic positions):', err?.message))
     }
 
-    // 5-step, 1s-per-step choreography for FacialAnalysisOverlay — ticks
-    // forward on a fixed cadence regardless of API speed and parks at step 4
-    // (pulsing) once it gets there. minDisplayPromise is the real completion
-    // gate: below, we always await BOTH the real API result AND this timer,
-    // so a fast response still plays the full animation, and a slow one just
-    // holds on the step-4 visual until the real result actually exists —
-    // there is no path where we proceed on the timer alone.
-    const stageTimer = setInterval(() => {
-      setAnalysisStep(prev => {
-        if (prev >= 4) return prev
-        triggerHaptic()
-        return prev + 1
-      })
-    }, 800)
     const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
-    const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 4000))
 
     try {
       const faceB64    = await toBase64(facePhoto)
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
+      if (sideB64 && !isNative()) {
+        // FaceMesh uses one shared instance: wait for the front photo before
+        // asking it to inspect the side photo for visual callout anchors.
+        frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+          .then(({ getLandmarks }) => getLandmarks(sideB64))
+          .then(lm => setSideAnalysisPoints(profilePointsFromMesh(lm)))
+          .catch(() => {}) // a strict profile may have no reliable mesh
+      }
 
       // Real, on-device geometry — Apple's Vision framework measuring actual
       // detected joints/landmarks in the photos already taken above, not an
@@ -1652,9 +1608,11 @@ export default function Scan() {
       // AI scorer below just falls back to its own visual read — we never
       // invent a plausible-looking measurement to fill the gap.
       const sideProfileGeometryResult = (isNative() && sideB64) ? await analyzeSideProfile(sideB64) : null
+      if (sideProfileGeometryResult?.detected) setSideAnalysisPoints(profilePointsFromVision(sideProfileGeometryResult.landmarks))
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null
+      setAnalysisStep(2)
 
       let aiResult
       if (token === 'demo-token') {
@@ -1712,11 +1670,7 @@ export default function Scan() {
         }
       }
 
-      // Real result is in hand — but never finish before the minimum 5-step
-      // choreography has fully played out (a fast response just waits here;
-      // a slow one already has the ticker parked, pulsing, at step 4).
-      await minDisplayPromise
-      setAnalysisStep(4)
+      setAnalysisStep(3)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -1856,6 +1810,7 @@ export default function Scan() {
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
+      setAnalysisStep(4)
       logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
@@ -1909,7 +1864,6 @@ export default function Scan() {
         setStep(2)
       }
     } finally {
-      clearInterval(stageTimer)
       clearTimeout(slowTimer)
       setSlowAnalysis(false)
       setMorphing(false)
@@ -2161,7 +2115,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} meshPathD={meshPathD} scanResult={analysisResult} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} scanResult={analysisResult} />
             </motion.div>
           )}
         </AnimatePresence>

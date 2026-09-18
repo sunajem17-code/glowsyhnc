@@ -1,7 +1,9 @@
 import useStore from '../store/useStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
-const BASE = `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
+// In local development, use Vite's same-origin proxy. Browsers otherwise
+// block requests from 127.0.0.1 when the deployed API allows localhost only.
+const BASE = import.meta.env.DEV ? '/api' : `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own

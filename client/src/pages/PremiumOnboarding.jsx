@@ -7,8 +7,10 @@ import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import hypergamyChart from '../assets/hypergamy-chart.png'
 import haloEffectImg from '../assets/halo-effect-new.png'
-import { PhotoUploadStep, AnalyzingScreen, extractScanOverlayPoints } from './Scan'
+import { PhotoUploadStep, AnalyzingScreen, extractScanOverlayPoints, buildMeshPathD } from './Scan'
 import { ANALYSIS_STEPS } from '../utils/analysisSteps'
+import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
+import { analyzeSideProfile } from '../utils/photoGeometry'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
@@ -2326,7 +2328,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
 
       <div className="px-3 pb-3">
         <PhotoUploadStep
-          stepNum={1}
+          stepNum={photoType === 'side' ? 2 : 1}
           heroLayout
           photoType={photoType}
           guide={null}
@@ -2354,6 +2356,8 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [liveAnalysisResult, setLiveAnalysisResult] = useState(null)
   const [analysisPoints, setAnalysisPoints] = useState(null)
+  const [sideAnalysisPoints, setSideAnalysisPoints] = useState(null)
+  const [meshPathD, setMeshPathD] = useState(null)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
   const [quotaExhausted, setQuotaExhausted] = useState(false)
@@ -2410,23 +2414,26 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setAnalysisStep(0)
     setLiveAnalysisResult(null)
     setAnalysisPoints(null)
+    setSideAnalysisPoints(null)
+    setMeshPathD(null)
 
     // Fire MediaPipe landmark detection in parallel with the AI call so
     // FacialAnalysisOverlay gets real per-user coordinates instead of null.
+    let frontLandmarksPromise = Promise.resolve()
     if (face) {
-      import('../utils/faceLandmarks.js')
+      setAnalysisStep(1)
+      frontLandmarksPromise = import('../utils/faceLandmarks.js')
         .then(({ getLandmarks }) => getLandmarks(face))
         .then(lm => {
           const pts = extractScanOverlayPoints(lm)
           if (pts) setAnalysisPoints(pts)
+          import('@mediapipe/face_mesh').then(({ FACEMESH_TESSELATION }) => {
+            setMeshPathD(buildMeshPathD(lm, FACEMESH_TESSELATION))
+          }).catch(() => {})
         })
         .catch(err => console.warn('[PremiumOnboarding] Landmark detection failed (non-fatal):', err?.message))
     }
 
-    // Start the visual progress timer immediately so the bar advances as soon as
-    // the analyzing screen appears — not after toBase64 finishes (which can take
-    // several seconds for large camera photos, leaving the bar stuck at 5%).
-    const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
     const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
     try {
@@ -2434,7 +2441,20 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
       if (sideB64) setSidePhoto(sideB64)
+      if (sideB64) {
+        if (Capacitor.isNativePlatform()) {
+          analyzeSideProfile(sideB64).then(result => {
+            if (result?.detected) setSideAnalysisPoints(profilePointsFromVision(result.landmarks))
+          })
+        } else {
+          frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+            .then(({ getLandmarks }) => getLandmarks(sideB64))
+            .then(lm => setSideAnalysisPoints(profilePointsFromMesh(lm)))
+            .catch(() => {})
+        }
+      }
       setSlowAnalysis(false)
+      setAnalysisStep(2)
 
       // Wait for the silent guest session to resolve before calling the
       // authenticated API. If the user reaches analysis faster than the
@@ -2450,15 +2470,12 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         ])
       } finally {
         setScanInFlight(false)
-        clearInterval(stageTimer)
         clearTimeout(slowTimer)
         setSlowAnalysis(false)
       }
 
       setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
-      await new Promise(r => setTimeout(r, 350))
-      setAnalysisStep(4)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -2582,7 +2599,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} scanResult={liveAnalysisResult} points={analysisPoints} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} />
       </div>
     )
   }
@@ -2622,9 +2639,19 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       onBack={onBack}
       error={error}
       buttonLabel={facePhoto ? 'Continue' : 'Begin Scan'}
-      onButton={() => {
+      onButton={async () => {
         if (!facePhoto) faceTriggerRef.current?.()
-        else { enableAnalytics(); setPhase('side'); setError('') }
+        else {
+          try {
+            const { validateScanQuality } = await import('../utils/scanQuality.js')
+            const quality = await validateScanQuality(facePhoto)
+            if (!quality.passed) {
+              setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo.')
+              return
+            }
+            enableAnalytics(); setPhase('side'); setError('')
+          } catch { setError('Could not check the photo. Please try again.') }
+        }
       }}
       extra={<ConsentMicroText />}
     />
