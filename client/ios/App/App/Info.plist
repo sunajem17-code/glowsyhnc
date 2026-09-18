@@ -35,6 +35,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ascendus uses your camera to capture photos for AI-powered facial analysis and to run a live TrueDepth face scan that measures facial geometry.</string>
 	<key>NSFaceIDUsageDescription</key>
