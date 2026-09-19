@@ -163,6 +163,13 @@ public class PhotoGeometryPlugin: CAPPlugin, CAPBridgedPlugin {
             return toImageSpace(CGPoint(x: sum.x / CGFloat(pts.count), y: sum.y / CGFloat(pts.count)))
         }
 
+        func nearerToNose(_ first: CGPoint?, _ second: CGPoint?, nose: CGPoint?) -> CGPoint? {
+            guard let nose else { return first ?? second }
+            guard let first else { return second }
+            guard let second else { return first }
+            return abs(first.x - nose.x) < abs(second.x - nose.x) ? first : second
+        }
+
         // Nose tip: in a profile shot, the actual tip is whichever extreme
         // horizontal point of the nose crest is furthest from the face
         // bounding box's center — robust to whether the subject faces left
@@ -184,13 +191,29 @@ public class PhotoGeometryPlugin: CAPPlugin, CAPBridgedPlugin {
             return pts.max(by: { $0.y < $1.y })
         }
 
-        let browPoint = averagePoint(landmarks.leftEyebrow) ?? averagePoint(landmarks.rightEyebrow)
+
+        func jawPoint() -> CGPoint? {
+            guard let contour = landmarks.faceContour, contour.pointCount > 2 else { return nil }
+            let pts = contour.normalizedPoints.map(toImageSpace)
+            guard let chin = pts.max(by: { $0.y < $1.y }) else { return nil }
+            let candidates = pts.filter { $0.y > chin.y - face.boundingBox.height * 0.23 && $0.y < chin.y - face.boundingBox.height * 0.04 }
+            return candidates.min(by: { abs($0.x - chin.x) < abs($1.x - chin.x) }) ?? chin
+        }
+
         let nose = noseTipPoint()
+        let browPoint = nearerToNose(averagePoint(landmarks.leftEyebrow), averagePoint(landmarks.rightEyebrow), nose: nose)
+        let eyePoint = nearerToNose(averagePoint(landmarks.leftEye), averagePoint(landmarks.rightEye), nose: nose)
+        let noseBridgePoint = averagePoint(landmarks.noseCrest)
+        let lipsPoint = averagePoint(landmarks.outerLips)
         let chin = chinPoint()
+        let jaw = jawPoint()
 
         var result: [String: Any] = ["supported": true, "detected": true]
         var landmarksOut: [String: [Double]] = [:]
-        for (name, pt) in [("brow", browPoint), ("nose", nose), ("chin", chin)] {
+        for (name, pt) in [
+            ("brow", browPoint), ("eye", eyePoint), ("noseBridge", noseBridgePoint),
+            ("nose", nose), ("lips", lipsPoint), ("chin", chin), ("jaw", jaw),
+        ] {
             if let pt { landmarksOut[name] = [Double(pt.x), Double(pt.y)] }
         }
         result["landmarks"] = landmarksOut

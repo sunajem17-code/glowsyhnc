@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
+import { Camera, Upload, Check, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -1197,82 +1197,117 @@ function FaceMeshScanOverlay({ pathD }) {
 // exactly the "not on the person's face" bug this fixes. `aspectRatio`
 // only kicks in as a fallback for the (normally unreachable) case where
 // there's no photo yet, so the box doesn't collapse to zero height.
-function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, meshPathD }) {
-  const [elapsed, setElapsed] = useState(0)
-  const frontFeatures = frontFeatureAnchors(points)
-  const profileFeatures = sidePhoto ? profileFeatureAnchors(sidePoints) : []
-  // Timed against the reference: ~1.5s sweep, then chin, eyes, jaw,
-  // cheeks, and structure. The circles at the photo edge accumulate.
-  const introMs = 1550
-  const frontDurations = [2000, 2300, 2200, 2200, 2600]
-  const profileStart = introMs + frontFeatures.reduce((sum, _, i) => sum + frontDurations[i], 0) + 500
-  const showingSide = frontFeatures.length > 0 && profileFeatures.length > 0 && elapsed >= profileStart
+const FRONT_FEATURE_HOLD_MS = 1400
+const PROFILE_FEATURE_HOLD_MS = 1200
+const DEBUG_SCAN_LANDMARKS = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debugLandmarks')
+
+function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, rawLandmarks, sideRawLandmarks, onSequenceComplete }) {
+  const [sequence, setSequence] = useState({ surface: 'intro', index: -1 })
+  const [featureProgress, setFeatureProgress] = useState(0)
+  const completionSent = useRef(false)
+  const frontFeatures = useMemo(() => frontFeatureAnchors(points), [points])
+  const profileFeatures = useMemo(() => sidePhoto ? profileFeatureAnchors(sidePoints) : [], [sidePhoto, sidePoints])
+  const showingSide = sequence.surface.startsWith('profile')
   const features = showingSide ? profileFeatures : frontFeatures
-  const durations = showingSide ? profileFeatures.map(() => 1850) : frontDurations.slice(0, frontFeatures.length)
-  const stageStart = showingSide ? profileStart : introMs
-  let activeCount = 0
-  let activeStart = stageStart
-  while (activeCount < features.length && elapsed >= activeStart) {
-    if (elapsed < activeStart + durations[activeCount]) break
-    activeStart += durations[activeCount]
-    activeCount += 1
-  }
-  if (activeCount < features.length && elapsed >= activeStart) activeCount += 1
-  const activeFeature = features[activeCount - 1]
-  const activeDuration = durations[activeCount - 1] ?? 1
-  const beatProgress = activeFeature ? Math.min(1, Math.max(0, (elapsed - activeStart) / activeDuration)) : 0
-  const photoFlash = activeFeature && beatProgress < .15
+  const activeFeature = sequence.index >= 0 ? features[sequence.index] : null
   const displayPhoto = showingSide ? sidePhoto : photo
+  const debugLandmarks = showingSide ? sideRawLandmarks : rawLandmarks
+
   useEffect(() => {
-    setElapsed(0)
-    const started = Date.now()
-    const id = setInterval(() => {
-      const next = Date.now() - started
-      setElapsed(next)
-      if (next > 22000) clearInterval(id)
-    }, 50)
-    return () => clearInterval(id)
-  }, [photo, points])
-  const stageLabel = step >= 4 ? 'COMPILING RESULTS' : activeCount === 0 ? 'DETECTING STRUCTURE' : `ANALYZING · ${activeCount}/${features.length}`
+    if (!import.meta.env.DEV) return
+    console.log('[ASCENDUS SCAN] Analysis animation mounted')
+    console.log('[ASCENDUS SCAN] Front image available:', !!photo)
+    console.log('[ASCENDUS SCAN] Profile image available:', !!sidePhoto)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Landmarks available:', !!points)
+  }, [points])
+
+  // Explicit feature state machine. It cannot advance out of the intro until
+  // measured front landmarks exist, and it cannot enter the profile sequence
+  // until measured profile landmarks exist.
+  useEffect(() => {
+    if (sequence.surface === 'intro' && frontFeatures.length) {
+      const timer = setTimeout(() => setSequence({ surface: 'front', index: 0 }), 1350)
+      return () => clearTimeout(timer)
+    }
+    if (sequence.surface === 'profile-wait' && profileFeatures.length) {
+      const timer = setTimeout(() => setSequence({ surface: 'profile', index: 0 }), 450)
+      return () => clearTimeout(timer)
+    }
+    if ((sequence.surface !== 'front' && sequence.surface !== 'profile') || !activeFeature) return
+    const holdMs = sequence.surface === 'front' ? FRONT_FEATURE_HOLD_MS : PROFILE_FEATURE_HOLD_MS
+    const timer = setTimeout(() => {
+      if (sequence.index + 1 < features.length) {
+        setSequence(current => ({ ...current, index: current.index + 1 }))
+      } else if (sequence.surface === 'front' && sidePhoto) {
+        setSequence({ surface: 'profile-wait', index: -1 })
+      } else if (!completionSent.current) {
+        completionSent.current = true
+        if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Animation sequence complete')
+        onSequenceComplete?.()
+        setSequence({ surface: `${sequence.surface}-finished`, index: sequence.index })
+      }
+    }, holdMs)
+    return () => clearTimeout(timer)
+  }, [sequence, activeFeature, features.length, frontFeatures.length, profileFeatures.length, sidePhoto, onSequenceComplete])
+
+  useEffect(() => {
+    if (!activeFeature) { setFeatureProgress(0); return }
+    const holdMs = sequence.surface === 'front' ? FRONT_FEATURE_HOLD_MS : PROFILE_FEATURE_HOLD_MS
+    const started = performance.now()
+    setFeatureProgress(0)
+    const timer = setInterval(() => {
+      setFeatureProgress(Math.min(99, Math.round((performance.now() - started) / holdMs * 100)))
+    }, 60)
+    return () => clearInterval(timer)
+  }, [sequence.surface, sequence.index, activeFeature])
+
+  const analyzedCount = sequence.index + 1
+  const sequenceFinished = sequence.surface.endsWith('finished')
+  const stageLabel = step >= 4 || sequenceFinished
+    ? 'COMPILING RESULTS'
+    : activeFeature
+      ? `${showingSide ? 'PROFILE' : 'ANALYZING'} · ${analyzedCount}/${features.length}`
+      : showingSide ? 'MAPPING PROFILE' : 'DETECTING STRUCTURE'
+  const visibleFeatures = activeFeature ? features.slice(0, sequence.index + 1) : []
   return (
     <div className="w-full flex flex-col items-center mb-5">
       <div className="rounded-full px-3 py-1 mb-3 font-mono" style={{ border: `1px solid ${GOLD}66`, color: GOLD, background: '#17140c', fontSize: 9, letterSpacing: '0.16em' }}>{stageLabel}</div>
-      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || 5 }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < activeCount ? GOLD : `${GOLD}44` }} />)}</div>
+      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || (showingSide ? 7 : 5) }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < analyzedCount ? GOLD : `${GOLD}44` }} />)}</div>
       <div className="relative mx-auto" style={{ width: 'fit-content', maxWidth: '100%', ...(photo ? {} : { aspectRatio: '2/3', width: '100%' }) }}>
-        <div className="relative rounded-3xl overflow-hidden" style={{ background: '#0a0a0a' }}>
-          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full" style={{ maxHeight: '75dvh', filter: activeCount === 0 || step >= 4 || photoFlash ? 'brightness(.88)' : 'brightness(.43) saturate(.78)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.04),transparent 32%,rgba(0,0,0,.16))' }} />
-          {!morphing && activeCount === 0 && <motion.div className="absolute left-0 right-0 pointer-events-none" style={{ height: 2, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, boxShadow: `0 0 15px 5px ${GOLD}88` }} initial={{ top: '5%' }} animate={{ top: '95%' }} transition={{ duration: 1.35, ease: 'easeInOut' }} />}
+        <div className="relative rounded-3xl" style={{ background: '#0a0a0a', border: `1px solid ${GOLD}30` }}>
+          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full rounded-3xl" style={{ maxHeight: '75dvh', filter: activeFeature ? 'brightness(.42) saturate(.82)' : 'brightness(.72)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
+          <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.12),transparent 30%,rgba(0,0,0,.28))' }} />
+          {!morphing && sequence.surface === 'intro' && <motion.div className="absolute left-0 right-0 pointer-events-none" style={{ height: 2, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, boxShadow: `0 0 15px 5px ${GOLD}88` }} initial={{ top: '5%' }} animate={{ top: '95%' }} transition={{ duration: 1.35, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }} />}
           {morphing && <MorphWarpOverlay photo={displayPhoto} />}
-          {!morphing && activeFeature && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-            {features.slice(0, activeCount).map((feature, featureIndex) => <g key={feature.id} opacity={featureIndex === activeCount - 1 && beatProgress < .68 ? 1 : .48}>
-              {feature.regions?.filter(Boolean).map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill={GOLD} fillOpacity=".35" stroke={GOLD} strokeOpacity=".6" strokeWidth=".3" />)}
-              {feature.contour && <polyline points={feature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke={GOLD} strokeWidth=".5" opacity=".75" vectorEffect="non-scaling-stroke" />}
-            </g>)}
+          {!morphing && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible', filter: `drop-shadow(0 0 4px ${GOLD}88)` }}>
+            {DEBUG_SCAN_LANDMARKS && debugLandmarks?.map((p, i) => <circle key={i} cx={p.x * 100} cy={p.y * 100} r=".28" fill={GOLD} opacity=".75" />)}
+            {activeFeature && <motion.g key={`highlight-${sequence.surface}-${activeFeature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .24 }}>
+              {activeFeature.regions?.filter(Boolean).map((polygon, i) => <motion.polygon key={i} points={polygon.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill={GOLD} stroke={GOLD} strokeWidth=".5" initial={{ fillOpacity: 0, strokeOpacity: 0 }} animate={{ fillOpacity: [.12, .46, .28], strokeOpacity: [.35, .9, .55] }} transition={{ duration: .8 }} />)}
+              {activeFeature.contour && <motion.polyline points={activeFeature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke={GOLD} strokeWidth=".65" vectorEffect="non-scaling-stroke" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .45 }} />}
+            </motion.g>}
+            {visibleFeatures.map((feature, i) => {
+              const current = i === sequence.index
+              const x = feature.point.x * 100
+              const y = feature.point.y * 100
+              return <motion.g key={`line-${sequence.surface}-${feature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .22 }}>
+                <motion.path d={`M ${x} ${y} L ${feature.badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1.1" vectorEffect="non-scaling-stroke" initial={current ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: .55 }} />
+                <circle cx={x} cy={y} r="1.1" fill="#fff" stroke={GOLD} strokeWidth=".45" vectorEffect="non-scaling-stroke" />
+                <circle cx={x} cy={y} r="2.4" fill="none" stroke={GOLD} strokeOpacity=".35" strokeWidth=".45" vectorEffect="non-scaling-stroke" />
+              </motion.g>
+            })}
           </svg>}
+          {!morphing && visibleFeatures.map((feature, i) => {
+            const current = i === sequence.index && !sequenceFinished
+            return <motion.div key={`badge-${sequence.surface}-${feature.id}`} className="absolute pointer-events-none" style={{ left: `${feature.badgeX}%`, top: `${feature.badgeY}%`, transform: 'translate(-50%,-50%)' }} initial={{ opacity: 0, scale: .7 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .3, type: 'spring', stiffness: 260, damping: 20 }}>
+              <div className="flex items-center justify-center rounded-full font-body" style={{ width: 48, height: 48, border: `2px solid ${GOLD}`, background: current ? 'rgba(17,15,10,.82)' : GOLD, boxShadow: `0 0 18px ${GOLD}66`, color: current ? '#fff' : '#090909', fontSize: 13, fontWeight: 700 }}>
+                {current ? `${featureProgress}%` : <Check size={27} strokeWidth={2.5} />}
+              </div>
+              <div className="absolute font-body" style={{ width: 96, left: '50%', top: 53, transform: 'translateX(-50%)', color: '#fff', fontSize: 9, lineHeight: 1.15, fontWeight: 700, textAlign: 'center', textShadow: '0 1px 5px #000' }}>{feature.label}</div>
+            </motion.div>
+          })}
         </div>
-        {!morphing && activeFeature && <motion.div className="absolute pointer-events-none rounded-full" style={{ x: '-50%', y: '-50%', border: `1.5px solid ${GOLD}`, boxShadow: `0 0 16px ${GOLD}77, inset 0 0 11px ${GOLD}33` }}
-          initial={{ opacity: 0, scale: .5 }} animate={{ left: `${activeFeature.point.x * 100}%`, top: `${activeFeature.point.y * 100}%`, width: activeFeature.radius, height: activeFeature.radius, opacity: beatProgress < .68 ? .78 : 0, scale: beatProgress < .68 ? 1 : 1.25 }}
-          transition={{ left: { duration: .42, ease: 'easeInOut' }, top: { duration: .42, ease: 'easeInOut' }, width: { duration: .42 }, height: { duration: .42 }, opacity: { duration: .25 }, scale: { duration: .32 } }} />}
-        {!morphing && features.slice(0, activeCount).map((feature, i) => {
-          const x = feature.point.x * 100
-          const y = feature.point.y * 100
-          const badgeX = feature.side === 'right' ? 96 : 5
-          const current = i === activeCount - 1 && beatProgress < .68
-          return <motion.div key={`${showingSide ? 'side' : 'front'}-${feature.label}`} className="absolute inset-0 pointer-events-none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .25 }}>
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-              {current
-                ? <motion.path d={`M ${x} ${y} L ${badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1" vectorEffect="non-scaling-stroke" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .5 }} />
-                : <path d={`M ${x} ${y} L ${badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1" vectorEffect="non-scaling-stroke" />}
-              <circle cx={x} cy={y} r=".8" fill={GOLD} />
-              {feature.secondaryPoint && <circle cx={feature.secondaryPoint.x * 100} cy={feature.secondaryPoint.y * 100} r=".8" fill={GOLD} />}
-            </svg>
-            <div className="absolute flex items-center justify-center rounded-full" style={{ left: `${badgeX}%`, top: `${feature.badgeY}%`, transform: 'translate(-50%,-50%)', width: 42, height: 42, border: `1.5px solid ${GOLD}`, background: current ? '#17140c' : GOLD, boxShadow: `0 0 18px ${GOLD}66`, color: current ? GOLD : '#17140c' }}>
-              {current ? <motion.div className="rounded-full" style={{ width: 14, height: 14, border: `2px solid ${GOLD}`, borderTopColor: 'transparent' }} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} /> : <CheckCircle2 size={21} strokeWidth={1.5} />}
-            </div>
-            <span className="absolute font-mono" style={{ left: `${badgeX}%`, top: `calc(${feature.badgeY}% + 25px)`, transform: 'translateX(-50%)', fontSize: 7, fontWeight: 700, color: GOLD, letterSpacing: '.08em', whiteSpace: 'nowrap', textShadow: '0 1px 5px #000' }}>{feature.label}</span>
-          </motion.div>
-        })}
       </div>
     </div>
   )
@@ -1294,12 +1329,12 @@ function buildDiagnosticLines(scanResult) {
   ]
 }
 
-export function AnalyzingScreen({ currentStep, slow, photo, sidePhoto = null, morphing = false, points = null, sidePoints = null, meshPathD = null, scanResult = null }) {
+export function AnalyzingScreen({ currentStep, slow, photo, sidePhoto = null, morphing = false, points = null, sidePoints = null, rawLandmarks = null, sideRawLandmarks = null, meshPathD = null, scanResult = null, sideDetectionPending = false, onSequenceComplete }) {
   const stepIndex = Math.min(currentStep, 4)
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} sidePhoto={sidePhoto} step={currentStep} morphing={morphing} points={points} sidePoints={sidePoints} meshPathD={meshPathD} />
+      <AnalyzingSweepOverlay photo={photo} sidePhoto={sidePhoto} step={currentStep} morphing={morphing} points={points} sidePoints={sidePoints} rawLandmarks={rawLandmarks} sideRawLandmarks={sideRawLandmarks} meshPathD={meshPathD} scanResult={scanResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={onSequenceComplete} />
       <span className="sr-only" aria-live="polite">{REAL_SCAN_STAGES[stepIndex]}</span>
     </div>
   )
@@ -1399,16 +1434,14 @@ export default function Scan() {
   // navigate() call.
   const [morphing, setMorphing]           = useState(false)
   const [transitioning, setTransitioning] = useState(false) // brief overlay between preview→analyze
-  // Real MediaPipe face-landmark points for THIS scan's photo, used to
-  // position FacialAnalysisOverlay's lines/dots/readouts on the actual
-  // detected face — see startAnalysis, which kicks off detection the
-  // instant the analyzing screen mounts. Stays null (fallback, generic
-  // centered geometry) until detection resolves, or if it fails outright.
+  // Measured landmarks for this scan's photos. Mapping starts after the
+  // front photo passes validation so the processing overlay can use it.
   const [analysisPoints, setAnalysisPoints] = useState(null)
+  const [analysisLandmarks, setAnalysisLandmarks] = useState(null)
   const [sideAnalysisPoints, setSideAnalysisPoints] = useState(null)
-  // Deduped SVG path string for the ~3.4s mesh-scan beat (FaceMeshScanOverlay)
-  // — built from the same detection call as analysisPoints above, see
-  // startAnalysis. null until that resolves (the beat simply doesn't play).
+  const [sideAnalysisLandmarks, setSideAnalysisLandmarks] = useState(null)
+  const [sideDetectionPending, setSideDetectionPending] = useState(false)
+  // SVG mesh path from the same front landmark detection.
   const [meshPathD, setMeshPathD]         = useState(null)
   const [error, setError]                 = useState('')
   const [rateLimited, setRateLimited]     = useState(false)
@@ -1420,8 +1453,42 @@ export default function Scan() {
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
+  const frontLandmarksRef = useRef(null)
+  const validatedFrontRef = useRef(recoveredFrontPhoto)
+  const animationGateRef = useRef(null)
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
+
+  const finishAnimation = useCallback(() => {
+    animationGateRef.current?.()
+    animationGateRef.current = null
+  }, [])
+
+  function ensureFrontLandmarks(url) {
+    if (!url) return Promise.resolve(null)
+    if (frontLandmarksRef.current?.url === url) return frontLandmarksRef.current.promise
+    setAnalysisPoints(null)
+    setMeshPathD(null)
+    const promise = import('../utils/faceLandmarks.js')
+      .then(({ getLandmarks }) => getLandmarks(url))
+      .then(lm => {
+        setAnalysisLandmarks(lm)
+        const points = extractScanOverlayPoints(lm)
+        if (points) setAnalysisPoints(points)
+        import('@mediapipe/face_mesh').then(mod => {
+          const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
+          const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
+          if (path) setMeshPathD(path)
+        }).catch(() => {})
+        return points
+      })
+      .catch(err => {
+        console.warn('[Scan] Front landmark mapping unavailable:', err?.message)
+        return null
+      })
+    frontLandmarksRef.current = { url, promise }
+    return promise
+  }
 
   // Countdown → auto-retry
   useEffect(() => {
@@ -1483,6 +1550,7 @@ export default function Scan() {
   // check works for BOTH camera captures and library uploads (both call this).
   // FAIL-CLOSED: any error during validation blocks the scan, never silently passes.
   async function transitionToSide(url) {
+    if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Front captured')
     console.log('[ASCENDUS SCAN] 1. Scan started')
     console.log('[ASCENDUS SCAN] 2. Image captured/selected — type:', url ? url.slice(0, 40) : 'null')
 
@@ -1514,6 +1582,8 @@ export default function Scan() {
       return
     }
 
+    validatedFrontRef.current = url
+    ensureFrontLandmarks(url) // start mapping during side capture, before processing mounts
     console.log('[ASCENDUS SCAN] 9. Starting facial analysis')
     setStep(2)
     setTransitioning(false)
@@ -1523,10 +1593,9 @@ export default function Scan() {
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
-    // Belt-and-suspenders: re-validate the face photo before analysis starts.
-    // The result is cached in scanQuality.js so this is instant (no re-run).
-    // Fail-CLOSED: any error blocks analysis.
-    if (facePhoto) {
+    // Validate only if this photo did not already pass the front capture gate.
+    // Network validation is not cached and can delay the processing screen.
+    if (facePhoto && validatedFrontRef.current !== facePhoto) {
       let qPassed = false
       let qIssues = []
       try {
@@ -1543,46 +1612,29 @@ export default function Scan() {
         navigate('/scan/quality-fail', { state: { issues: qIssues, photoUrl: facePhoto } })
         return
       }
+      validatedFrontRef.current = facePhoto
     }
 
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
     setGender(g)
+    if (import.meta.env.DEV) {
+      console.log('[ASCENDUS SCAN] Profile captured')
+      console.log('[ASCENDUS SCAN] Entering processing')
+    }
     setStep(3)  // analyzing
     setError('')
     setAnalysisStep(0)
-    setAnalysisPoints(null) // clear any previous scan's points before detecting this one's
+    setAnalysisResult(null)
     setSideAnalysisPoints(null)
-    setMeshPathD(null)      // same for the mesh-scan beat — don't replay the last scan's mesh
+    setSideAnalysisLandmarks(null)
+    setSideDetectionPending(!!sidePhoto && !skipSide)
+    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
-    // Kick off real face-landmark detection the instant the analyzing screen
-    // mounts, in parallel with the actual AI scoring call below — this is
-    // what lets FacialAnalysisOverlay trace the real detected face instead
-    // of an assumed centered position, and what the mesh-scan beat
-    // (FaceMeshScanOverlay) draws from too. Non-blocking and non-fatal: the
-    // real scan flow never depends on either succeeding, so a slow/failed
-    // detection (e.g. MediaPipe can't confidently read this photo) just
-    // leaves the overlay on its generic fallback geometry and skips the
-    // mesh beat entirely — never blocks or breaks the actual scan. The
-    // 16-18s typical API wait gives this ample time even accounting for
-    // MediaPipe's cold-start model load on the very first scan of a session.
-    let frontLandmarksPromise = Promise.resolve()
-    if (facePhoto) {
-      setAnalysisStep(1)
-      frontLandmarksPromise = import('../utils/faceLandmarks.js')
-        .then(({ getLandmarks }) => getLandmarks(facePhoto))
-        .then(lm => {
-          const pts = extractScanOverlayPoints(lm)
-          if (pts) setAnalysisPoints(pts)
-          import('@mediapipe/face_mesh')
-            .then(({ FACEMESH_TESSELATION }) => {
-              const d = buildMeshPathD(lm, FACEMESH_TESSELATION)
-              if (d) setMeshPathD(d)
-            })
-            .catch(err => console.warn('[Scan] Face mesh tessellation unavailable (non-fatal, mesh-scan beat skipped):', err?.message))
-        })
-        .catch(err => console.warn('[Scan] Analyzing-screen landmark detection failed (non-fatal, overlay falls back to generic positions):', err?.message))
-    }
+    // Reuse front landmarks already mapping during side capture. The overlay
+    // waits for measured anchors rather than drawing generic positions.
+    const frontLandmarksPromise = ensureFrontLandmarks(facePhoto)
+    if (facePhoto) setAnalysisStep(1)
 
     const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
 
@@ -1591,13 +1643,23 @@ export default function Scan() {
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
+      let sideLandmarksPromise = Promise.resolve(null)
       if (sideB64 && !isNative()) {
         // FaceMesh uses one shared instance: wait for the front photo before
         // asking it to inspect the side photo for visual callout anchors.
-        frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+        sideLandmarksPromise = frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
           .then(({ getLandmarks }) => getLandmarks(sideB64))
-          .then(lm => setSideAnalysisPoints(profilePointsFromMesh(lm)))
-          .catch(() => {}) // a strict profile may have no reliable mesh
+          .then(lm => {
+            setSideAnalysisLandmarks(lm)
+            const profilePoints = profilePointsFromMesh(lm)
+            setSideAnalysisPoints(profilePoints)
+            return profilePoints
+          })
+          .catch(err => {
+            console.warn('[Scan] Profile landmark mapping unavailable:', err?.message)
+            return null
+          })
+          .finally(() => setSideDetectionPending(false))
       }
 
       // Real, on-device geometry — Apple's Vision framework measuring actual
@@ -1608,13 +1670,20 @@ export default function Scan() {
       // AI scorer below just falls back to its own visual read — we never
       // invent a plausible-looking measurement to fill the gap.
       const sideProfileGeometryResult = (isNative() && sideB64) ? await analyzeSideProfile(sideB64) : null
-      if (sideProfileGeometryResult?.detected) setSideAnalysisPoints(profilePointsFromVision(sideProfileGeometryResult.landmarks))
+      const nativeSidePoints = sideProfileGeometryResult?.detected ? profilePointsFromVision(sideProfileGeometryResult.landmarks) : null
+      if (nativeSidePoints) setSideAnalysisPoints(nativeSidePoints)
+      if (isNative() || !sideB64) setSideDetectionPending(false)
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null
+      const detectedFrontPoints = await frontLandmarksPromise
+      if (!detectedFrontPoints) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      const detectedSidePoints = sideB64 ? (isNative() ? nativeSidePoints : await sideLandmarksPromise) : null
+      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
       setAnalysisStep(2)
 
       let aiResult
+      if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
       if (token === 'demo-token') {
         // Demo users: return mock results instead of hitting the backend
         await new Promise(r => setTimeout(r, 2500))
@@ -1671,6 +1740,7 @@ export default function Scan() {
       }
 
       setAnalysisStep(3)
+      if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis response received')
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -1810,6 +1880,10 @@ export default function Scan() {
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
+      // The real score may arrive before the user's measured landmarks and
+      // visual callouts have appeared. Wait for that sequence, bounded in
+      // case a device cannot run the landmark model.
+      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
       setAnalysisStep(4)
       logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
@@ -1823,6 +1897,7 @@ export default function Scan() {
 
       // Transition through the scan-ready screen (progress bar + affirming
       // messages) before landing on results or the unlock gate.
+      if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Navigating to results')
       navigate('/scan/ready')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
@@ -2115,7 +2190,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} scanResult={analysisResult} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} scanResult={analysisResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
             </motion.div>
           )}
         </AnimatePresence>

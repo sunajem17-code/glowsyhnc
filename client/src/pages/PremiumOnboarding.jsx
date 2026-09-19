@@ -2356,15 +2356,50 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [slowAnalysis, setSlowAnalysis] = useState(false)
   const [liveAnalysisResult, setLiveAnalysisResult] = useState(null)
   const [analysisPoints, setAnalysisPoints] = useState(null)
+  const [analysisLandmarks, setAnalysisLandmarks] = useState(null)
   const [sideAnalysisPoints, setSideAnalysisPoints] = useState(null)
+  const [sideAnalysisLandmarks, setSideAnalysisLandmarks] = useState(null)
+  const [sideDetectionPending, setSideDetectionPending] = useState(false)
   const [meshPathD, setMeshPathD] = useState(null)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
   const [quotaExhausted, setQuotaExhausted] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
+  const frontLandmarksRef = useRef(null)
+  const animationGateRef = useRef(null)
   const sideTriggerRef = useRef(null)
   const faceTriggerRef = useRef(null)
+  const finishAnimation = useCallback(() => {
+    animationGateRef.current?.()
+    animationGateRef.current = null
+  }, [])
+
+  function ensureFrontLandmarks(url) {
+    if (!url) return Promise.resolve(null)
+    if (frontLandmarksRef.current?.url === url) return frontLandmarksRef.current.promise
+    setAnalysisPoints(null)
+    setMeshPathD(null)
+    const promise = import('../utils/faceLandmarks.js')
+      .then(({ getLandmarks }) => getLandmarks(url))
+      .then(lm => {
+        setAnalysisLandmarks(lm)
+        const points = extractScanOverlayPoints(lm)
+        if (points) setAnalysisPoints(points)
+        import('@mediapipe/face_mesh').then(mod => {
+          const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
+          const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
+          if (path) setMeshPathD(path)
+        }).catch(() => {})
+        return points
+      })
+      .catch(err => {
+        console.warn('[PremiumOnboarding] Front landmark mapping unavailable:', err?.message)
+        return null
+      })
+    frontLandmarksRef.current = { url, promise }
+    return promise
+  }
   // Countdown → auto-retry with the same photos
   useEffect(() => {
     if (!rateLimited) return
@@ -2413,25 +2448,17 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setError('')
     setAnalysisStep(0)
     setLiveAnalysisResult(null)
-    setAnalysisPoints(null)
     setSideAnalysisPoints(null)
-    setMeshPathD(null)
+    setSideAnalysisLandmarks(null)
+    setSideDetectionPending(!!side)
+    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
     // Fire MediaPipe landmark detection in parallel with the AI call so
     // FacialAnalysisOverlay gets real per-user coordinates instead of null.
-    let frontLandmarksPromise = Promise.resolve()
+    let frontLandmarksPromise = Promise.resolve(null)
     if (face) {
       setAnalysisStep(1)
-      frontLandmarksPromise = import('../utils/faceLandmarks.js')
-        .then(({ getLandmarks }) => getLandmarks(face))
-        .then(lm => {
-          const pts = extractScanOverlayPoints(lm)
-          if (pts) setAnalysisPoints(pts)
-          import('@mediapipe/face_mesh').then(({ FACEMESH_TESSELATION }) => {
-            setMeshPathD(buildMeshPathD(lm, FACEMESH_TESSELATION))
-          }).catch(() => {})
-        })
-        .catch(err => console.warn('[PremiumOnboarding] Landmark detection failed (non-fatal):', err?.message))
+      frontLandmarksPromise = ensureFrontLandmarks(face)
     }
 
     const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
@@ -2441,19 +2468,41 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
       if (sideB64) setSidePhoto(sideB64)
+      let sideLandmarksPromise = Promise.resolve(null)
       if (sideB64) {
         if (Capacitor.isNativePlatform()) {
-          analyzeSideProfile(sideB64).then(result => {
-            if (result?.detected) setSideAnalysisPoints(profilePointsFromVision(result.landmarks))
+          sideLandmarksPromise = analyzeSideProfile(sideB64).then(result => {
+            const profilePoints = result?.detected ? profilePointsFromVision(result.landmarks) : null
+            if (profilePoints) setSideAnalysisPoints(profilePoints)
+            return profilePoints
+          }).catch(err => {
+            console.warn('[PremiumOnboarding] Profile mapping unavailable:', err?.message)
+            return null
           })
+            .finally(() => setSideDetectionPending(false))
         } else {
-          frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+          sideLandmarksPromise = frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
             .then(({ getLandmarks }) => getLandmarks(sideB64))
-            .then(lm => setSideAnalysisPoints(profilePointsFromMesh(lm)))
-            .catch(() => {})
+            .then(lm => {
+              setSideAnalysisLandmarks(lm)
+              const profilePoints = profilePointsFromMesh(lm)
+              setSideAnalysisPoints(profilePoints)
+              return profilePoints
+            })
+            .catch(err => {
+              console.warn('[PremiumOnboarding] Profile mapping unavailable:', err?.message)
+              return null
+            })
+            .finally(() => setSideDetectionPending(false))
         }
+      } else {
+        setSideDetectionPending(false)
       }
       setSlowAnalysis(false)
+      const detectedFrontPoints = await frontLandmarksPromise
+      if (!detectedFrontPoints) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      const detectedSidePoints = sideB64 ? await sideLandmarksPromise : null
+      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
       setAnalysisStep(2)
 
       // Wait for the silent guest session to resolve before calling the
@@ -2504,6 +2553,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
       }
 
+      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
       onDone(scanRecord)
     } catch (err) {
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
@@ -2599,7 +2649,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
       </div>
     )
   }
@@ -2649,6 +2699,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
               setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo.')
               return
             }
+            ensureFrontLandmarks(facePhoto)
             enableAnalytics(); setPhase('side'); setError('')
           } catch { setError('Could not check the photo. Please try again.') }
         }

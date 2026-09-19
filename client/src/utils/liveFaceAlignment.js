@@ -1,7 +1,13 @@
 // A separate, low-resolution tracker for the camera preview. The analysis
 // FaceMesh singleton uses its own onResults callback and must not be shared.
 export async function createLiveFaceAlignment(onFrame) {
-  const { FaceMesh } = await import('@mediapipe/face_mesh')
+  const mod = await import('@mediapipe/face_mesh')
+  const FaceMesh = typeof mod.FaceMesh === 'function'
+    ? mod.FaceMesh
+    : typeof mod.default?.FaceMesh === 'function'
+      ? mod.default.FaceMesh
+      : globalThis.FaceMesh
+  if (typeof FaceMesh !== 'function') throw new Error('FaceMesh constructor unavailable')
   const mesh = new FaceMesh({ locateFile: file => `/mediapipe/${file}` })
   mesh.setOptions({ maxNumFaces: 2, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 })
   mesh.onResults(({ multiFaceLandmarks = [] }) => {

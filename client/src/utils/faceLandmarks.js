@@ -68,7 +68,13 @@ export async function initFaceMesh() {
     try {
       console.log('[FaceDetector] importing @mediapipe/face_mesh…')
       const mod = await import('@mediapipe/face_mesh')
-      FaceMesh = mod.FaceMesh
+      // The package is CommonJS: Vite exposes its exports under default.
+      FaceMesh = typeof mod.FaceMesh === 'function'
+        ? mod.FaceMesh
+        : typeof mod.default?.FaceMesh === 'function'
+          ? mod.default.FaceMesh
+          : globalThis.FaceMesh
+      if (typeof FaceMesh !== 'function') throw new Error('FaceMesh constructor unavailable')
       console.log('[FaceDetector] import OK — FaceMesh type:', typeof FaceMesh)
     } catch (err) {
       console.error('[FaceDetector] import FAILED:', err?.message, err?.stack?.split('\n')[1])
@@ -157,7 +163,17 @@ export async function initFaceMesh() {
 }
 
 // ─── Get 468 facial landmarks from an image URL ───────────────────────────────
-export async function getLandmarks(imageUrl) {
+// FaceMesh has one onResults callback. Serialize front, profile, and
+// post-result scans so one request cannot steal another request's result.
+let landmarkQueue = Promise.resolve()
+
+export function getLandmarks(imageUrl) {
+  const task = landmarkQueue.then(() => detectLandmarks(imageUrl))
+  landmarkQueue = task.catch(() => {})
+  return task
+}
+
+async function detectLandmarks(imageUrl) {
   const mesh = await initFaceMesh()
 
   return new Promise((resolve, reject) => {

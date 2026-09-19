@@ -15,26 +15,29 @@ const region = points => points.every(valid) ? points : null
 export function frontFeatureAnchors(p) {
   if (!p) return []
   return available([
-    { id: 'chin', label: 'CHIN', point: p.chin, side: 'right', badgeY: 79, radius: 48,
+    { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 96, badgeY: 74,
       regions: [region([p.jawChinL, p.chin, p.jawChinR])] },
-    { id: 'eyes', label: 'EYE AREA', point: midpoint(p.eyeOuterL, p.eyeInnerL), secondaryPoint: midpoint(p.eyeOuterR, p.eyeInnerR), side: 'left', badgeY: 29, radius: 45,
-      regions: [region([p.eyeOuterL, p.eyeInnerL, midpoint(p.eyeInnerL, p.cheekL), midpoint(p.eyeOuterL, p.cheekL)]),
-        region([p.eyeInnerR, p.eyeOuterR, midpoint(p.eyeOuterR, p.cheekR), midpoint(p.eyeInnerR, p.cheekR)])] },
-    { id: 'jaw', label: 'JAWLINE', point: p.jawR, secondaryPoint: p.jawL, side: 'right', badgeY: 62, radius: 56,
+    { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 4, badgeY: 29,
+      regions: [region([p.eyeOuterL, p.eyeInnerL, p.cheekL]), region([p.eyeInnerR, p.eyeOuterR, p.cheekR])] },
+    { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 96, badgeY: 52,
       contour: region([p.jawL, p.jawMidL, p.jawChinL, p.chin, p.jawChinR, p.jawMidR, p.jawR]) },
-    { id: 'cheeks', label: 'CHEEKBONES', point: p.cheekL, secondaryPoint: p.cheekR, side: 'left', badgeY: 51, radius: 52,
+    { id: 'cheek-leanness', label: 'CHEEK LEANNESS & OGEE CURVE', point: p.cheekL, badgeX: 4, badgeY: 61,
       regions: [region([p.eyeOuterL, p.cheekL, p.jawMidL]), region([p.eyeOuterR, p.cheekR, p.jawMidR])] },
-    { id: 'structure', label: 'FACIAL STRUCTURE', point: p.nose, side: 'right', badgeY: 24, radius: 58,
-      contour: region([p.forehead, p.nose, p.chin]) },
+    { id: 'submental-definition', label: 'SUBMENTAL DEFINITION', point: p.chin, badgeX: 96, badgeY: 28,
+      contour: region([p.jawChinL, p.chin, p.jawChinR]) },
   ])
 }
 
 export function profileFeatureAnchors(p) {
   if (!p) return []
   return available([
-    { id: 'profile-brow', label: 'BROW', point: p.brow, side: 'left', badgeY: 24, radius: 42 },
-    { id: 'profile-nose', label: 'NOSE TIP', point: p.noseTip, side: 'right', badgeY: 42, radius: 46 },
-    { id: 'profile-chin', label: 'CHIN', point: p.chin, side: 'right', badgeY: 72, radius: 50 },
+    { id: 'profile-brow', label: 'BROW', point: p.brow, badgeX: 4, badgeY: 22 },
+    { id: 'profile-eye', label: 'EYE', point: p.eye, badgeX: 96, badgeY: 31 },
+    { id: 'profile-nose-bridge', label: 'NOSE BRIDGE', point: p.noseBridge, badgeX: 4, badgeY: 42 },
+    { id: 'profile-nose-tip', label: 'NOSE TIP', point: p.noseTip, badgeX: 96, badgeY: 48 },
+    { id: 'profile-lips', label: 'LIPS', point: p.lips, badgeX: 4, badgeY: 61 },
+    { id: 'profile-chin', label: 'CHIN', point: p.chin, badgeX: 96, badgeY: 72 },
+    { id: 'profile-jaw', label: 'JAWLINE', point: p.jaw, badgeX: 4, badgeY: 79 },
   ])
 }
 
@@ -43,7 +46,15 @@ export function profilePointsFromVision(landmarks) {
   const point = name => Array.isArray(landmarks[name]) && landmarks[name].length === 2
     ? { x: landmarks[name][0], y: landmarks[name][1] }
     : null
-  return { brow: point('brow'), noseTip: point('nose'), chin: point('chin') }
+  return {
+    brow: point('brow'),
+    eye: point('eye'),
+    noseBridge: point('noseBridge'),
+    noseTip: point('nose'),
+    lips: point('lips'),
+    chin: point('chin'),
+    jaw: point('jaw'),
+  }
 }
 
 export function profilePointsFromMesh(lm) {
