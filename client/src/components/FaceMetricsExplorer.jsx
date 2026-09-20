@@ -24,25 +24,18 @@ const DEMO_LANDMARKS_2D = {
   templeRight:    [0.84792, 0.48325],  // lm 356
   cheekboneLeft:  [0.16063, 0.5364],   // lm 234
   cheekboneRight: [0.84272, 0.53732],  // lm 454
-  jawBodyLeft:    [0.19558, 0.71412],  // lm 58  — pre-gonion ramus (Jaw Width cm)
+  jawBodyLeft:    [0.19558, 0.71412],  // lm 58  — pre-gonion width ratio
   jawBodyRight:   [0.80327, 0.71433],  // lm 288
   jawCornerLeft:  [0.22602, 0.76523],  // lm 172 — gonion (Bigonial Width %)
   jawCornerRight: [0.77185, 0.76528],  // lm 397
 }
 
-// Values computed by running computeExplorerMetrics against the real MediaPipe
-// coordinates above (male scale reference: cheekboneWidthCM = 13.5 cm anchor).
+// Scale-independent values computed from the MediaPipe coordinates above.
 const DEMO_METRICS = {
-  jawWidthCM: 12.0,
-  cheekboneWidthCM: 13.5,
-  bitemporalWidthCM: 13.7,
+  jawToCheekWidthRatio: 0.89,
+  templeToCheekWidthRatio: 1.01,
   bigonialWidthPercent: 80.0,
   midfaceRatio: 0.12,
-  facialAngleDegrees: 88.2,
-  facialConvexityDegrees: 169.5,
-  foreheadSlopeDegrees: 7.5,
-  noseProjectionMM: 18.2,
-  chinProjectionMM: 9.6,
   jawAsymmetryScore: 0.3,
   cheekboneAsymmetryScore: 0.1,
   templeAsymmetryScore: 0.2,
@@ -52,19 +45,10 @@ const DEMO_METRICS = {
 // Two landmark keys = draw a line between them (width-type measurements).
 // One landmark key = single marker (angle/projection-type measurements).
 const METRIC_DEFS = [
-  // jawWidthCM uses pre-gonion ramus points (lm 58/288) — one level above bigonial.
-  // bigonialWidthPercent uses gonion points (lm 172/397) — the true bigonial.
-  // These are distinct anatomical points; the cm vs % is NOT the only difference.
-  { key: 'jawWidthCM',        label: 'Jaw Width',        unit: 'cm', landmarks: ['jawBodyLeft',  'jawBodyRight']  },
-  { key: 'cheekboneWidthCM',  label: 'Cheekbone Width',  unit: 'cm', landmarks: ['cheekboneLeft', 'cheekboneRight'] },
-  { key: 'bitemporalWidthCM', label: 'Bitemporal Width', unit: 'cm', landmarks: ['templeLeft', 'templeRight'] },
+  { key: 'jawToCheekWidthRatio', label: 'Jaw / Cheek Width', unit: 'x', landmarks: ['jawBodyLeft', 'jawBodyRight'] },
+  { key: 'templeToCheekWidthRatio', label: 'Temple / Cheek Width', unit: 'x', landmarks: ['templeLeft', 'templeRight'] },
   { key: 'bigonialWidthPercent', label: 'Bigonial Width', unit: '%', landmarks: ['jawCornerLeft', 'jawCornerRight'] },
   { key: 'midfaceRatio',      label: 'Midface Ratio',    unit: 'x', landmarks: ['cheekboneLeft', 'cheekboneRight'] },
-  { key: 'facialAngleDegrees', label: 'Facial Angle',      unit: '°', landmarks: ['browPoint'] },
-  { key: 'facialConvexityDegrees', label: 'Facial Convexity', unit: '°', landmarks: ['noseTip'] },
-  { key: 'foreheadSlopeDegrees', label: 'Forehead Slope',  unit: '°', landmarks: ['browPoint'] },
-  { key: 'noseProjectionMM',  label: 'Nose Projection',  unit: 'mm', landmarks: ['noseTip'] },
-  { key: 'chinProjectionMM',  label: 'Chin Projection',  unit: 'mm', landmarks: ['chinTip'] },
   { key: 'jawAsymmetryScore', label: 'Jaw Asymmetry',    unit: '%', landmarks: ['jawCornerLeft', 'jawCornerRight'] },
   { key: 'cheekboneAsymmetryScore', label: 'Cheekbone Asymmetry', unit: '%', landmarks: ['cheekboneLeft', 'cheekboneRight'] },
   { key: 'templeAsymmetryScore', label: 'Temple Asymmetry', unit: '%', landmarks: ['templeLeft', 'templeRight'] },
@@ -75,12 +59,6 @@ function formatValue(value, unit, units = 'metric') {
   if (unit === '°') return `${value.toFixed(1)}°`
   if (unit === '%') return `${value.toFixed(1)}%`
   if (unit === 'x') return `${value.toFixed(2)}x`
-  if (units === 'imperial') {
-    if (unit === 'cm') return `${(value * 0.3937).toFixed(1)} in`
-    if (unit === 'mm') return `${(value * 0.03937).toFixed(2)} in`
-  }
-  if (unit === 'mm') return `${value.toFixed(1)} mm`
-  if (unit === 'cm') return `${value.toFixed(1)} cm`
   return String(value)
 }
 

@@ -361,12 +361,8 @@ export default function Results() {
   useEffect(() => {
     if (!currentScan || activeTab !== 'products' || productsFetched || !isPremium) return
     const { faceData: fd, aiScore: ai, pillars: sp, gender: g } = currentScan
-    const sk = fd?.skinClarity ?? null
-    const issues = sk == null ? [] : [
-      sk < 5.5 ? 'acne' : null, sk < 4.5 ? 'scarring' : null,
-      sk < 6.0 ? 'oiliness' : null, sk < 5.0 ? 'dark_circles' : null,
-      sk < 6.5 ? 'dullness' : null,
-    ].filter(Boolean)
+    const observationToIssue = { visible_acne: 'acne', visible_scarring: 'scarring', visible_oiliness: 'oiliness', visible_dark_circles: 'dark_circles', visible_dullness: 'dullness' }
+    const issues = (ai?.visualObservations ?? []).map(observation => observationToIssue[observation.id]).filter(Boolean)
     setProductsLoading(true)
     api.products.recommendations({
       weaknesses:    ai?.keyWeaknesses ?? [],
@@ -414,13 +410,8 @@ export default function Results() {
     skinScore >= 6.0  ? 'Good'          :
     skinScore >= 4.5  ? 'Fair'          :
     skinScore >= 3.5  ? 'Blemish-Prone' : 'Needs Attention'
-  const skinIssues = skinScore == null ? [] : [
-    skinScore < 5.5 ? 'acne'        : null,
-    skinScore < 4.5 ? 'scarring'    : null,
-    skinScore < 6.0 ? 'oiliness'    : null,
-    skinScore < 5.0 ? 'dark_circles': null,
-    skinScore < 6.5 ? 'dullness'    : null,
-  ].filter(Boolean)
+  const observationToSkinIssue = { visible_acne: 'acne', visible_scarring: 'scarring', visible_oiliness: 'oiliness', visible_dark_circles: 'dark_circles', visible_dullness: 'dullness' }
+  const skinIssues = (aiScore?.visualObservations ?? []).map(observation => observationToSkinIssue[observation.id]).filter(Boolean)
   const skinIsClear   = skinScore != null && skinScore >= 7.5
   const skinPotential = skinScore != null ? Math.min(10, skinScore + (skinScore < 5 ? 2.5 : skinScore < 7 ? 1.8 : 1.2)).toFixed(1) : null
 

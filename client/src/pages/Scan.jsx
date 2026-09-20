@@ -24,6 +24,7 @@ import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
 import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
+import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 
 // No-op on web — no native bridge, and no web Firebase app configured yet either.
 async function logAnalyticsEvent(name, params) {
@@ -1480,7 +1481,7 @@ export default function Scan() {
           const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
           if (path) setMeshPathD(path)
         }).catch(() => {})
-        return points
+        return { points, landmarks: lm }
       })
       .catch(err => {
         console.warn('[Scan] Front landmark mapping unavailable:', err?.message)
@@ -1593,6 +1594,8 @@ export default function Scan() {
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
+    let qualityGate = { passed: true, state: 'SUCCESS', source: 'prior_capture_gate' }
+
     // Validate only if this photo did not already pass the front capture gate.
     // Network validation is not cached and can delay the processing screen.
     if (facePhoto && validatedFrontRef.current !== facePhoto) {
@@ -1601,6 +1604,7 @@ export default function Scan() {
       try {
         const { validateScanQuality } = await import('../utils/scanQuality.js')
         const qResult = await validateScanQuality(facePhoto)
+        qualityGate = qResult
         qPassed = qResult.passed
         qIssues = qResult.issues
       } catch (err) {
@@ -1676,10 +1680,16 @@ export default function Scan() {
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null
-      const detectedFrontPoints = await frontLandmarksPromise
-      if (!detectedFrontPoints) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      const frontDetection = await frontLandmarksPromise
+      if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
       const detectedSidePoints = sideB64 ? (isNative() ? nativeSidePoints : await sideLandmarksPromise) : null
       if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      const analysisEvidence = await buildProductionEvidence({
+        frontImage: faceB64,
+        frontLandmarks: frontDetection.landmarks,
+        qualityGate,
+        sideProfileGeometry: sideProfileGeometryResult,
+      })
       setAnalysisStep(2)
 
       let aiResult
@@ -1721,22 +1731,26 @@ export default function Scan() {
         try {
           setScanInFlight(true)
           const lastGlowScore = scans?.[0]?.glowScore ?? null
-          const scoreCall = api.ai.score({
+          aiResult = await requestProductionAnalysis({
+            apiClient: api,
             faceImage: faceB64,
-            ...(sideB64 ? { sideImage: sideB64 } : {}),
-            ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
+            sideImage: sideB64,
+            sideProfileGeometry,
+            evidence: analysisEvidence,
             gender: g,
-            ...(lastGlowScore != null ? { previousScore: lastGlowScore } : {}),
+            previousScore: lastGlowScore,
           })
-          const timeoutCall = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
-          )
-          aiResult = await Promise.race([scoreCall, timeoutCall])
           setAnalysisResult(aiResult)
 
         } finally {
           setScanInFlight(false)
         }
+      }
+
+      if (!aiResult.analysisEvidence) aiResult.analysisEvidence = analysisEvidence
+      if (!aiResult.scoreClassification) aiResult.scoreClassification = {
+        overall: 'legacy_subjective_visual_assessment',
+        objectiveReplacementStatus: 'not_validated',
       }
 
       setAnalysisStep(3)
@@ -1754,6 +1768,7 @@ export default function Scan() {
         glowScore:      Math.round(aiResult.overallScore * 10) / 10,
         tier:           aiResult.tier,
         aiScore:        aiResult,
+        analysisEvidence: aiResult.analysisEvidence,
         faceData: {
           aestheticScore:    aiResult.faceScore,
           pillars:           null,

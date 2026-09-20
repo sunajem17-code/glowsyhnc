@@ -152,6 +152,43 @@ function stripPrefix(dataUrl) {
   return dataUrl.replace(/^data:image\/\w+;base64,/, '')
 }
 
+function sanitizeAnalysisEvidence(input) {
+  if (!input || typeof input !== 'object') return null
+  const cleanRows = (rows, max = 40) => Array.isArray(rows) ? rows.slice(0, max).map(row => ({
+    id: typeof row?.id === 'string' ? row.id.slice(0, 80) : null,
+    value: Number.isFinite(row?.value) ? Math.round(row.value * 10000) / 10000 : null,
+    unit: typeof row?.unit === 'string' ? row.unit.slice(0, 20) : null,
+    source: typeof row?.source === 'string' ? row.source.slice(0, 60) : null,
+    formula: typeof row?.formula === 'string' ? row.formula.slice(0, 240) : null,
+    assessable: row?.assessable === true,
+    reason: typeof row?.reason === 'string' ? row.reason.slice(0, 100) : null,
+    landmarksUsed: Array.isArray(row?.landmarksUsed) ? row.landmarksUsed.slice(0, 12).map(point => ({
+      index: Number.isInteger(point?.index) ? point.index : null,
+      label: typeof point?.label === 'string' ? point.label.slice(0, 40) : null,
+    })) : [],
+  })).filter(row => row.id) : []
+  return {
+    schemaVersion: typeof input.schemaVersion === 'string' ? input.schemaVersion.slice(0, 20) : null,
+    status: input.status === 'measured' ? 'measured' : 'additional_image_required',
+    reason: typeof input.reason === 'string' ? input.reason.slice(0, 100) : null,
+    pose: input.pose && typeof input.pose === 'object' ? {
+      orientation: input.pose.orientation === 'front' ? 'front' : null,
+      rollDegrees: Number.isFinite(input.pose.rollDegrees) ? input.pose.rollDegrees : null,
+      yawProxy: Number.isFinite(input.pose.yawProxy) ? input.pose.yawProxy : null,
+      pitchProxy: Number.isFinite(input.pose.pitchProxy) ? input.pose.pitchProxy : null,
+      acceptable: input.pose.acceptable === true,
+    } : null,
+    measurements: cleanRows(input.measurements),
+    notAssessable: cleanRows(input.notAssessable),
+    profile: input.profile && typeof input.profile === 'object' ? {
+      status: input.profile.status === 'measured' ? 'measured' : 'not_assessable',
+      reason: typeof input.profile.reason === 'string' ? input.profile.reason.slice(0, 100) : null,
+      measurements: cleanRows(input.profile.measurements, 10),
+      notAssessable: cleanRows(input.profile.notAssessable, 10),
+    } : null,
+  }
+}
+
 // ── CALL 1: Core score — Face + Grooming + 4 Pillars (+ optional side profile) ──
 // Focused on facial structure, grooming, and the 4 aesthetic pillars. This is
 // deliberately the SMALL/FAST call — the 30-metric extended breakdown lives in
@@ -162,7 +199,7 @@ function stripPrefix(dataUrl) {
 // not image/input processing.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
-async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null) {
+async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null, analysisEvidence = null) {
   const client = getClient()
   const isFemale = gender === 'female'
   const hasSide = !!sideBase64
@@ -176,6 +213,10 @@ async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null
   const measuredGeometryNote = (hasSide && sideProfileGeometry?.facialConvexityDegrees != null)
     ? `\nMEASURED REFERENCE (from on-device landmark detection, not a visual estimate): facial convexity angle ≈ ${sideProfileGeometry.facialConvexityDegrees.toFixed(1)}°. A straighter/more obtuse angle reads as a flatter profile; a sharper angle reads as more convex/protrusive. Use this as a factual anchor for jawline_projection and chin_projection — don't contradict it without clear photographic reason, but your visual read still governs profile_score and nose_bridge.`
     : ''
+
+  const evidenceNote = analysisEvidence?.status === 'measured'
+    ? `\n\nDETERMINISTIC PHOTOGRAPHIC EVIDENCE (calculated before this call):\n${JSON.stringify(analysisEvidence)}\nTreat these ratios as the authoritative measured geometry. Do not describe your own visual estimate as a measurement. The numeric appearance scores below remain a legacy subjective product output and must not be described as objective geometry.`
+    : '\n\nNo reliable deterministic geometry was supplied. Do not invent measurements.'
 
   const profileSection = hasSide ? `
 
@@ -312,16 +353,6 @@ HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "bald"       → shaved head or very close cut with no texture visible
 - "unknown"    → hair not visible or cannot be determined from photo
 
-PERCEIVED ETHNICITY — classify the most visually apparent ethnic background from facial features only. Use the closest single match:
-- "white"         → Northern/Southern/Eastern European ancestry
-- "black"         → Sub-Saharan African ancestry
-- "east_asian"    → East Asian (Chinese, Japanese, Korean, Southeast Asian)
-- "south_asian"   → South Asian (Indian, Pakistani, Bangladeshi, Sri Lankan)
-- "latino"        → Latin American or Hispanic (regardless of skin tone)
-- "middle_eastern"→ Arab, Persian, Turkish, or Levantine ancestry
-- "mixed"         → Clearly mixed or ambiguous — cannot confidently assign one group
-Base this only on visual facial features visible in the photo. If uncertain, use "mixed".
-
 FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"):
 - jawline: sharpness, gonial angle definition, and visible edge clarity
 - cheekbones: height, prominence, and forward projection of the malar bones
@@ -330,7 +361,9 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
-${profileSection}
+${profileSection}${evidenceNote}
+
+VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
 KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
@@ -341,7 +374,6 @@ Return ONLY this JSON — no markdown, nothing else:
   "grooming_score": <number 1.0–10.0>,
   "facial_structure": "<soft/round|average|defined|strong>",
   "hair_type": "<straight|wavy|curly|coily|locs|bald|unknown>",
-  "perceived_ethnicity": "<white|black|east_asian|south_asian|latino|middle_eastern|mixed>",
   "pillars": {
     "harmony": <number 1.0–10.0>,
     "angularity": <number 1.0–10.0>,
@@ -359,6 +391,9 @@ Return ONLY this JSON — no markdown, nothing else:
   "key_strengths": ["<strength 1>", "<strength 2>"],
   "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
   "top_improvement": "<single most impactful improvement>",
+  "visual_observations": [
+    { "id": "<allowed id>", "category": "<skin|hair|grooming>", "source": "visual_observation", "confidence": "<low|medium|high>", "images_supporting": ["<front|profile>"], "limitations": ["<relevant limitation>"] }
+  ],
   "face_metrics": {
     "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
     "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
@@ -735,6 +770,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     }
 
     const { faceImage, sideImage, bodyImage, gender = 'male', previousScore, bodyGeometry, sideProfileGeometry } = req.body
+    const analysisEvidence = sanitizeAnalysisEvidence(req.body.analysisEvidence)
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -794,7 +830,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.log('[aiScore] STEP 1 — Face scoring...')
       const tFaceStart = Date.now()
       const facePromise = withRetry(
-        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry),
+        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry, analysisEvidence),
         'face'
       ).then(result => {
         console.log(`[aiScore:TIMING] STEP 1 (face) took ${Date.now() - tFaceStart}ms`)
@@ -880,7 +916,21 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       tier,
       facialStructure:    faceResult.facial_structure,
       hairType:           faceResult.hair_type ?? 'unknown',
-      perceivedEthnicity: faceResult.perceived_ethnicity ?? 'mixed',
+      visualObservations: Array.isArray(faceResult.visual_observations)
+        ? faceResult.visual_observations.slice(0, 12).map(observation => ({
+            id: typeof observation?.id === 'string' ? observation.id : null,
+            category: typeof observation?.category === 'string' ? observation.category : null,
+            source: 'visual_observation',
+            confidence: ['low', 'medium', 'high'].includes(observation?.confidence) ? observation.confidence : 'low',
+            imagesSupporting: Array.isArray(observation?.images_supporting) ? observation.images_supporting.slice(0, 2) : [],
+            limitations: Array.isArray(observation?.limitations) ? observation.limitations.map(String).slice(0, 3) : [],
+          })).filter(observation => observation.id)
+        : [],
+      evidenceSummary: analysisEvidence,
+      scoreClassification: {
+        overall: 'legacy_subjective_visual_assessment',
+        objectiveReplacementStatus: 'not_validated',
+      },
       faceSubScores: {
         symmetry:          r(faceSub.symmetry),
         jawlineDefinition: r(faceSub.jawline_definition),
@@ -918,7 +968,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       // held up waiting on it. 'pending' tells the client to fire that
       // follow-up call and patch the result in once it resolves.
       extendedMetrics: null,
-      extendedMetricsStatus: 'pending',
+      extendedMetricsStatus: 'unsupported_removed',
       // Side profile — null when no side photo was provided
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,

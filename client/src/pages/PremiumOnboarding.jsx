@@ -24,6 +24,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/th
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import ProcessingOverlay from '../components/ProcessingOverlay'
+import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 
 // Analytics collection ships disabled by default (see GoogleService-Info.plist's
 // IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
@@ -2391,7 +2392,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
           if (path) setMeshPathD(path)
         }).catch(() => {})
-        return points
+        return { points, landmarks: lm }
       })
       .catch(err => {
         console.warn('[PremiumOnboarding] Front landmark mapping unavailable:', err?.message)
@@ -2469,9 +2470,11 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       const sideB64 = side ? await toBase64(side) : null
       if (sideB64) setSidePhoto(sideB64)
       let sideLandmarksPromise = Promise.resolve(null)
+      let sideProfileGeometryResult = null
       if (sideB64) {
         if (Capacitor.isNativePlatform()) {
           sideLandmarksPromise = analyzeSideProfile(sideB64).then(result => {
+            sideProfileGeometryResult = result
             const profilePoints = result?.detected ? profilePointsFromVision(result.landmarks) : null
             if (profilePoints) setSideAnalysisPoints(profilePoints)
             return profilePoints
@@ -2499,10 +2502,19 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setSideDetectionPending(false)
       }
       setSlowAnalysis(false)
-      const detectedFrontPoints = await frontLandmarksPromise
-      if (!detectedFrontPoints) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      const frontDetection = await frontLandmarksPromise
+      if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
       const detectedSidePoints = sideB64 ? await sideLandmarksPromise : null
       if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      const sideProfileGeometry = sideProfileGeometryResult?.detected
+        ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
+        : null
+      const analysisEvidence = await buildProductionEvidence({
+        frontImage: faceB64,
+        frontLandmarks: frontDetection.landmarks,
+        qualityGate: { passed: true, state: 'SUCCESS', source: 'onboarding_capture_gate' },
+        sideProfileGeometry: sideProfileGeometryResult,
+      })
       setAnalysisStep(2)
 
       // Wait for the silent guest session to resolve before calling the
@@ -2513,10 +2525,14 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       let aiResult
       try {
         setScanInFlight(true)
-        aiResult = await Promise.race([
-          api.ai.score({ faceImage: faceB64, sideImage: sideB64, gender: gender || 'male' }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)),
-        ])
+        aiResult = await requestProductionAnalysis({
+          apiClient: api,
+          faceImage: faceB64,
+          sideImage: sideB64,
+          sideProfileGeometry,
+          evidence: analysisEvidence,
+          gender: gender || 'male',
+        })
       } finally {
         setScanInFlight(false)
         clearTimeout(slowTimer)
@@ -2538,6 +2554,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         glowScore:      Math.round(aiResult.overallScore * 10) / 10,
         tier:           aiResult.tier,
         aiScore:        aiResult,
+        analysisEvidence: aiResult.analysisEvidence,
         faceData: {
           aestheticScore:    aiResult.faceScore,
           pillars:           null,

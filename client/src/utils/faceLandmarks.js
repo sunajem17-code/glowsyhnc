@@ -409,7 +409,7 @@ export function toExplorerLandmarks2D(lm) {
     templeRight:    p(356),
     cheekboneLeft:  p(234),
     cheekboneRight: p(454),
-    // jawBody = pre-gonion ramus (lm 58/288), used for jawWidthCM
+    // jawBody = pre-gonion points (lm 58/288), used for a width ratio
     jawBodyLeft:    p(58),
     jawBodyRight:   p(288),
     // jawCorner = gonion angle (lm 172/397), used for bigonialWidthPercent
@@ -418,24 +418,15 @@ export function toExplorerLandmarks2D(lm) {
   }
 }
 
-// Average bizygomatic (cheekbone-to-cheekbone) width used as the cm reference.
-// We don't have a physical ruler in the photo so we anchor to population mean
-// then scale every other distance proportionally. Deliberately labeled as
-// "estimates" in the UI — accurate enough for a looksmaxxing reference, not
-// for medical use.
-const CHEEK_REF_CM = { male: 13.5, female: 12.5, default: 13.0 }
-
-export function computeExplorerMetrics(lm, gender) {
+export function computeExplorerMetrics(lm) {
   const p = (i) => lm[i]
   const d = (a, b) => Math.sqrt((p(a).x - p(b).x) ** 2 + (p(a).y - p(b).y) ** 2)
 
   const cheekDist = d(234, 454)
   if (cheekDist < 0.01) return null  // degenerate — caller should fall back to demo
 
-  const refCm = CHEEK_REF_CM[gender] ?? CHEEK_REF_CM.default
-  const scale = refCm / cheekDist  // normalized units → cm
-
-  // jawBodyDist = pre-gonion ramus (lm 58/288) — used for Jaw Width cm
+  // All output is scale-independent. An ordinary selfie has no physical ruler,
+  // so centimetres or millimetres would be fabricated precision.
   // bigonialDist = gonion-to-gonion (lm 172/397) — used for Bigonial Width %
   // Keeping them separate ensures the two metrics measure distinct anatomy.
   const jawBodyDist   = d(58, 288)
@@ -451,9 +442,8 @@ export function computeExplorerMetrics(lm, gender) {
   }
 
   return {
-    jawWidthCM:              Math.round(jawBodyDist  * scale * 10) / 10,
-    cheekboneWidthCM:        Math.round(cheekDist    * scale * 10) / 10,
-    bitemporalWidthCM:       Math.round(tempDist     * scale * 10) / 10,
+    jawToCheekWidthRatio:    Math.round(jawBodyDist / cheekDist * 100) / 100,
+    templeToCheekWidthRatio: Math.round(tempDist / cheekDist * 100) / 100,
     bigonialWidthPercent:    Math.round(bigonialDist / cheekDist * 1000) / 10,
     midfaceRatio:            Math.round(midfaceH / cheekDist * 100) / 100,
     jawAsymmetryScore:       asymScore(172, 397),

@@ -45,7 +45,7 @@ async function request(path, options = {}) {
   }
 
   // AI scoring can take 20–40s — give it 130s. All other calls get 15s.
-  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/')
+  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/') || path.startsWith('/hair/')
   const timeoutMs = isAiCall ? 130_000 : 15_000
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -176,7 +176,8 @@ export const api = {
     message: (data) => request('/coach/message', { method: 'POST', body: JSON.stringify(data) }),
   },
   hair: {
-    analyze: (data) => request('/hair/analyze', { method: 'POST', body: JSON.stringify(data) }),
+    recommend: (data) => request('/hair/recommend', { method: 'POST', body: JSON.stringify(data) }),
+    preview: (data) => request('/hair/preview', { method: 'POST', body: JSON.stringify(data) }),
   },
   leaderboard: {
     get: () => request('/leaderboard'),
