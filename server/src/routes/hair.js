@@ -1,13 +1,9 @@
 const express = require('express')
-const crypto = require('crypto')
-const OpenAI = require('openai')
 const Anthropic = require('@anthropic-ai/sdk')
-const { toFile } = require('openai')
-const { verifyToken, claudeLimit, requirePro } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit } = require('../middleware/claudeGate')
 const { withRetry } = require('../utils/withRetry')
 
 const router = express.Router()
-const previewCache = new Map()
 
 const HAIR_CATALOG = [
   ['textured_crop', ['straight','wavy'], ['low','medium','high'], ['fine','medium','thick'], 'short', 'low', { topHeight:'low', foreheadExposure:'low', sideWidth:'low' }],
@@ -60,10 +56,37 @@ function eligibleStyles(profile) {
   )
 }
 
+function deterministicRecommendations(candidates, profile, measurements) {
+  const values = new Map(measurements.map(row => [row.id, row]))
+  const widthHeight = values.get('face_width_to_height_ratio')?.value
+  const jawCheek = values.get('jaw_to_cheek_width_ratio')?.value
+  const upperThird = values.get('upper_visible_third_ratio')?.value
+  const cited = ['face_width_to_height_ratio', 'jaw_to_cheek_width_ratio', 'upper_visible_third_ratio'].filter(id => values.has(id))
+
+  return candidates.map(style => {
+    let score = 70
+    const reasons = [`Compatible with ${profile.hairType} hair, ${profile.density} density, and ${profile.strandThickness} strands`]
+    if (widthHeight < 0.68 && ['low', 'none'].includes(style.visualEffects.topHeight)) { score += 12; reasons.push('Keeps added height controlled for your measured facial elongation') }
+    if (widthHeight > 0.82 && ['medium', 'high'].includes(style.visualEffects.topHeight)) { score += 12; reasons.push('Adds vertical emphasis for your measured width-to-height relationship') }
+    if (jawCheek < 0.72 && style.visualEffects.sideWidth !== 'low') { score += 7; reasons.push('Adds balanced width around your measured jaw-to-cheek relationship') }
+    if (upperThird > 0.27 && style.visualEffects.foreheadExposure === 'low') { score += 8; reasons.push('Keeps forehead exposure low for your measured upper-third proportion') }
+    if (profile.desiredLength === style.length) score += 5
+    if (profile.maintenancePreference === style.maintenance) score += 4
+    return { style, score, reasons }
+  }).sort((a, b) => b.score - a.score).slice(0, 8).map(({ style, reasons }, index) => ({
+    hairstyleId: style.id,
+    rank: index + 1,
+    matchReasons: reasons.slice(0, 3),
+    relevantMeasurements: cited.map(id => values.get(id)),
+    compatibilityFactors: [`${profile.hairType} hair`, `${profile.density} density`, `${profile.strandThickness} strands`],
+    limitations: ['Photographic ratios guide visual balance and do not diagnose face shape'],
+    catalogFactors: { hairTypes: style.hairTypes, densities: style.densities, thicknesses: style.thicknesses, length: style.length, maintenance: style.maintenance, visualEffects: style.visualEffects },
+  }))
+}
+
 router.post('/recommend', verifyToken, claudeLimit, async (req, res) => {
+  let fallback = []
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) return res.status(500).json({ error: 'Hair recommendation service is not configured' })
     const profile = sanitizeHairProfile(req.body?.hairProfile)
     const measurements = sanitizeMeasurements(req.body?.analysisEvidence)
     if (!profile.hairType || !profile.density || !profile.strandThickness) return res.status(400).json({ error: 'Complete hair profile is required' })
@@ -71,6 +94,9 @@ router.post('/recommend', verifyToken, claudeLimit, async (req, res) => {
 
     let candidates = eligibleStyles(profile)
     if (candidates.length < 3) candidates = HAIR_CATALOG.filter(style => style.hairTypes.includes(profile.hairType) && style.densities.includes(profile.density) && style.thicknesses.includes(profile.strandThickness))
+    fallback = deterministicRecommendations(candidates, profile, measurements)
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) return res.json({ engine: 'deterministic_catalog_fallback_v1', scanId: profile.scanId, recommendations: fallback })
     const measurementMap = new Map(measurements.map(row => [row.id, row]))
     const candidateIds = new Set(candidates.map(style => style.id))
     const prompt = `Rank the supplied hairstyle catalog for a visual hairstyle fitting room.
@@ -142,73 +168,17 @@ Schema:
         catalogFactors: { hairTypes: catalog.hairTypes, densities: catalog.densities, thicknesses: catalog.thicknesses, length: catalog.length, maintenance: catalog.maintenance, visualEffects: catalog.visualEffects },
       }
     })
-    if (!recommendations.length) throw new Error('Recommendation engine returned no valid catalog ids')
-    return res.json({ engine: 'claude_grounded_catalog_v1', scanId: profile.scanId, recommendations })
+    // Preserve Claude's valid order, then fill any missing slots from the
+    // deterministic ranking. Malformed, duplicate, or incomplete model output
+    // can never collapse the personalized slideshow.
+    const completed = [...recommendations, ...fallback.filter(item => !seen.has(item.hairstyleId))]
+      .slice(0, Math.min(8, candidates.length))
+      .map((item, index) => ({ ...item, rank: index + 1 }))
+    return res.json({ engine: recommendations.length ? 'claude_grounded_catalog_v1' : 'deterministic_catalog_fallback_v1', scanId: profile.scanId, recommendations: completed })
   } catch (err) {
     console.error('[Hair] recommendation failed:', err.message, err.status)
+    if (fallback.length) return res.json({ engine: 'deterministic_catalog_fallback_v1', recommendations: fallback })
     return res.status(500).json({ error: 'Hair recommendation failed — please try again' })
-  }
-})
-
-const STYLE_PROMPTS = {
-  textured_crop: 'a short textured crop, low natural taper, soft forward texture',
-  french_crop: 'a French crop with a soft forward fringe and clean short sides',
-  caesar: 'a modern Caesar cut with an even short layer and subtle fringe',
-  crew_cut: 'a classic crew cut, short tapered sides, slightly longer at the front',
-  buzz_cut: 'a clean even buzz cut with a natural tapered outline',
-  low_taper_fringe: 'a low taper with a loose natural fringe and retained side weight',
-  mid_taper_texture: 'a mid taper with medium textured hair on top',
-  curly_taper: 'a low curly taper preserving the natural curl pattern and density',
-  curly_fringe: 'a defined curly fringe with softly blended sides',
-  curtains: 'medium length curtains with a natural center part and soft side flow',
-  side_part: 'a soft natural side part with a connected low taper',
-  messy_fringe: 'a loose messy fringe with irregular natural texture and a low taper',
-  slick_back: 'a connected slick back with natural volume and no harsh disconnect',
-  quiff: 'a modern controlled quiff with tapered sides and natural matte texture',
-  pompadour: 'a soft pompadour with connected sides and realistic pliable volume',
-  modern_mullet: 'a modern layered mullet with tapered temples and deliberate back length',
-  flow: 'medium-long layered flow moving naturally away from the face',
-}
-
-function imageParts(value, fallbackType = 'image/jpeg') {
-  const match = typeof value === 'string' ? value.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/s) : null
-  if (match) return { mediaType: match[1], base64: match[2] }
-  return { mediaType: fallbackType, base64: value }
-}
-
-// Production HairMax no longer asks an LLM to guess face shape. Matching is
-// deterministic on the client from the saved scan evidence. This endpoint has
-// one job: edit hair while preserving the source portrait.
-router.post('/preview', verifyToken, requirePro, claudeLimit, async (req, res) => {
-  try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return res.status(500).json({ error: 'Hair preview service is not configured' })
-
-    const { faceImage, hairstyleId, mediaType = 'image/jpeg' } = req.body
-    const hairstyle = STYLE_PROMPTS[hairstyleId]
-    if (!faceImage || !hairstyle) return res.status(400).json({ error: 'Valid faceImage and hairstyleId are required' })
-
-    const parts = imageParts(faceImage, mediaType)
-    if (!parts.base64 || parts.base64.length > 15_000_000) return res.status(413).json({ error: 'Image is missing or too large' })
-    const key = crypto.createHash('sha256').update(parts.base64).update('|').update(hairstyleId).digest('hex')
-    const cached = previewCache.get(key)
-    if (cached) return res.json({ image: cached, hairstyleId, cached: true })
-
-    const openai = new OpenAI({ apiKey })
-    const buffer = Buffer.from(parts.base64, 'base64')
-    const file = await toFile(buffer, 'hairmax-source.png', { type: parts.mediaType })
-    const prompt = `Edit this exact portrait so the person has ${hairstyle}. Preserve the person's identity exactly: same face shape, facial proportions, jawline, nose, eyes, eyebrows, ears, skin tone, skin texture, facial hair, expression, apparent age, head position and body. Preserve the same crop, camera angle, background and lighting. Do not beautify, retouch skin, add makeup, reshape the face, alter weight, or change clothing. Change only the scalp hair and the minimum surrounding hair edges required for a realistic haircut. Photorealistic hairstyle fitting-room comparison.`
-
-    const response = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, size: '1024x1024', n: 1 })
-    const output = response.data?.[0]?.b64_json
-    if (!output) return res.status(502).json({ error: 'No hairstyle preview was returned' })
-    const image = `data:image/png;base64,${output}`
-    if (previewCache.size >= 120) previewCache.delete(previewCache.keys().next().value)
-    previewCache.set(key, image)
-    return res.json({ image, hairstyleId, cached: false })
-  } catch (err) {
-    console.error('[Hair] preview failed:', err.message, err.status)
-    return res.status(500).json({ error: 'Hairstyle preview failed — please try again' })
   }
 })
 

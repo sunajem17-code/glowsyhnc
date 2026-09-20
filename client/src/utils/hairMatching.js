@@ -76,7 +76,6 @@ export function rankHairstyles(profile, structure, limit = 8) {
       compatibility: Math.min(99, score),
       reasons: [...new Set(reasons)].slice(0, 3),
       limitations: structure.connected ? structure.limitations : ['No reliable face geometry was available; ranking uses hair feasibility and preferences'],
-      previewStatus: 'idle', previewUrl: null,
     }
   }).sort((a, b) => b.compatibility - a.compatibility).slice(0, limit).map((item, index) => ({ ...item, rank: index + 1 }))
 }
@@ -84,6 +83,7 @@ export function rankHairstyles(profile, structure, limit = 8) {
 export function conciseReason(recommendation) {
   const reasons = recommendation?.reasons ?? []
   if (!reasons.length) return 'Works with your selected hair and styling preferences.'
-  const sentence = reasons.slice(0, 2).join(' and ')
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.'
+  const sentence = reasons[0].replace(/[.!?]+$/, '')
+  const shortened = sentence.length > 118 ? `${sentence.slice(0, 115).replace(/\s+\S*$/, '')}…` : `${sentence}.`
+  return shortened.charAt(0).toUpperCase() + shortened.slice(1)
 }

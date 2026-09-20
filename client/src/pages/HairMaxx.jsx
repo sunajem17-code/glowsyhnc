@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Bookmark, Check, ChevronLeft, ChevronRight, Heart, Loader2, Scissors, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Bookmark, Check, ChevronLeft, ChevronRight, Heart, Scissors, Sparkles, X } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-import { DENSITIES, HAIR_TYPES, HAIRSTYLE_CATALOG, LENGTHS, THICKNESSES } from '../utils/hairCatalog'
-import { conciseReason, structureFromScan } from '../utils/hairMatching'
+import { DENSITIES, HAIR_CATALOG_VERSION, HAIR_TYPES, HAIRSTYLE_CATALOG, LENGTHS, THICKNESSES } from '../utils/hairCatalog'
+import { conciseReason, rankHairstyles, structureFromScan } from '../utils/hairMatching'
 import { portableEvidence } from '../utils/productionAnalysis'
 import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -83,7 +83,7 @@ function ConnectedIntro({ structure, scan, image, onContinue, onRescan }) {
 
 function Matching({ profile, structure }) {
   const [step, setStep] = useState(0)
-  const steps = ['Matching styles', 'Building looks', 'Finalizing previews']
+  const steps = ['Matching styles', 'Ranking matches', 'Preparing slideshow']
   useEffect(() => {
     const timer = setInterval(() => setStep(value => Math.min(2, value + 1)), 700)
     return () => clearInterval(timer)
@@ -99,25 +99,34 @@ function Matching({ profile, structure }) {
   </div>
 }
 
-function PreviewImage({ recommendation, sourceImage }) {
-  const loading = recommendation.previewStatus === 'loading'
-  return <div className="relative rounded-[28px] overflow-hidden" style={{ aspectRatio: '4/5', background: '#111', border: '1px solid rgba(255,255,255,.08)' }}>
-    <img src={recommendation.previewUrl || sourceImage} alt={`${recommendation.style.name} preview`} className="w-full h-full object-cover" style={{ filter: loading ? 'brightness(.45) saturate(.6)' : 'none' }} />
-    {loading && <div className="absolute inset-0 flex flex-col items-center justify-center"><Loader2 size={28} className="animate-spin" color={GOLD} /><span className="mt-3 text-[10px] uppercase tracking-[.2em] text-white/70">Building this look</span></div>}
-    {recommendation.previewStatus === 'failed' && <div className="absolute inset-x-4 bottom-4 rounded-xl px-3 py-2 text-center text-[11px] text-white/70" style={{ background: 'rgba(0,0,0,.7)' }}>Preview unavailable. Your match details are still ready.</div>}
+function CatalogModelImage({ recommendation, className = '' }) {
+  const crop = recommendation.style.image
+  const x = (crop.x / (crop.sheetWidth - crop.width)) * 100
+  const y = (crop.y / (crop.sheetHeight - crop.height)) * 100
+  return <div className={`relative overflow-hidden ${className}`} role="img" aria-label={`${recommendation.style.name} model reference`}
+    style={{
+      aspectRatio: `${crop.width}/${crop.height}`,
+      backgroundColor: '#111',
+      backgroundImage: `url(${crop.sheet})`,
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: `${(crop.sheetWidth / crop.width) * 100}% ${(crop.sheetHeight / crop.height) * 100}%`,
+      backgroundPosition: `${x}% ${y}%`,
+      border: '1px solid rgba(255,255,255,.08)',
+    }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 68%, rgba(0,0,0,.36))' }} />
     {recommendation.rank === 1 && <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[9px] font-heading font-bold uppercase tracking-wider" style={{ background: GOLD, color: '#080808' }}>Best match</div>}
   </div>
 }
 
-function DetailSheet({ recommendation, sourceImage, onClose, onBarber }) {
+function DetailSheet({ recommendation, onClose, onBarber }) {
   const style = recommendation.style
   return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,.78)' }} onClick={onClose}>
     <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={SPRING_STANDARD} className="w-full max-h-[88vh] overflow-y-auto rounded-t-[30px] p-5" style={{ background: '#111', borderTop: '1px solid rgba(255,255,255,.1)' }} onClick={event => event.stopPropagation()}>
       <div className="flex justify-between items-start mb-5"><div><p className="text-[9px] uppercase tracking-[.2em]" style={{ color: GOLD }}>Why it works</p><h3 className="font-heading font-bold text-[24px] text-white mt-1">{style.name}</h3></div><button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: PANEL }}><X size={16} color="white" /></button></div>
-      <img src={recommendation.previewUrl || sourceImage} alt="Selected hairstyle" className="w-full rounded-2xl object-cover mb-5" style={{ aspectRatio: '16/10' }} />
+      <CatalogModelImage recommendation={recommendation} className="w-full rounded-2xl mb-5" />
       <div className="space-y-4">
-        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Face</p><p className="text-[13px] leading-relaxed text-white/80">{conciseReason(recommendation)}</p></section>
-        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Hair</p><p className="text-[13px] leading-relaxed text-white/80">Compatible with your selected hair type and density.</p></section>
+        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Why it fits you</p><p className="text-[13px] leading-relaxed text-white/80">{conciseReason(recommendation)}</p></section>
+        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Hair compatibility</p><p className="text-[13px] leading-relaxed text-white/80">{recommendation.compatibilityFactors?.length ? recommendation.compatibilityFactors.join(' · ') : 'Compatible with your selected hair type, density, and strand thickness.'}</p></section>
         <div className="grid grid-cols-2 gap-3"><section className="rounded-xl p-3" style={{ background: PANEL }}><p className="text-[9px] uppercase text-white/40">Maintenance</p><p className="text-[13px] capitalize text-white mt-1">{style.maintenance}</p></section><section className="rounded-xl p-3" style={{ background: PANEL }}><p className="text-[9px] uppercase text-white/40">Growth</p><p className="text-[13px] text-white mt-1">{style.growth}</p></section></div>
         <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Styling</p><p className="text-[13px] leading-relaxed text-white/80">{style.styling}</p></section>
       </div>
@@ -126,25 +135,25 @@ function DetailSheet({ recommendation, sourceImage, onClose, onBarber }) {
   </motion.div>
 }
 
-function BarberMode({ recommendation, sourceImage, onClose }) {
+function BarberMode({ recommendation, onClose }) {
   const { style } = recommendation
   return <div className="fixed inset-0 z-[60] overflow-y-auto px-5 pb-10" style={{ background: BG, paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
     <div className="flex items-center justify-between mb-5"><button onClick={onClose}><ArrowLeft size={22} color="white" /></button><p className="font-heading font-bold text-white">Show Barber</p><div className="w-6" /></div>
-    <img src={recommendation.previewUrl || sourceImage} alt="Barber reference" className="w-full rounded-[26px] object-cover mb-6" style={{ aspectRatio: '4/5' }} />
+    <CatalogModelImage recommendation={recommendation} className="w-full rounded-[26px] mb-6" />
     <p className="text-[10px] uppercase tracking-[.22em] mb-1" style={{ color: GOLD }}>Reference</p><h2 className="font-heading font-bold text-[27px] text-white mb-6">{style.name}</h2>
     <div className="space-y-3">{Object.entries(style.barber).map(([part, value]) => <div key={part} className="rounded-2xl p-4" style={{ background: PANEL, border: '1px solid rgba(255,255,255,.07)' }}><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">{part}</p><p className="text-[14px] text-white/85 leading-relaxed">{value}</p></div>)}</div>
     <div className="rounded-2xl p-4 mt-3" style={{ background: 'rgba(198,168,92,.08)', border: '1px solid rgba(198,168,92,.22)' }}><p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: GOLD }}>Styling</p><p className="text-[14px] text-white/85">{style.styling}</p></div>
   </div>
 }
 
-function Looks({ recommendations, active, setActive, sourceImage, savedIds, onSave, onDetails, onSaved }) {
+function Looks({ recommendations, active, setActive, savedIds, onSave, onDetails, onSaved }) {
   const item = recommendations[active]
   if (!item) return null
   const go = direction => setActive(value => (value + direction + recommendations.length) % recommendations.length)
   return <div className="px-5 pb-10">
     <div className="pt-5 flex items-end justify-between mb-4"><div><p className="text-[10px] uppercase tracking-[.24em]" style={{ color: GOLD }}>HairMax</p><h1 className="font-heading font-bold text-[28px] text-white">Your Best Looks</h1></div><button onClick={onSaved} className="flex items-center gap-1.5 text-[11px] text-white/60"><Bookmark size={14} />{savedIds.length}</button></div>
     <motion.div key={item.hairstyleId} drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={.18} onDragEnd={(_, info) => { if (info.offset.x < -55) go(1); if (info.offset.x > 55) go(-1) }} initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }}>
-      <div className="relative"><PreviewImage recommendation={item} sourceImage={sourceImage} /><button onClick={() => go(-1)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronLeft size={18} color="white" /></button><button onClick={() => go(1)} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronRight size={18} color="white" /></button></div>
+      <div className="relative"><CatalogModelImage recommendation={item} className="w-full rounded-[28px]" /><button onClick={() => go(-1)} aria-label="Previous hairstyle" className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronLeft size={18} color="white" /></button><button onClick={() => go(1)} aria-label="Next hairstyle" className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronRight size={18} color="white" /></button></div>
       <div className="pt-5"><div className="flex justify-between items-start"><div><p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: GOLD }}>{item.compatibility >= 90 ? 'Strong match' : 'Good match'}</p><h2 className="font-heading font-bold text-[23px] text-white">{item.style.name}</h2></div><span className="font-body text-[11px] text-white/40">{active + 1} / {recommendations.length}</span></div><p className="font-body text-[13px] text-white/60 mt-2 leading-relaxed max-w-[90%]">{conciseReason(item)}</p></div>
       <div className="grid grid-cols-2 gap-3 mt-5"><button onClick={() => onSave(item.hairstyleId)} className="py-3.5 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[12px]" style={{ background: savedIds.includes(item.hairstyleId) ? 'rgba(198,168,92,.14)' : PANEL, color: savedIds.includes(item.hairstyleId) ? GOLD : 'white', border: '1px solid rgba(255,255,255,.08)' }}><Heart size={15} fill={savedIds.includes(item.hairstyleId) ? GOLD : 'none'} />Save</button><button onClick={() => onDetails(item)} className="py-3.5 rounded-2xl font-heading font-bold text-[12px]" style={{ background: PANEL, color: 'white', border: '1px solid rgba(255,255,255,.08)' }}>Details</button></div>
       <div className="flex justify-center gap-1.5 mt-5">{recommendations.map((value, index) => <button key={value.hairstyleId} onClick={() => setActive(index)} className="h-1.5 rounded-full transition-all" style={{ width: index === active ? 20 : 6, background: index === active ? GOLD : 'rgba(255,255,255,.18)' }} />)}</div>
@@ -152,9 +161,12 @@ function Looks({ recommendations, active, setActive, sourceImage, savedIds, onSa
   </div>
 }
 
-function SavedLooks({ recommendations, savedIds, sourceImage, onSelect }) {
-  const saved = recommendations.filter(item => savedIds.includes(item.hairstyleId))
-  return <div className="px-5 py-6"><h1 className="font-heading font-bold text-[28px] text-white mb-1">Saved Looks</h1><p className="text-[13px] text-white/45 mb-6">Your hairstyle shortlist.</p>{saved.length ? <div className="grid grid-cols-2 gap-3">{saved.map(item => <button key={item.hairstyleId} onClick={() => onSelect(item)} className="text-left"><img src={item.previewUrl || sourceImage} alt={item.style.name} className="w-full object-cover rounded-2xl" style={{ aspectRatio: '4/5' }} /><p className="font-heading font-bold text-[12px] text-white mt-2">{item.style.name}</p></button>)}</div> : <div className="rounded-2xl py-14 text-center" style={{ background: PANEL }}><Heart size={24} color={GOLD} className="mx-auto mb-3" /><p className="text-[13px] text-white/55">Save a look to compare later.</p></div>}</div>
+function SavedLooks({ recommendations, savedIds, onSelect }) {
+  const saved = savedIds.map(id => recommendations.find(item => item.hairstyleId === id) ?? (() => {
+    const style = HAIRSTYLE_CATALOG.find(item => item.id === id)
+    return style ? { hairstyleId: id, style, reasons: [], compatibilityFactors: [], limitations: [] } : null
+  })()).filter(Boolean)
+  return <div className="px-5 py-6"><h1 className="font-heading font-bold text-[28px] text-white mb-1">Saved Looks</h1><p className="text-[13px] text-white/45 mb-6">Your hairstyle shortlist.</p>{saved.length ? <div className="grid grid-cols-2 gap-3">{saved.map(item => <button key={item.hairstyleId} onClick={() => onSelect(item)} className="text-left"><CatalogModelImage recommendation={item} className="w-full rounded-2xl" /><p className="font-heading font-bold text-[12px] text-white mt-2">{item.style.name}</p></button>)}</div> : <div className="rounded-2xl py-14 text-center" style={{ background: PANEL }}><Heart size={24} color={GOLD} className="mx-auto mb-3" /><p className="text-[13px] text-white/55">Save a look to compare later.</p></div>}</div>
 }
 
 export default function HairMaxx() {
@@ -167,9 +179,10 @@ export default function HairMaxx() {
   const setHairType = useStore(state => state.setHairType)
   const storedProfile = useStore(state => state.hairProfile)
   const setHairProfile = useStore(state => state.setHairProfile)
+  const recommendationCache = useStore(state => state.hairRecommendationCache)
+  const setRecommendationCache = useStore(state => state.setHairRecommendationCache)
   const savedIds = useStore(state => state.savedHairLookIds)
   const toggleSaved = useStore(state => state.toggleSavedHairLook)
-  const isPremium = useStore(state => state.isPremium)
 
   const structure = useMemo(() => structureFromScan(scan), [scan])
   const [sourceImage, setSourceImage] = useState(lastFaceScanImage || currentScan?.facePhotoUrl || null)
@@ -212,47 +225,58 @@ export default function HairMaxx() {
     else beginMatching(nextProfile)
   }
 
+  function cacheKey(nextProfile) {
+    const evidenceVersion = structure.evidence?.schemaVersion ?? structure.evidence?.version ?? 'measured-v1'
+    const profileKey = ['hairType', 'density', 'strandThickness', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
+    return `${scan?.id ?? 'no-scan'}|${evidenceVersion}|${profileKey}|${HAIR_CATALOG_VERSION}`
+  }
+
+  function resolveRecommendations(items, engine, hairProfile) {
+    return items.map((item, index) => {
+      const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
+      const hardCompatible = style && style.compatibleHairTypes.includes(hairProfile.hairType) &&
+        style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness)
+      return hardCompatible ? {
+        hairstyleId: item.hairstyleId, style, rank: item.rank ?? index + 1,
+        compatibility: item.compatibility ?? Math.max(72, 97 - index * 4),
+        reasons: item.matchReasons ?? item.reasons ?? [],
+        relevantMeasurements: item.relevantMeasurements ?? [],
+        compatibilityFactors: item.compatibilityFactors ?? [], limitations: item.limitations ?? [],
+        engine: item.engine ?? engine,
+      } : null
+    }).filter(Boolean)
+  }
+
   async function beginMatching(nextProfile) {
     setHairProfile(nextProfile)
     setHairType(nextProfile.hairType)
     setActive(0)
+    const key = cacheKey(nextProfile)
+    if (recommendationCache?.key === key && recommendationCache.recommendations?.length) {
+      const cached = resolveRecommendations(recommendationCache.recommendations, recommendationCache.engine, nextProfile)
+      if (cached.length) {
+        setRecommendations(cached)
+        setStage('looks')
+        return
+      }
+    }
     setStage('matching')
     let ranked
     try {
       const response = await api.hair.recommend({ hairProfile: nextProfile, analysisEvidence: portableEvidence(structure.evidence) })
-      ranked = response.recommendations.map((item, index) => {
-        const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
-        return style ? {
-          hairstyleId: item.hairstyleId, style, rank: item.rank ?? index + 1,
-          compatibility: Math.max(72, 97 - index * 4), reasons: item.matchReasons ?? [],
-          relevantMeasurements: item.relevantMeasurements ?? [],
-          compatibilityFactors: item.compatibilityFactors ?? [], limitations: item.limitations ?? [],
-          previewStatus: 'idle', previewUrl: null, engine: response.engine,
-        } : null
-      }).filter(Boolean)
+      ranked = resolveRecommendations(response.recommendations ?? [], response.engine, nextProfile)
     } catch (error) {
       console.error('[HairMax] Grounded recommendation request failed:', error?.message)
-      setRecommendations([])
-      setStage('recommend_error')
-      return
+      ranked = rankHairstyles(nextProfile, structure, 8).map(item => ({ ...item, engine: 'deterministic_catalog_fallback_v1' }))
     }
+    if (!ranked.length) { setRecommendations([]); setStage('recommend_error'); return }
+    setRecommendationCache({
+      key,
+      engine: ranked[0]?.engine,
+      recommendations: ranked.map(({ hairstyleId, rank, compatibility, reasons, relevantMeasurements, compatibilityFactors, limitations, engine }) => ({ hairstyleId, rank, compatibility, reasons, relevantMeasurements, compatibilityFactors, limitations, engine })),
+    })
     setRecommendations(ranked)
     setStage('looks')
-    if (isPremium && sourceImage) generatePreviews(ranked)
-  }
-
-  async function generatePreviews(ranked) {
-    const generate = async item => {
-      setRecommendations(current => current.map(value => value.hairstyleId === item.hairstyleId ? { ...value, previewStatus: 'loading' } : value))
-      try {
-        const result = await api.hair.preview({ faceImage: sourceImage, hairstyleId: item.hairstyleId })
-        setRecommendations(current => current.map(value => value.hairstyleId === item.hairstyleId ? { ...value, previewStatus: 'ready', previewUrl: result.image } : value))
-      } catch {
-        setRecommendations(current => current.map(value => value.hairstyleId === item.hairstyleId ? { ...value, previewStatus: 'failed' } : value))
-      }
-    }
-    if (ranked[0]) await generate(ranked[0])
-    await Promise.all(ranked.slice(1, 3).map(generate))
   }
 
   function back() {
@@ -272,11 +296,10 @@ export default function HairMaxx() {
       {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="px-5"><ChoiceGrid {...selectedQuestion} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
       {stage === 'matching' && <motion.div key="matching" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Matching profile={profile} structure={structure} /></motion.div>}
       {stage === 'recommend_error' && <motion.div key="recommend-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[70vh] px-6 flex flex-col items-center justify-center text-center"><Sparkles size={30} color={GOLD} /><h2 className="font-heading font-bold text-[22px] text-white mt-5">Couldn’t build your looks</h2><p className="text-[13px] text-white/50 mt-2 mb-6">Your scan is safe. Try the grounded matching step again.</p><button onClick={() => beginMatching(profile)} className="px-6 py-3 rounded-2xl font-heading font-bold text-[13px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Try again</button></motion.div>}
-      {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks recommendations={recommendations} active={active} setActive={setActive} sourceImage={sourceImage} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
-      {stage === 'saved' && <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><SavedLooks recommendations={recommendations} savedIds={savedIds} sourceImage={sourceImage} onSelect={item => { setDetail(item); setStage('looks') }} /></motion.div>}
+      {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks recommendations={recommendations} active={active} setActive={setActive} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
+      {stage === 'saved' && <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><SavedLooks recommendations={recommendations} savedIds={savedIds} onSelect={item => { setDetail(item); setStage('looks') }} /></motion.div>}
     </AnimatePresence>
-    {!isPremium && stage === 'looks' && <div className="fixed inset-x-5 bottom-5 z-20 rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: 'rgba(17,17,17,.94)', border: '1px solid rgba(198,168,92,.32)' }}><div><p className="font-heading font-bold text-[12px] text-white">AI previews are part of Max</p><p className="text-[10px] text-white/45">Your structured matches are ready.</p></div><button onClick={() => navigate('/unlock?paywall=1')} className="px-4 py-2 rounded-xl font-heading font-bold text-[11px]" style={{ background: GOLD, color: '#080808' }}>Unlock</button></div>}
-    <AnimatePresence>{detail && <DetailSheet recommendation={detail} sourceImage={sourceImage} onClose={() => setDetail(null)} onBarber={() => { setBarber(detail); setDetail(null) }} />}</AnimatePresence>
-    {barber && <BarberMode recommendation={barber} sourceImage={sourceImage} onClose={() => setBarber(null)} />}
+    <AnimatePresence>{detail && <DetailSheet recommendation={detail} onClose={() => setDetail(null)} onBarber={() => { setBarber(detail); setDetail(null) }} />}</AnimatePresence>
+    {barber && <BarberMode recommendation={barber} onClose={() => setBarber(null)} />}
   </MotionPage>
 }
