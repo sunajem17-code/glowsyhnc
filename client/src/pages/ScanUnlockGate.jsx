@@ -14,19 +14,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import MotionPage from '../components/MotionPage'
-
-// Native purchase path only — the web/Stripe checkout path doesn't actually
-// complete here (see handleAscend), so this is deliberately not called for it.
-async function logAnalyticsEvent(name, params) {
-  if (!isNative()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
@@ -1688,7 +1676,6 @@ export default function ScanUnlockGate() {
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
-          logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
           handleUnlockSuccess()
           setIsPurchasing(false)
           purchaseLockRef.current = false

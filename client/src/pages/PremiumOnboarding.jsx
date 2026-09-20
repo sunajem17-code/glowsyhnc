@@ -18,35 +18,12 @@ import { isNative } from '../utils/iap'
 
 // ── Animated processing overlay (bars + "Processing" label) ──────────────────
 import { Capacitor } from '@capacitor/core'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
-
-// Analytics collection ships disabled by default (see GoogleService-Info.plist's
-// IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
-// to it in StepConsent. No-op on web — no native bridge, and no web Firebase app
-// configured yet either.
-async function enableAnalytics() {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    await FirebaseAnalytics.setEnabled({ enabled: true })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
-
-async function logAnalyticsEvent(name, params) {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
@@ -59,7 +36,7 @@ const G = GOLD
 const G_DIM = 'rgba(198,168,92,0.10)'
 const G_BORDER = 'rgba(198,168,92,0.28)'
 const BG = 'var(--bg)'
-const SURFACE = '#111111'
+const SURFACE = '#0D0D0D'
 const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = 'var(--text-primary)'
 const DIM = 'var(--text-secondary)'
@@ -637,7 +614,7 @@ function StepGender({ data, onChange, onNext }) {
     border: `1.5px solid ${selected === gender ? '#C6A85C' : '#262626'}`,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', transition: 'background 0.2s, border 0.2s', flexShrink: 0,
-    background: selected === gender ? 'rgba(198,168,92,0.10)' : '#141414',
+    background: selected === gender ? 'rgba(198,168,92,0.10)' : '#0D0D0D',
   })
 
   return (
@@ -945,7 +922,7 @@ function StepTestimonials({ onNext }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 + i * 0.1, duration: 0.35, ease: 'easeOut' }}
             style={{
-              background:   '#141414',
+              background:   '#0D0D0D',
               border:       '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
               padding:      '16px 18px',
@@ -1421,6 +1398,11 @@ function HaloTypewriter({ start }) {
 
   useEffect(() => {
     if (!start) return
+    triggerPageHaptic()
+  }, [start, lineIdx])
+
+  useEffect(() => {
+    if (!start) return
     const text = HALO_LINES[lineIdx]
     idx.current = 0
     setDisplayed('')
@@ -1473,6 +1455,7 @@ function HaloSubTypewriter({ start }) {
     if (!start) return
     // delay until main typewriter is roughly done (~2 lines × chars × 28ms + pauses ≈ 3.5s)
     const delay = setTimeout(() => {
+      triggerPageHaptic()
       idx.current = 0
       setDisplayed('')
       const id = setInterval(() => {
@@ -1557,7 +1540,7 @@ function StepHypergamy({ onNext, onBack }) {
       {/* Bottom card — locked to bottom */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 24px' }}>
         <div style={{
-          background: '#141414',
+          background: '#0D0D0D',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 24,
           padding: '12px 16px 20px',
@@ -1605,7 +1588,7 @@ function StepWhyAppearance({ onNext, onBack }) {
             <motion.div
               key={s.value}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut', delay: 0.25 + i * 0.1 }}
-              className="rounded-2xl px-6 py-4" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.07)', height: 150, display: 'flex', alignItems: 'center' }}>
+              className="rounded-2xl px-6 py-4" style={{ background: '#0D0D0D', border: '1px solid rgba(255,255,255,0.07)', height: 150, display: 'flex', alignItems: 'center' }}>
               <div className="flex items-center gap-5" style={{ width: '100%' }}>
                 <span className="font-heading font-bold text-[36px] shrink-0 w-20 text-center" style={{ color: G, textShadow: `0 0 18px rgba(198,168,92,0.7), 0 0 40px rgba(198,168,92,0.35)` }}>{s.value}</span>
                 <div className="flex flex-col gap-0.5">
@@ -1636,6 +1619,7 @@ function useTypewriter(text, speed = 38) {
     const iv = setInterval(() => {
       i++
       setDisplayed(text.slice(0, i))
+      triggerHaptic()
       if (i >= text.length) clearInterval(iv)
     }, speed)
     return () => clearInterval(iv)
@@ -1656,13 +1640,17 @@ function StepCinematic({ onNext }) {
   const displayed = useTypewriter(lines[lineIdx]?.text, 55)
 
   useEffect(() => {
+    // Light tap as each new line starts — skip lineIdx 0 on mount (feels like a jolt on open)
+    if (lineIdx > 0) triggerPageHaptic()
+  }, [lineIdx])
+
+  useEffect(() => {
     let cancelled = false
     const line = lines[lineIdx]
     const dur = line?.text.length * 55 + 1600
     const t = setTimeout(() => {
       if (cancelled) return
       if (lineIdx < lines.length - 1) {
-        triggerHaptic()
         setLineIdx(i => i + 1)
       } else {
         setLeaving(true)
@@ -1673,8 +1661,8 @@ function StepCinematic({ onNext }) {
   }, [lineIdx, onNext])
 
   function handleTap() {
+    triggerHaptic()
     if (lineIdx < lines.length - 1) {
-      triggerHaptic()
       setLineIdx(i => i + 1)
     } else {
       onNext()
@@ -1837,6 +1825,7 @@ function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
   const selected = data.primaryGoal || ''
 
   function pick(key) {
+    triggerHaptic()
     onChange('primaryGoal', key)
     setTimeout(onNext, 220)
   }
@@ -1902,6 +1891,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
   const selected = data.improvementFocus || []
 
   function toggle(key) {
+    triggerHaptic()
     const next = selected.includes(key)
       ? selected.filter(k => k !== key)
       : [...selected, key]
@@ -2717,7 +2707,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
               return
             }
             ensureFrontLandmarks(facePhoto)
-            enableAnalytics(); setPhase('side'); setError('')
+            setPhase('side'); setError('')
           } catch { setError('Could not check the photo. Please try again.') }
         }
       }}
@@ -3150,6 +3140,7 @@ export default function PremiumOnboarding() {
     saveDraft({ step, formData })
   }, [step, formData, isAuthenticated])
 
+
   function updateField(key, value) {
     if (key === '_units') {
       setUnits(value)
@@ -3203,7 +3194,6 @@ export default function PremiumOnboarding() {
       }
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
-      logAnalyticsEvent('scan_completed', { tier: scanRecord?.tier, score: scanRecord?.umaxScore, source: 'onboarding' })
 
       // Extended metrics (30-metric breakdown) were split into a separate,
       // slower follow-up call for latency — fire it now, non-blocking, so
@@ -3259,7 +3249,6 @@ export default function PremiumOnboarding() {
       useStore.getState().setAuth({ id: 'guest', name: 'Guest', email: '' }, 'demo-token')
     }
     setHasOnboarded()
-    logAnalyticsEvent('onboarding_completed', { source: 'notifications_step' })
   }
 
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications

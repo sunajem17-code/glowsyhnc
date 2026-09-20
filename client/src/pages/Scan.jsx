@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, Check, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
+import { Camera, Upload, Check, CheckCircle2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -16,25 +17,16 @@ import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
 import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
+import { CameraPreview } from '@capacitor-community/camera-preview'
+import { Camera as CapacitorCamera } from '@capacitor/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
 import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
-
-// No-op on web — no native bridge, and no web Firebase app configured yet either.
-async function logAnalyticsEvent(name, params) {
-  if (!isNative()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
 
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -141,13 +133,56 @@ function SideGuide({ size = 'normal', gender }) {
   )
 }
 
+// Crops a captured data-URL photo down to exactly the region the user saw
+// live inside the card window — see the capture handler in CameraOverlay
+// below for why matching just the aspect ratio (an earlier version of this
+// function) wasn't enough.
+//
+// The native preview fills the FULL SCREEN frame via
+// AVLayerVideoGravity.resizeAspectFill (matches CameraPreview.start()'s own
+// x:0,y:0,width:screen,height:screen call) — it scales the raw sensor image
+// up until one axis exactly covers that frame, cropping the overflow on the
+// other axis, centered. That's a real zoom, not just a reshape. The user
+// then only ever sees the small card sub-region of that full-screen render.
+// CameraPreview.capture() ignores all of this and returns the raw, un-zoomed
+// sensor photo — so to reproduce what was actually on screen, this inverts
+// the exact same scale-to-fill-screen transform and reads off the sub-region
+// of the raw photo landing under the card's own on-screen rect.
+function cropDataUrlToMatchLivePreview(dataUrl, cardRect) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const viewportW = window.screen.width
+      const viewportH = window.screen.height
+      const scale = Math.max(viewportW / img.width, viewportH / img.height)
+      const renderedW = img.width * scale
+      const renderedH = img.height * scale
+      const originX = (viewportW - renderedW) / 2
+      const originY = (viewportH - renderedH) / 2
+      const cropX = (cardRect.left - originX) / scale
+      const cropY = (cardRect.top - originY) / scale
+      const cropW = cardRect.width / scale
+      const cropH = cardRect.height / scale
+      const canvas = document.createElement('canvas')
+      canvas.width = cropW
+      canvas.height = cropH
+      canvas.getContext('2d').drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+      resolve(canvas.toDataURL('image/jpeg', 0.92))
+    }
+    img.onerror = () => resolve(dataUrl) // fall back to the uncropped photo on any failure
+    img.src = dataUrl
+  })
+}
+
 // ─── Live Camera Overlay ──────────────────────────────────────────────────────
 
 function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const videoRef    = useRef()
+  const cardRef     = useRef()
   const canvasRef   = useRef()
   const uploadRef   = useRef()
   const streamRef   = useRef()
+  const previewActiveRef = useRef(false)
   const [ready, setReady]         = useState(false)
   const [facingMode, setFacingMode] = useState('user')
   const [error, setError]         = useState('')
@@ -156,45 +191,103 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const [trackingAvailable, setTrackingAvailable] = useState(false)
   const alignment = getAlignment(alignmentFrame, stepNum === 2)
 
+  // ── Native: CameraPreview live viewfinder ─────────────────────────────────
+  const startNativePreview = useCallback(async (position) => {
+    try {
+      if (previewActiveRef.current) {
+        await CameraPreview.stop()
+        previewActiveRef.current = false
+      }
+      // Fill the entire screen so we can overlay our UI on top via z-index
+      await CameraPreview.start({
+        position,
+        toBack: true,        // render BEHIND the WebView; we make the WebView transparent over the camera area
+        disableAudio: true,
+        enableZoom: false,
+        enableHighResolution: true, // plugin defaults this to false, capping captures at a reduced resolution
+        x: 0,
+        y: 0,
+        width: window.screen.width,
+        height: window.screen.height,
+      })
+      previewActiveRef.current = true
+      setReady(true)
+    } catch (err) {
+      console.warn('[CameraOverlay] CameraPreview.start failed:', err?.message)
+      setError('Could not start camera. Please close and reopen the app.')
+    }
+  }, [])
+
+  const stopNativePreview = useCallback(async () => {
+    document.body.style.backgroundColor = ''
+    document.documentElement.style.backgroundColor = ''
+    const rootEl = document.getElementById('root')
+    if (rootEl) rootEl.style.visibility = ''
+    if (!previewActiveRef.current) return
+    try { await CameraPreview.stop() } catch {}
+    previewActiveRef.current = false
+  }, [])
+
   const startCamera = useCallback(async (mode) => {
+    if (isNative()) {
+      setReady(false)
+      document.body.style.backgroundColor = 'transparent'
+      document.documentElement.style.backgroundColor = 'transparent'
+      // WKWebView's toBack transparency only reveals the native camera layer where
+      // the ENTIRE webview render is un-painted — the routed page behind this portal
+      // (#root, e.g. Layout's opaque bg-page) still paints through body/html's
+      // transparent background otherwise, so it has to stop painting too.
+      const rootEl = document.getElementById('root')
+      if (rootEl) rootEl.style.visibility = 'hidden'
+      await startNativePreview(mode === 'environment' ? 'rear' : 'front')
+      return
+    }
+    // Web: use getUserMedia with high-res fallback
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
     setReady(false)
     try {
-      // On native iOS, getUserMedia won't trigger the system permission dialog —
-      // the Capacitor Camera plugin must request it first.
-      if (isNative()) {
-        const { Camera: CapCamera } = await import('@capacitor/camera')
-        try {
-          const perm = await CapCamera.requestPermissions({ permissions: ['camera'] })
-          console.log('[CameraOverlay] iOS perm:', JSON.stringify(perm))
-          if (perm?.camera === 'denied') {
-            setError('Camera access denied. Go to Settings → Privacy → Camera and enable access for this app.')
-            return
-          }
-        } catch (e) { console.warn('[CameraOverlay] requestPermissions non-fatal:', e) }
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode, width: { ideal: 3840 }, height: { ideal: 2160 } },
+          audio: false,
+        })
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
       }
-      // Request highest available resolution — mobile cameras will cap naturally
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 3840 }, height: { ideal: 2160 } },
-        audio: false,
-      })
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.onloadedmetadata = () => setReady(true)
       }
-    } catch {
+    } catch (err) {
+      console.warn('[CameraOverlay] getUserMedia failed:', err?.message)
       setError('Camera access denied. Please allow camera permission and try again.')
     }
-  }, [])
+  }, [startNativePreview])
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) — startCamera synchronously hides #root
+  // and clears body's background before its own async native calls. Doing
+  // that in useLayoutEffect applies it before the browser's next paint;
+  // useEffect runs after paint, leaving a frame or two where the (possibly
+  // light-themed) page underneath was still visible through the not-yet-
+  // hidden #root — the brief white flash on opening the camera.
+  useLayoutEffect(() => {
     startCamera(facingMode)
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
-  }, [facingMode, startCamera])
+    return () => {
+      if (isNative()) { stopNativePreview() }
+      else { streamRef.current?.getTracks().forEach(t => t.stop()) }
+    }
+  }, [facingMode, startCamera, stopNativePreview])
 
   useEffect(() => {
-    if (!ready || capturedUrl) return
+    // Alignment tracking samples frames off the web <video> element, which
+    // doesn't exist on native (CameraPreview is a native layer, not a DOM
+    // video) — trackingAvailable would flip true on init regardless, but
+    // .check() would never actually run, leaving alignment.aligned stuck
+    // false forever and permanently dimming the capture button. Skip it
+    // entirely on native rather than let it fake-disable a working camera.
+    if (!ready || capturedUrl || isNative()) return
     let cancelled = false
     let timer
     let tracker
@@ -247,17 +340,27 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
 
   function handleContinue() {
     if (!capturedUrl) return
-    // Re-fetch blob from the object URL for the onCapture callback
-    fetch(capturedUrl).then(r => r.blob()).then(blob => onCapture(capturedUrl, blob))
+    if (capturedUrl.startsWith('data:')) {
+      // Native capture — base64 data URL; pass null blob (server accepts dataUrl)
+      onCapture(capturedUrl, null)
+    } else {
+      // Web blob URL
+      fetch(capturedUrl).then(r => r.blob()).then(blob => onCapture(capturedUrl, blob))
+    }
   }
 
   function handleRetake() {
-    if (capturedUrl) { URL.revokeObjectURL(capturedUrl); setCapturedUrl(null) }
-    // Resume the paused video so live preview continues
-    if (videoRef.current) videoRef.current.play().catch(() => {})
-    // If stream was stopped (e.g. Continue was pressed then back), restart
-    if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
+    if (capturedUrl && capturedUrl.startsWith('blob:')) URL.revokeObjectURL(capturedUrl)
+    setCapturedUrl(null)
+    if (isNative()) {
+      // Restart the live preview
       startCamera(facingMode)
+    } else {
+      // Resume the paused web video
+      if (videoRef.current) videoRef.current.play().catch(() => {})
+      if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
+        startCamera(facingMode)
+      }
     }
   }
 
@@ -283,18 +386,25 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const showLive = !capturedUrl
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
-      {/* Header */}
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: (isNative() && !capturedUrl) ? 'transparent' : '#000' }}>
+      {/* Header — own solid background (not inherited from the outer wrapper,
+          which stays transparent in live mode so the card's mask below can
+          actually reveal the native camera instead of this wrapper's own
+          black painting straight through it). */}
       <div style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)',
         paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
+        flexShrink: 0, background: '#000',
       }}>
         <button
-          onClick={() => {
+          onClick={async () => {
             if (capturedUrl) { handleRetake() }
-            else { streamRef.current?.getTracks().forEach(t => t.stop()); onClose() }
+            else {
+              if (isNative()) await stopNativePreview()
+              else streamRef.current?.getTracks().forEach(t => t.stop())
+              onClose()
+            }
           }}
           style={{ position: 'absolute', left: 16, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
         >
@@ -312,29 +422,68 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
       </div>
 
       {/* Camera / Photo area */}
-      <div style={{ flex: 1, padding: '0 16px', minHeight: 0 }}>
-        <div style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', position: 'relative', background: '#111' }}>
+      <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
+        {/* overflow:hidden here clips the card's huge box-shadow (below) to this
+            row's own bounds. Without it, the shadow — a POSITIONED descendant's
+            paint — renders above ALL non-positioned siblings regardless of DOM
+            order, so it was blanketing the header and button row above/below
+            this row and hiding them entirely. */}
+        {/* Side gutters — separate, non-overlapping siblings of the card (not
+            padding+background on this row) so the card's transparent live-camera
+            interior isn't re-blocked by an ancestor background painted behind it. */}
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 16, background: '#000' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 16, background: '#000' }} />
+        <div ref={cardRef} style={{ position: 'absolute', left: 16, right: 16, top: 0, bottom: 0, borderRadius: 20, overflow: 'hidden', boxShadow: '0 0 0 9999px #000', background: (isNative() && !capturedUrl) ? 'transparent' : '#111' }}>
           {error ? (
             <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4">
               <AlertCircle size={40} className="text-warning" />
               <p className="text-white text-sm font-body">{error}</p>
-              <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
-              {isNative() && <button onClick={async () => { try { const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
+              {isNative() && error.toLowerCase().includes('denied') ? (
+                <>
+                  <button
+                    onClick={async () => { try { const { App } = await import('@capacitor/app'); await App.openUrl({ url: 'app-settings:' }) } catch { /* fallback */ } }}
+                    className="px-6 py-3 rounded-2xl text-sm font-heading font-bold"
+                    style={{ background: GOLD, color: '#000' }}>
+                    Open Settings
+                  </button>
+                  <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
+                  {isNative() && <button onClick={async () => { try { const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
+                </>
+              )}
+            </div>
+          ) : isNative() ? (
+            /* Native iOS — CameraPreview renders behind the WebView (toBack:true).
+               Body + this div are transparent so the camera layer shows through.
+               After capture we show the frozen photo on top. */
+            <div className="absolute inset-0" style={{ background: 'transparent' }}>
+              {capturedUrl ? (
+                /* Show captured image after photo is taken */
+                <img src={capturedUrl} alt="Captured" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <>
+                  {ready && (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                      {stepNum !== 2 && (
+                        <div style={{ width: '70%', height: '67%', border: `1.5px solid ${GOLD}`, borderRadius: '48% 48% 42% 42%', boxShadow: `0 0 16px ${GOLD}55` }} />
+                      )}
+                      <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: GOLD, fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
+                        {stepNum === 2 ? 'Align your side profile' : 'Position your face in the oval'}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <>
-              {/* Video always renders — paused after capture to show freeze-frame.
-                  Keep scaleX(-1) even when paused so the frozen frame matches what
-                  the user saw live. Canvas capture applies the same flip so the
-                  saved image is correctly oriented. */}
+              {/* Web: live getUserMedia preview */}
               <video ref={videoRef} autoPlay playsInline muted
                 style={{ width: '100%', height: '100%', objectFit: 'cover',
                   transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
-              {!ready && !capturedUrl && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 size={36} className="text-white animate-spin" />
-                </div>
-              )}
               {showLive && ready && (
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
@@ -348,12 +497,40 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
         </div>
       </div>
 
-      {/* Buttons */}
+      {/* Buttons — own solid background, same reasoning as the header above */}
       {!error && (
-        <div style={{ padding: '12px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ padding: '12px 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, background: '#000' }}>
           <button
-            onClick={() => { triggerHaptic(); capturedUrl ? handleContinue() : capture() }}
-            disabled={!capturedUrl && (!ready || (trackingAvailable && !alignment.aligned))}
+            onClick={async () => {
+              triggerHaptic()
+              if (capturedUrl) { handleContinue(); return }
+              if (isNative()) {
+                // Measured before the capture/stop calls, though layout doesn't
+                // actually shift from those — just keeping it closest to what
+                // was on screen when the shutter was pressed.
+                const rect = cardRef.current?.getBoundingClientRect()
+                try {
+                  // Must be exactly 100 — the plugin's native iOS side does
+                  // integer division (quality!/100) to build JPEG
+                  // compressionQuality, so anything under 100 truncates to 0
+                  // (worst possible quality) regardless of what's passed. 100
+                  // is the only value that survives that division intact (1.0).
+                  const result = await CameraPreview.capture({ quality: 100 })
+                  // result.value is a base64 JPEG string (no data: prefix)
+                  const dataUrl = `data:image/jpeg;base64,${result.value}`
+                  await stopNativePreview()
+                  const finalUrl = rect?.width > 0 && rect?.height > 0
+                    ? await cropDataUrlToMatchLivePreview(dataUrl, rect)
+                    : dataUrl
+                  setCapturedUrl(finalUrl)
+                } catch (err) {
+                  console.warn('[CameraOverlay] capture failed:', err?.message)
+                }
+                return
+              }
+              capture()
+            }}
+            disabled={!capturedUrl && !ready}
             style={{
               width: '100%', padding: '18px 0', borderRadius: 50,
               background: GOLD_GRADIENT, border: 'none', cursor: 'pointer',
@@ -368,6 +545,22 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
       )}
       <canvas ref={canvasRef} className="hidden" />
       <input ref={uploadRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+      {/* Full-screen processing cover while the camera spins up — hides the
+          header/card/button while they're still settling into their "ready"
+          layout (and, on native, the abrupt pop-in of the native camera layer
+          starting) instead of letting that transition show through as a flash.
+          A plain opaque backing sits behind ProcessingOverlay itself, since
+          that component is only ~85% opaque + blurred — not enough on its own
+          to hide the native camera's own blown-out white frame while its
+          sensor is still calibrating exposure underneath. */}
+      <AnimatePresence>
+        {!error && !ready && !capturedUrl && (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 998, background: '#000' }} />
+            <ProcessingOverlay label="Processing" />
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -456,8 +649,9 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
 
     return (
       <div className="flex flex-col h-full" style={{ paddingTop: 12 }}>
-        {cameraOpen && (
-          <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
+        {cameraOpen && createPortal(
+          <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />,
+          document.body
         )}
         <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
 
@@ -516,8 +710,9 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
 
   return (
     <div className="flex flex-col h-full px-3 justify-center">
-      {cameraOpen && (
-        <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
+      {cameraOpen && createPortal(
+        <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />,
+        document.body
       )}
 
       {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below.
@@ -1422,7 +1617,6 @@ export default function Scan() {
 
   const [step, setStep]                   = useState(recoveredFrontPhoto ? 2 : 1) // skip gender step — already collected in onboarding
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
-  const [showPhotoChoice, setShowPhotoChoice] = useState(false) // bottom sheet: take vs upload
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
   const [gender, setLocalGender]          = useState(savedGender ?? null)
   const [facePhoto, setFacePhoto]         = useState(recoveredFrontPhoto)
@@ -1900,7 +2094,6 @@ export default function Scan() {
       // case a device cannot run the landmark model.
       await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
       setAnalysisStep(4)
-      logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
 
@@ -1948,6 +2141,10 @@ export default function Scan() {
           // fires when saving the result locally fails, not when scoring fails.
           console.error('[Scan] Local storage full while saving scan result:', err.message)
           setError('Your device storage for this app is full. Try clearing some scan history, or reinstalling the app.')
+        } else if (err.errorCode === 'analysis_quality_failed') {
+          // Geometry/pose check failed — route to quality-fail screen with the specific reason
+          const reason = err.analysisEvidence?.reason ?? 'excessive_yaw'
+          navigate('/scan/quality-fail', { state: { issues: [{ code: reason, severity: 'high' }], photoUrl: facePhoto } })
         } else {
           setError(err.message || 'Analysis failed. Please try again.')
         }
@@ -2070,64 +2267,6 @@ export default function Scan() {
                   />
                 </div>
               )}
-
-              {/* iOS-style action sheet — appears over the guide content */}
-              <AnimatePresence>
-                {showPhotoChoice && (
-                  <>
-                    <motion.div
-                      key="backdrop"
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[60]"
-                      style={{ background: 'rgba(0,0,0,0.45)' }}
-                      onClick={() => setShowPhotoChoice(false)}
-                    />
-                    <motion.div
-                      key="sheet"
-                      initial={{ opacity: 0, scale: 0.97, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                      transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-                      className="fixed left-4 right-4 z-[61] rounded-2xl overflow-hidden"
-                      style={{ bottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {/* Take Photo row */}
-                      <button
-                        onClick={() => { triggerHaptic(); setShowPhotoChoice(false); setCameraOpen(true) }}
-                        className="w-full flex items-center justify-center gap-2 py-4 font-heading font-semibold text-[17px] active:opacity-70"
-                        style={{ background: 'rgba(30,30,32,0.96)', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
-                      >
-                        <Camera size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Take Photo
-                      </button>
-                      {/* Choose from Library row */}
-                      <button
-                        onClick={async () => {
-                          triggerHaptic(); setShowPhotoChoice(false)
-                          try {
-                            let url = null
-                            if (isNative()) { url = await pickPhoto() }
-                            else {
-                              url = await new Promise(resolve => {
-                                const inp = document.createElement('input')
-                                inp.type = 'file'; inp.accept = 'image/*'
-                                inp.onchange = e => resolve(e.target.files?.[0] ? URL.createObjectURL(e.target.files[0]) : null)
-                                inp.click()
-                              })
-                            }
-                            if (url) {
-                              if (step === 1) { transitionToSide(url) }
-                              else { setTransitioning(true); setSidePhoto(url); setError(''); setTimeout(() => { setStep(3); setTransitioning(false); setTimeout(() => startAnalysisRef.current?.(), 50) }, 300) }
-                            }
-                          } catch {}
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-4 font-heading font-semibold text-[17px] active:opacity-70"
-                        style={{ background: 'rgba(30,30,32,0.96)', color: '#fff' }}
-                      >
-                        <Upload size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Choose from Library
-                      </button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
             </motion.div>
           )}
           {(step === 1 || step === 2) && previewPhoto && (
@@ -2180,8 +2319,28 @@ export default function Scan() {
               </div>
             </motion.div>
           )}
+          {isAnalyzing && (
+            <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} scanResult={analysisResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Camera overlay — own independent AnimatePresence + portal, escapes Layout's
+          swipe-back transform (see CameraOverlay/portal comment history). Kept OUT of
+          the step-switching AnimatePresence above: a bare createPortal() as one of
+          several keyed children there confused its mode="wait" child-key tracking and
+          silently kept CameraOverlay from ever mounting. */}
+      {createPortal(
+        <AnimatePresence>
+          {/* No entrance fade — CameraOverlay is fully opaque from its very
+              first frame (header/gutters/processing-backing all solid), so
+              fading it in only risked exposing a transitional glimpse of
+              whatever's behind before #root finished hiding. Exit still
+              fades, for a smooth close. */}
           {(step === 1 || step === 2) && cameraOpen && (
-            <motion.div key={`cam-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+            <motion.div key={`cam-${step}`} initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
               <CameraOverlay
                 stepNum={step}
                 gender={gender}
@@ -2203,13 +2362,9 @@ export default function Scan() {
               />
             </motion.div>
           )}
-          {isAnalyzing && (
-            <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} scanResult={analysisResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Processing overlay — shown between front face confirm → side profile, and side confirm → analyzing */}
       <AnimatePresence>
@@ -2346,7 +2501,16 @@ export default function Scan() {
           {(step === 1 || step === 2) && (
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
+              onClick={async () => {
+                triggerHaptic()
+                if (isNative()) {
+                  try {
+                    // Triggers the iOS "Allow camera access" system dialog if not yet granted
+                    await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
+                  } catch {}
+                }
+                setCameraOpen(true)
+              }}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
               style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >

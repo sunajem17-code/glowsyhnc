@@ -7,7 +7,7 @@ import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
 import BodyStatsFlow from '../components/BodyStatsStep'
-import TrainingPlanIntro from '../components/TrainingPlanIntro'
+// TrainingPlanIntro removed — physique scan now handled by /physique-scan page
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
@@ -535,19 +535,13 @@ export default function WorkoutPlan() {
   // ── Gate: no body photo uploaded yet — runs the 4-step welcome → stats →
   // photo → generating intro instead of a bare upload button. A returning
   // user who already has a physique score skips straight past this entirely.
-  if (!physiqueScores) {
-    return (
-      <TrainingPlanIntro
-        gender={gender}
-        initialHeight={userProfile?.height}
-        initialWeight={userProfile?.weight}
-        goal={userProfile?.goal}
-        onBodyStatsSave={handleBodyStatsSave}
-        onComplete={handleIntroComplete}
-        onClose={() => navigate(-1)}
-      />
-    )
-  }
+  useEffect(() => {
+    if (!physiqueScores) {
+      navigate('/physique-scan', { replace: true })
+    }
+  }, [physiqueScores])
+
+  if (!physiqueScores) return null
 
   const levelLabel = plan?.trainingLevel ?? inferredLevel
   const splitLabel = plan?.split ?? `${inferredLevel === 'beginner' ? '3-day Full Body' : inferredLevel === 'intermediate' ? '4-day Upper/Lower' : '6-day PPL'}`

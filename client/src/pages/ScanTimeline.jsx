@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown, ArrowLeft } from 'lucide-react'
+import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import ProLock from '../components/ProLock'
@@ -172,10 +172,11 @@ export default function ScanTimeline() {
       <div className="flex items-center gap-3 mb-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button
           onClick={() => { triggerHaptic(); navigate(-1) }}
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(255,255,255,0.06)' }}
+          aria-label="Go back"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
         >
-          <ArrowLeft size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+          <ChevronLeft size={18} className="text-primary" />
         </button>
         <div>
           <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>

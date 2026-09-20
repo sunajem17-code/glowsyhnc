@@ -102,10 +102,11 @@ const PHYSIQUE_METRICS = [
 
 const REQUIRED = 3
 
-// Exact copy of LockedRevealScreen from ScanUnlockGate, adapted for physique
+// Clone of LockedRevealScreen from ScanUnlockGate — physique text only
 function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, error }) {
+  const navigate = useNavigate()
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <div className="flex flex-col items-center px-5 pb-10"
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
 
@@ -118,17 +119,18 @@ function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, err
         </div>
 
         {/* Header */}
-        <h1 className="font-heading font-bold text-[26px] text-center leading-tight mb-1" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Reveal your ratings
+        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+          Reveal your physique
         </h1>
-        <p className="font-body text-[13px] text-center mb-5 leading-snug" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Invite 3 friends or get Ascendus Max to view your physique results
+        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          See your full physique analysis with Ascendus Max
         </p>
 
-        {/* Photo circle overlapping card */}
-        <div className="relative w-full">
-          <div className="flex justify-center" style={{ marginBottom: -48, position: 'relative', zIndex: 2 }}>
-            <div style={{ width: 96, height: 96, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
+        {/* Photo circle + card */}
+        <div className="relative w-full" style={{ marginTop: 102 }}>
+          {/* Circle — absolutely positioned */}
+          <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
+            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
               {photo
                 ? <img src={photo} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
                 : null}
@@ -136,16 +138,16 @@ function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, err
           </div>
 
           {/* Metrics card */}
-          <div className="w-full rounded-3xl pt-16 pb-5 px-5" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-            <div className="grid grid-cols-2 gap-x-5" style={{ rowGap: 0 }}>
+          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+            <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
               {PHYSIQUE_METRICS.map(({ label }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 20 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                    <Lock size={11} style={{ color: GOLD, flexShrink: 0 }} />
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
+                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                    <Lock size={13} style={{ color: GOLD, flexShrink: 0 }} />
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
                   </div>
-                  <div style={{ width: 60, height: 22, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 8, opacity: 0.9 }} />
-                  <div style={{ height: 5, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
+                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
+                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
                 </div>
               ))}
             </div>
@@ -153,7 +155,7 @@ function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, err
         </div>
 
         {/* CTAs */}
-        <div className="w-full mt-8 flex flex-col gap-3.5">
+        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
@@ -164,14 +166,6 @@ function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, err
             {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
           </motion.button>
-
-          <button
-            onClick={() => { triggerHaptic(); onInvite() }}
-            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px]"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
-          >
-            Invite 3 Friends
-          </button>
         </div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: '#FF453A' }}>{error}</p>}
@@ -377,7 +371,7 @@ export default function PhysiqueResults() {
           onClick={() => { triggerHaptic(); navigate('/scan') }}
           aria-label="Go back"
           className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
         >
           <ChevronLeft size={18} className="text-primary" />
         </button>

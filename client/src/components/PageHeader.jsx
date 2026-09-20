@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { triggerHaptic } from '../utils/haptics'
 
-// icon defaults to ArrowLeft (the "go back one step" affordance used
-// everywhere else this header appears); pass icon={X} for screens where
-// tapping this button exits the whole flow rather than stepping back —
+// icon defaults to ChevronLeft — the same circular back button used
+// everywhere else in the app (e.g. Scan.jsx's "Take your front photo" step
+// header is the reference design this matches); pass icon={X} for screens
+// where tapping this button exits the whole flow rather than stepping back —
 // same button container/position, just a different icon + onBack target.
-export default function PageHeader({ title, subtitle, back, onBack, action, icon: Icon = ArrowLeft }) {
+export default function PageHeader({ title, subtitle, back, onBack, action, icon: Icon = ChevronLeft }) {
   const navigate = useNavigate()
 
   return (
@@ -14,14 +15,15 @@ export default function PageHeader({ title, subtitle, back, onBack, action, icon
       {back && (
         <button
           onClick={() => { triggerHaptic(); onBack ? onBack() : navigate(-1) }}
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+          aria-label="Go back"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
           style={{
             background: 'var(--card)',
             border: '1px solid var(--border)',
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          <Icon size={17} className="text-primary" />
+          <Icon size={18} className="text-primary" />
         </button>
       )}
       <div className="flex-1">

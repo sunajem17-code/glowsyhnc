@@ -18,20 +18,9 @@ import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-
-// No-op on web — no native bridge, and no web Firebase app configured yet either.
-async function logAnalyticsEvent(name, params) {
-  if (!isNative()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -121,15 +110,15 @@ function HeightWeightSelector({ height, weight, heightUnit, weightUnit, onHeight
   const wUnit    = imperial ? 'lbs' : 'kg'
 
   return (
-    <div className="flex flex-col px-6 gap-8 h-full justify-center" style={{ paddingBottom: '18%' }}>
+    <div className="flex flex-col px-6 h-full" style={{ paddingTop: '10%', paddingBottom: '6%', gap: 48 }}>
 
       {/* HEIGHT */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between mb-1">
-          <p className="font-heading font-bold text-[13px] tracking-[0.2em]" style={{ color: '#fff' }}>HEIGHT</p>
-          <div className="flex items-baseline gap-2">
-            <span className="font-heading font-bold" style={{ fontSize: 48, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{hDisplay}</span>
-            {hUnit && <span className="font-heading font-bold text-[20px]" style={{ color: GOLD, textShadow: '0 0 16px rgba(198,168,92,0.6)' }}>{hUnit}</span>}
+          <p className="font-heading text-[20px]" style={{ color: '#fff', fontWeight: 900 }}>HEIGHT</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-heading font-bold" style={{ fontSize: 56, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{hDisplay}</span>
+            {hUnit && <span className="font-heading font-bold" style={{ fontSize: 24, lineHeight: 1, color: GOLD, textShadow: '0 0 12px rgba(198,168,92,0.9), 0 0 30px rgba(198,168,92,0.5)', marginBottom: 8 }}>{hUnit}</span>}
           </div>
         </div>
         <AscSlider key={`h-${imperial}`} min={hMin} max={hMax} value={hVal} onChange={onHSlide} />
@@ -138,25 +127,25 @@ function HeightWeightSelector({ height, weight, heightUnit, weightUnit, onHeight
       {/* WEIGHT */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between mb-1">
-          <p className="font-heading font-bold text-[13px] tracking-[0.2em]" style={{ color: '#fff' }}>WEIGHT</p>
-          <div className="flex items-baseline gap-2">
-            <span className="font-heading font-bold" style={{ fontSize: 48, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{wDisplay}</span>
-            <span className="font-heading font-bold text-[20px]" style={{ color: GOLD, textShadow: '0 0 16px rgba(198,168,92,0.6)' }}>{wUnit}</span>
+          <p className="font-heading text-[20px]" style={{ color: '#fff', fontWeight: 900 }}>WEIGHT</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-heading font-bold" style={{ fontSize: 56, lineHeight: 1, letterSpacing: '-0.02em', color: GOLD, textShadow: '0 0 20px rgba(198,168,92,0.7), 0 0 50px rgba(198,168,92,0.35)' }}>{wDisplay}</span>
+            <span className="font-heading font-bold" style={{ fontSize: 24, lineHeight: 1, color: GOLD, textShadow: '0 0 12px rgba(198,168,92,0.9), 0 0 30px rgba(198,168,92,0.5)', marginBottom: 8 }}>{wUnit}</span>
           </div>
         </div>
         <AscSlider key={`w-${imperial}`} min={wMin} max={wMax} value={wVal} onChange={onWSlide} />
       </div>
 
-      {/* Metric / Imperial */}
-      <div className="flex gap-3">
+      {/* Metric / Imperial — sits just above Analyze My Physique */}
+      <div className="flex gap-3" style={{ marginTop: 'auto' }}>
         {['metric', 'imperial'].map(sys => {
           const active = imperial ? sys === 'imperial' : sys === 'metric'
           return (
             <motion.button key={sys} whileTap={{ scale: 0.97 }} onClick={() => switchSystem(sys)}
               className="flex-1 py-3.5 rounded-2xl font-heading font-bold text-[15px]"
               style={{
-                background: active ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
-                border: `1.5px solid ${active ? GOLD : 'rgba(255,255,255,0.1)'}`,
+                background: '#0D0D0D',
+                border: `1.5px solid ${active ? GOLD : 'rgba(255,255,255,0.08)'}`,
                 color: active ? GOLD : 'rgba(255,255,255,0.3)',
               }}>
               {sys.charAt(0).toUpperCase() + sys.slice(1)}
@@ -1470,6 +1459,206 @@ function ChecklistRow({ step: s, i, currentStep }) {
   )
 }
 
+// ─── Physique-specific analyzing screen ───────────────────────────────────────
+
+const PHYSIQUE_STEP_LABELS = [
+  'Detecting body composition...',
+  'Measuring shoulder-to-waist ratio...',
+  'Evaluating muscle definition...',
+  'Analyzing V-taper & symmetry...',
+  'Finalizing physique matrix...',
+]
+
+const PHYSIQUE_DIAG_LINES_BASE = [
+  'Body silhouette detected',
+  'Shoulder width calibration in progress',
+  'Waist-to-hip ratio analysis running',
+  'Muscle group visibility scanning',
+  'Symmetry index calculation active',
+  'Body fat estimation underway',
+  'Frame structure mapping complete',
+  'V-taper geometry confirmed',
+]
+
+function buildPhysiqueDiagLines(scanResult) {
+  const p = scanResult?.physiqueScore
+  if (!p) return PHYSIQUE_DIAG_LINES_BASE
+  const add = (v, pos, neg) => ((v ?? 0) >= 7 ? pos : neg)
+  return [
+    add(p.muscleDevelopment,  'Strong muscle development detected',      'Muscle development path identified'),
+    add(p.bodyFatEstimate,    'Lean body composition confirmed',          'Body fat reduction opportunity found'),
+    add(p.shoulderToWaist,   'Excellent shoulder-to-waist ratio',        'Frame proportion opportunity detected'),
+    add(p.vTaper,            'V-taper geometry highly favorable',        'V-taper calibration in progress'),
+    add(p.symmetry,          'Bilateral muscle symmetry confirmed',       'Symmetry variance analysis complete'),
+    add(p.overallPhysique,   'Elite physique classification matched',     'Physique potential path identified'),
+  ]
+}
+
+function PhysiqueAnalyzingScreen({ currentStep, slow, photo, morphing = false, scanResult = null }) {
+  const stepIndex  = Math.min(currentStep, 4)
+  const progressPct = [5, 20, 50, 80, 95][stepIndex]
+
+  const diagLines = useMemo(() => buildPhysiqueDiagLines(scanResult), [scanResult])
+  const [feedIdx, setFeedIdx] = useState(0)
+  useEffect(() => {
+    if (!diagLines.length) return
+    setFeedIdx(0)
+    const id = setInterval(() => setFeedIdx(i => (i + 1) % diagLines.length), 1300)
+    return () => clearInterval(id)
+  }, [diagLines])
+
+  const targetScore = scanResult?.physiqueScore?.overallPhysique ?? null
+  const [displayScore, setDisplayScore] = useState(null)
+  useEffect(() => {
+    if (targetScore == null) return
+    let current = 0
+    const steps = 28
+    const increment = targetScore / steps
+    const intervalMs = 1200 / steps
+    setDisplayScore(0)
+    let count = 0
+    const id = setInterval(() => {
+      count++
+      if (count >= steps) { setDisplayScore(targetScore); clearInterval(id) }
+      else { current += increment; setDisplayScore(Math.round(current * 10) / 10) }
+    }, intervalMs)
+    return () => clearInterval(id)
+  }, [targetScore])
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+      {/* Photo with scan overlay */}
+      <div className="relative w-full rounded-3xl overflow-hidden mb-5" style={{ background: '#0a0a0a', ...(photo ? {} : { aspectRatio: '3/4' }) }}>
+        {photo && (
+          <img src={photo} alt="" className="block w-full h-auto" style={{ filter: 'brightness(0.5) saturate(0.85)' }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }} />
+        {/* Grid overlay */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: `linear-gradient(rgba(198,168,92,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.05) 1px, transparent 1px)`,
+          backgroundSize: '20% 12.5%',
+        }} />
+        {/* Scan measurement lines — horizontal thirds guides */}
+        {!morphing && (
+          <>
+            {[33, 66].map(pct => (
+              <div key={pct} className="absolute left-0 right-0 pointer-events-none" style={{
+                top: `${pct}%`, height: 1,
+                background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}44 20%, ${LANDMARK_GOLD}44 80%, transparent)`,
+              }} />
+            ))}
+            {/* Vertical center line */}
+            <div className="absolute top-0 bottom-0 pointer-events-none" style={{
+              left: '50%', width: 1,
+              background: `linear-gradient(180deg, transparent, ${LANDMARK_GOLD}33 20%, ${LANDMARK_GOLD}33 80%, transparent)`,
+            }} />
+            {/* Shoulder width bracket */}
+            <motion.div
+              className="absolute pointer-events-none"
+              initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0 }}
+              transition={{ duration: 0.5 }}
+              style={{ top: '12%', left: '15%', right: '15%', height: 2, background: `${LANDMARK_GOLD}88` }}
+            >
+              <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
+              <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
+            </motion.div>
+            {/* Waist bracket */}
+            <motion.div
+              className="absolute pointer-events-none"
+              initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0 }}
+              transition={{ duration: 0.5 }}
+              style={{ top: '45%', left: '28%', right: '28%', height: 2, background: `${LANDMARK_GOLD}88` }}
+            >
+              <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
+              <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
+            </motion.div>
+            {/* Callout labels */}
+            <motion.div
+              initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0, x: stepIndex >= 1 ? 0 : -8 }}
+              transition={{ duration: 0.4 }}
+              style={{ position: 'absolute', top: '8%', left: '4%', textAlign: 'left' }}
+            >
+              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>SHOULDERS</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0, x: stepIndex >= 2 ? 0 : -8 }}
+              transition={{ duration: 0.4 }}
+              style={{ position: 'absolute', top: '42%', left: '4%', textAlign: 'left' }}
+            >
+              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>WAIST</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 8 }} animate={{ opacity: stepIndex >= 3 ? 1 : 0, x: stepIndex >= 3 ? 0 : 8 }}
+              transition={{ duration: 0.4 }}
+              style={{ position: 'absolute', top: '20%', right: '4%', textAlign: 'right' }}
+            >
+              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>V-TAPER</p>
+            </motion.div>
+            {/* Score readout once result arrives */}
+            {displayScore != null && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                style={{ position: 'absolute', bottom: '8%', right: '5%', textAlign: 'right' }}
+              >
+                <p style={{ fontSize: 22, fontWeight: 900, color: LANDMARK_GOLD, textShadow: `0 0 20px ${LANDMARK_GOLD}99`, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {displayScore.toFixed(1)}
+                </p>
+                <p style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.14em', color: `${LANDMARK_GOLD}bb` }}>PHYSIQUE</p>
+              </motion.div>
+            )}
+            {/* Continuous ping-pong scan laser */}
+            <motion.div
+              className="absolute left-0 right-0 pointer-events-none"
+              style={{
+                height: 1,
+                background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}cc 30%, ${LANDMARK_GOLD} 50%, ${LANDMARK_GOLD}cc 70%, transparent)`,
+                boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
+              }}
+              animate={{ top: ['2%', '98%'] }}
+              transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Status text */}
+      <p className="font-mono text-center mb-1" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: `${GOLD}99`, textTransform: 'uppercase' }}>
+        SCANNING PHYSIQUE MATRIX
+      </p>
+      <div className="h-5 mb-2 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.3 }}
+            className="text-xs font-body" style={{ color: slow ? GOLD : 'var(--text-secondary)' }}>
+            {PHYSIQUE_STEP_LABELS[stepIndex]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* Diagnostic feed */}
+      <div className="h-4 mb-3 flex items-center justify-center overflow-hidden">
+        <AnimatePresence mode="wait">
+          {diagLines.length > 0 && (
+            <motion.p key={feedIdx} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: 0.25 }}
+              className="font-mono text-center" style={{ fontSize: 9, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.45)' }}>
+              {'> '}{diagLines[feedIdx]}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full" style={{ height: 36, borderRadius: 999, border: `2px solid ${GOLD}`, padding: 4, background: 'transparent', boxSizing: 'border-box' }}>
+        <motion.div
+          style={{ height: '100%', borderRadius: 999, background: GOLD, originX: 0 }}
+          initial={{ width: '5%' }}
+          animate={{ width: `${progressPct}%` }}
+          transition={{ duration: 0.9, ease: 'easeOut' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Scan Page ───────────────────────────────────────────────────────────
 // Steps: 0=gender  1=face  2=side-profile  3=analyzing
 // Body Photo / physique scoring is intentionally NOT part of this flow —
@@ -1635,21 +1824,7 @@ export default function PhysiqueScan() {
     // mesh beat entirely — never blocks or breaks the actual scan. The
     // 16-18s typical API wait gives this ample time even accounting for
     // MediaPipe's cold-start model load on the very first scan of a session.
-    if (facePhoto) {
-      import('../utils/faceLandmarks.js')
-        .then(({ getLandmarks }) => getLandmarks(facePhoto))
-        .then(lm => {
-          const pts = extractScanOverlayPoints(lm)
-          if (pts) setAnalysisPoints(pts)
-          import('@mediapipe/face_mesh')
-            .then(({ FACEMESH_TESSELATION }) => {
-              const d = buildMeshPathD(lm, FACEMESH_TESSELATION)
-              if (d) setMeshPathD(d)
-            })
-            .catch(err => console.warn('[Scan] Face mesh tessellation unavailable (non-fatal, mesh-scan beat skipped):', err?.message))
-        })
-        .catch(err => console.warn('[Scan] Analyzing-screen landmark detection failed (non-fatal, overlay falls back to generic positions):', err?.message))
-    }
+    // Body photo — no face landmark detection needed for physique scan
 
     // 5-step, 1s-per-step choreography for FacialAnalysisOverlay — ticks
     // forward on a fixed cadence regardless of API speed and parks at step 4
@@ -1784,6 +1959,9 @@ export default function PhysiqueScan() {
         // above. (Body geometry/physique scoring intentionally no longer
         // happens here — see the Training Plan flow's own body-photo step.)
         sideProfileGeometry:  sideProfileGeometry ?? undefined,
+        // Physique score from scorePhysique API — used by WorkoutPlan/Routine Tracker
+        physiqueScore:        aiResult.physiqueScore ?? null,
+        bodyPhotoUrl:         faceB64,
       }
 
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
@@ -1880,7 +2058,6 @@ export default function PhysiqueScan() {
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
-      logAnalyticsEvent('scan_completed', { tier: aiResult.tier, score: aiResult.overallScore, source: 'rescan' })
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
 
@@ -2015,6 +2192,7 @@ export default function PhysiqueScan() {
                   src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
                   alt="Guide"
                   className="w-full h-full object-cover"
+                  style={{ transform: 'scale(1)', transformOrigin: 'center center' }}
                 />
               </div>
 
@@ -2153,7 +2331,7 @@ export default function PhysiqueScan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} points={analysisPoints} meshPathD={meshPathD} scanResult={analysisResult} />
+              <PhysiqueAnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} scanResult={analysisResult} />
             </motion.div>
           )}
         </AnimatePresence>

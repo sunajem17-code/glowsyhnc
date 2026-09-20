@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { Camera, Lock, TrendingUp, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Camera, Lock, TrendingUp, ChevronRight, ChevronLeft } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -247,14 +247,15 @@ export default function ScanHistory() {
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => { triggerHaptic(); navigate(-1) }}
+          aria-label="Go back"
           style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.06)',
+            background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}
         >
-          <ArrowLeft size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+          <ChevronLeft size={18} className="text-primary" />
         </motion.button>
         <h1 className="font-heading font-bold text-[20px] text-primary" style={{ letterSpacing: '-0.02em' }}>
           Scan History

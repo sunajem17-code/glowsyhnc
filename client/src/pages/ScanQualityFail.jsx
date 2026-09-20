@@ -60,6 +60,24 @@ const ISSUE_CONTENT = {
     desc:     'A bright light source is silhouetting your face.',
     tips:     ['Turn around so the light faces you', 'Avoid standing in front of windows', 'Find a spot with even lighting'],
   },
+  excessive_yaw: {
+    headline: "Your face isn't straight-on enough",
+    label:    'Head turned too far',
+    desc:     'Your head appears slightly turned. We need a straight, front-facing photo to measure accurately.',
+    tips:     ['Look directly at the camera lens', 'Keep your chin level — not tilted up or down', 'Imagine a dot on the wall at eye level and look straight at it'],
+  },
+  excessive_roll: {
+    headline: "Your head is tilted to one side",
+    label:    'Head tilt detected',
+    desc:     'Your head appears tilted left or right. Keep it level for an accurate scan.',
+    tips:     ['Keep both ears at the same height', 'Hold your phone straight — not at an angle', 'Look directly at the lens with your head upright'],
+  },
+  excessive_pitch: {
+    headline: "Your face angle isn't quite right",
+    label:    'Head pitched up or down',
+    desc:     'Your chin is too high or too low. Keep your head level with the camera.',
+    tips:     ['Hold your phone at eye level — not above or below', 'Look straight ahead, not up at the ceiling or down at the floor', 'Keep your chin roughly parallel to the ground'],
+  },
   validation_error: {
     headline: 'Could not validate your photo',
     label:    'Technical error',

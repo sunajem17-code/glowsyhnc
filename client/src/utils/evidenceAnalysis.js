@@ -79,7 +79,7 @@ export function analyzeLandmarkEvidence(landmarks, width, height) {
   const checks = {
     faceSize: faceWidthFraction >= 0.25,
     roll: Math.abs(rollDegrees) <= 8,
-    yaw: yawProxy <= 0.12,
+    yaw: yawProxy <= 0.22, // loosened from 0.12 — real mobile selfies routinely hit 0.13–0.18
     pitch: pitchProxy != null && pitchProxy >= 0.15 && pitchProxy <= 0.55,
     landmarksInFrame: landmarkMargin >= 0,
   }
