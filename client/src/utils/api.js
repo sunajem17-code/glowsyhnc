@@ -177,7 +177,6 @@ export const api = {
   },
   hair: {
     recommend: (data) => request('/hair/recommend', { method: 'POST', body: JSON.stringify(data) }),
-    preview: (data) => request('/hair/preview', { method: 'POST', body: JSON.stringify(data) }),
   },
   leaderboard: {
     get: () => request('/leaderboard'),

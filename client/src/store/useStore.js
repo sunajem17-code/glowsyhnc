@@ -54,6 +54,7 @@ const useStore = create(
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
           hairProfile: null,
+          hairRecommendationCache: null,
           savedHairLookIds: [],
           hasOnboarded: false,
           gender: null,
@@ -227,11 +228,13 @@ const useStore = create(
       hairType: null, // null = not set, 'straight'|'wavy'|'curly'|'coily'|'locs'|'bald'
       setHairType: (t) => set({ hairType: t }),
 
-      // HairMax keeps lightweight choices and style ids only. Generated image
-      // data remains in memory/server cache so localStorage is never flooded.
+      // HairMax keeps lightweight choices, recommended catalog ids, and reasons.
+      // Model photography is static and never stored in localStorage.
       hairProfile: null,
+      hairRecommendationCache: null,
       savedHairLookIds: [],
       setHairProfile: (profile) => set({ hairProfile: profile }),
+      setHairRecommendationCache: (cache) => set({ hairRecommendationCache: cache }),
       toggleSavedHairLook: (id) => set(state => ({
         savedHairLookIds: state.savedHairLookIds.includes(id)
           ? state.savedHairLookIds.filter(value => value !== id)
@@ -412,6 +415,7 @@ const useStore = create(
         gender: state.gender,
         hairType: state.hairType,
         hairProfile: state.hairProfile,
+        hairRecommendationCache: state.hairRecommendationCache,
         savedHairLookIds: state.savedHairLookIds,
         userProfile: state.userProfile,
         privacySettings: state.privacySettings,

@@ -4,12 +4,39 @@
 const all = ['straight', 'wavy', 'curly', 'coily']
 const densityAll = ['low', 'medium', 'high']
 
+export const HAIR_CATALOG_VERSION = '2026-09-20-static-models-v1'
+export const HAIR_CATALOG_SHEET = '/hairmax/catalog-models.png'
+
+// Photography is supplied as one optimized catalog sheet. Each catalog entry
+// points at its pre-generated model crop; HairMax never generates images while
+// the user is browsing or swiping.
+const MODEL_CROPS = {
+  textured_crop: [1, 0], french_crop: [2, 0], messy_fringe: [3, 0], curly_fringe: [4, 0],
+  low_taper_fringe: [0, 0], curly_taper: [5, 0], mid_taper_texture: [0, 1],
+  curtains: [2, 1], flow: [3, 1], side_part: [4, 1], quiff: [5, 1],
+  crew_cut: [0, 2], buzz_cut: [1, 2], caesar: [2, 2], slick_back: [3, 2],
+  modern_mullet: [4, 2], pompadour: [5, 2],
+}
+
+const modelCrop = id => {
+  const [column, row] = MODEL_CROPS[id]
+  return {
+    sheet: HAIR_CATALOG_SHEET,
+    x: [11, 229, 446, 662, 879, 1096][column],
+    y: [126, 475, 821][row],
+    width: 205,
+    height: 270,
+    sheetWidth: 1312,
+    sheetHeight: 1199,
+  }
+}
+
 const THICKNESS_REQUIRED = new Set(['crew_cut', 'mid_taper_texture', 'curly_fringe', 'slick_back', 'quiff', 'pompadour', 'modern_mullet', 'flow'])
 
 const style = (id, name, hairTypes, density, length, maintenance, visualEffects, barber, styling, growth = 'Ready now') => ({
   id, name, compatibleHairTypes: hairTypes, compatibleDensity: density, length,
   compatibleThickness: THICKNESS_REQUIRED.has(id) ? ['medium', 'thick'] : ['fine', 'medium', 'thick'],
-  maintenance, visualEffects, barber, styling, growth,
+  maintenance, visualEffects, barber, styling, growth, image: modelCrop(id),
 })
 
 export const HAIRSTYLE_CATALOG = [
