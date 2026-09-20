@@ -97,14 +97,38 @@ Schema:
 {"recommendations":[{"hairstyleId":"catalog_id","matchReasons":["short reason"],"relevantMeasurementIds":["measurement_id"],"compatibilityFactors":["hair feasibility factor"],"limitations":["limitation"]}]}`
 
     const client = new Anthropic({ apiKey })
+    const toolName = 'submit_hair_recommendations'
     const message = await withRetry(() => client.messages.create({
-      model: 'claude-haiku-4-5', max_tokens: 1300, temperature: 0,
+      model: 'claude-haiku-4-5', max_tokens: 4096, temperature: 0,
       messages: [{ role: 'user', content: prompt }],
+      tools: [{
+        name: toolName,
+        description: 'Submit the grounded hairstyle ranking in the required structure.',
+        input_schema: {
+          type: 'object', additionalProperties: false, required: ['recommendations'],
+          properties: {
+            recommendations: {
+              type: 'array', minItems: 1, maxItems: 8,
+              items: {
+                type: 'object', additionalProperties: false,
+                required: ['hairstyleId', 'matchReasons', 'relevantMeasurementIds', 'compatibilityFactors', 'limitations'],
+                properties: {
+                  hairstyleId: { type: 'string', enum: [...candidateIds] },
+                  matchReasons: { type: 'array', maxItems: 3, items: { type: 'string' } },
+                  relevantMeasurementIds: { type: 'array', maxItems: 5, items: { type: 'string', enum: [...measurementMap.keys()] } },
+                  compatibilityFactors: { type: 'array', maxItems: 4, items: { type: 'string' } },
+                  limitations: { type: 'array', maxItems: 4, items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+      }],
+      tool_choice: { type: 'tool', name: toolName },
     }), 'hair-recommend')
-    const raw = message.content?.[0]?.text ?? ''
-    const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('Recommendation engine returned non-JSON')
-    const parsed = JSON.parse(match[0])
+    const toolUse = message.content?.find(block => block.type === 'tool_use' && block.name === toolName)
+    if (!toolUse?.input) throw new Error('Recommendation engine returned no structured result')
+    const parsed = toolUse.input
     const seen = new Set()
     const recommendations = (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).filter(item => candidateIds.has(item?.hairstyleId) && !seen.has(item.hairstyleId) && seen.add(item.hairstyleId)).slice(0, 8).map((item, index) => {
       const catalog = candidates.find(style => style.id === item.hairstyleId)
