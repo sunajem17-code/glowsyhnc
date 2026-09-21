@@ -6,6 +6,8 @@ const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
 
+const { shapeDefinitionAnalysis } = require('../lib/definitionAnalysis')
+
 const router = express.Router()
 
 // ── Score cache: hash(face+body) → full result ────────────────────────────────
@@ -239,8 +241,8 @@ Include a "profile" object in your JSON response.` : ''
     model: 'claude-sonnet-4-6',
     // extended_metrics (30 more {score, descriptor} pairs) moved to its own
     // call (getExtendedMetrics) — this budget only needs to cover the core
-    // fields + optional profile block now.
-    max_tokens: hasSide ? 1300 : 1100,
+    // fields, five definition ratings and optional profile block now.
+    max_tokens: hasSide ? 2000 : 1800,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
@@ -364,6 +366,8 @@ Descriptor rules: describe what IS there, not what is missing. Max 10 words. No 
 ${profileSection}${evidenceNote}
 
 VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
+DEFINITION ANALYSIS: Independently assess the five visible cosmetic definition features requested in definition_analysis. Higher means more visibly defined, not healthier. Use null when a feature cannot be assessed from the provided angles, lighting or occlusion (especially submental). These are subjective visual ratings, not measured dimensions. Do not infer bloat, hydration, body fat, medical causes or guaranteed fixability from a photo. Do not copy overall/symmetry/skin/eye-area scores into these fields.
+
 KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
@@ -394,6 +398,13 @@ Return ONLY this JSON — no markdown, nothing else:
   "visual_observations": [
     { "id": "<allowed id>", "category": "<skin|hair|grooming>", "source": "visual_observation", "confidence": "<low|medium|high>", "images_supporting": ["<front|profile>"], "limitations": ["<relevant limitation>"] }
   ],
+  "definition_analysis": {
+    "chin": { "score": <number 1.0–10.0 or null>, "descriptor": "<visible chin contour and definition>" },
+    "cheekbones": { "score": <number 1.0–10.0 or null>, "descriptor": "<visible malar prominence>" },
+    "jaw": { "score": <number 1.0–10.0 or null>, "descriptor": "<visible mandibular contour definition>" },
+    "cheeks": { "score": <number 1.0–10.0 or null>, "descriptor": "<visible cheek leanness and ogee contour>" },
+    "submental": { "score": <number 1.0–10.0 or null>, "descriptor": "<visible underside-of-chin definition>" }
+  },
   "face_metrics": {
     "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
     "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
@@ -790,14 +801,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     // ── L1: in-process memory cache ───────────────────────────────────────────
     // v2: suffix bumped to invalidate stale celebrity results from before the
     // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
-    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v3', sideBase64)
+    const cacheKey = hashImages(faceBase64, 'FACE_DEFINITION_v4', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       return res.json(scoreCache.get(cacheKey))
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
-    const fullHash = computeFullHash(faceBase64, null, sideBase64)
+    const fullHash = computeFullHash(faceBase64, 'FACE_DEFINITION_v4', sideBase64)
     const tL2Start = Date.now()
     const sbCached = await getScanCache(fullHash)
     console.log(`[aiScore:TIMING] L2 Supabase cache lookup took ${Date.now() - tL2Start}ms`)
@@ -909,6 +920,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const r = (v) => v != null ? Math.round(Number(v) * 10) / 10 : null
 
     const result = {
+      definitionAnalysis: shapeDefinitionAnalysis(faceResult.definition_analysis),
       overallScore:      final,
       faceOnlyScore:     faceOnlyScore,   // face pillar avg before physique blend
       faceScore:         Math.round(faceScore    * 10) / 10,

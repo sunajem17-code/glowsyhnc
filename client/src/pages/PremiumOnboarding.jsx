@@ -1,3 +1,5 @@
+import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
+import { presentationGate } from '../utils/scanPresentation'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -2340,6 +2342,8 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
 
 // ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
+  const presentationRef = useRef(null)
+  useEffect(() => () => { presentationRef.current?.finish(false); presentationRef.current = null }, [])
   const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing' | 'retry_error'
   const [facePhoto, setFacePhoto]       = useState(null)
   const [sidePhoto, setSidePhoto]       = useState(null)
@@ -2358,13 +2362,8 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
   const frontLandmarksRef = useRef(null)
-  const animationGateRef = useRef(null)
   const sideTriggerRef = useRef(null)
   const faceTriggerRef = useRef(null)
-  const finishAnimation = useCallback(() => {
-    animationGateRef.current?.()
-    animationGateRef.current = null
-  }, [])
 
   function ensureFrontLandmarks(url) {
     if (!url) return Promise.resolve(null)
@@ -2377,7 +2376,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setAnalysisLandmarks(lm)
         const points = extractScanOverlayPoints(lm)
         if (points) setAnalysisPoints(points)
-        import('@mediapipe/face_mesh').then(mod => {
+        loadFaceMeshLibrary().then(mod => {
           const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
           const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
           if (path) setMeshPathD(path)
@@ -2435,6 +2434,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   }
 
   async function runAnalysisWithData(face, side) {
+    presentationRef.current?.finish(false)
+    const presentation = presentationGate()
+    presentationRef.current = presentation
     setPhase('analyzing')
     setError('')
     setAnalysisStep(0)
@@ -2442,7 +2444,6 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setSideAnalysisPoints(null)
     setSideAnalysisLandmarks(null)
     setSideDetectionPending(!!side)
-    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
     // Fire MediaPipe landmark detection in parallel with the AI call so
     // FacialAnalysisOverlay gets real per-user coordinates instead of null.
@@ -2455,6 +2456,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
     try {
+      const landmarks = await frontLandmarksPromise
+      if (presentationRef.current !== presentation) return
+      if (!landmarks?.points) throw new Error('We could not locate your face. Please use a clear front-facing photo and retry.')
       const faceB64 = await toBase64(face)
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
@@ -2529,6 +2533,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setSlowAnalysis(false)
       }
 
+      if (presentationRef.current !== presentation) return
       setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
 
@@ -2560,9 +2565,12 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
       }
 
-      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
+      if (!await presentation.promise || presentationRef.current !== presentation) return
       onDone(scanRecord)
     } catch (err) {
+      if (presentationRef.current !== presentation) return
+      presentation.finish(false)
+      clearTimeout(slowTimer)
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
       retrySideRef.current = side
       const code = err.errorCode || ''
@@ -2656,7 +2664,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} onPresentationComplete={() => presentationRef.current?.finish()} />
       </div>
     )
   }

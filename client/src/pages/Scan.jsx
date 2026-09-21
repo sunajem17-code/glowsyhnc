@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -25,8 +26,10 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/th
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
-import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
+import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
+import ScanPortrait from '../components/ScanPortrait'
+import { scanFrame, presentationGate } from '../utils/scanPresentation'
 
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -1412,261 +1415,36 @@ function FaceMeshScanOverlay({ pathD }) {
   )
 }
 
-// The user's real captured photo with the step-synced landmark overlay above
-// (FacialAnalysisOverlay) — replaces the earlier generic sweep-line/dot-mesh
-// versions entirely. Purely visual; onScanComplete-equivalent completion in
-// startAnalysis is still gated on the real API result, never on this timer
-// (see the minDisplayPromise wiring there). `morphing` plays MorphWarpOverlay
-// once, right before Scan.jsx navigates away to results/unlock.
-// No forced aspectRatio/object-cover on the base photo — same fix as
-// FaceMetricsExplorer.jsx (see its comment): the overlay's landmark dots
-// are positioned as a straight % of this box's width/height, which only
-// lines up with the real face if this box IS the photo's actual aspect
-// ratio. A fixed 2:3 crop was silently shifting every point off the face
-// for any photo shaped differently than that (which is most of them) —
-// exactly the "not on the person's face" bug this fixes. `aspectRatio`
-// only kicks in as a fallback for the (normally unreachable) case where
-// there's no photo yet, so the box doesn't collapse to zero height.
-const FRONT_FEATURE_HOLD_MS = 1800
-const PROFILE_FEATURE_HOLD_MS = 800
-const INTRO_HOLD_MS = 1700
-const SWEEP_DURATION_S = 1.5
-const DEBUG_SCAN_LANDMARKS = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debugLandmarks')
-
-// How strongly the camera pushes toward the active feature — kept small (a
-// few percent of the container's own size) so it reads as a deliberate
-// focus nudge rather than a jarring zoom. Only scale/translate are ever
-// animated here (GPU-composited transforms), never top/left/width, which
-// force a layout pass on every frame.
-const FOCUS_SCALE = 1.05
-const FOCUS_PAN_STRENGTH = 0.14
-
-// A more vibrant neon gold than the shared GOLD theme token (#C6A85C, tuned
-// for flat UI chrome elsewhere in the app) — kept local to this scan effect
-// specifically, same precedent as this file's existing LANDMARK_GOLD, since
-// nothing else needs this exact glowing shade.
-const NEON_GOLD = '#FFD700'
-const NEON_GLOW = `0 0 10px ${NEON_GOLD}, 0 0 20px ${NEON_GOLD}66`
-
-function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, rawLandmarks, sideRawLandmarks, meshPathD, sideDetectionPending, onSequenceComplete }) {
-  const [sequence, setSequence] = useState({ surface: 'intro', index: -1 })
-  const [featureProgress, setFeatureProgress] = useState(0)
-  const completionSent = useRef(false)
-  const containerRef = useRef(null)
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
-  const frontFeatures = useMemo(() => frontFeatureAnchors(points), [points])
-  const profileFeatures = useMemo(() => sidePhoto ? profileFeatureAnchors(sidePoints) : [], [sidePhoto, sidePoints])
-  const showingSide = sequence.surface.startsWith('profile')
-  const features = showingSide ? profileFeatures : frontFeatures
-  const activeFeature = sequence.index >= 0 ? features[sequence.index] : null
-  const displayPhoto = showingSide ? sidePhoto : photo
-  const debugLandmarks = showingSide ? sideRawLandmarks : rawLandmarks
-
-  // Measures the actual rendered photo box so the sweep beam and camera
-  // focus can animate in real pixels via transform (translate/scale) instead
-  // of percentage top/left, which forces a layout recalculation every frame.
-  // ResizeObserver reports the layout box only — untouched by the transforms
-  // this same element animates below, so measuring and animating the same
-  // ref is safe.
+// The presentation clock starts once landmarks are ready. Image URL upgrades
+// and late mesh updates never reset it; real-result completion waits on its gate.
+// ScanPortrait applies the same source-to-cover transform to photo and geometry.
+function AnalyzingSweepOverlay({ photo, points, meshPathD, onPresentationComplete, previewElapsed }) {
+  const [elapsed, setElapsed] = useState(0)
+  const finishRef = useRef(onPresentationComplete)
+  finishRef.current = onPresentationComplete
+  const ready = Boolean(points)
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const observer = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect
-      setContainerSize({ width, height })
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [displayPhoto])
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    console.log('[ASCENDUS SCAN] Analysis animation mounted')
-    console.log('[ASCENDUS SCAN] Front image available:', !!photo)
-    console.log('[ASCENDUS SCAN] Profile image available:', !!sidePhoto)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Landmarks available:', !!points)
-  }, [points])
-
-  // Explicit feature state machine. It cannot advance out of the intro until
-  // measured front landmarks exist, and it cannot enter the profile sequence
-  // until measured profile landmarks exist.
-  useEffect(() => {
-    if (sequence.surface === 'intro' && frontFeatures.length) {
-      const timer = setTimeout(() => setSequence({ surface: 'front', index: 0 }), INTRO_HOLD_MS)
-      return () => clearTimeout(timer)
+    if (!ready || previewElapsed != null) return
+    const start = performance.now()
+    let id
+    const tick = now => {
+      const next = now - start
+      setElapsed(next)
+      if (scanFrame(next).complete) finishRef.current?.()
+      else id = requestAnimationFrame(tick)
     }
-    // Waits on !sideDetectionPending too, not just profileFeatures.length —
-    // profile points are set twice: an initial MediaPipe-mesh guess (front-
-    // face-model landmarks run on a profile photo, so anchor points land
-    // approximately, not on the actual silhouette edge), then replaced by
-    // Apple Vision's real profile-aware landmarks once that native call
-    // resolves. Starting on the first (rough) set is what left connecting
-    // lines floating off the silhouette; waiting the extra beat for the
-    // accurate set fixes that at the source instead of fudging offsets.
-    if (sequence.surface === 'profile-wait' && profileFeatures.length && !sideDetectionPending) {
-      const timer = setTimeout(() => setSequence({ surface: 'profile', index: 0 }), 450)
-      return () => clearTimeout(timer)
-    }
-    if ((sequence.surface !== 'front' && sequence.surface !== 'profile') || !activeFeature) return
-    const holdMs = sequence.surface === 'front' ? FRONT_FEATURE_HOLD_MS : PROFILE_FEATURE_HOLD_MS
-    const timer = setTimeout(() => {
-      if (sequence.index + 1 < features.length) {
-        setSequence(current => ({ ...current, index: current.index + 1 }))
-      } else if (sequence.surface === 'front' && sidePhoto) {
-        setSequence({ surface: 'profile-wait', index: -1 })
-      } else if (!completionSent.current) {
-        completionSent.current = true
-        if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Animation sequence complete')
-        onSequenceComplete?.()
-        setSequence({ surface: `${sequence.surface}-finished`, index: sequence.index })
-      }
-    }, holdMs)
-    return () => clearTimeout(timer)
-  }, [sequence, activeFeature, features.length, frontFeatures.length, profileFeatures.length, sidePhoto, sideDetectionPending, onSequenceComplete])
-
-  useEffect(() => {
-    if (!activeFeature) { setFeatureProgress(0); return }
-    const holdMs = sequence.surface === 'front' ? FRONT_FEATURE_HOLD_MS : PROFILE_FEATURE_HOLD_MS
-    const started = performance.now()
-    setFeatureProgress(0)
-    const timer = setInterval(() => {
-      setFeatureProgress(Math.min(99, Math.round((performance.now() - started) / holdMs * 100)))
-    }, 60)
-    return () => clearInterval(timer)
-  }, [sequence.surface, sequence.index, activeFeature])
-
-  const analyzedCount = sequence.index + 1
-  const sequenceFinished = sequence.surface.endsWith('finished')
-  const stageLabel = step >= 4 || sequenceFinished
-    ? 'COMPILING RESULTS'
-    : activeFeature
-      ? `${showingSide ? 'PROFILE' : 'ANALYZING'} · ${analyzedCount}/${features.length}`
-      : showingSide ? 'MAPPING PROFILE' : 'DETECTING STRUCTURE'
-  const visibleFeatures = activeFeature ? features.slice(0, sequence.index + 1) : []
-
-  // Camera focus — a subtle GPU-composited scale + pan toward whichever
-  // feature is currently active, computed in real pixels from the measured
-  // container size. Neutral (scale 1, no pan) whenever nothing is active
-  // (intro sweep, between-phase waits, finished) so the frame settles back
-  // to a full, centered view rather than staying pushed in.
-  const focusTransform = activeFeature && containerSize.width && containerSize.height
-    ? {
-        scale: FOCUS_SCALE,
-        x: (0.5 - activeFeature.point.x) * containerSize.width * FOCUS_PAN_STRENGTH,
-        y: (0.5 - activeFeature.point.y) * containerSize.height * FOCUS_PAN_STRENGTH,
-      }
-    : { scale: 1, x: 0, y: 0 }
-
-  return (
-    <div className="w-full flex flex-col items-center mb-5">
-      <div className="rounded-full px-3 py-1 mb-3 font-mono" style={{ border: `1px solid ${NEON_GOLD}88`, color: NEON_GOLD, background: '#17140c', fontSize: 9, letterSpacing: '0.16em', boxShadow: `0 0 12px ${NEON_GOLD}44` }}>{stageLabel}</div>
-      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || (showingSide ? 7 : 5) }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < analyzedCount ? NEON_GOLD : `${NEON_GOLD}33`, boxShadow: i < analyzedCount ? `0 0 6px ${NEON_GOLD}` : 'none' }} />)}</div>
-      <div className="relative mx-auto" style={{ width: 'fit-content', maxWidth: '100%', ...(photo ? {} : { aspectRatio: '2/3', width: '100%' }) }}>
-        <motion.div
-          ref={containerRef}
-          className="relative rounded-3xl"
-          style={{ background: '#0a0a0a', border: `1px solid ${NEON_GOLD}40`, overflow: 'hidden', willChange: 'transform' }}
-          animate={focusTransform}
-          transition={{ type: 'spring', stiffness: 90, damping: 20, mass: 0.6 }}
-        >
-          {/* Lighter dim than before (was brightness(.42), then .75/.88) —
-              still not full brightness so the gold UI reads clearly over it. */}
-          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full rounded-3xl" style={{ maxHeight: '75dvh', filter: activeFeature ? 'brightness(.92) saturate(.97)' : 'brightness(1)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
-          <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.05),transparent 30%,rgba(0,0,0,.25))' }} />
-          {/* translateY via a measured pixel range, not `top` — top forces a
-              layout recalculation every frame; transform is compositor-only. */}
-          {!morphing && sequence.surface === 'intro' && containerSize.height > 0 && (
-            <motion.div
-              className="absolute left-0 right-0 pointer-events-none"
-              style={{ top: 0, height: 2, background: `linear-gradient(90deg,transparent,${NEON_GOLD},transparent)`, boxShadow: NEON_GLOW, willChange: 'transform' }}
-              initial={{ y: containerSize.height * 0.05 }}
-              animate={{ y: containerSize.height * 0.95 }}
-              transition={{ duration: SWEEP_DURATION_S, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
-            />
-          )}
-          {morphing && <MorphWarpOverlay photo={displayPhoto} />}
-          {!morphing && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible', filter: `drop-shadow(0 0 4px ${NEON_GOLD}99)` }}>
-            <defs>
-              {/* Delicate gradient for line strokes (connector lines, jaw
-                  contour) — the solid flat-yellow fill/stroke read as heavy
-                  and blown-out; a gradient gives the "holographic" look
-                  without raising actual brightness. */}
-              <linearGradient id="goldLineGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#FFD700" />
-                <stop offset="100%" stopColor="#FFC107" />
-              </linearGradient>
-            </defs>
-            {/* Front-face wireframe only — a straight-on mesh sitting over a
-                profile silhouette looked wrong, so this hides entirely during
-                the profile phase rather than just dimming. Lower opacity
-                (.15-.18) and thinner stroke than before so it reads as a
-                refined wireframe, not a dense web. */}
-            {meshPathD && !showingSide && (
-              <motion.path
-                d={meshPathD} fill="none" stroke={LANDMARK_GUIDE} strokeWidth=".5" vectorEffect="non-scaling-stroke"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: sequence.surface === 'intro' ? 0 : 0.17 }}
-                transition={{ duration: .6 }}
-              />
-            )}
-            {DEBUG_SCAN_LANDMARKS && debugLandmarks?.map((p, i) => <circle key={i} cx={p.x * 100} cy={p.y * 100} r=".28" fill={NEON_GOLD} opacity=".75" />)}
-            {/* Region fill is a flat, soft translucent tint (not an animated
-                fill-opacity ramp) with a crisp thin stroke — matches a subtle
-                optical-mesh look instead of a solid glowing wedge. */}
-            {activeFeature && <motion.g key={`highlight-${sequence.surface}-${activeFeature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .28 }}>
-              {activeFeature.regions?.filter(Boolean).map((polygon, i) => <motion.path key={i} d={smoothClosedPath(polygon)} fill="rgba(255,215,0,0.12)" stroke={NEON_GOLD} strokeWidth=".3" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .5, ease: 'easeOut' }} />)}
-              {activeFeature.contour && <motion.polyline points={activeFeature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke="url(#goldLineGrad)" strokeWidth=".35" vectorEffect="non-scaling-stroke" style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .55, ease: 'easeInOut' }} />}
-            </motion.g>}
-            {visibleFeatures.map((feature, i) => {
-              const current = i === sequence.index
-              const x = feature.point.x * 100
-              const y = feature.point.y * 100
-              return <motion.g key={`line-${sequence.surface}-${feature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .22 }} style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }}>
-                <motion.path d={`M ${x} ${y} L ${feature.badgeX} ${feature.badgeY}`} fill="none" stroke="url(#goldLineGrad)" strokeWidth=".5" vectorEffect="non-scaling-stroke" initial={current ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: .65, ease: 'easeInOut' }} />
-                <circle cx={x} cy={y} r="1.1" fill="#fff" stroke={NEON_GOLD} strokeWidth=".3" vectorEffect="non-scaling-stroke" />
-                <circle cx={x} cy={y} r="2.4" fill="none" stroke={NEON_GOLD} strokeOpacity=".5" strokeWidth=".3" vectorEffect="non-scaling-stroke" />
-              </motion.g>
-            })}
-          </svg>}
-          {/* Outer wrapper has NO transform of its own — it just pins a
-              zero-size point at (badgeX%, badgeY%). The circle and the label
-              are both absolutely-positioned children of THAT untransformed
-              point, each with their own independent offset. Previously the
-              label lived inside the circle's `translate(-50%,-50%)` wrapper,
-              which made that ~48px transformed box its containing block —
-              so `right:24`/`left:24` resolved against the tiny badge box
-              instead of the real card, truncating text on the right edge.
-              Keeping the label a sibling of (not nested in) any transformed
-              ancestor avoids that containing-block trap entirely. */}
-          {!morphing && visibleFeatures.map((feature, i) => {
-            const current = i === sequence.index && !sequenceFinished
-            const onRight = feature.badgeX > 50
-            return (
-              <div key={`badge-${sequence.surface}-${feature.id}`} className="absolute pointer-events-none" style={{ left: `${feature.badgeX}%`, top: `${feature.badgeY}%`, width: 0, height: 0 }}>
-                <motion.div className="absolute" style={{ transform: 'translate(-50%,-50%)', willChange: 'transform, opacity' }} initial={{ opacity: 0, scale: .7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: current ? .3 : 0, duration: .3, type: 'spring', stiffness: 220, damping: 22 }}>
-                  <div className="flex items-center justify-center rounded-full font-body" style={{ width: 48, height: 48, border: `2px solid ${NEON_GOLD}`, background: current ? 'rgba(17,15,10,.82)' : NEON_GOLD, boxShadow: `0 0 15px ${NEON_GOLD}, 0 0 4px ${NEON_GOLD}`, color: current ? '#fff' : '#090909', fontSize: 13, fontWeight: 700 }}>
-                    {current ? `${featureProgress}%` : <Check size={27} strokeWidth={2.5} />}
-                  </div>
-                </motion.div>
-                <motion.div
-                  className="absolute font-body"
-                  style={{
-                    top: 29, width: 100, maxWidth: '38vw',
-                    ...(onRight ? { right: 24, textAlign: 'right' } : { left: 24, textAlign: 'left' }),
-                    color: '#fff', fontSize: 9, lineHeight: 1.15, fontWeight: 700, textShadow: '0 1px 5px #000',
-                    willChange: 'opacity',
-                  }}
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: current ? .3 : 0, duration: .3 }}
-                >{feature.label}</motion.div>
-              </div>
-            )
-          })}
-        </motion.div>
-      </div>
-    </div>
-  )
+    id = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(id)
+  }, [ready, previewElapsed])
+  const time = previewElapsed ?? elapsed
+  const frame = scanFrame(time)
+  const label = frame.compiling ? 'COMPILING RESULTS' : frame.active < 0 ? 'DETECTING STRUCTURE' : `ANALYZING · ${frame.active + 1}/5`
+  return <div className="reference-scan">
+    <div className="reference-status" role="status" aria-live="polite">{label}</div>
+    <div className="reference-segments" aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <i key={i} className={frame.active >= i ? 'is-active' : ''} />)}</div>
+    <ScanPortrait photo={photo} points={points} meshPathD={meshPathD} elapsed={time} frame={frame} />
+    {!ready && <p className="reference-wait">Locating facial landmarks…</p>}
+  </div>
 }
 
 const REAL_SCAN_STAGES = ['Preparing images', 'Detecting facial landmarks', 'Analyzing front and side', 'Building results', 'Results ready']
@@ -1685,15 +1463,8 @@ function buildDiagnosticLines(scanResult) {
   ]
 }
 
-export function AnalyzingScreen({ currentStep, slow, photo, sidePhoto = null, morphing = false, points = null, sidePoints = null, rawLandmarks = null, sideRawLandmarks = null, meshPathD = null, scanResult = null, sideDetectionPending = false, onSequenceComplete }) {
-  const stepIndex = Math.min(currentStep, 4)
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      <AnalyzingSweepOverlay photo={photo} sidePhoto={sidePhoto} step={currentStep} morphing={morphing} points={points} sidePoints={sidePoints} rawLandmarks={rawLandmarks} sideRawLandmarks={sideRawLandmarks} meshPathD={meshPathD} scanResult={scanResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={onSequenceComplete} />
-      <span className="sr-only" aria-live="polite">{REAL_SCAN_STAGES[stepIndex]}</span>
-    </div>
-  )
+export function AnalyzingScreen({ photo, points = null, meshPathD = null, onPresentationComplete, previewElapsed }) {
+  return <AnalyzingSweepOverlay photo={photo} points={points} meshPathD={meshPathD} onPresentationComplete={onPresentationComplete} previewElapsed={previewElapsed} />
 }
 
 function ChecklistRow({ step: s, i, currentStep }) {
@@ -1745,6 +1516,12 @@ function ChecklistRow({ step: s, i, currentStep }) {
 // steps 1 and 2 render their own matching custom header instead (below).
 
 export default function Scan() {
+  const presentationRef = useRef(null)
+  const scanMountedRef = useRef(true)
+  useEffect(() => {
+    scanMountedRef.current = true
+    return () => { scanMountedRef.current = false; presentationRef.current?.finish(false); presentationRef.current = null }
+  }, [])
   const navigate = useNavigate()
   const { state: routeState } = useLocation()
   const recoveredFrontPhoto = routeState?.recoveredFrontPhoto ?? null
@@ -1810,14 +1587,9 @@ export default function Scan() {
   const startAnalysisRef  = useRef(null)
   const frontLandmarksRef = useRef(null)
   const validatedFrontRef = useRef(recoveredFrontPhoto)
-  const animationGateRef = useRef(null)
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
 
-  const finishAnimation = useCallback(() => {
-    animationGateRef.current?.()
-    animationGateRef.current = null
-  }, [])
 
   function ensureFrontLandmarks(url) {
     if (!url) return Promise.resolve(null)
@@ -1830,7 +1602,7 @@ export default function Scan() {
         setAnalysisLandmarks(lm)
         const points = extractScanOverlayPoints(lm)
         if (points) setAnalysisPoints(points)
-        import('@mediapipe/face_mesh').then(mod => {
+        loadFaceMeshLibrary().then(mod => {
           const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
           const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
           if (path) setMeshPathD(path)
@@ -1966,6 +1738,7 @@ export default function Scan() {
         qPassed = false
         qIssues = [{ code: 'validation_error', title: 'Could not validate photo', advice: 'Please try again.', severity: 'critical' }]
       }
+      if (!scanMountedRef.current) return
       if (!qPassed) {
         navigate('/scan/quality-fail', { state: { issues: qIssues, photoUrl: facePhoto } })
         return
@@ -1973,6 +1746,9 @@ export default function Scan() {
       validatedFrontRef.current = facePhoto
     }
 
+    presentationRef.current?.finish(false)
+    const presentation = presentationGate()
+    presentationRef.current = presentation
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
     setGender(g)
@@ -1987,7 +1763,6 @@ export default function Scan() {
     setSideAnalysisPoints(null)
     setSideAnalysisLandmarks(null)
     setSideDetectionPending(!!sidePhoto && !skipSide)
-    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
     // Reuse front landmarks already mapping during side capture. The overlay
     // waits for measured anchors rather than drawing generic positions.
@@ -1997,6 +1772,9 @@ export default function Scan() {
     const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
 
     try {
+      const landmarks = await frontLandmarksPromise
+      if (presentationRef.current !== presentation) return
+      if (!landmarks?.points) throw new Error('We could not locate your face. Please use a clear front-facing photo and retry.')
       const faceB64    = await toBase64(facePhoto)
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
@@ -2094,6 +1872,7 @@ export default function Scan() {
             gender: g,
             previousScore: lastGlowScore,
           })
+          if (presentationRef.current !== presentation) return
           setAnalysisResult(aiResult)
 
         } finally {
@@ -2107,6 +1886,7 @@ export default function Scan() {
         objectiveReplacementStatus: 'not_validated',
       }
 
+      if (!await presentation.promise || presentationRef.current !== presentation) return
       setAnalysisStep(3)
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis response received')
 
@@ -2252,22 +2032,14 @@ export default function Scan() {
       // The real score may arrive before the user's measured landmarks and
       // visual callouts have appeared. Wait for that sequence, bounded in
       // case a device cannot run the landmark model.
-      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
       setAnalysisStep(4)
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
 
-      // Play the morph-warp flourish over the finished photo before handing
-      // off — MorphWarpOverlay's own keyframes run ~900ms; 950ms gives it a
-      // hair of buffer so navigate() never cuts it off mid-play.
-      setMorphing(true)
-      await new Promise(r => setTimeout(r, 950))
-
-      // Transition through the scan-ready screen (progress bar + affirming
-      // messages) before landing on results or the unlock gate.
-      if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Navigating to results')
-      navigate('/scan/ready')
+      navigate(isPremium ? '/results' : '/unlock', { replace: true })
     } catch (err) {
+      if (presentationRef.current !== presentation) return
+      presentation.finish(false)
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
       if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
@@ -2385,7 +2157,7 @@ export default function Scan() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 ${isAnalyzing ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
@@ -2489,7 +2261,7 @@ export default function Scan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} scanResult={analysisResult} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
+              <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} morphing={morphing} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} scanResult={analysisResult} sideDetectionPending={sideDetectionPending} onPresentationComplete={() => presentationRef.current?.finish()} />
             </motion.div>
           )}
         </AnimatePresence>

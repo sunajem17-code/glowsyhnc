@@ -50,6 +50,15 @@ async function _logEnvironmentDiagnostics() {
   }
 }
 
+// MediaPipe's legacy UMD bundle exposes globals in Vite dev and named exports
+// in the production bundle. Normalize both entry points before using it.
+export async function loadFaceMeshLibrary() {
+  const mod = await import('@mediapipe/face_mesh')
+  const library = mod.FaceMesh ? mod : mod.default?.FaceMesh ? mod.default : globalThis
+  if (typeof library.FaceMesh !== 'function') throw new Error('Face landmark library is unavailable')
+  return { FaceMesh: library.FaceMesh, FACEMESH_TESSELATION: library.FACEMESH_TESSELATION }
+}
+
 export async function initFaceMesh() {
   if (_mesh) return _mesh
   // Guard: if a pending init is already in flight, await it.
@@ -67,14 +76,8 @@ export async function initFaceMesh() {
     let FaceMesh
     try {
       console.log('[FaceDetector] importing @mediapipe/face_mesh…')
-      const mod = await import('@mediapipe/face_mesh')
-      // The package is CommonJS: Vite exposes its exports under default.
-      FaceMesh = typeof mod.FaceMesh === 'function'
-        ? mod.FaceMesh
-        : typeof mod.default?.FaceMesh === 'function'
-          ? mod.default.FaceMesh
-          : globalThis.FaceMesh
-      if (typeof FaceMesh !== 'function') throw new Error('FaceMesh constructor unavailable')
+      const mod = await loadFaceMeshLibrary()
+      FaceMesh = mod.FaceMesh
       console.log('[FaceDetector] import OK — FaceMesh type:', typeof FaceMesh)
     } catch (err) {
       console.error('[FaceDetector] import FAILED:', err?.message, err?.stack?.split('\n')[1])
@@ -163,16 +166,14 @@ export async function initFaceMesh() {
 }
 
 // ─── Get 468 facial landmarks from an image URL ───────────────────────────────
-// FaceMesh has one onResults callback. Serialize front, profile, and
-// post-result scans so one request cannot steal another request's result.
 let landmarkQueue = Promise.resolve()
-
 export function getLandmarks(imageUrl) {
-  const task = landmarkQueue.then(() => detectLandmarks(imageUrl))
-  landmarkQueue = task.catch(() => {})
-  return task
+  // The singleton has one onResults handler: never let front/profile/result
+  // requests overwrite each other's handler while an image is being processed.
+  const next = landmarkQueue.then(() => detectLandmarks(imageUrl))
+  landmarkQueue = next.catch(() => {})
+  return next
 }
-
 async function detectLandmarks(imageUrl) {
   const mesh = await initFaceMesh()
 

@@ -62,7 +62,11 @@ export default function Layout() {
   const { x, swipeExit, resetAfterExit, edgeHandlers } = useSwipeBack({ enabled: swipeEnabled })
 
   const isTabSwitch = TAB_ROOT_PATHS.includes(location.pathname)
-  const pageVariants = buildPageVariants(navigationType === 'POP', isTabSwitch)
+  const pageVariants = location.pathname === '/unlock'
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 0, transition: { duration: .15 } } }
+    : location.pathname === '/scan/capture'
+      ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0, transition: { duration: .12 } } }
+      : buildPageVariants(navigationType === 'POP', isTabSwitch)
 
   return (
     <div className="flex flex-col h-full bg-page">
@@ -105,7 +109,7 @@ export default function Layout() {
           </motion.div>
         </AnimatePresence>
       </main>
-      <BottomNav />
+      {!['/scan/capture', '/unlock'].includes(location.pathname) && <BottomNav />}
     </div>
   )
 }

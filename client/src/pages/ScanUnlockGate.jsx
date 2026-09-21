@@ -1,9 +1,13 @@
+import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
+import ScanPortrait, { DefinitionIcon } from '../components/ScanPortrait'
+import { SCAN_FEATURES } from '../utils/scanPresentation'
+import { extractScanOverlayPoints, buildMeshPathD } from './Scan'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { isNative, purchasePro, purchaseDiscountedAnnual } from '../utils/iap'
 import {
-  UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
+  UserPlus, Share2, Check, Loader2, Users, ChevronRight, X, Hand, ScanFace,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -1523,91 +1527,51 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, isPurchasing, error }) {
-  const navigate = useNavigate()
-  const facePhoto = scan?.facePhotoUrl ?? null
-  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
-  const fd = scan?.faceData ?? {}
-  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 68
-
-  // Fixed locked display values — these are shown blurred, so they
-  // function as teaser numbers, not real scores.
-  const metrics = [
-    { label: 'Overall',      pct: 61 },
-    { label: 'Potential',    pct: 88 },
-    { label: 'Symmetry',     pct: 63 },
-    { label: 'Skin Quality', pct: 68 },
-    { label: 'Jawline',      pct: 57 },
-    { label: 'Cheekbones',   pct: 51 },
-  ]
-
-  return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
-      <div className="flex flex-col items-center px-5 pb-10"
-           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-
-        {/* Close button */}
-        <div className="w-full flex justify-end mb-3">
-          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="flex items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
+export function LockedRevealScreen({ scan, onAscend, isPurchasing, error, previewGeometry = null }) {
+  const photo = scan?.facePhotoUrl
+  const [geometry, setGeometry] = useState(previewGeometry)
+  const definition = scan?.aiScore?.definitionAnalysis
+  const count = definition?.focusAreaCount
+  useEffect(() => {
+    let cancelled = false
+    if (previewGeometry) return
+    setGeometry(null)
+    if (photo) import('../utils/faceLandmarks').then(async ({ getLandmarks }) => {
+      const lm = await getLandmarks(photo)
+      const { FACEMESH_TESSELATION } = await loadFaceMeshLibrary()
+      if (!cancelled) setGeometry({ points: extractScanOverlayPoints(lm), meshPathD: buildMeshPathD(lm, FACEMESH_TESSELATION) })
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [photo, previewGeometry])
+  const unlock = () => { if (!isPurchasing) onAscend?.() }
+  return <div className="definition-results">
+    <div className="definition-scroll">
+      <header className="definition-header">
+        <h1>{Number.isInteger(count) && count > 0 ? `We found ${count} focus ${count === 1 ? 'area' : 'areas'}.` : 'Your results are ready.'}</h1>
+        <p>Your facial definition — here’s your breakdown.</p>
+      </header>
+      <ScanPortrait photo={photo} points={geometry?.points} meshPathD={geometry?.meshPathD} results onRegion={unlock} regionValues={Object.fromEntries(SCAN_FEATURES.map(f => [f.id, definition?.metrics?.[f.id]?.score?.toFixed(1)]))} />
+      <button className="definition-hint" onClick={unlock}><Hand size={16} />Tap a region on your face to see its score.</button>
+      <section className="definition-score" aria-label="Locked facial definition score">
+        <div className="definition-score-heading"><ScanFace size={16} /><span>YOUR DEFINITION SCORE</span><span className="definition-blur" aria-hidden="true">{definition?.overallScore?.toFixed(1) ?? '—'}</span><button className="definition-lock" onClick={unlock} aria-label="Unlock score"><Lock size={13} /></button></div>
+        <div className="definition-score-pills" aria-hidden="true"><span className="definition-pill"><span className="definition-blur">Definition</span></span><span className="definition-pill"><span className="definition-blur">{definition?.overallScore != null ? `${definition.overallScore}/10` : '—'}</span></span></div>
+        <p className="definition-score-helper"><Lock size={14} />Your scores are ready — unlock your plan to reveal them</p>
+      </section>
+      <h2 className="definition-measure-title">Your measurements</h2>
+      <section className="definition-measurements" aria-label="Facial definition ratings">
+        {SCAN_FEATURES.map(feature => {
+          const value = definition?.metrics?.[feature.id]?.score
+          const available = Number.isFinite(value)
+          return <button key={feature.id} className="definition-row" onClick={unlock} aria-label={`${feature.label}: ${available ? 'unlock score' : 'not available for this scan'}`}>
+            <DefinitionIcon kind={feature.icon} />
+            <div><div className="definition-row-heading"><span>{feature.label}</span><span className={available ? 'definition-blur' : ''} style={{ color: feature.color }} aria-hidden="true">{available ? value.toFixed(1) : '—'}</span><ChevronRight size={14} /></div><div className="definition-track" aria-hidden="true"><span style={{ width: `${available ? Math.max(0, Math.min(100, value * 10)) : 0}%`, background: feature.color }} /></div></div>
           </button>
-        </div>
-
-        {/* Header */}
-        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Reveal your ratings
-        </h1>
-        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full facial analysis with Ascendus Max
-        </p>
-
-        {/* Face circle + card */}
-        <div className="relative w-full" style={{ marginTop: 102 }}>
-          {/* Circle — absolutely positioned, fully detached from card */}
-          <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
-            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
-              {facePhoto
-                ? <img src={facePhoto} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
-                : null}
-            </div>
-          </div>
-
-          {/* Metrics card */}
-          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-            <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
-              {metrics.map(({ label, pct }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <Lock size={13} style={{ color: G, flexShrink: 0 }} />
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
-                  </div>
-                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
-                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* CTAs */}
-        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
-          <motion.button
-            whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-            onClick={() => { triggerHaptic(); onAscend() }}
-            disabled={isPurchasing}
-            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-          >
-            {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
-            {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
-          </motion.button>
-
-        </div>
-
-        {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
-      </div>
+        })}
+      </section>
+      {error && <p className="definition-error" role="alert">{error}</p>}
     </div>
-  )
+    <footer className="definition-footer"><button className="definition-unlock" onClick={unlock} disabled={isPurchasing}>{isPurchasing ? 'Processing…' : 'Unlock My Results 🔒'}</button></footer>
+  </div>
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -1709,9 +1673,10 @@ export default function ScanUnlockGate() {
   }
 
   return (
-    <MotionPage
-      baseClassName=""
-      className="fixed inset-0 z-50 overflow-hidden dark"
+    <motion.div
+      initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: .2, ease: 'easeOut' }}
+      className="absolute inset-0 z-50 overflow-hidden dark"
       style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
       {(isPremium || justUnlocked) ? (
@@ -1772,6 +1737,6 @@ export default function ScanUnlockGate() {
           />
         )}
       </AnimatePresence>
-    </MotionPage>
+    </motion.div>
   )
 }

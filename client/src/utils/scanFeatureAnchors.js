@@ -22,36 +22,17 @@ const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
 export function frontFeatureAnchors(p) {
-  if (!p) return []
-  // Synthetic "upper cheek" anchors, 70% of the way from just-under-the-eye
-  // toward the cheekbone point — eyeBottomL/eyeBottomR alone sit right on
-  // the lower eyelid rim, which still reads as touching the eye. Blending
-  // toward cheekL/cheekR moves the anchor clearly onto the cheek without
-  // guessing at an unverified landmark index.
-  const upperCheekL = lerp(p.eyeBottomL, p.cheekL, 0.7)
-  const upperCheekR = lerp(p.eyeBottomR, p.cheekR, 0.7)
-  return available([
-    { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 90, badgeY: 74,
-      regions: [region([p.jawChinL, p.chin, p.jawChinR])] },
-    // Temple → upper cheek → cheekbone point. Previously used the eye
-    // CORNERS (eyeOuterL/eyeInnerL) as two of the four vertices, which put
-    // those points directly on the eyelid — since the polygon connects its
-    // vertices in order, that drew the highlight straight across the eyes.
-    { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 10, badgeY: 29,
-      regions: [region([p.templeL, upperCheekL, p.cheekL]), region([p.templeR, upperCheekR, p.cheekR])] },
-    { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 90, badgeY: 52,
-      contour: region([p.jawL, p.jawMidL, p.jawChinL, p.chin, p.jawChinR, p.jawMidR, p.jawR]) },
-    // Extended down through jawChin (not just jawMid) so the highlighted
-    // region actually spans the cheek-to-jaw transition the "ogee curve"
-    // name refers to, instead of stopping mid-cheek. Starts from eyeBottomL
-    // (below the eyelid) rather than eyeOuterL (the eye corner itself) for
-    // the same reason as cheekbone-prominence above — the eye corner as a
-    // polygon vertex drew the top edge straight across the eye.
-    { id: 'cheek-leanness', label: 'CHEEK LEANNESS & OGEE CURVE', point: p.cheekL, badgeX: 10, badgeY: 61,
-      regions: [region([p.eyeBottomL, p.cheekL, p.jawChinL, p.jawMidL]), region([p.eyeBottomR, p.cheekR, p.jawChinR, p.jawMidR])] },
-    { id: 'submental-definition', label: 'SUBMENTAL DEFINITION', point: p.chin, badgeX: 90, badgeY: 28,
-      contour: region([p.jawChinL, p.chin, p.jawChinR]) },
-  ])
+  const pt = p || {}
+  const leftUpper = region([pt.templeL, lerp(pt.eyeBottomL, pt.cheekL, 0.7), pt.cheekL])
+  const rightUpper = region([pt.templeR, lerp(pt.eyeBottomR, pt.cheekR, 0.7), pt.cheekR])
+  // Always five stages; missing landmarks are not invented or removed from the count.
+  return [
+    { id: 'chin', label: 'Chin Definition', point: pt.chin, contour: region([pt.jawChinL, pt.chin, pt.jawChinR]) },
+    { id: 'cheekbones', label: 'Cheekbone Prominence', point: midpoint(pt.eyeBottomL, pt.cheekL), regions: [leftUpper, rightUpper] },
+    { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: region([pt.jawL, pt.jawMidL, pt.jawChinL, pt.chin, pt.jawChinR, pt.jawMidR, pt.jawR]) },
+    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: midpoint(pt.cheekL, pt.mouthL), regions: [region([pt.cheekL, midpoint(pt.eyeBottomL, pt.cheekL), pt.mouthL, pt.jawChinL, pt.jawMidL]), region([pt.cheekR, midpoint(pt.eyeBottomR, pt.cheekR), pt.mouthR, pt.jawChinR, pt.jawMidR])] },
+    { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: region([pt.jawChinL, pt.chin, pt.jawChinR]) },
+  ]
 }
 
 export function profileFeatureAnchors(p) {
