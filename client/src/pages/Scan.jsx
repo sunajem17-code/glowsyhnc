@@ -174,6 +174,40 @@ function cropDataUrlToMatchLivePreview(dataUrl, cardRect) {
   })
 }
 
+// Renders a set of landmark points as a smooth closed curve (a Catmull-Rom
+// spline through every point, converted to cubic Bezier segments) instead of
+// a straight-edged polygon — this is what actually produces the tapered,
+// almond/leaf-shaped region highlights (cheekbone, cheek/ogee curve) seen in
+// the reference: connecting the same landmark points with straight lines
+// reads as a hard-edged triangle, the same points connected as a spline
+// reads as an organic curved highlight. Coordinates are in the same 0-100
+// viewBox-percent space as everything else this overlay draws.
+function smoothClosedPath(points, tension = 0.55) {
+  if (!points || points.length < 3) return ''
+  const n = points.length
+  // A 3-point "spline" is degenerate: with only 3 distinct points, the
+  // Catmull-Rom formula's "next-next" neighbor (p3) collapses back onto p0,
+  // so the tangent calc reuses the same point twice and the curve balloons
+  // outward unpredictably — visible as the cheekbone triangle overshooting
+  // up into the eyebrow instead of tracing the cheek. A straight-edged
+  // triangle (softened by strokeLinejoin="round" + the glow filter) avoids
+  // that entirely; smoothing only behaves once there are 4+ points.
+  if (n === 3) {
+    return `M ${points[0].x * 100} ${points[0].y * 100} L ${points[1].x * 100} ${points[1].y * 100} L ${points[2].x * 100} ${points[2].y * 100} Z`
+  }
+  const at = i => points[((i % n) + n) % n]
+  let d = `M ${at(0).x * 100} ${at(0).y * 100}`
+  for (let i = 0; i < n; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+    const c1x = (p1.x + (p2.x - p0.x) * tension / 3) * 100
+    const c1y = (p1.y + (p2.y - p0.y) * tension / 3) * 100
+    const c2x = (p2.x - (p3.x - p1.x) * tension / 3) * 100
+    const c2y = (p2.y - (p3.y - p1.y) * tension / 3) * 100
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x * 100} ${p2.y * 100}`
+  }
+  return d + ' Z'
+}
+
 // ─── Live Camera Overlay ──────────────────────────────────────────────────────
 
 function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
@@ -1393,14 +1427,33 @@ function FaceMeshScanOverlay({ pathD }) {
 // exactly the "not on the person's face" bug this fixes. `aspectRatio`
 // only kicks in as a fallback for the (normally unreachable) case where
 // there's no photo yet, so the box doesn't collapse to zero height.
-const FRONT_FEATURE_HOLD_MS = 1400
-const PROFILE_FEATURE_HOLD_MS = 1200
+const FRONT_FEATURE_HOLD_MS = 1800
+const PROFILE_FEATURE_HOLD_MS = 800
+const INTRO_HOLD_MS = 1700
+const SWEEP_DURATION_S = 1.5
 const DEBUG_SCAN_LANDMARKS = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debugLandmarks')
 
-function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, rawLandmarks, sideRawLandmarks, onSequenceComplete }) {
+// How strongly the camera pushes toward the active feature — kept small (a
+// few percent of the container's own size) so it reads as a deliberate
+// focus nudge rather than a jarring zoom. Only scale/translate are ever
+// animated here (GPU-composited transforms), never top/left/width, which
+// force a layout pass on every frame.
+const FOCUS_SCALE = 1.05
+const FOCUS_PAN_STRENGTH = 0.14
+
+// A more vibrant neon gold than the shared GOLD theme token (#C6A85C, tuned
+// for flat UI chrome elsewhere in the app) — kept local to this scan effect
+// specifically, same precedent as this file's existing LANDMARK_GOLD, since
+// nothing else needs this exact glowing shade.
+const NEON_GOLD = '#FFD700'
+const NEON_GLOW = `0 0 10px ${NEON_GOLD}, 0 0 20px ${NEON_GOLD}66`
+
+function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sidePoints, rawLandmarks, sideRawLandmarks, meshPathD, sideDetectionPending, onSequenceComplete }) {
   const [sequence, setSequence] = useState({ surface: 'intro', index: -1 })
   const [featureProgress, setFeatureProgress] = useState(0)
   const completionSent = useRef(false)
+  const containerRef = useRef(null)
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const frontFeatures = useMemo(() => frontFeatureAnchors(points), [points])
   const profileFeatures = useMemo(() => sidePhoto ? profileFeatureAnchors(sidePoints) : [], [sidePhoto, sidePoints])
   const showingSide = sequence.surface.startsWith('profile')
@@ -1408,6 +1461,23 @@ function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sideP
   const activeFeature = sequence.index >= 0 ? features[sequence.index] : null
   const displayPhoto = showingSide ? sidePhoto : photo
   const debugLandmarks = showingSide ? sideRawLandmarks : rawLandmarks
+
+  // Measures the actual rendered photo box so the sweep beam and camera
+  // focus can animate in real pixels via transform (translate/scale) instead
+  // of percentage top/left, which forces a layout recalculation every frame.
+  // ResizeObserver reports the layout box only — untouched by the transforms
+  // this same element animates below, so measuring and animating the same
+  // ref is safe.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      setContainerSize({ width, height })
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [displayPhoto])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1424,10 +1494,18 @@ function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sideP
   // until measured profile landmarks exist.
   useEffect(() => {
     if (sequence.surface === 'intro' && frontFeatures.length) {
-      const timer = setTimeout(() => setSequence({ surface: 'front', index: 0 }), 1350)
+      const timer = setTimeout(() => setSequence({ surface: 'front', index: 0 }), INTRO_HOLD_MS)
       return () => clearTimeout(timer)
     }
-    if (sequence.surface === 'profile-wait' && profileFeatures.length) {
+    // Waits on !sideDetectionPending too, not just profileFeatures.length —
+    // profile points are set twice: an initial MediaPipe-mesh guess (front-
+    // face-model landmarks run on a profile photo, so anchor points land
+    // approximately, not on the actual silhouette edge), then replaced by
+    // Apple Vision's real profile-aware landmarks once that native call
+    // resolves. Starting on the first (rough) set is what left connecting
+    // lines floating off the silhouette; waiting the extra beat for the
+    // accurate set fixes that at the source instead of fudging offsets.
+    if (sequence.surface === 'profile-wait' && profileFeatures.length && !sideDetectionPending) {
       const timer = setTimeout(() => setSequence({ surface: 'profile', index: 0 }), 450)
       return () => clearTimeout(timer)
     }
@@ -1446,7 +1524,7 @@ function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sideP
       }
     }, holdMs)
     return () => clearTimeout(timer)
-  }, [sequence, activeFeature, features.length, frontFeatures.length, profileFeatures.length, sidePhoto, onSequenceComplete])
+  }, [sequence, activeFeature, features.length, frontFeatures.length, profileFeatures.length, sidePhoto, sideDetectionPending, onSequenceComplete])
 
   useEffect(() => {
     if (!activeFeature) { setFeatureProgress(0); return }
@@ -1467,43 +1545,125 @@ function AnalyzingSweepOverlay({ photo, sidePhoto, step, morphing, points, sideP
       ? `${showingSide ? 'PROFILE' : 'ANALYZING'} · ${analyzedCount}/${features.length}`
       : showingSide ? 'MAPPING PROFILE' : 'DETECTING STRUCTURE'
   const visibleFeatures = activeFeature ? features.slice(0, sequence.index + 1) : []
+
+  // Camera focus — a subtle GPU-composited scale + pan toward whichever
+  // feature is currently active, computed in real pixels from the measured
+  // container size. Neutral (scale 1, no pan) whenever nothing is active
+  // (intro sweep, between-phase waits, finished) so the frame settles back
+  // to a full, centered view rather than staying pushed in.
+  const focusTransform = activeFeature && containerSize.width && containerSize.height
+    ? {
+        scale: FOCUS_SCALE,
+        x: (0.5 - activeFeature.point.x) * containerSize.width * FOCUS_PAN_STRENGTH,
+        y: (0.5 - activeFeature.point.y) * containerSize.height * FOCUS_PAN_STRENGTH,
+      }
+    : { scale: 1, x: 0, y: 0 }
+
   return (
     <div className="w-full flex flex-col items-center mb-5">
-      <div className="rounded-full px-3 py-1 mb-3 font-mono" style={{ border: `1px solid ${GOLD}66`, color: GOLD, background: '#17140c', fontSize: 9, letterSpacing: '0.16em' }}>{stageLabel}</div>
-      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || (showingSide ? 7 : 5) }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < analyzedCount ? GOLD : `${GOLD}44` }} />)}</div>
+      <div className="rounded-full px-3 py-1 mb-3 font-mono" style={{ border: `1px solid ${NEON_GOLD}88`, color: NEON_GOLD, background: '#17140c', fontSize: 9, letterSpacing: '0.16em', boxShadow: `0 0 12px ${NEON_GOLD}44` }}>{stageLabel}</div>
+      <div className="flex gap-1 mb-4 w-28" aria-hidden="true">{Array.from({ length: features.length || (showingSide ? 7 : 5) }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < analyzedCount ? NEON_GOLD : `${NEON_GOLD}33`, boxShadow: i < analyzedCount ? `0 0 6px ${NEON_GOLD}` : 'none' }} />)}</div>
       <div className="relative mx-auto" style={{ width: 'fit-content', maxWidth: '100%', ...(photo ? {} : { aspectRatio: '2/3', width: '100%' }) }}>
-        <div className="relative rounded-3xl" style={{ background: '#0a0a0a', border: `1px solid ${GOLD}30` }}>
-          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full rounded-3xl" style={{ maxHeight: '75dvh', filter: activeFeature ? 'brightness(.42) saturate(.82)' : 'brightness(.72)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
-          <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.12),transparent 30%,rgba(0,0,0,.28))' }} />
-          {!morphing && sequence.surface === 'intro' && <motion.div className="absolute left-0 right-0 pointer-events-none" style={{ height: 2, background: `linear-gradient(90deg,transparent,${GOLD},transparent)`, boxShadow: `0 0 15px 5px ${GOLD}88` }} initial={{ top: '5%' }} animate={{ top: '95%' }} transition={{ duration: 1.35, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }} />}
+        <motion.div
+          ref={containerRef}
+          className="relative rounded-3xl"
+          style={{ background: '#0a0a0a', border: `1px solid ${NEON_GOLD}40`, overflow: 'hidden', willChange: 'transform' }}
+          animate={focusTransform}
+          transition={{ type: 'spring', stiffness: 90, damping: 20, mass: 0.6 }}
+        >
+          {/* Lighter dim than before (was brightness(.42), then .75/.88) —
+              still not full brightness so the gold UI reads clearly over it. */}
+          {displayPhoto && <motion.img key={showingSide ? 'side' : 'front'} src={displayPhoto} alt="" className="block w-auto h-auto max-w-full rounded-3xl" style={{ maxHeight: '75dvh', filter: activeFeature ? 'brightness(.92) saturate(.97)' : 'brightness(1)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} />}
+          <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,.05),transparent 30%,rgba(0,0,0,.25))' }} />
+          {/* translateY via a measured pixel range, not `top` — top forces a
+              layout recalculation every frame; transform is compositor-only. */}
+          {!morphing && sequence.surface === 'intro' && containerSize.height > 0 && (
+            <motion.div
+              className="absolute left-0 right-0 pointer-events-none"
+              style={{ top: 0, height: 2, background: `linear-gradient(90deg,transparent,${NEON_GOLD},transparent)`, boxShadow: NEON_GLOW, willChange: 'transform' }}
+              initial={{ y: containerSize.height * 0.05 }}
+              animate={{ y: containerSize.height * 0.95 }}
+              transition={{ duration: SWEEP_DURATION_S, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
+            />
+          )}
           {morphing && <MorphWarpOverlay photo={displayPhoto} />}
-          {!morphing && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible', filter: `drop-shadow(0 0 4px ${GOLD}88)` }}>
-            {DEBUG_SCAN_LANDMARKS && debugLandmarks?.map((p, i) => <circle key={i} cx={p.x * 100} cy={p.y * 100} r=".28" fill={GOLD} opacity=".75" />)}
-            {activeFeature && <motion.g key={`highlight-${sequence.surface}-${activeFeature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .24 }}>
-              {activeFeature.regions?.filter(Boolean).map((polygon, i) => <motion.polygon key={i} points={polygon.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill={GOLD} stroke={GOLD} strokeWidth=".5" initial={{ fillOpacity: 0, strokeOpacity: 0 }} animate={{ fillOpacity: [.12, .46, .28], strokeOpacity: [.35, .9, .55] }} transition={{ duration: .8 }} />)}
-              {activeFeature.contour && <motion.polyline points={activeFeature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke={GOLD} strokeWidth=".65" vectorEffect="non-scaling-stroke" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .45 }} />}
+          {!morphing && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible', filter: `drop-shadow(0 0 4px ${NEON_GOLD}99)` }}>
+            <defs>
+              {/* Delicate gradient for line strokes (connector lines, jaw
+                  contour) — the solid flat-yellow fill/stroke read as heavy
+                  and blown-out; a gradient gives the "holographic" look
+                  without raising actual brightness. */}
+              <linearGradient id="goldLineGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#FFD700" />
+                <stop offset="100%" stopColor="#FFC107" />
+              </linearGradient>
+            </defs>
+            {/* Front-face wireframe only — a straight-on mesh sitting over a
+                profile silhouette looked wrong, so this hides entirely during
+                the profile phase rather than just dimming. Lower opacity
+                (.15-.18) and thinner stroke than before so it reads as a
+                refined wireframe, not a dense web. */}
+            {meshPathD && !showingSide && (
+              <motion.path
+                d={meshPathD} fill="none" stroke={LANDMARK_GUIDE} strokeWidth=".5" vectorEffect="non-scaling-stroke"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: sequence.surface === 'intro' ? 0 : 0.17 }}
+                transition={{ duration: .6 }}
+              />
+            )}
+            {DEBUG_SCAN_LANDMARKS && debugLandmarks?.map((p, i) => <circle key={i} cx={p.x * 100} cy={p.y * 100} r=".28" fill={NEON_GOLD} opacity=".75" />)}
+            {/* Region fill is a flat, soft translucent tint (not an animated
+                fill-opacity ramp) with a crisp thin stroke — matches a subtle
+                optical-mesh look instead of a solid glowing wedge. */}
+            {activeFeature && <motion.g key={`highlight-${sequence.surface}-${activeFeature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .28 }}>
+              {activeFeature.regions?.filter(Boolean).map((polygon, i) => <motion.path key={i} d={smoothClosedPath(polygon)} fill="rgba(255,215,0,0.12)" stroke={NEON_GOLD} strokeWidth=".3" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .5, ease: 'easeOut' }} />)}
+              {activeFeature.contour && <motion.polyline points={activeFeature.contour.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} fill="none" stroke="url(#goldLineGrad)" strokeWidth=".35" vectorEffect="non-scaling-stroke" style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: .55, ease: 'easeInOut' }} />}
             </motion.g>}
             {visibleFeatures.map((feature, i) => {
               const current = i === sequence.index
               const x = feature.point.x * 100
               const y = feature.point.y * 100
-              return <motion.g key={`line-${sequence.surface}-${feature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .22 }}>
-                <motion.path d={`M ${x} ${y} L ${feature.badgeX} ${feature.badgeY}`} fill="none" stroke={GOLD} strokeWidth="1.1" vectorEffect="non-scaling-stroke" initial={current ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: .55 }} />
-                <circle cx={x} cy={y} r="1.1" fill="#fff" stroke={GOLD} strokeWidth=".45" vectorEffect="non-scaling-stroke" />
-                <circle cx={x} cy={y} r="2.4" fill="none" stroke={GOLD} strokeOpacity=".35" strokeWidth=".45" vectorEffect="non-scaling-stroke" />
+              return <motion.g key={`line-${sequence.surface}-${feature.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .22 }} style={{ filter: `drop-shadow(0 0 3px ${NEON_GOLD}99)` }}>
+                <motion.path d={`M ${x} ${y} L ${feature.badgeX} ${feature.badgeY}`} fill="none" stroke="url(#goldLineGrad)" strokeWidth=".5" vectorEffect="non-scaling-stroke" initial={current ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: .65, ease: 'easeInOut' }} />
+                <circle cx={x} cy={y} r="1.1" fill="#fff" stroke={NEON_GOLD} strokeWidth=".3" vectorEffect="non-scaling-stroke" />
+                <circle cx={x} cy={y} r="2.4" fill="none" stroke={NEON_GOLD} strokeOpacity=".5" strokeWidth=".3" vectorEffect="non-scaling-stroke" />
               </motion.g>
             })}
           </svg>}
+          {/* Outer wrapper has NO transform of its own — it just pins a
+              zero-size point at (badgeX%, badgeY%). The circle and the label
+              are both absolutely-positioned children of THAT untransformed
+              point, each with their own independent offset. Previously the
+              label lived inside the circle's `translate(-50%,-50%)` wrapper,
+              which made that ~48px transformed box its containing block —
+              so `right:24`/`left:24` resolved against the tiny badge box
+              instead of the real card, truncating text on the right edge.
+              Keeping the label a sibling of (not nested in) any transformed
+              ancestor avoids that containing-block trap entirely. */}
           {!morphing && visibleFeatures.map((feature, i) => {
             const current = i === sequence.index && !sequenceFinished
-            return <motion.div key={`badge-${sequence.surface}-${feature.id}`} className="absolute pointer-events-none" style={{ left: `${feature.badgeX}%`, top: `${feature.badgeY}%`, transform: 'translate(-50%,-50%)' }} initial={{ opacity: 0, scale: .7 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .3, type: 'spring', stiffness: 260, damping: 20 }}>
-              <div className="flex items-center justify-center rounded-full font-body" style={{ width: 48, height: 48, border: `2px solid ${GOLD}`, background: current ? 'rgba(17,15,10,.82)' : GOLD, boxShadow: `0 0 18px ${GOLD}66`, color: current ? '#fff' : '#090909', fontSize: 13, fontWeight: 700 }}>
-                {current ? `${featureProgress}%` : <Check size={27} strokeWidth={2.5} />}
+            const onRight = feature.badgeX > 50
+            return (
+              <div key={`badge-${sequence.surface}-${feature.id}`} className="absolute pointer-events-none" style={{ left: `${feature.badgeX}%`, top: `${feature.badgeY}%`, width: 0, height: 0 }}>
+                <motion.div className="absolute" style={{ transform: 'translate(-50%,-50%)', willChange: 'transform, opacity' }} initial={{ opacity: 0, scale: .7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: current ? .3 : 0, duration: .3, type: 'spring', stiffness: 220, damping: 22 }}>
+                  <div className="flex items-center justify-center rounded-full font-body" style={{ width: 48, height: 48, border: `2px solid ${NEON_GOLD}`, background: current ? 'rgba(17,15,10,.82)' : NEON_GOLD, boxShadow: `0 0 15px ${NEON_GOLD}, 0 0 4px ${NEON_GOLD}`, color: current ? '#fff' : '#090909', fontSize: 13, fontWeight: 700 }}>
+                    {current ? `${featureProgress}%` : <Check size={27} strokeWidth={2.5} />}
+                  </div>
+                </motion.div>
+                <motion.div
+                  className="absolute font-body"
+                  style={{
+                    top: 29, width: 100, maxWidth: '38vw',
+                    ...(onRight ? { right: 24, textAlign: 'right' } : { left: 24, textAlign: 'left' }),
+                    color: '#fff', fontSize: 9, lineHeight: 1.15, fontWeight: 700, textShadow: '0 1px 5px #000',
+                    willChange: 'opacity',
+                  }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: current ? .3 : 0, duration: .3 }}
+                >{feature.label}</motion.div>
               </div>
-              <div className="absolute font-body" style={{ width: 96, left: '50%', top: 53, transform: 'translateX(-50%)', color: '#fff', fontSize: 9, lineHeight: 1.15, fontWeight: 700, textAlign: 'center', textShadow: '0 1px 5px #000' }}>{feature.label}</div>
-            </motion.div>
+            )
           })}
-        </div>
+        </motion.div>
       </div>
     </div>
   )
@@ -2306,8 +2466,16 @@ export default function Scan() {
                       setTimeout(() => {
                         setPreviewPhoto(null)
                         setStep(3)
-                        setTransitioning(false)
-                        setTimeout(() => startAnalysisRef.current?.(), 50)
+                        // Kept on through startAnalysisRef firing (not hidden
+                        // right after setStep(3)) — AnalyzingScreen's own scan
+                        // animation needs real data (photo, points, etc.) to
+                        // look right; dropping the processing cover before
+                        // that data exists showed its bare/incomplete initial
+                        // render for a beat, which read as a choppy stutter.
+                        setTimeout(() => {
+                          startAnalysisRef.current?.()
+                          setTransitioning(false)
+                        }, 50)
                       }, 300)
                     }
                   }}
@@ -2353,8 +2521,12 @@ export default function Scan() {
                     setSidePhoto(url); setError(''); setCameraOpen(false)
                     setTimeout(() => {
                       setStep(3)
-                      setTransitioning(false)
-                      setTimeout(() => startAnalysisRef.current?.(), 50)
+                      // Kept on through startAnalysisRef firing — see the
+                      // matching comment on the other setSidePhoto call site.
+                      setTimeout(() => {
+                        startAnalysisRef.current?.()
+                        setTransitioning(false)
+                      }, 50)
                     }, 300)
                   }
                 }}

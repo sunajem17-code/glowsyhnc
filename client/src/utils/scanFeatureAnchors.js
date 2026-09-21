@@ -9,21 +9,47 @@ const midpoint = (a, b) => valid(a) && valid(b)
   ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
   : null
 
+// Weighted point between a and b (t=0 → a, t=1 → b). Used to place a synthetic
+// "upper cheek" anchor below the eye without needing an unverified landmark
+// index — eyeBottomL sits right on the lower eyelid rim, so a highlight
+// anchored there alone still reads as touching the eye; blending 70% of the
+// way toward the cheekbone point moves it clearly onto the cheek instead.
+const lerp = (a, b, t) => valid(a) && valid(b)
+  ? { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+  : null
+
 const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
 export function frontFeatureAnchors(p) {
   if (!p) return []
+  // Synthetic "upper cheek" anchors, 70% of the way from just-under-the-eye
+  // toward the cheekbone point — eyeBottomL/eyeBottomR alone sit right on
+  // the lower eyelid rim, which still reads as touching the eye. Blending
+  // toward cheekL/cheekR moves the anchor clearly onto the cheek without
+  // guessing at an unverified landmark index.
+  const upperCheekL = lerp(p.eyeBottomL, p.cheekL, 0.7)
+  const upperCheekR = lerp(p.eyeBottomR, p.cheekR, 0.7)
   return available([
-    { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 96, badgeY: 74,
+    { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 90, badgeY: 74,
       regions: [region([p.jawChinL, p.chin, p.jawChinR])] },
-    { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 4, badgeY: 29,
-      regions: [region([p.eyeOuterL, p.eyeInnerL, p.cheekL]), region([p.eyeInnerR, p.eyeOuterR, p.cheekR])] },
-    { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 96, badgeY: 52,
+    // Temple → upper cheek → cheekbone point. Previously used the eye
+    // CORNERS (eyeOuterL/eyeInnerL) as two of the four vertices, which put
+    // those points directly on the eyelid — since the polygon connects its
+    // vertices in order, that drew the highlight straight across the eyes.
+    { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 10, badgeY: 29,
+      regions: [region([p.templeL, upperCheekL, p.cheekL]), region([p.templeR, upperCheekR, p.cheekR])] },
+    { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 90, badgeY: 52,
       contour: region([p.jawL, p.jawMidL, p.jawChinL, p.chin, p.jawChinR, p.jawMidR, p.jawR]) },
-    { id: 'cheek-leanness', label: 'CHEEK LEANNESS & OGEE CURVE', point: p.cheekL, badgeX: 4, badgeY: 61,
-      regions: [region([p.eyeOuterL, p.cheekL, p.jawMidL]), region([p.eyeOuterR, p.cheekR, p.jawMidR])] },
-    { id: 'submental-definition', label: 'SUBMENTAL DEFINITION', point: p.chin, badgeX: 96, badgeY: 28,
+    // Extended down through jawChin (not just jawMid) so the highlighted
+    // region actually spans the cheek-to-jaw transition the "ogee curve"
+    // name refers to, instead of stopping mid-cheek. Starts from eyeBottomL
+    // (below the eyelid) rather than eyeOuterL (the eye corner itself) for
+    // the same reason as cheekbone-prominence above — the eye corner as a
+    // polygon vertex drew the top edge straight across the eye.
+    { id: 'cheek-leanness', label: 'CHEEK LEANNESS & OGEE CURVE', point: p.cheekL, badgeX: 10, badgeY: 61,
+      regions: [region([p.eyeBottomL, p.cheekL, p.jawChinL, p.jawMidL]), region([p.eyeBottomR, p.cheekR, p.jawChinR, p.jawMidR])] },
+    { id: 'submental-definition', label: 'SUBMENTAL DEFINITION', point: p.chin, badgeX: 90, badgeY: 28,
       contour: region([p.jawChinL, p.chin, p.jawChinR]) },
   ])
 }
@@ -31,13 +57,13 @@ export function frontFeatureAnchors(p) {
 export function profileFeatureAnchors(p) {
   if (!p) return []
   return available([
-    { id: 'profile-brow', label: 'BROW', point: p.brow, badgeX: 4, badgeY: 22 },
-    { id: 'profile-eye', label: 'EYE', point: p.eye, badgeX: 96, badgeY: 31 },
-    { id: 'profile-nose-bridge', label: 'NOSE BRIDGE', point: p.noseBridge, badgeX: 4, badgeY: 42 },
-    { id: 'profile-nose-tip', label: 'NOSE TIP', point: p.noseTip, badgeX: 96, badgeY: 48 },
-    { id: 'profile-lips', label: 'LIPS', point: p.lips, badgeX: 4, badgeY: 61 },
-    { id: 'profile-chin', label: 'CHIN', point: p.chin, badgeX: 96, badgeY: 72 },
-    { id: 'profile-jaw', label: 'JAWLINE', point: p.jaw, badgeX: 4, badgeY: 79 },
+    { id: 'profile-brow', label: 'BROW', point: p.brow, badgeX: 10, badgeY: 22 },
+    { id: 'profile-eye', label: 'EYE', point: p.eye, badgeX: 90, badgeY: 31 },
+    { id: 'profile-nose-bridge', label: 'NOSE BRIDGE', point: p.noseBridge, badgeX: 10, badgeY: 42 },
+    { id: 'profile-nose-tip', label: 'NOSE TIP', point: p.noseTip, badgeX: 90, badgeY: 48 },
+    { id: 'profile-lips', label: 'LIPS', point: p.lips, badgeX: 10, badgeY: 61 },
+    { id: 'profile-chin', label: 'CHIN', point: p.chin, badgeX: 90, badgeY: 72 },
+    { id: 'profile-jaw', label: 'JAWLINE', point: p.jaw, badgeX: 10, badgeY: 79 },
   ])
 }
 
