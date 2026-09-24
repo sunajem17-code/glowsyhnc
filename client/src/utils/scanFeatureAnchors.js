@@ -21,17 +21,37 @@ const lerp = (a, b, t) => valid(a) && valid(b)
 const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
+// Envelope of the detected upper-cheek surface points, including the outer
+// face boundary. Interior mesh points must not fold the outline inward.
+const cheekEnvelope = points => {
+  if (!points?.length || !points.every(valid)) return null
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y)
+  const cross = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const half = list => {
+    const hull = []
+    for (const p of list) {
+      while (hull.length > 1 && cross(hull.at(-2), hull.at(-1), p) <= 0) hull.pop()
+      hull.push(p)
+    }
+    return hull.slice(0, -1)
+  }
+  return [...half(sorted), ...half([...sorted].reverse())]
+}
+
 export function frontFeatureAnchors(p) {
   const pt = p || {}
-  const leftUpper = region([pt.templeL, lerp(pt.eyeBottomL, pt.cheekL, 0.7), pt.cheekL])
-  const rightUpper = region([pt.templeR, lerp(pt.eyeBottomR, pt.cheekR, 0.7), pt.cheekR])
-  // Always five stages; missing landmarks are not invented or removed from the count.
+  const leftUpper = cheekEnvelope(pt.malarL)
+  const rightUpper = cheekEnvelope(pt.malarR)
+  // Preserve the requested stage order; missing landmarks are not invented or removed from the count.
   return [
-    { id: 'chin', label: 'Chin Definition', point: pt.chin, contour: region([pt.jawChinL, pt.chin, pt.jawChinR]) },
-    { id: 'cheekbones', label: 'Cheekbone Prominence', point: midpoint(pt.eyeBottomL, pt.cheekL), regions: [leftUpper, rightUpper] },
-    { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: region([pt.jawL, pt.jawMidL, pt.jawChinL, pt.chin, pt.jawChinR, pt.jawMidR, pt.jawR]) },
-    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: midpoint(pt.cheekL, pt.mouthL), regions: [region([pt.cheekL, midpoint(pt.eyeBottomL, pt.cheekL), pt.mouthL, pt.jawChinL, pt.jawMidL]), region([pt.cheekR, midpoint(pt.eyeBottomR, pt.cheekR), pt.mouthR, pt.jawChinR, pt.jawMidR])] },
-    { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: region([pt.jawChinL, pt.chin, pt.jawChinR]) },
+    { id: 'chin', label: 'Chin Definition', point: midpoint(pt.lowerLip, pt.chin), regions: [region([pt.lowerLip, pt.jawChinL, pt.chin, pt.jawChinR])], contour: pt.chinContour },
+    { id: 'cheekbones', label: 'Cheekbone Prominence', point: pt.malarL?.[3], focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
+    { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: pt.jawContour },
+    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: midpoint(pt.cheekL, pt.mouthL), focus: midpoint(midpoint(pt.cheekL, pt.mouthL), midpoint(pt.cheekR, pt.mouthR)), regions: [region([pt.cheekL, lerp(pt.cheekL, pt.mouthL, .35), pt.mouthL, pt.jawChinL, pt.jawMidL]), region([pt.cheekR, lerp(pt.cheekR, pt.mouthR, .35), pt.mouthR, pt.jawChinR, pt.jawMidR])] },
+    { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: pt.chinContour },
+    { id: 'eyes', label: 'Eye Contours', point: midpoint(pt.eyeOuterL, pt.eyeInnerL), focus: midpoint(pt.eyeInnerL, pt.eyeInnerR), regions: [pt.eyeLoopL, pt.eyeLoopR], exact: true },
+    { id: 'eyebrows', label: 'Eyebrow Shape', point: pt.browL, focus: midpoint(pt.browL, pt.browR), regions: [pt.browLoopL, pt.browLoopR], exact: true },
+    { id: 'mandible', label: 'Mandible Contour', point: pt.jawL, focus: midpoint(pt.jawL, pt.jawR), contours: [pt.mandibleL, pt.mandibleR] },
   ]
 }
 

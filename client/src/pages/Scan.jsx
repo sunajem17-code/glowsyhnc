@@ -29,7 +29,7 @@ import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignmen
 import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 import ScanPortrait from '../components/ScanPortrait'
-import { scanFrame, presentationGate } from '../utils/scanPresentation'
+import { scanFrame, presentationGate, SCAN_FEATURES } from '../utils/scanPresentation'
 
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -962,6 +962,19 @@ export function extractScanOverlayPoints(lm) {
     if (!p) return null
     out[key] = { x: p.x, y: p.y }
   }
+  // Ordered MediaPipe surface contours; omit an incomplete loop rather than
+  // inventing a symmetric shape or using an unrelated landmark as a fallback.
+  const loop = ids => ids.every(i => lm[i]) ? ids.map(i => ({ x: lm[i].x, y: lm[i].y })) : null
+  out.jawContour = loop([234,93,132,58,172,136,150,149,176,148,152,377,400,378,379,365,397,288,361,323,454])
+  out.mandibleL = loop([234,93,132,58,172,136,150,149,176,148,152])
+  out.mandibleR = loop([454,323,361,288,397,365,379,378,400,377,152])
+  out.chinContour = loop([149,176,148,152,377,400,378])
+  out.malarL = loop([127,111,117,118,119,120,121,47,100,101,50,205,187,123,234])
+  out.malarR = loop([356,340,346,347,348,349,350,277,329,330,280,425,411,352,454])
+  out.eyeLoopL = loop([33,246,161,160,159,158,157,173,133,155,154,153,145,144,163,7])
+  out.eyeLoopR = loop([263,466,388,387,386,385,384,398,362,382,381,380,374,373,390,249])
+  out.browLoopL = loop([70,63,105,66,107,55,65,52,53,46])
+  out.browLoopR = loop([300,293,334,296,336,285,295,282,283,276])
   return out
 }
 
@@ -1438,10 +1451,10 @@ function AnalyzingSweepOverlay({ photo, points, meshPathD, onPresentationComplet
   }, [ready, previewElapsed])
   const time = previewElapsed ?? elapsed
   const frame = scanFrame(time)
-  const label = frame.compiling ? 'COMPILING RESULTS' : frame.active < 0 ? 'DETECTING STRUCTURE' : `ANALYZING · ${frame.active + 1}/5`
+  const label = frame.compiling ? 'COMPILING RESULTS' : frame.active < 0 ? 'DETECTING STRUCTURE' : `ANALYZING · ${frame.active + 1}/${SCAN_FEATURES.length}`
   return <div className="reference-scan">
     <div className="reference-status" role="status" aria-live="polite">{label}</div>
-    <div className="reference-segments" aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <i key={i} className={frame.active >= i ? 'is-active' : ''} />)}</div>
+    <div className="reference-segments" aria-hidden="true">{Array.from({ length: SCAN_FEATURES.length }, (_, i) => <i key={i} className={frame.active >= i ? 'is-active' : ''} />)}</div>
     <ScanPortrait photo={photo} points={points} meshPathD={meshPathD} elapsed={time} frame={frame} />
     {!ready && <p className="reference-wait">Locating facial landmarks…</p>}
   </div>
@@ -1516,6 +1529,22 @@ function ChecklistRow({ step: s, i, currentStep }) {
 // steps 1 and 2 render their own matching custom header instead (below).
 
 export default function Scan() {
+  const [showScanSource, setShowScanSource] = useState(false)
+  const libraryInputRef = useRef(null)
+  const libraryBusyRef = useRef(false)
+  async function addPhoto() {
+    if (libraryBusyRef.current) return
+    triggerHaptic()
+    if (!isNative()) { libraryInputRef.current?.click(); return }
+    libraryBusyRef.current = true
+    try {
+      const url = await pickPhoto()
+      if (url) setPreviewPhoto({ url, forStep: step, source: 'library' })
+    } catch (err) {
+      if (!/cancel/i.test(err?.message || '')) setError('Could not open your photo. Please try again.')
+    } finally { libraryBusyRef.current = false }
+  }
+
   const presentationRef = useRef(null)
   const scanMountedRef = useRef(true)
   useEffect(() => {
@@ -2036,7 +2065,7 @@ export default function Scan() {
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
 
-      navigate(isPremium ? '/results' : '/unlock', { replace: true })
+      navigate(isPremium ? '/results' : '/unlock', { replace: true, state: { scanCelebration: true } })
     } catch (err) {
       if (presentationRef.current !== presentation) return
       presentation.finish(false)
@@ -2219,7 +2248,7 @@ export default function Scan() {
                 style={{ paddingTop: 14, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}
               >
                 <button
-                  onClick={() => { triggerHaptic(); setPreviewPhoto(null); setCameraOpen(true) }}
+                  onClick={() => { triggerHaptic(); setPreviewPhoto(null); if (previewPhoto.source !== 'library') setCameraOpen(true) }}
                   className="w-full py-4 rounded-2xl font-heading font-bold text-[16px]"
                   style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
                 >
@@ -2439,27 +2468,37 @@ export default function Scan() {
         </div>
       )}
 
+      <input ref={libraryInputRef} type="file" accept="image/*" className="hidden" aria-label="Choose a scan photo" onChange={e => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (file) { setError(''); setPreviewPhoto({ url: URL.createObjectURL(file), forStep: step, source: 'library' }) }
+      }} />
+      <AnimatePresence>
+        {showScanSource && <PhotoActionSheet onClose={() => setShowScanSource(false)} options={[
+          { label: 'Take Photo', icon: Camera, onSelect: async () => {
+            setShowScanSource(false)
+            if (isNative()) {
+              try { await CapacitorCamera.requestPermissions({ permissions: ['camera'] }) } catch {}
+            }
+            setCameraOpen(true)
+          } },
+          { label: 'Add Photo', icon: Upload, onSelect: () => { setShowScanSource(false); addPhoto() } },
+        ]} />}
+      </AnimatePresence>
       {/* CTAs — pinned at bottom, same position/size on every step */}
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
           {(step === 1 || step === 2) && (
+            <>
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={async () => {
-                triggerHaptic()
-                if (isNative()) {
-                  try {
-                    // Triggers the iOS "Allow camera access" system dialog if not yet granted
-                    await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
-                  } catch {}
-                }
-                setCameraOpen(true)
-              }}
+              onClick={() => { triggerHaptic(); setShowScanSource(true) }}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
               style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
             >
               Begin Scan
             </motion.button>
+            </>
           )}
         </div>
       )}

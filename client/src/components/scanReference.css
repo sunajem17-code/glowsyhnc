@@ -57,3 +57,21 @@
 @keyframes definition-reveal{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 @media(max-width:360px){.reference-photo{width:min(calc(100vw - 72px),calc((100dvh - env(safe-area-inset-top,0px) - 138px)*.46058))}.reference-badge-group{width:42px;height:42px}.reference-label{font-size:9px;width:88px}.definition-scroll{padding-left:18px;padding-right:18px}.definition-row{gap:8px}.definition-row-heading{font-size:13px}.definition-face{width:230px;height:230px}.definition-hint{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.reference-pulse{animation:none;opacity:0}.definition-face{animation:none}.reference-photo-clip>img,.definition-track>span{transition:none}}
+
+/* Shared camera surface preserves image/landmark registration during focus. */
+.reference-camera{position:absolute;inset:0;transform-origin:50% 50%;transition:transform 650ms cubic-bezier(.22,1,.36,1);will-change:transform}
+.reference-focus-scrim{transition:opacity 200ms ease-out}
+.reference-region-reveal{animation:reference-region-in 220ms ease-out both}
+.reference-trace{stroke-dasharray:1;stroke-dashoffset:0;animation:reference-trace-in 750ms cubic-bezier(.22,1,.36,1) both}
+.reference-hologram-band{animation:reference-hologram 1800ms linear infinite;will-change:transform}
+.reference-intro-sweep{left:12%;width:76%;top:0;animation:reference-intro 1435ms cubic-bezier(.22,1,.36,1) both;will-change:transform}
+@keyframes reference-region-in{from{opacity:0}to{opacity:1}}
+@keyframes reference-trace-in{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes reference-hologram{from{transform:translateY(0)}to{transform:translateY(130px)}}
+@keyframes reference-intro{from{transform:translateY(80px);opacity:0}15%{opacity:.8}to{transform:translateY(420px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.reference-camera{transform:none!important;transition:none;will-change:auto}.reference-hologram-band,.reference-intro-sweep{display:none}.reference-region-reveal,.reference-trace{animation:none}.reference-focus-scrim{transition:none}}
+
+.scan-celebration{position:fixed;inset:0;z-index:1000;overflow:hidden;pointer-events:none}
+.scan-celebration i{position:absolute;top:-12px;width:5px;height:9px;opacity:0;animation:scan-confetti 1250ms cubic-bezier(.2,.6,.4,1) both;will-change:transform,opacity}
+@keyframes scan-confetti{0%{transform:translate3d(0,0,0) rotate(0);opacity:0}12%{opacity:1}80%{opacity:.85}100%{transform:translate3d(var(--drift),75vh,0) rotate(var(--turn));opacity:0}}
+@media(prefers-reduced-motion:reduce){.scan-celebration{display:none}}

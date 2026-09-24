@@ -1,6 +1,6 @@
-import { useState, useId } from 'react'
+import { memo, useMemo, useState, useId } from 'react'
 import { frontFeatureAnchors } from '../utils/scanFeatureAnchors'
-import { coverTransform, faceCropTransform, projectPoint, SCAN_FEATURES } from '../utils/scanPresentation'
+import { scanCropTransform, faceCropTransform, projectPoint, SCAN_FEATURES } from '../utils/scanPresentation'
 import { GOLD } from '../utils/theme'
 import './scanReference.css'
 
@@ -9,47 +9,87 @@ export function DefinitionIcon({ kind, ...props }) {
   return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d={paths[kind] || paths.chin} /></svg>
 }
 
+const pathPoints = list => list?.map(p => `${p.x * 100},${p.y * 100}`).join(' ')
+const regionPath = (list, exact = false) => {
+  if (exact) return `M ${pathPoints(list)} Z`
+  const mid = (a, b) => `${(a.x + b.x) * 50} ${(a.y + b.y) * 50}`
+  return `M ${mid(list.at(-1), list[0])} ` + list.map((p, i) => `Q ${p.x * 100} ${p.y * 100} ${mid(p, list[(i + 1) % list.length])}`).join(' ') + ' Z'
+}
+
+// The dense wireframe never re-renders for percentage-counter updates.
+const PortraitGeometry = memo(function PortraitGeometry({ features, active, compiling, results, meshPathD, transform, uid }) {
+  const current = features[active]
+  const focused = !results && !compiling && Boolean(current?.point)
+  const regions = current?.regions?.filter(Boolean) || []
+  const focusShape = <>
+    {regions.map((polygon, i) => <path key={i} d={regionPath(polygon, current?.exact)} />)}
+    {current?.contours?.filter(Boolean).map((contour, i) => <polyline key={`c${i}`} points={pathPoints(contour)} fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />)}
+    {current?.contour && <polyline points={pathPoints(current.contour)} fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />}
+  </>
+  return <svg className="reference-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <mask id={`${uid}spot`} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+        <rect width="100" height="100" fill="white" />
+        <g transform={transform} fill="black" color="black">{focusShape}</g>
+      </mask>
+      <mask id={`${uid}region`} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+        <g transform={transform} fill="white" color="white">{focusShape}</g>
+      </mask>
+      <linearGradient id={`${uid}light`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#e0c988" stopOpacity="0" />
+        <stop offset=".8" stopColor="#e0c988" stopOpacity=".06" />
+        <stop offset=".96" stopColor="#fff2c9" stopOpacity=".42" />
+        <stop offset="1" stopColor="#e0c988" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <rect className="reference-focus-scrim" width="100" height="100" fill="black" mask={`url(#${uid}spot)`} style={{ opacity: focused ? .64 : 0 }} />
+    <g transform={transform}>
+      {meshPathD && <path d={meshPathD} fill="none" stroke={results ? '#E6DBC0' : GOLD} strokeWidth=".45" vectorEffect="non-scaling-stroke" opacity={results ? .25 : focused ? .1 : .28} />}
+      {features.map((feature, i) => {
+        if (!feature.point || (!results && (i !== active || compiling))) return null
+        const color = results ? SCAN_FEATURES[i].color : GOLD
+        return <g key={feature.id} className={results ? undefined : 'reference-region-reveal'}>
+          {feature.regions?.filter(Boolean).map((polygon, j) => <path key={j} d={regionPath(polygon, feature.exact)} fill={color} fillOpacity=".09" stroke={color} strokeWidth="1" strokeOpacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace'} />)}
+          {feature.contours?.filter(Boolean).map((contour, j) => <polyline key={`c${j}`} points={pathPoints(contour)} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke" pathLength="1" className="reference-trace" />)}
+          {feature.contour && <polyline points={pathPoints(feature.contour)} fill="none" stroke={color} strokeWidth="1.4" opacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace'} />}
+        </g>
+      })}
+    </g>
+    {focused && <g mask={`url(#${uid}region)`} key={active}>
+      {meshPathD && <path d={meshPathD} transform={transform} fill="none" stroke="#f5e4b5" strokeWidth=".75" vectorEffect="non-scaling-stroke" opacity=".6" />}
+      <rect className="reference-hologram-band" x="0" y="-30" width="100" height="30" fill={`url(#${uid}light)`} />
+    </g>}
+  </svg>
+})
+
 // One registered image/geometry surface shared by processing and the result portrait.
-export default function ScanPortrait({ photo, points, meshPathD, elapsed = 0, frame, results = false, onRegion, regionValues = {} }) {
+export default function ScanPortrait({ photo, points, meshPathD, frame, results = false, onRegion, regionValues = {} }) {
   const [size, setSize] = useState(null)
   const uid = useId().replace(/:/g, '')
-  const t = size ? (results ? faceCropTransform(size.width, size.height, points) : coverTransform(size.width, size.height)) : { sx: 1, sy: 1, tx: 0, ty: 0 }
-  const features = frontFeatureAnchors(points)
+  const t = size ? (results ? faceCropTransform(size.width, size.height, points) : scanCropTransform(size.width, size.height, points)) : { sx: 1, sy: 1, tx: 0, ty: 0 }
+  const features = useMemo(() => frontFeatureAnchors(points), [points])
   const active = frame?.active ?? -1
   const compiling = frame?.compiling ?? false
   const current = features[active]
   const transformed = p => projectPoint(p, t)
-  const pathPoints = list => list?.map(p => `${p.x * 100},${p.y * 100}`).join(' ')
-  const regionPath = list => {
-    const mid = (a, b) => `${(a.x + b.x) * 50} ${(a.y + b.y) * 50}`
-    return `M ${mid(list.at(-1), list[0])} ` + list.map((p, i) => `Q ${p.x * 100} ${p.y * 100} ${mid(p, list[(i + 1) % list.length])}`).join(' ') + ' Z'
-  }
   const transform = `translate(${t.tx} ${t.ty}) scale(${t.sx} ${t.sy})`
+  const focus = transformed(current?.focus || current?.point)
+  const focusing = !results && !compiling && Boolean(focus)
+  const zoom = focusing ? 1.045 : 1
+  const cameraStyle = {
+    transform: `translate3d(${focusing ? (50 - focus.x) * .045 : 0}%,${focusing ? (50 - focus.y) * .045 : 0}%,0) scale(${zoom})`,
+  }
   const resultBadges = [{ x: 90, y: 102 }, { x: 8, y: -1 }, { x: 7, y: 99 }, { x: 92, y: -1 }, { x: 50, y: 116 }]
   return <div className={results ? 'definition-face' : 'reference-photo'}>
+    <div className="reference-camera" style={cameraStyle}>
     <div className="reference-photo-clip">
-      <img src={photo || undefined} alt={results ? 'Your facial analysis' : 'Photo being analyzed'} onLoad={e => setSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} style={{ position: 'absolute', width: `${t.sx * 100}%`, height: `${t.sy * 100}%`, left: `${t.tx}%`, top: `${t.ty}%`, maxWidth: 'none', opacity: size ? 1 : 0, filter: `brightness(${results ? .72 : active < 0 || compiling ? .85 : .43})` }} />
-      {size && <svg className="reference-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <defs><filter id={`${uid}glow`} x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation=".8" /></filter></defs>
-        <g transform={transform}>
-          {meshPathD && <path d={meshPathD} fill="none" stroke={results ? '#E6DBC0' : GOLD} strokeWidth=".32" vectorEffect="non-scaling-stroke" opacity={compiling || results ? .32 : active < 0 ? .32 * Math.min(1, elapsed / 450) : .15} />}
-          {features.map((feature, i) => {
-            if (!feature.point || (!results && i !== active)) return null
-            const color = results ? SCAN_FEATURES[i].color : GOLD
-            return <g key={feature.id}>
-              {feature.regions?.filter(Boolean).map((polygon, j) => <g key={j}>
-                <path d={regionPath(polygon)} fill={color} opacity=".45" filter={`url(#${uid}glow)`} />
-                <path d={regionPath(polygon)} fill={color} fillOpacity=".2" stroke={color} strokeWidth=".5" strokeOpacity=".7" vectorEffect="non-scaling-stroke" />
-              </g>)}
-              {feature.contour && <polyline points={pathPoints(feature.contour)} fill="none" stroke={color} strokeWidth={results ? 1.2 : 2} opacity=".7" vectorEffect="non-scaling-stroke" />}
-            </g>
-          })}
-        </g>
-      </svg>}
-      {!results && active < 0 && points && <div className="reference-sweep" style={{ left: `${Math.max(0, transformed(points.templeL)?.x ?? 15)}%`, width: `${Math.abs((transformed(points.templeR)?.x ?? 85) - (transformed(points.templeL)?.x ?? 15))}%`, top: `${transformed(points.eyeBottomL)?.y + Math.sin(Math.min(1, elapsed / 1435) * Math.PI) * 18}%` }} />}
+      <img src={photo || undefined} alt={results ? 'Your facial analysis' : 'Photo being analyzed'} onLoad={e => setSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} style={{ position: 'absolute', width: `${t.sx * 100}%`, height: `${t.sy * 100}%`, left: `${t.tx}%`, top: `${t.ty}%`, maxWidth: 'none', opacity: size ? 1 : 0, filter: `brightness(${results ? .72 : .92})` }} />
+      {size && <PortraitGeometry features={features} active={active} compiling={compiling} results={results} meshPathD={meshPathD} transform={transform} uid={uid} />}
+      {!results && active < 0 && points && <div className="reference-sweep reference-intro-sweep" />}
+
     </div>
     {size && features.map((feature, i) => {
-      if (!feature.point || (!results && i > active)) return null
+      if (!feature.point || (!results && (i > active || i < active - 2))) return null
       const p = transformed(feature.point)
       const badge = results ? resultBadges[i] : SCAN_FEATURES[i]
       const color = results ? SCAN_FEATURES[i].color : GOLD
@@ -67,6 +107,7 @@ export default function ScanPortrait({ photo, points, meshPathD, elapsed = 0, fr
           </div>}
       </div>
     })}
-    {!results && current?.point && frame.progress < .45 && <div key={active} className="reference-pulse" style={{ left: `${transformed(current.point).x}%`, top: `${transformed(current.point).y}%` }} />}
+    {!results && !compiling && current?.point && frame.progress < .45 && <div key={active} className="reference-pulse" style={{ left: `${transformed(current.point).x}%`, top: `${transformed(current.point).y}%` }} />}
+    </div>
   </div>
 }
