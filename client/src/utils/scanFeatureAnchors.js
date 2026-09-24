@@ -9,15 +9,6 @@ const midpoint = (a, b) => valid(a) && valid(b)
   ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
   : null
 
-// Weighted point between a and b (t=0 → a, t=1 → b). Used to place a synthetic
-// "upper cheek" anchor below the eye without needing an unverified landmark
-// index — eyeBottomL sits right on the lower eyelid rim, so a highlight
-// anchored there alone still reads as touching the eye; blending 70% of the
-// way toward the cheekbone point moves it clearly onto the cheek instead.
-const lerp = (a, b, t) => valid(a) && valid(b)
-  ? { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
-  : null
-
 const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
@@ -47,7 +38,7 @@ export function frontFeatureAnchors(p) {
     { id: 'chin', label: 'Chin Definition', point: midpoint(pt.lowerLip, pt.chin), regions: [region([pt.lowerLip, pt.jawChinL, pt.chin, pt.jawChinR])], contour: pt.chinContour },
     { id: 'cheekbones', label: 'Cheekbone Prominence', point: pt.malarL?.[3], focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
     { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: pt.jawContour },
-    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: midpoint(pt.cheekL, pt.mouthL), focus: midpoint(midpoint(pt.cheekL, pt.mouthL), midpoint(pt.cheekR, pt.mouthR)), regions: [region([pt.cheekL, lerp(pt.cheekL, pt.mouthL, .35), pt.mouthL, pt.jawChinL, pt.jawMidL]), region([pt.cheekR, lerp(pt.cheekR, pt.mouthR, .35), pt.mouthR, pt.jawChinR, pt.jawMidR])] },
+    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: pt.buccalL?.[5], focus: midpoint(pt.buccalL?.[5], pt.buccalR?.[5]), regions: [cheekEnvelope(pt.buccalL), cheekEnvelope(pt.buccalR)], exact: true },
     { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: pt.chinContour },
     { id: 'eyes', label: 'Eye Contours', point: midpoint(pt.eyeOuterL, pt.eyeInnerL), focus: midpoint(pt.eyeInnerL, pt.eyeInnerR), regions: [pt.eyeLoopL, pt.eyeLoopR], exact: true },
     { id: 'eyebrows', label: 'Eyebrow Shape', point: pt.browL, focus: midpoint(pt.browL, pt.browR), regions: [pt.browLoopL, pt.browLoopR], exact: true },

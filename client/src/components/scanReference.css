@@ -1,6 +1,6 @@
 .reference-scan,.definition-results{--scan-accent:#c6a85c;--scan-light:#e0c988;background:#080808;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:400}
 .reference-scan{height:100%;min-height:0;display:flex;align-items:center;flex-direction:column;padding-top:calc(env(safe-area-inset-top,0px) + 8px);overflow:hidden}
-.reference-status{height:42px;display:flex;align-items:center;justify-content:center;gap:8px;background:#c6a85c08;border:1px solid #c6a85c26;border-radius:28px;padding:0 18px;color:var(--scan-light);font-size:11px;letter-spacing:1.7px;white-space:nowrap}
+.reference-status{height:42px;flex-shrink:0;margin-bottom:24px;display:flex;align-items:center;justify-content:center;gap:8px;background:#c6a85c08;border:1px solid #c6a85c26;border-radius:28px;padding:0 18px;color:var(--scan-light);font-size:11px;letter-spacing:1.7px;white-space:nowrap}
 .reference-status:before{content:'';width:6px;height:6px;background:var(--scan-accent);border-radius:50%;box-shadow:0 0 9px #c6a85c60}
 .reference-segments{display:flex;gap:4px;width:130px;height:9px;align-items:center;flex-shrink:0}
 .reference-segments i{height:2px;flex:1;border-radius:2px;background:#c6a85c26;transition:background .15s}
