@@ -11,10 +11,11 @@ export async function requestNotificationPermission() {
   if (!isNative()) return false
   try {
     let perm = await LocalNotifications.checkPermissions()
-    if (perm.display === 'prompt') {
+    if (['prompt', 'prompt-with-rationale'].includes(perm.display)) {
       perm = await LocalNotifications.requestPermissions()
     }
-    return perm.display === 'granted'
+    if (perm.display !== 'granted') return false
+    return await scheduleStreakReminder()
   } catch {
     return false
   }
@@ -37,25 +38,21 @@ export async function scheduleStreakReminder() {
     // Cancel existing streak reminder before rescheduling
     await LocalNotifications.cancel({ notifications: [{ id: STREAK_NOTIF_ID }] })
 
-    // Next 8pm
-    const at = new Date()
-    at.setHours(20, 0, 0, 0)
-    if (at <= new Date()) at.setDate(at.getDate() + 1)
-
     await LocalNotifications.schedule({
       notifications: [
         {
           id: STREAK_NOTIF_ID,
           title: "Don't break your streak 🔥",
           body: "Check in today to keep your progress alive. 30 seconds is all it takes.",
-          schedule: { at, repeats: true, every: 'day' },
+          schedule: { on: { hour: 20, minute: 0 }, repeats: true },
           sound: 'default',
-          smallIcon: 'ic_stat_icon',
         },
       ],
     })
+    return true
   } catch (err) {
     console.warn('[Notifications] streak reminder failed:', err?.message)
+    return false
   }
 }
 
@@ -93,7 +90,6 @@ export async function scheduleRescanNotification(daysUntilReady = 14) {
           body: "It's been 2 weeks. See how much you've improved. Rescan now.",
           schedule: { at },
           sound: 'default',
-          smallIcon: 'ic_stat_icon',
         },
       ],
     })

@@ -1,3 +1,4 @@
+import NotificationPrompt from './components/NotificationPrompt'
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
@@ -188,6 +189,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <UpdatePrompt />
+      <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
       <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
       <AnimatePresence mode="wait">
         <Routes>
