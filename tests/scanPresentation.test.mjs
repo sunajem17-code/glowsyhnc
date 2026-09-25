@@ -5,14 +5,14 @@ import { scanFrame, SCAN_STARTS, COMPILE_AT, PRESENTATION_END, presentationGate,
 import { frontFeatureAnchors } from '../client/src/utils/scanFeatureAnchors.js'
 const { shapeDefinitionAnalysis } = createRequire(import.meta.url)('../server/src/lib/definitionAnalysis.js')
 
-test('all observed boundaries advance once, preserving the eight-stage order', () => {
+test('all observed boundaries advance once, preserving the five-stage order', () => {
  assert.equal(scanFrame(0).active,-1)
  SCAN_STARTS.forEach((start,i)=> {assert.equal(scanFrame(start-.01).active,i-1);assert.equal(scanFrame(start).active,i)})
  assert.equal(scanFrame(COMPILE_AT-.01).compiling,false)
  assert.equal(scanFrame(COMPILE_AT).compiling,true)
  assert.equal(scanFrame(PRESENTATION_END-.01).complete,false)
  assert.equal(scanFrame(PRESENTATION_END).complete,true)
- assert.equal(scanFrame(120000).active,7)
+ assert.equal(scanFrame(120000).active,4)
 })
 test('a fast backend must wait for presentation; completion and cancellation settle once', async () => {
  const gate=presentationGate();let navigated=false
@@ -21,8 +21,8 @@ test('a fast backend must wait for presentation; completion and cancellation set
  gate.finish();gate.finish(false);await ready;assert.equal(navigated,true)
  const cancelled=presentationGate();cancelled.finish(false);cancelled.finish();assert.equal(await cancelled.promise,false)
 })
-test('missing landmarks preserve eight stages without fabricated face anchors',()=>{
- const features=frontFeatureAnchors(null);assert.equal(features.length,8);assert.ok(features.every(f=>!f.point))
+test('missing landmarks preserve five stages without fabricated face anchors',()=>{
+ const features=frontFeatureAnchors(null);assert.equal(features.length,5);assert.ok(features.every(f=>!f.point))
  assert.deepEqual(features.map(f=>f.label),SCAN_FEATURES.map(f=>f.label))
 })
 test('cover transform aligns source center and handles portrait/landscape crops',()=>{
@@ -42,16 +42,6 @@ test('definition ratings fail closed for malformed or incomplete model output',(
  assert.equal(shapeDefinitionAnalysis(null).overallScore,null)
 })
 
-test('eye and eyebrow stages preserve detected contours and missing contours stay absent',()=>{
- const eye=[{x:.2,y:.3},{x:.3,y:.28},{x:.4,y:.3},{x:.3,y:.32}]
- const brow=[{x:.2,y:.2},{x:.3,y:.18},{x:.4,y:.2}]
- const features=frontFeatureAnchors({eyeLoopL:eye,browLoopL:brow})
- assert.deepEqual(features.find(f=>f.id==='eyes').regions[0],eye)
- assert.deepEqual(features.find(f=>f.id==='eyebrows').regions[0],brow)
- assert.equal(features.find(f=>f.id==='eyes').regions[1],undefined)
- assert.equal(features.find(f=>f.id==='eyebrows').exact,true)
-})
-
 test('scan framing keeps the complete jaw visible across image aspect ratios',()=>{
  const points={forehead:{x:.5,y:.2},jawContour:[{x:.2,y:.4},{x:.35,y:.7},{x:.5,y:.8},{x:.65,y:.7},{x:.8,y:.4}]}
  for (const [w,h] of [[1000,1400],[1920,1080],[1000,1000]]) {
@@ -68,5 +58,21 @@ test('jaw and malar overlays retain supplied detected surface points',()=>{
  const features=frontFeatureAnchors({jawContour:jaw,malarL:malar,mandibleL:jaw})
  assert.deepEqual(features.find(f=>f.id==='jaw').contour,jaw)
  assert.deepEqual(features.find(f=>f.id==='cheekbones').regions[0],malar)
- assert.deepEqual(features.find(f=>f.id==='mandible').contours[0],jaw)
 })
+
+test('reference recording contains exactly five stages and a 14.4 second presentation',()=>{
+ assert.deepEqual(SCAN_FEATURES.map(f=>f.id),['chin','cheekbones','jaw','eyebrows','submental'])
+ assert.equal(PRESENTATION_END,14400)
+ for(let i=0;i<SCAN_STARTS.length;i++) {
+  assert.equal(scanFrame(SCAN_STARTS[i]).progress,0)
+  assert.equal(scanFrame(SCAN_STARTS[i]+1200).progress,1)
+ }
+})
+
+ test('eyebrow stage highlights detected brow loops instead of cheeks', () => {
+ const p = { browL: {x:.3,y:.3}, browLoopL:[{x:.2,y:.3},{x:.3,y:.25},{x:.4,y:.3}], browLoopR:[{x:.6,y:.3},{x:.7,y:.25},{x:.8,y:.3}] }
+ const feature = frontFeatureAnchors(p)[3]
+ assert.equal(feature.id, 'eyebrows')
+ assert.equal(feature.point, p.browL)
+ assert.deepEqual(feature.regions, [p.browLoopL,p.browLoopR])
+ })

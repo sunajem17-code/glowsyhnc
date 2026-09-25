@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src",
-    "remotion": "remotion studio src/remotion/index.ts"
+    "remotion": "remotion studio src/remotion/index.ts",
+    "postinstall": "bash scripts/fix-ios-packages.sh"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",

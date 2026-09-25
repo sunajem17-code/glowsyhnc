@@ -1,3 +1,4 @@
+import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
@@ -1642,10 +1643,9 @@ export default function Scan() {
       })
       .catch(err => {
         console.warn('[Scan] Front landmark mapping unavailable:', err?.message)
-        return null
+        return { points: null, error: err }
       })
-    frontLandmarksRef.current = { url, promise }
-    return promise
+    return cacheLandmarkResult(frontLandmarksRef, url, promise)
   }
 
   // Countdown → auto-retry
@@ -1741,7 +1741,14 @@ export default function Scan() {
     }
 
     validatedFrontRef.current = url
-    ensureFrontLandmarks(url) // start mapping during side capture, before processing mounts
+    const mapping = await ensureFrontLandmarks(url)
+    if (!scanMountedRef.current) return
+    if (!mapping?.points) {
+      setError(frontLandmarkError(mapping).message)
+      setStep(1)
+      setTransitioning(false)
+      return
+    }
     console.log('[ASCENDUS SCAN] 9. Starting facial analysis')
     setStep(2)
     setTransitioning(false)
@@ -1805,7 +1812,7 @@ export default function Scan() {
     try {
       const landmarks = await frontLandmarksPromise
       if (presentationRef.current !== presentation) return
-      if (!landmarks?.points) throw new Error('We could not locate your face. Please use a clear front-facing photo and retry.')
+      if (!landmarks?.points) throw frontLandmarkError(landmarks)
       const faceB64    = await toBase64(facePhoto)
       if (faceB64) setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
@@ -2072,6 +2079,11 @@ export default function Scan() {
       if (presentationRef.current !== presentation) return
       presentation.finish(false)
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
+      if (err.code === 'front_landmarks_failed') {
+        setError(err.message)
+        setStep(1)
+        return
+      }
       if (err.message === 'hourly_cap_reached' || err.errorCode === 'hourly_cap_reached') {
         setScanCapPlan(err.plan || 'free')
         setScanCapReached(true)
@@ -2237,16 +2249,17 @@ export default function Scan() {
               key={`preview-${step}`}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-50 flex flex-col"
+              className="fixed inset-0 z-50 flex items-center justify-center"
               style={{ background: '#000' }}
             >
-              {/* Photo fills all space above the buttons */}
+              <div className="flex flex-col overflow-hidden" style={{ width: 'min(100vw, 56.25dvh)', height: 'min(100dvh, 177.7778vw)', aspectRatio: '9 / 16', background: '#080808' }}>
+              {/* Keep the complete photo inside the portrait confirmation panel. */}
               <div className="flex-1 min-h-0 overflow-hidden">
-                <img src={previewPhoto.url} alt="Your photo" className="w-full h-full object-cover" />
+                <img src={previewPhoto.url} alt="Your photo" className="w-full h-full object-contain" />
               </div>
               {/* Both buttons pinned at the bottom */}
               <div
-                className="flex-shrink-0 flex flex-col gap-3 px-5"
+                className="flex-shrink-0 flex flex-col gap-3"
                 style={{ paddingTop: 14, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}
               >
                 <button
@@ -2287,6 +2300,7 @@ export default function Scan() {
                 >
                   Continue
                 </motion.button>
+              </div>
               </div>
             </motion.div>
           )}
@@ -2453,7 +2467,7 @@ export default function Scan() {
               <button onClick={() => setError('')} className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100"><X size={14} className="text-warning" /></button>
             </div>
             <button
-              onClick={() => { setError(''); startAnalysisRef.current?.() }}
+              onClick={() => { setError(''); if (step === 1) { setFacePhoto(null); setCameraOpen(true) } else startAnalysisRef.current?.() }}
               className="w-full text-sm font-heading font-bold py-2 rounded-xl active:opacity-70 transition-opacity"
               style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
               Try Again

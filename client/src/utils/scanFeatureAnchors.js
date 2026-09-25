@@ -38,11 +38,9 @@ export function frontFeatureAnchors(p) {
     { id: 'chin', label: 'Chin Definition', point: midpoint(pt.lowerLip, pt.chin), regions: [region([pt.lowerLip, pt.jawChinL, pt.chin, pt.jawChinR])], contour: pt.chinContour },
     { id: 'cheekbones', label: 'Cheekbone Prominence', point: pt.malarL?.[3], focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
     { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: pt.jawContour },
-    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: pt.buccalL?.[5], focus: midpoint(pt.buccalL?.[5], pt.buccalR?.[5]), regions: [cheekEnvelope(pt.buccalL), cheekEnvelope(pt.buccalR)], exact: true },
+    { id: 'eyebrows', label: 'Eyebrows', point: pt.browL, regions: [pt.browLoopL, pt.browLoopR], exact: true },
     { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: pt.chinContour },
-    { id: 'eyes', label: 'Eye Contours', point: midpoint(pt.eyeOuterL, pt.eyeInnerL), focus: midpoint(pt.eyeInnerL, pt.eyeInnerR), regions: [pt.eyeLoopL, pt.eyeLoopR], exact: true },
-    { id: 'eyebrows', label: 'Eyebrow Shape', point: pt.browL, focus: midpoint(pt.browL, pt.browR), regions: [pt.browLoopL, pt.browLoopR], exact: true },
-    { id: 'mandible', label: 'Mandible Contour', point: pt.jawL, focus: midpoint(pt.jawL, pt.jawR), contours: [pt.mandibleL, pt.mandibleR] },
+
   ]
 }
 

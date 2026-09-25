@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useId } from 'react'
 import { frontFeatureAnchors } from '../utils/scanFeatureAnchors'
-import { scanCropTransform, faceCropTransform, projectPoint, SCAN_FEATURES } from '../utils/scanPresentation'
+import { coverTransform, faceCropTransform, projectPoint, SCAN_FEATURES } from '../utils/scanPresentation'
 import { GOLD } from '../utils/theme'
 import './scanReference.css'
 
@@ -42,14 +42,14 @@ const PortraitGeometry = memo(function PortraitGeometry({ features, active, comp
         <stop offset="1" stopColor="#e0c988" stopOpacity="0" />
       </linearGradient>
     </defs>
-    <rect className="reference-focus-scrim" width="100" height="100" fill="black" mask={`url(#${uid}spot)`} style={{ opacity: focused ? .64 : 0 }} />
+    <rect className="reference-focus-scrim" width="100" height="100" fill="black" mask={`url(#${uid}spot)`} style={{ opacity: focused ? .46 : 0 }} />
     <g transform={transform}>
-      {meshPathD && <path d={meshPathD} fill="none" stroke={results ? '#E6DBC0' : GOLD} strokeWidth=".45" vectorEffect="non-scaling-stroke" opacity={results ? .25 : focused ? .1 : .28} />}
+      {meshPathD && <path d={meshPathD} fill="none" stroke={results ? '#E6DBC0' : '#e0c988'} strokeWidth=".45" vectorEffect="non-scaling-stroke" opacity={results ? .25 : .32} />}
       {features.map((feature, i) => {
         if (!feature.point || (!results && (i !== active || compiling))) return null
         const color = results ? SCAN_FEATURES[i].color : GOLD
         return <g key={feature.id} className={results ? undefined : 'reference-region-reveal'}>
-          {feature.regions?.filter(Boolean).map((polygon, j) => <path key={j} d={regionPath(polygon, feature.exact)} fill={color} fillOpacity=".09" stroke={color} strokeWidth="1" strokeOpacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace'} />)}
+          {feature.regions?.filter(Boolean).map((polygon, j) => <path key={j} d={regionPath(polygon, feature.exact)} fill={color} fillOpacity={results ? .15 : .42} stroke={color} strokeWidth="1" strokeOpacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace reference-lit-region'} />)}
           {feature.contours?.filter(Boolean).map((contour, j) => <polyline key={`c${j}`} points={pathPoints(contour)} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke" pathLength="1" className="reference-trace" />)}
           {feature.contour && <polyline points={pathPoints(feature.contour)} fill="none" stroke={color} strokeWidth="1.4" opacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace'} />}
         </g>
@@ -66,22 +66,16 @@ const PortraitGeometry = memo(function PortraitGeometry({ features, active, comp
 export default function ScanPortrait({ photo, points, meshPathD, frame, results = false, onRegion, regionValues = {} }) {
   const [size, setSize] = useState(null)
   const uid = useId().replace(/:/g, '')
-  const t = size ? (results ? faceCropTransform(size.width, size.height, points) : scanCropTransform(size.width, size.height, points)) : { sx: 1, sy: 1, tx: 0, ty: 0 }
+  const t = size ? (results ? faceCropTransform(size.width, size.height, points) : coverTransform(size.width, size.height)) : { sx: 1, sy: 1, tx: 0, ty: 0 }
   const features = useMemo(() => frontFeatureAnchors(points), [points])
   const active = frame?.active ?? -1
   const compiling = frame?.compiling ?? false
   const current = features[active]
   const transformed = p => projectPoint(p, t)
   const transform = `translate(${t.tx} ${t.ty}) scale(${t.sx} ${t.sy})`
-  const focus = transformed(current?.focus || current?.point)
-  const focusing = !results && !compiling && Boolean(focus)
-  const zoom = focusing ? 1.045 : 1
-  const cameraStyle = {
-    transform: `translate3d(${focusing ? (50 - focus.x) * .045 : 0}%,${focusing ? (50 - focus.y) * .045 : 0}%,0) scale(${zoom})`,
-  }
   const resultBadges = [{ x: 90, y: 102 }, { x: 8, y: -1 }, { x: 7, y: 99 }, { x: 92, y: -1 }, { x: 50, y: 116 }]
   return <div className={results ? 'definition-face' : 'reference-photo'}>
-    <div className="reference-camera" style={cameraStyle}>
+    <div className="reference-camera">
     <div className="reference-photo-clip">
       <img src={photo || undefined} alt={results ? 'Your facial analysis' : 'Photo being analyzed'} onLoad={e => setSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} style={{ position: 'absolute', width: `${t.sx * 100}%`, height: `${t.sy * 100}%`, left: `${t.tx}%`, top: `${t.ty}%`, maxWidth: 'none', opacity: size ? 1 : 0, filter: `brightness(${results ? .72 : .92})` }} />
       {size && <PortraitGeometry features={features} active={active} compiling={compiling} results={results} meshPathD={meshPathD} transform={transform} uid={uid} />}
@@ -89,7 +83,7 @@ export default function ScanPortrait({ photo, points, meshPathD, frame, results 
 
     </div>
     {size && features.map((feature, i) => {
-      if (!feature.point || (!results && (i > active || i < active - 2))) return null
+      if (!feature.point || (!results && i > active)) return null
       const p = transformed(feature.point)
       const badge = results ? resultBadges[i] : SCAN_FEATURES[i]
       const color = results ? SCAN_FEATURES[i].color : GOLD
@@ -103,7 +97,7 @@ export default function ScanPortrait({ photo, points, meshPathD, frame, results 
         {results ? <button className="definition-region" style={{ left: `${badge.x}%`, top: `${badge.y}%` }} onClick={() => onRegion?.(feature.id)} aria-label={`${feature.label}: unlock score`}><DefinitionIcon kind={SCAN_FEATURES[i].icon} width="14" height="14" /><span aria-hidden="true" className="definition-blur">{regionValues[feature.id] ?? '—'}</span></button>
           : <div className="reference-badge-group" style={{ left: `${badge.x}%`, top: `${badge.y}%` }}>
             <div className={`reference-badge ${done ? 'is-complete' : ''}`} aria-hidden="true">{done ? <svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : `${percent}%`}</div>
-            <span className="reference-label">{feature.id === 'submental' ? <>Submental<br />Definition</> : feature.id === 'cheekbones' ? <>Cheekbone<br />Prominence</> : feature.id === 'cheeks' ? <>Cheek Leanness &amp;<br />Ogee Curve</> : feature.label}</span>
+            <span className="reference-label">{feature.id === 'submental' ? <>Submental<br />Definition</> : feature.id === 'cheekbones' ? <>Cheekbone<br />Prominence</> : feature.label}</span>
           </div>}
       </div>
     })}

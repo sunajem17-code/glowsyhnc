@@ -1,16 +1,14 @@
 // Movie timestamps, measured in presentation order. The recording starts mid-sweep.
-export const SCAN_STARTS = [1435, 3636.667, 6138.333, 8640, 11141.667, 13630, 15830, 18030]
-export const COMPILE_AT = 20230
-export const PRESENTATION_END = 21130
+export const SCAN_STARTS = [1435, 3636.667, 6138.333, 8640, 11141.667]
+export const COMPILE_AT = 13343.333
+export const PRESENTATION_END = 14400
 export const SCAN_FEATURES = [
   { id: 'chin', label: 'Chin Definition', x: 95, y: 74, color: '#E0C988', icon: 'chin' },
   { id: 'cheekbones', label: 'Cheekbone Prominence', x: 5, y: 30, color: '#D4B96A', icon: 'cheekbones' },
   { id: 'jaw', label: 'Jaw Definition', x: 95, y: 52, color: '#C6A85C', icon: 'jaw' },
-  { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', x: 5, y: 62, color: '#B99A50', icon: 'cheeks' },
+  { id: 'eyebrows', label: 'Eyebrows', x: 5, y: 46, color: '#B99A50', icon: 'eyebrows' },
   { id: 'submental', label: 'Submental Definition', x: 95, y: 30, color: '#A8893A', icon: 'submental' },
-  { id: 'eyes', label: 'Eye Contours', x: 5, y: 43, color: '#E0C988', icon: 'eyes' },
-  { id: 'eyebrows', label: 'Eyebrow Shape', x: 50, y: 12, color: '#D4B96A', icon: 'brows' },
-  { id: 'mandible', label: 'Mandible Contour', x: 5, y: 84, color: '#C6A85C', icon: 'jaw' },
+
 ]
 export function scanFrame(elapsed) {
   const active = SCAN_STARTS.findLastIndex(t => elapsed >= t)

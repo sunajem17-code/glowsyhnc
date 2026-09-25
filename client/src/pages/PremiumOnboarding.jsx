@@ -1,3 +1,4 @@
+import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
 import { presentationGate } from '../utils/scanPresentation'
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -2385,10 +2386,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       })
       .catch(err => {
         console.warn('[PremiumOnboarding] Front landmark mapping unavailable:', err?.message)
-        return null
+        return { points: null, error: err }
       })
-    frontLandmarksRef.current = { url, promise }
-    return promise
+    return cacheLandmarkResult(frontLandmarksRef, url, promise)
   }
   // Countdown → auto-retry with the same photos
   useEffect(() => {
@@ -2458,7 +2458,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     try {
       const landmarks = await frontLandmarksPromise
       if (presentationRef.current !== presentation) return
-      if (!landmarks?.points) throw new Error('We could not locate your face. Please use a clear front-facing photo and retry.')
+      if (!landmarks?.points) throw frontLandmarkError(landmarks)
       const faceB64 = await toBase64(face)
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
@@ -2589,7 +2589,8 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setQuotaExhausted(false)
         setRateLimited(false)
         setError(err.message || 'Something went wrong, please try again.')
-        setPhase('retry_error')
+        if (err.code === 'front_landmarks_failed') { setFacePhoto(null); setPhase('face') }
+        else setPhase('retry_error')
       }
     }
   }
@@ -2714,7 +2715,12 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
               setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo.')
               return
             }
-            ensureFrontLandmarks(facePhoto)
+            const mapping = await ensureFrontLandmarks(facePhoto)
+            if (!mapping?.points) {
+              setError(frontLandmarkError(mapping).message)
+              setFacePhoto(null)
+              return
+            }
             setPhase('side'); setError('')
           } catch { setError('Could not check the photo. Please try again.') }
         }
