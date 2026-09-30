@@ -1,12 +1,12 @@
 // Movie timestamps, measured in presentation order. The recording starts mid-sweep.
-export const SCAN_STARTS = [1435, 3636.667, 6138.333, 8640, 11141.667]
+export const SCAN_STARTS = [1300, 3400, 5700, 8200, 10700]
 export const COMPILE_AT = 13343.333
 export const PRESENTATION_END = 14400
 export const SCAN_FEATURES = [
   { id: 'chin', label: 'Chin Definition', x: 95, y: 74, color: '#E0C988', icon: 'chin' },
   { id: 'cheekbones', label: 'Cheekbone Prominence', x: 5, y: 30, color: '#D4B96A', icon: 'cheekbones' },
   { id: 'jaw', label: 'Jaw Definition', x: 95, y: 52, color: '#C6A85C', icon: 'jaw' },
-  { id: 'eyebrows', label: 'Eyebrows', x: 5, y: 46, color: '#B99A50', icon: 'eyebrows' },
+  { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', x: 5, y: 62, color: '#B99A50', icon: 'cheeks' },
   { id: 'submental', label: 'Submental Definition', x: 95, y: 30, color: '#A8893A', icon: 'submental' },
 
 ]
@@ -53,4 +53,10 @@ export function scanCropTransform(width, height, points) {
   if (!Number.isFinite(scale)) return coverTransform(width,height)
   const sx = width*scale/333, sy = height*scale/723
   return {sx,sy,tx:50-(minX+maxX)/2*sx*100,ty:50-(minY+maxY)/2*sy*100}
+}
+
+// A monolithic analysis response must be ready before any metric is checked.
+export function advanceScanClock(elapsed, delta, analysisReady) {
+  const next = elapsed + Math.max(0, delta)
+  return analysisReady ? Math.min(PRESENTATION_END, next) : Math.min(SCAN_STARTS[0] + 850, next)
 }

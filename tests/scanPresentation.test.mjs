@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { scanFrame, SCAN_STARTS, COMPILE_AT, PRESENTATION_END, presentationGate, coverTransform, projectPoint, scanCropTransform, SCAN_FEATURES } from '../client/src/utils/scanPresentation.js'
+import { advanceScanClock, scanFrame, SCAN_STARTS, COMPILE_AT, PRESENTATION_END, presentationGate, coverTransform, projectPoint, scanCropTransform, SCAN_FEATURES } from '../client/src/utils/scanPresentation.js'
 import { frontFeatureAnchors } from '../client/src/utils/scanFeatureAnchors.js'
 const { shapeDefinitionAnalysis } = createRequire(import.meta.url)('../server/src/lib/definitionAnalysis.js')
 
@@ -61,7 +61,7 @@ test('jaw and malar overlays retain supplied detected surface points',()=>{
 })
 
 test('reference recording contains exactly five stages and a 14.4 second presentation',()=>{
- assert.deepEqual(SCAN_FEATURES.map(f=>f.id),['chin','cheekbones','jaw','eyebrows','submental'])
+ assert.deepEqual(SCAN_FEATURES.map(f=>f.id),['chin','cheekbones','jaw','cheeks','submental'])
  assert.equal(PRESENTATION_END,14400)
  for(let i=0;i<SCAN_STARTS.length;i++) {
   assert.equal(scanFrame(SCAN_STARTS[i]).progress,0)
@@ -69,10 +69,20 @@ test('reference recording contains exactly five stages and a 14.4 second present
  }
 })
 
- test('eyebrow stage highlights detected brow loops instead of cheeks', () => {
- const p = { browL: {x:.3,y:.3}, browLoopL:[{x:.2,y:.3},{x:.3,y:.25},{x:.4,y:.3}], browLoopR:[{x:.6,y:.3},{x:.7,y:.25},{x:.8,y:.3}] }
- const feature = frontFeatureAnchors(p)[3]
- assert.equal(feature.id, 'eyebrows')
- assert.equal(feature.point, p.browL)
- assert.deepEqual(feature.regions, [p.browLoopL,p.browLoopR])
- })
+test('cheek stage uses the detected cheek points and chin stays unfilled', () => {
+ const cheek=[{x:.2,y:.4},{x:.3,y:.45},{x:.25,y:.6}]
+ const features=frontFeatureAnchors({buccalL:cheek,buccalR:cheek})
+ assert.equal(features[3].id,'cheeks')
+ assert.equal(features[3].point,cheek[2])
+ assert.ok(features[3].regions[0].every(p=>cheek.includes(p)))
+ assert.deepEqual(features[0].regions,[])
+})
+
+test('slow analysis cannot check a metric or finish on elapsed time alone', () => {
+ const held=advanceScanClock(0,60000,false)
+ assert.equal(scanFrame(held).active,0)
+ assert.ok(scanFrame(held).progress<1)
+ assert.equal(scanFrame(held).complete,false)
+ assert.equal(advanceScanClock(held,500,false),held)
+ assert.equal(advanceScanClock(held,60000,true),PRESENTATION_END)
+})

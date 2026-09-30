@@ -30,7 +30,7 @@ import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignmen
 import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 import ScanPortrait from '../components/ScanPortrait'
-import { scanFrame, presentationGate, SCAN_FEATURES } from '../utils/scanPresentation'
+import { scanFrame, advanceScanClock, presentationGate, SCAN_FEATURES } from '../utils/scanPresentation'
 
 
 // ─── Step 0: Gender Selector ─────────────────────────────────────────────────
@@ -970,10 +970,10 @@ export function extractScanOverlayPoints(lm) {
   out.mandibleL = loop([234,93,132,58,172,136,150,149,176,148,152])
   out.mandibleR = loop([454,323,361,288,397,365,379,378,400,377,152])
   out.chinContour = loop([149,176,148,152,377,400,378])
-  out.malarL = loop([127,111,117,118,119,120,121,47,100,101,50,205,187,123,234])
-  out.malarR = loop([356,340,346,347,348,349,350,277,329,330,280,425,411,352,454])
-  out.buccalL = loop([123,117,118,50,101,205,206,207,192,147,93,234])
-  out.buccalR = loop([352,346,347,280,330,425,426,427,416,376,323,454])
+  out.malarL = loop([234,117,118,119,100,50,123])
+  out.malarR = loop([454,346,347,348,329,280,352])
+  out.buccalL = loop([234,123,50,205,207,147,93])
+  out.buccalR = loop([454,352,280,425,427,376,323])
   out.eyeLoopL = loop([33,246,161,160,159,158,157,173,133,155,154,153,145,144,163,7])
   out.eyeLoopR = loop([263,466,388,387,386,385,384,398,362,382,381,380,374,373,390,249])
   out.browLoopL = loop([70,63,105,66,107,55,65,52,53,46])
@@ -1434,17 +1434,22 @@ function FaceMeshScanOverlay({ pathD }) {
 // The presentation clock starts once landmarks are ready. Image URL upgrades
 // and late mesh updates never reset it; real-result completion waits on its gate.
 // ScanPortrait applies the same source-to-cover transform to photo and geometry.
-function AnalyzingSweepOverlay({ photo, points, meshPathD, onPresentationComplete, previewElapsed }) {
+function AnalyzingSweepOverlay({ photo, points, meshPathD, onPresentationComplete, previewElapsed, scanResult }) {
   const [elapsed, setElapsed] = useState(0)
   const finishRef = useRef(onPresentationComplete)
   finishRef.current = onPresentationComplete
   const ready = Boolean(points)
+  const analysisReadyRef = useRef(false)
+  analysisReadyRef.current = Boolean(scanResult)
   useEffect(() => {
     if (!ready || previewElapsed != null) return
-    const start = performance.now()
+    let previous = performance.now()
+    let clock = 0
     let id
     const tick = now => {
-      const next = now - start
+      const next = advanceScanClock(clock, now - previous, analysisReadyRef.current)
+      previous = now
+      clock = next
       setElapsed(next)
       if (scanFrame(next).complete) finishRef.current?.()
       else id = requestAnimationFrame(tick)
@@ -1479,8 +1484,8 @@ function buildDiagnosticLines(scanResult) {
   ]
 }
 
-export function AnalyzingScreen({ photo, points = null, meshPathD = null, onPresentationComplete, previewElapsed }) {
-  return <AnalyzingSweepOverlay photo={photo} points={points} meshPathD={meshPathD} onPresentationComplete={onPresentationComplete} previewElapsed={previewElapsed} />
+export function AnalyzingScreen({ photo, points = null, meshPathD = null, onPresentationComplete, previewElapsed, scanResult }) {
+  return <AnalyzingSweepOverlay scanResult={scanResult} photo={photo} points={points} meshPathD={meshPathD} onPresentationComplete={onPresentationComplete} previewElapsed={previewElapsed} />
 }
 
 function ChecklistRow({ step: s, i, currentStep }) {
@@ -1755,7 +1760,11 @@ export default function Scan() {
   }
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
+  const analysisBusyRef = useRef(false)
   async function startAnalysis(skipSideOverride = false) {
+    if (analysisBusyRef.current) return
+    analysisBusyRef.current = true
+    try {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
     let qualityGate = { passed: true, state: 'SUCCESS', source: 'prior_capture_gate' }
@@ -1918,6 +1927,7 @@ export default function Scan() {
         }
       }
 
+      setAnalysisResult(aiResult)
       if (!aiResult.analysisEvidence) aiResult.analysisEvidence = analysisEvidence
       if (!aiResult.scoreClassification) aiResult.scoreClassification = {
         overall: 'legacy_subjective_visual_assessment',
@@ -2130,6 +2140,7 @@ export default function Scan() {
       setSlowAnalysis(false)
       setMorphing(false)
     }
+    } finally { analysisBusyRef.current = false }
   }
 
   startAnalysisRef.current = startAnalysis

@@ -1,3 +1,4 @@
+import { SCAN_FEATURES } from '../utils/scanPresentation'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
@@ -470,6 +471,18 @@ export default function Results() {
     const upgrade = () => navigate('/premium')
     return (
       <div className="px-4 pb-6">
+        <section className="mt-4 mb-4 rounded-2xl border border-[#C6A85C]/25 p-4" aria-label="Facial definition analysis">
+          <h2 className="font-bold text-lg text-primary">Facial definition</h2>
+          <p className="text-xs text-secondary mt-1 mb-3">Visual assessments, not clinical measurements.</p>
+          {SCAN_FEATURES.map(feature => {
+            const metric = aiScore?.definitionAnalysis?.metrics?.[feature.id]
+            const available = Number.isFinite(metric?.score)
+            return <div key={feature.id} className="py-3 border-t border-[#C6A85C]/15">
+              <div className="flex justify-between gap-4 text-sm"><span>{feature.label}</span><span style={{color:'#C6A85C'}}>{available ? (isPremium ? `${metric.score.toFixed(1)}/10` : 'Locked') : 'Unavailable'}</span></div>
+              {available && isPremium && metric.descriptor && <p className="text-xs text-secondary mt-1">{metric.descriptor}</p>}
+            </div>
+          })}
+        </section>
         {/* Scan type badge */}
         <div className="flex justify-center pt-4 mb-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-heading font-bold text-[10px] uppercase tracking-wide"

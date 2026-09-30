@@ -42,7 +42,7 @@ const PortraitGeometry = memo(function PortraitGeometry({ features, active, comp
         <stop offset="1" stopColor="#e0c988" stopOpacity="0" />
       </linearGradient>
     </defs>
-    <rect className="reference-focus-scrim" width="100" height="100" fill="black" mask={`url(#${uid}spot)`} style={{ opacity: focused ? .46 : 0 }} />
+    <rect className="reference-focus-scrim" width="100" height="100" fill="black" mask={`url(#${uid}spot)`} style={{ opacity: results ? 0 : focused ? .52 : .3 }} />
     <g transform={transform}>
       {meshPathD && <path d={meshPathD} fill="none" stroke={results ? '#E6DBC0' : '#e0c988'} strokeWidth=".45" vectorEffect="non-scaling-stroke" opacity={results ? .25 : .32} />}
       {features.map((feature, i) => {
@@ -51,7 +51,7 @@ const PortraitGeometry = memo(function PortraitGeometry({ features, active, comp
         return <g key={feature.id} className={results ? undefined : 'reference-region-reveal'}>
           {feature.regions?.filter(Boolean).map((polygon, j) => <path key={j} d={regionPath(polygon, feature.exact)} fill={color} fillOpacity={results ? .15 : .42} stroke={color} strokeWidth="1" strokeOpacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace reference-lit-region'} />)}
           {feature.contours?.filter(Boolean).map((contour, j) => <polyline key={`c${j}`} points={pathPoints(contour)} fill="none" stroke={color} strokeWidth="1.4" vectorEffect="non-scaling-stroke" pathLength="1" className="reference-trace" />)}
-          {feature.contour && <polyline points={pathPoints(feature.contour)} fill="none" stroke={color} strokeWidth="1.4" opacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace'} />}
+          {feature.contour && <polyline points={pathPoints(feature.contour)} fill="none" stroke={results ? color : '#fff1c5'} strokeWidth="2" opacity=".9" vectorEffect="non-scaling-stroke" pathLength="1" className={results ? undefined : 'reference-trace reference-contour-glow'} />}
         </g>
       })}
     </g>
@@ -91,13 +91,14 @@ export default function ScanPortrait({ photo, points, meshPathD, frame, results 
       const percent = Math.min(99, Math.round((frame?.progress || 0) * 100))
       return <div key={feature.id} className="reference-callout" style={{ '--region-color': color }}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path d={`M ${p.x} ${p.y} L ${badge.x} ${badge.y}`} stroke={color} strokeWidth="1" opacity=".8" vectorEffect="non-scaling-stroke" />
-          <ellipse cx={p.x} cy={p.y} rx={results ? 1.3 : .9} ry={results ? 1.3 : .9 * 333 / 723} fill={results ? color : '#fff'} />
+          <path d={`M ${p.x} ${p.y} L ${badge.x} ${badge.y}`} stroke={color} strokeWidth="2" opacity=".9" vectorEffect="non-scaling-stroke" />
+          {!results && <ellipse cx={p.x} cy={p.y} rx="4" ry={4 * 333 / 723} fill="none" stroke={color} strokeOpacity=".45" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+          <ellipse cx={p.x} cy={p.y} rx={results ? 1.3 : 1.3} ry={results ? 1.3 : 1.3 * 333 / 723} fill={results ? color : '#fff'} />
         </svg>
         {results ? <button className="definition-region" style={{ left: `${badge.x}%`, top: `${badge.y}%` }} onClick={() => onRegion?.(feature.id)} aria-label={`${feature.label}: unlock score`}><DefinitionIcon kind={SCAN_FEATURES[i].icon} width="14" height="14" /><span aria-hidden="true" className="definition-blur">{regionValues[feature.id] ?? '—'}</span></button>
           : <div className="reference-badge-group" style={{ left: `${badge.x}%`, top: `${badge.y}%` }}>
             <div className={`reference-badge ${done ? 'is-complete' : ''}`} aria-hidden="true">{done ? <svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : `${percent}%`}</div>
-            <span className="reference-label">{feature.id === 'submental' ? <>Submental<br />Definition</> : feature.id === 'cheekbones' ? <>Cheekbone<br />Prominence</> : feature.label}</span>
+            <span className="reference-label">{feature.id === 'submental' ? <>Submental<br />Definition</> : feature.id === 'cheeks' ? <>Cheek Leanness &amp;<br />Ogee Curve</> : feature.id === 'cheekbones' ? <>Cheekbone<br />Prominence</> : feature.label}</span>
           </div>}
       </div>
     })}

@@ -1,0 +1,11 @@
+.onboarding-word {
+  display: inline-block;
+  animation: onboarding-word-reveal 480ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes onboarding-word-reveal {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-word { animation: none; }
+}

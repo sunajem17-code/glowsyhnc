@@ -1,3 +1,4 @@
+import './onboardingMotion.css'
 import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
 import { presentationGate } from '../utils/scanPresentation'
@@ -1385,93 +1386,28 @@ const HALO_LINES = [
   "Make every second count",
 ]
 
+function SmoothOnboardingText({ text, delay = 0 }) {
+  return <span aria-label={text}>
+    {text.split('\n').map((line, lineIndex) => <span key={lineIndex} style={{ display: 'block' }} aria-hidden="true">
+      {line.split(' ').map((word, wordIndex) => <span key={wordIndex} className="onboarding-word" style={{ animationDelay: `${delay + (lineIndex * 6 + wordIndex) * 0.055}s` }}>{word}{'\u00a0'}</span>)}
+    </span>)}
+  </span>
+}
+
 function HaloTypewriter({ start }) {
   const [lineIdx, setLineIdx] = useState(0)
-  const [displayed, setDisplayed] = useState('')
-  const [done, setDone] = useState(false)
-  const idx = useRef(0)
-
   useEffect(() => {
     if (!start) return
-    idx.current = 0
-    setDisplayed('')
-    setDone(false)
     setLineIdx(0)
-  }, [start])
-
-  useEffect(() => {
-    if (!start) return
     triggerPageHaptic()
-  }, [start, lineIdx])
-
-  useEffect(() => {
-    if (!start) return
-    const text = HALO_LINES[lineIdx]
-    idx.current = 0
-    setDisplayed('')
-    setDone(false)
-    const id = setInterval(() => {
-      if (idx.current < text.length) {
-        setDisplayed(text.slice(0, idx.current + 1))
-        idx.current++
-      } else {
-        clearInterval(id)
-        if (lineIdx === 0) {
-          setTimeout(() => {
-            setDisplayed('')
-            setTimeout(() => setLineIdx(1), 300)
-          }, 1200)
-        } else {
-          setDone(true)
-        }
-      }
-    }, 28)
-    return () => clearInterval(id)
-  }, [start, lineIdx])
-
-  const cursor = start && !done ? (
-    <motion.span
-      animate={{ opacity: [1, 0] }}
-      transition={{ duration: 0.5, repeat: Infinity }}
-      style={{ color: '#C6A85C', marginLeft: 1 }}
-    >|</motion.span>
-  ) : null
-  const displayLines = displayed.split('\n')
-  return (
-    <span style={{ whiteSpace: 'pre-line' }}>
-      {displayLines.map((line, i) => (
-        <span key={i}>
-          {line}
-          {i === displayLines.length - 1 ? cursor : '\n'}
-        </span>
-      ))}
-    </span>
-  )
+    const timer = setTimeout(() => { setLineIdx(1); triggerPageHaptic() }, 3200)
+    return () => clearTimeout(timer)
+  }, [start])
+  return start ? <SmoothOnboardingText key={lineIdx} text={HALO_LINES[lineIdx]} /> : null
 }
 
 function HaloSubTypewriter({ start }) {
-  const text = 'What impression are you making?'
-  const [displayed, setDisplayed] = useState('')
-  const idx = useRef(0)
-
-  useEffect(() => {
-    if (!start) return
-    // delay until main typewriter is roughly done (~2 lines × chars × 28ms + pauses ≈ 3.5s)
-    const delay = setTimeout(() => {
-      triggerPageHaptic()
-      idx.current = 0
-      setDisplayed('')
-      const id = setInterval(() => {
-        idx.current++
-        setDisplayed(text.slice(0, idx.current))
-        if (idx.current >= text.length) clearInterval(id)
-      }, 24)
-      return () => clearInterval(id)
-    }, 200)
-    return () => clearTimeout(delay)
-  }, [start])
-
-  return <span>{displayed}</span>
+  return start ? <SmoothOnboardingText text="What impression are you making?" delay={0.2} /> : null
 }
 
 function StepHaloEffect({ onNext, onBack }) {
@@ -1613,23 +1549,6 @@ function StepWhyAppearance({ onNext, onBack }) {
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
 // ── STEP: Cinematic Closer ────────────────────────────────────────────────────
-function useTypewriter(text, speed = 38) {
-  const [displayed, setDisplayed] = useState('')
-  useEffect(() => {
-    setDisplayed('')
-    if (!text) return
-    let i = 0
-    const iv = setInterval(() => {
-      i++
-      setDisplayed(text.slice(0, i))
-      triggerHaptic()
-      if (i >= text.length) clearInterval(iv)
-    }, speed)
-    return () => clearInterval(iv)
-  }, [text, speed])
-  return displayed
-}
-
 function StepCinematic({ onNext }) {
   const lines = [
     { text: 'Looks shape how the world sees you', gold: false },
@@ -1640,7 +1559,6 @@ function StepCinematic({ onNext }) {
   ]
   const [lineIdx, setLineIdx] = useState(0)
   const [leaving, setLeaving] = useState(false)
-  const displayed = useTypewriter(lines[lineIdx]?.text, 55)
 
   useEffect(() => {
     // Light tap as each new line starts — skip lineIdx 0 on mount (feels like a jolt on open)
@@ -1702,7 +1620,7 @@ function StepCinematic({ onNext }) {
               : '0 0 20px rgba(198,168,92,0.25)',
           }}
         >
-          {displayed}
+          <SmoothOnboardingText text={lines[lineIdx].text} />
         </motion.p>
       </AnimatePresence>
     </motion.div>
@@ -2433,7 +2351,11 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     return Promise.race([convert, timeout])
   }
 
+  const analysisBusyRef = useRef(false)
   async function runAnalysisWithData(face, side) {
+    if (analysisBusyRef.current) return
+    analysisBusyRef.current = true
+    try {
     presentationRef.current?.finish(false)
     const presentation = presentationGate()
     presentationRef.current = presentation
@@ -2593,6 +2515,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         else setPhase('retry_error')
       }
     }
+    } finally { analysisBusyRef.current = false }
   }
 
   if (phase === 'retry_error') {

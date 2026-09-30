@@ -81,3 +81,18 @@
 .reference-badge.is-complete{box-shadow:0 0 20px #c6a85c50}
 .reference-photo{max-height:calc(100% - 68px)}
 .reference-scan .reference-camera{transition:none;will-change:auto}
+
+/* Measurements from the supplied five-stage reference. */
+.reference-badge-group{width:56px;height:56px}
+.reference-badge{font-size:17px}
+.reference-badge>svg{width:30px;height:30px}
+.reference-label{width:120px;font-weight:500}
+.reference-segments{width:142px;height:3px;margin-bottom:2px}
+.reference-segments i{height:3px}
+.reference-contour-glow{filter:drop-shadow(0 0 1px #fff6df) drop-shadow(0 0 3px #e0c988)}
+
+.reference-photo{container-type:inline-size}
+.reference-photo .reference-badge-group{width:16.8cqw;height:16.8cqw}
+.reference-photo .reference-badge{font-size:5.1cqw}
+.reference-photo .reference-badge>svg{width:9cqw;height:9cqw}
+.reference-photo .reference-label{font-size:3.3cqw;width:36cqw}

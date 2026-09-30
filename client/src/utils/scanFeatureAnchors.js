@@ -35,10 +35,10 @@ export function frontFeatureAnchors(p) {
   const rightUpper = cheekEnvelope(pt.malarR)
   // Preserve the requested stage order; missing landmarks are not invented or removed from the count.
   return [
-    { id: 'chin', label: 'Chin Definition', point: midpoint(pt.lowerLip, pt.chin), regions: [region([pt.lowerLip, pt.jawChinL, pt.chin, pt.jawChinR])], contour: pt.chinContour },
-    { id: 'cheekbones', label: 'Cheekbone Prominence', point: pt.malarL?.[3], focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
+    { id: 'chin', label: 'Chin Definition', point: pt.chin, regions: [] },
+    { id: 'cheekbones', label: 'Cheekbone Prominence', point: midpoint(pt.malarL?.[0], pt.malarL?.[1]), focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
     { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: pt.jawContour },
-    { id: 'eyebrows', label: 'Eyebrows', point: pt.browL, regions: [pt.browLoopL, pt.browLoopR], exact: true },
+    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: pt.buccalL?.[2], regions: [cheekEnvelope(pt.buccalL), cheekEnvelope(pt.buccalR)], exact: true },
     { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: pt.chinContour },
 
   ]
