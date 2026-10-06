@@ -41,18 +41,21 @@ export function faceCropTransform(width, height, points) {
   return { sx: width / side, sy: height / side, tx: 50 - cx * width / side * 100, ty: 50 - cy * height / side * 100 }
 }
 
-// Preserve the complete detected face rather than cropping lateral jaw/cheek
-// points out of the narrow scan viewport. Photo and overlay share this mapping.
+// Match the reference's face occupancy, not the uploaded image's crop. A single
+// aspect-preserving mapping registers the image, mesh, regions and anchors.
 export function scanCropTransform(width, height, points) {
-  if (!points?.jawContour?.length || !points?.forehead) return coverTransform(width, height)
+  if (!(width > 0 && height > 0) || !points?.jawContour?.length || !points?.forehead) return coverTransform(width, height)
   const bounds = [...points.jawContour, points.forehead]
+  if (bounds.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return coverTransform(width, height)
   const xs = bounds.map(p => p.x), ys = bounds.map(p => p.y)
   const minX = Math.min(...xs), maxX = Math.max(...xs)
   const minY = Math.min(...ys), maxY = Math.max(...ys)
-  const scale = Math.min(333 * .82 / ((maxX-minX)*width), 723 * .76 / ((maxY-minY)*height))
-  if (!Number.isFinite(scale)) return coverTransform(width,height)
+  if (maxX <= minX || maxY <= minY) return coverTransform(width, height)
+  // Reference forehead-to-chin occupies ~30% of the portrait height, with
+  // the face centered below the midpoint and room above for completed badges.
+  const scale = Math.min(333 * .64 / ((maxX-minX)*width), 723 * .30 / ((maxY-minY)*height))
   const sx = width*scale/333, sy = height*scale/723
-  return {sx,sy,tx:50-(minX+maxX)/2*sx*100,ty:50-(minY+maxY)/2*sy*100}
+  return {sx,sy,tx:50-(minX+maxX)/2*sx*100,ty:55-(minY+maxY)/2*sy*100}
 }
 
 // A monolithic analysis response must be ready before any metric is checked.

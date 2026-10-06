@@ -94,3 +94,27 @@ export function profilePointsFromMesh(lm) {
     jaw: closestToNose(point(172), point(397)),
   }
 }
+
+// Decorative scan regions are registered to measured landmarks. Their shapes
+// reproduce the reference's wedge and tapered-cheek overlays, not new scores.
+export function referenceScanFeatures(points) {
+  const features = frontFeatureAnchors(points)
+  if (!points) return features
+  const mix = (a, b, t) => valid(a) && valid(b) ? {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t} : null
+  const wedge = side => {
+    const outer=points[`eyeOuter${side}`], inner=points[`eyeInner${side}`]
+    const cheek=points[`cheek${side}`], jaw=points[`jaw${side}`]
+    return region([mix(outer,cheek,.42),mix(inner,points.chin,.08),mix(inner,points.chin,.17),mix(cheek,jaw,.25)])
+  }
+  const cheek = side => {
+    const edge=points[`cheek${side}`], jaw=points[`jaw${side}`], mid=points[`jawMid${side}`]
+    const nose=points.nose, mouth=points[`mouth${side}`]
+    return region([mix(edge,nose,.05),mix(edge,nose,.30),mix(edge,mouth,.55),mix(mid,jaw,.12),mix(edge,jaw,.65)])
+  }
+  const wedges=[wedge('L'),wedge('R')], cheeks=[cheek('L'),cheek('R')]
+  features[0]={...features[0],halo:true}
+  features[1]={...features[1],regions:wedges.every(Boolean)?wedges:features[1].regions}
+  features[2]={...features[2],contours:[points.mandibleL?.slice(3,8),points.mandibleR?.slice(3,8)],contour:null}
+  features[3]={...features[3],regions:cheeks.every(Boolean)?cheeks:features[3].regions}
+  return features
+}

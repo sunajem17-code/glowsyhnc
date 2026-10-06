@@ -86,3 +86,17 @@ test('slow analysis cannot check a metric or finish on elapsed time alone', () =
  assert.equal(advanceScanClock(held,500,false),held)
  assert.equal(advanceScanClock(held,60000,true),PRESENTATION_END)
 })
+
+
+test('scan framing normalizes face size and position without distorting the image',()=>{
+ const points={forehead:{x:.5,y:.2},jawContour:[{x:.2,y:.4},{x:.5,y:.8},{x:.8,y:.4}]}
+ for(const [w,h] of [[1000,1400],[1920,1080],[1000,1000]]) {
+  const t=scanCropTransform(w,h,points)
+  const top=projectPoint(points.forehead,t), chin=projectPoint(points.jawContour[1],t)
+  assert.ok(Math.abs((top.y+chin.y)/2-55)<1e-9)
+  assert.ok(chin.y-top.y<=30+1e-9)
+  assert.ok(Math.abs(t.sx/t.sy-w/h/(333/723))<1e-9)
+ }
+ const degenerate={forehead:{x:.5,y:.5},jawContour:[{x:.5,y:.5}]}
+ assert.deepEqual(scanCropTransform(1000,1000,degenerate),coverTransform(1000,1000))
+})
