@@ -175,6 +175,9 @@ export function getLandmarks(imageUrl) {
 
 async function detectLandmarks(imageUrl) {
   const mesh = await initFaceMesh()
+  // Each request is an independent still photo, not the next video frame.
+  // Discard the prior face ROI before locating this photo's face boundary.
+  await mesh.reset()
 
   return new Promise((resolve, reject) => {
     // First real scan: WASM already loaded, should be fast (~500ms)

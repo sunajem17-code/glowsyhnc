@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
-import { isNative, purchasePro, purchaseDiscountedAnnual } from '../utils/iap'
+import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
@@ -9,12 +9,12 @@ import {
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import { AnnualDiscountOfferModal } from '../components/OnboardingFinalSteps'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
+import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
@@ -704,6 +704,19 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
   }, [isPremium])
 
   const facePhoto = scan?.facePhotoUrl ?? null
+  const [photoReady, setPhotoReady] = useState(false)
+  useEffect(() => {
+    if (!facePhoto) { setPhotoReady(false); return undefined }
+    let active = true
+    const probe = new Image()
+    const ready = () => { if (active) setPhotoReady(true) }
+    probe.onload = ready
+    probe.onerror = () => { if (active) setPhotoReady(false) }
+    probe.src = facePhoto
+    if (probe.complete && probe.naturalWidth > 0) ready()
+    probe.decode?.().then(ready).catch(() => {})
+    return () => { active = false }
+  }, [facePhoto])
   const cards = [
     ...(isPremium ? [{ id: 'percentile', el: <CardPercentile scan={scan} /> }] : []),
     { id: 'score', el: <Card1Score scan={scan} isPremium={isPremium} /> },
@@ -1245,7 +1258,7 @@ function SocialProofTicker() {
   )
 }
 
-function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
+function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
   const containerRef = useRef(null)
@@ -1254,10 +1267,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
 
   // Exit-intent discount offer state
   const [showDiscount, setShowDiscount]       = useState(false)
-  const [discountLoading, setDiscountLoading] = useState(false)
   const [discountError, setDiscountError]     = useState('')
-  const setIsPremium = useStore(s => s.setIsPremium)
-  const updateUser   = useStore(s => s.updateUser)
 
   // Pull real scan count from server — no hardcoded numbers
   useEffect(() => {
@@ -1286,6 +1296,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
   // X button → show discount first; decline → actually close the paywall.
   // Shown every time (no "already seen" gate) — same policy as StepScoresWaiting.
   function handleCloseAttempt() {
+    if (isPurchasing) return
     triggerHaptic()
     setDiscountError('')
     setShowDiscount(true)
@@ -1297,35 +1308,10 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
     onClose()   // actually exit the paywall
   }
 
-  async function handleClaimDiscount() {
-    triggerHaptic()
-    if (!isNative()) {
-      setDiscountError('This offer is only available in the app right now.')
-      return
-    }
-    setDiscountLoading(true)
-    setDiscountError('')
-    try {
-      const result = await purchaseDiscountedAnnual()
-      if (result?.success) {
-        const rcUserId = result.customerInfo?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
-        setIsPremium(true)
-        updateUser?.({ isPremium: true })
-        setShowDiscount(false)
-        onClose()
-        return
-      }
-      if (result?.reason === 'not_configured') {
-        setDiscountError("This offer isn't set up yet. Please try again shortly.")
-      } else if (result?.reason !== 'cancelled') {
-        setDiscountError('Unable to complete purchase. Please try again.')
-      }
-    } catch {
-      setDiscountError('Unable to complete purchase. Please try again.')
-    } finally {
-      setDiscountLoading(false)
-    }
+  async function handleClaimDiscount(result) {
+    await api.payments.syncRc(result.customerInfo?.originalAppUserId)
+    setShowDiscount(false)
+    onUnlock()
   }
 
   // Dynamic score gap — only shown if we have a real computed score
@@ -1430,14 +1416,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
       </div>
 
       <AnimatePresence>
-        {showDiscount && (
-          <AnnualDiscountOfferModal
-            onClaim={handleClaimDiscount}
-            onDecline={handleDeclineDiscount}
-            loading={discountLoading}
-            error={discountError}
-          />
-        )}
+        {showDiscount && <FreeTrialOfferModal onClaim={handleClaimDiscount} onDecline={handleDeclineDiscount} loading={isPurchasing} error={discountError} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -1525,6 +1504,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
 function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, isPurchasing, error }) {
   const navigate = useNavigate()
+  const [photoReady, setPhotoReady] = useState(false)
   const facePhoto = scan?.facePhotoUrl ?? null
   const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
   const fd = scan?.faceData ?? {}
@@ -1542,16 +1522,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
   ]
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <div className="flex flex-col items-center px-5 pb-10"
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-
-        {/* Close button */}
-        <div className="w-full flex justify-end mb-3">
-          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="flex items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
-          </button>
-        </div>
 
         {/* Header */}
         <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
@@ -1565,9 +1538,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
         <div className="relative w-full" style={{ marginTop: 102 }}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
-            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
+            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
               {facePhoto
-                ? <img src={facePhoto} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
+                ? <img src={facePhoto} alt="" loading="eager" decoding="async" onLoad={() => setPhotoReady(true)} className="w-full h-full object-cover" style={{ filter: 'brightness(1)', opacity: photoReady ? 1 : 0, transition: 'opacity .16s ease-out' }} />
                 : null}
             </div>
           </div>
@@ -1606,19 +1579,19 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export default function ScanUnlockGate() {
+export default function ScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
-  const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const { currentScan, pendingFacePhoto, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
-  const [showPaywall, setShowPaywall]       = useState(searchParams.get('paywall') === '1')
+  const [showPaywall, setShowPaywall]       = useState(directPaywall || searchParams.get('paywall') === '1')
   const [showPromo, setShowPromo]           = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
   const justUnlockedRef = useRef(false)
@@ -1626,16 +1599,18 @@ export default function ScanUnlockGate() {
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  const displayedScan = pendingScan ? null : currentScan
+  const revealScan = currentScan ? { ...currentScan, facePhotoUrl: currentScan.facePhotoUrl || pendingFacePhoto } : currentScan
   // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
   // for why isPurchasing alone can't prevent a true double-tap.
   const purchaseLockRef = useRef(false)
 
   useEffect(() => {
-    if (isPremium && !justUnlockedRef.current) navigate('/results', { replace: true })
-  }, [isPremium])
+    if (isPremium && !pendingScan && (directPaywall || embeddedReveal || !justUnlockedRef.current)) navigate('/results', { replace: true })
+  }, [isPremium, pendingScan, directPaywall, embeddedReveal])
 
   useEffect(() => {
-    if (!currentScan && searchParams.get('paywall') !== '1') navigate('/scan', { replace: true })
+    if (!currentScan && !directPaywall && !embeddedReveal && searchParams.get('paywall') !== '1') navigate('/scan', { replace: true })
   }, [currentScan])
 
   useEffect(() => {
@@ -1648,9 +1623,10 @@ export default function ScanUnlockGate() {
   // When arriving from paywall=1 (e.g. daily check-in tap), show the paywall
   // even without a scan. Without this guard, the component returns null and the
   // paywall sheet—already set to open via useState—never renders.
-  const isPaywallRedirect = searchParams.get('paywall') === '1'
-  if (!currentScan && !isPaywallRedirect) return null
+  const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
+  if (!currentScan && !isPaywallRedirect && !embeddedReveal) return null
 
+  if (isPremium && pendingScan) return <div role="status" className="fixed inset-0 z-[10001] bg-black text-white flex items-center justify-center">Finishing your ratings…</div>
   if (isPremium && !justUnlocked) return null
 
   function handleUnlockSuccess() {
@@ -1662,6 +1638,7 @@ export default function ScanUnlockGate() {
     setIsPremium(true)
     updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
+
 
   async function handleAscend() {
     if (purchaseLockRef.current) return
@@ -1675,7 +1652,7 @@ export default function ScanUnlockGate() {
         const result = await purchasePro(plan)
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
-          api.payments.syncRc(rcUserId).catch(() => {})
+          await api.payments.syncRc(rcUserId)
           handleUnlockSuccess()
           setIsPurchasing(false)
           purchaseLockRef.current = false
@@ -1712,7 +1689,7 @@ export default function ScanUnlockGate() {
     <MotionPage
       baseClassName=""
       className="fixed inset-0 z-50 overflow-hidden dark"
-      style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
+      style={{ background: BG, ...((directPaywall || embeddedReveal) ? { zIndex: 10002 } : {}), '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
       {(isPremium || justUnlocked) ? (
         <SwipeableResultCards
@@ -1724,9 +1701,9 @@ export default function ScanUnlockGate() {
           error={purchaseError}
           isPremium={isPremium}
         />
-      ) : currentScan && !isPaywallRedirect ? (
+      ) : (currentScan || embeddedReveal) && !isPaywallRedirect ? (
         <LockedRevealScreen
-          scan={currentScan}
+          scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || pendingFacePhoto } : revealScan}
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
@@ -1744,9 +1721,10 @@ export default function ScanUnlockGate() {
       <AnimatePresence>
         {showPaywall && !isPremium && (
           <ProPaywall
-            scan={currentScan}
-            onClose={() => searchParams.get('paywall') === '1' ? navigate(-1) : setShowPaywall(false)}
+            scan={pendingScan ? null : currentScan}
+            onClose={() => navigate('/', { replace: true })}
             onPurchase={handleAscend}
+            onUnlock={handleUnlockSuccess}
             isPurchasing={isPurchasing}
           />
         )}

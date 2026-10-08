@@ -101,7 +101,7 @@ export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout,
+    user, isGuest, isPremium, logout, setIsPremium,
     theme, toggleTheme,
     units, setUnits,
     clearAllScanData,

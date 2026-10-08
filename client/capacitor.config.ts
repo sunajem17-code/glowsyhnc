@@ -10,7 +10,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 // To go back to a normal build: `npx cap sync ios` with no env var set,
 // then one more Xcode rebuild — this must NEVER ship in a real build.
 const liveReload = process.env.LIVE_RELOAD === '1'
-const liveReloadHost = process.env.LIVE_RELOAD_HOST || '10.0.0.122'
+const liveReloadHost = process.env.LIVE_RELOAD_HOST || '10.103.66.52'
 
 const config: CapacitorConfig = {
   appId: 'com.ascendus.app',

@@ -4,7 +4,8 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { isNative, purchaseDiscountedAnnual } from '../utils/iap'
+import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { trialRenewalText } from '../utils/scanTrial'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
@@ -235,7 +236,7 @@ function OverallCard({ scan }) {
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
-// ── Exit-intent: annual-discount offer ──────────────────────────────────────
+// ── Exit-intent: seven-day free trial, preserving the original offer shell ──
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
 // is deliberately no "only show once, skip straight through afterward" path.
 // An earlier version gated this behind a persisted flag so only the first-
@@ -245,15 +246,43 @@ function OverallCard({ scan }) {
 // gold-bordered card) for visual consistency with the other overlay already
 // used on this exact screen.
 //
-// Wired to the real com.ascendus.app.yearly.discount product via
-// purchaseDiscountedAnnual() (utils/iap.js), which searches every RevenueCat
-// offering for a package whose underlying store product matches that ID —
-// purchasePro() alone can't reach it since that only resolves the standard
-// monthly/annual slots. If RevenueCat doesn't have the product attached to
-// any offering yet, purchaseDiscountedAnnual() resolves reason:'not_configured'
-// and handleClaimOffer below shows that as a real, honest "not available yet"
-// message instead of pretending the purchase happened.
-export function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
+// Apple eligibility and the store product determine availability and renewal
+// terms. Never fall back to a paid discount under free-trial wording.
+export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
+  const [trial, setTrial] = useState(null)
+  const [checking, setChecking] = useState(true)
+  const [purchasing, setPurchasing] = useState(false)
+  const [trialError, setTrialError] = useState('')
+  const purchaseLock = useRef(false)
+  const completedPurchase = useRef(null)
+  const busy = loading || purchasing
+  useEffect(() => {
+    let active = true
+    getEligibleScanTrial().then(pkg => { if (active) setTrial(pkg) })
+      .catch(() => { if (active) setTrialError('Unable to check trial eligibility. Please try again later.') })
+      .finally(() => { if (active) setChecking(false) })
+    return () => { active = false }
+  }, [])
+  async function startTrial() {
+    if (!trial || purchaseLock.current || loading) return
+    purchaseLock.current = true
+    setPurchasing(true)
+    setTrialError('')
+    try {
+      const result = completedPurchase.current || await purchaseScanTrial(trial.product.identifier)
+      if (result?.success) {
+        completedPurchase.current = result
+        await onClaim(result)
+      } else if (result?.reason !== 'cancelled') {
+        setTrialError('Your trial could not be activated. Please try again.')
+      }
+    } catch (err) {
+      setTrialError(err?.message || 'Unable to start your trial. Please try again.')
+    } finally {
+      purchaseLock.current = false
+      setPurchasing(false)
+    }
+  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -262,7 +291,7 @@ export function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, 
       transition={{ duration: 0.18 }}
       className="fixed inset-0 z-[80] flex items-center justify-center px-6"
       style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onDecline() }}
+      onClick={(e) => { if (!busy && e.target === e.currentTarget) onDecline() }}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.94, y: 12 }}
@@ -279,6 +308,7 @@ export function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, 
         <div className="flex justify-end mb-1">
           <button
             onClick={onDecline}
+            disabled={busy}
             className="w-7 h-7 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
             style={{ background: 'rgba(255,255,255,0.07)' }}
             aria-label="Close"
@@ -291,41 +321,40 @@ export function AnnualDiscountOfferModal({ onClaim, onDecline, loading = false, 
           className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Tag size={26} style={{ color: G }} />
+          <Tag size={35} style={{ color: G }} />
         </div>
 
         <p className="font-heading font-bold text-[20px] text-white leading-tight mb-2">
-          Wait, before you go.
+          Wait, before you go
+        </p>
+        <p className="font-body text-[11px] font-semibold tracking-[0.16em] mb-3"
+           style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
+          A SPECIAL ONE TIME OFFER
         </p>
         <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
-          Take 50% off your first year, just for today.
+          Your first 7 days are completely free
         </p>
 
         <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-body text-[15px] line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>$49.99/yr</span>
-          <span className="font-heading font-bold text-[26px]" style={{ color: G }}>$24.99/yr</span>
+          <span className="font-body text-[22px] line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>$4.99</span>
+          <span className="font-heading font-bold text-[26px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial?.product?.introPrice?.priceString || '$0.00'}</span>
         </div>
 
-        {error && (
-          <p className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error}</p>
+        {trial && <p className="font-body text-[11px] leading-relaxed mb-3" style={{ color: DIM }}>
+          {trialRenewalText(trial.product)}
+        </p>}
+        {(error || trialError) && (
+          <p role="alert" className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error || trialError}</p>
         )}
 
         <button
-          onClick={onClaim}
-          disabled={loading}
+          onClick={startTrial}
+          disabled={busy || checking || !trial}
           className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
-          {loading && <Loader2 size={15} className="animate-spin" />}
-          {loading ? 'Processing…' : 'Claim Discount ($24.99/yr)'}
-        </button>
-        <button
-          onClick={onDecline}
-          disabled={loading}
-          className="w-full py-2 font-body text-[12px] transition-opacity hover:opacity-70 disabled:opacity-40"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
-        >
-          No thanks, I'll pay full price later
+          {busy && <Loader2 size={15} className="animate-spin" />}
+          {busy ? 'Processing…' : 'Start free trial'}
         </button>
       </motion.div>
     </motion.div>
@@ -362,7 +391,6 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   }, [cardIdx, containerW])
   const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
-  const [claimLoading, setClaimLoading] = useState(false)
   const [claimError, setClaimError] = useState('')
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser   = useStore(s => s.updateUser)
@@ -384,36 +412,11 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     setShowDiscountOffer(false)
   }
 
-  async function handleClaimOffer() {
-    triggerHaptic()
-    if (!isNative()) {
-      // Web has no equivalent Stripe price for this offer yet — flag rather
-      // than silently doing nothing or granting anything unpurchased.
-      setClaimError('This offer is only available in the app right now.')
-      return
-    }
-    setClaimLoading(true)
-    setClaimError('')
-    try {
-      const result = await purchaseDiscountedAnnual()
-      if (result?.success) {
-        const rcUserId = result.customerInfo?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
-        setIsPremium(true)
-        setShowDiscountOffer(false)
-        onPromoSuccess?.()
-        return
-      }
-      if (result?.reason === 'not_configured') {
-        setClaimError("This offer isn't set up yet. Please try again shortly.")
-      } else if (result?.reason !== 'cancelled') {
-        setClaimError('Unable to complete purchase. Please try again.')
-      }
-    } catch {
-      setClaimError('Unable to complete purchase. Please try again.')
-    } finally {
-      setClaimLoading(false)
-    }
+  async function handleClaimOffer(result) {
+    await api.payments.syncRc(result.customerInfo?.originalAppUserId)
+    setIsPremium(true)
+    setShowDiscountOffer(false)
+    onPromoSuccess?.()
   }
 
   const cards = [
@@ -596,10 +599,10 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
 
       <AnimatePresence>
         {showDiscountOffer && (
-          <AnnualDiscountOfferModal
+          <FreeTrialOfferModal
             onClaim={handleClaimOffer}
             onDecline={handleDeclineOffer}
-            loading={claimLoading}
+            loading={isPurchasing}
             error={claimError}
           />
         )}

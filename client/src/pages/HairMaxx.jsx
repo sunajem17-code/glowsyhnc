@@ -23,12 +23,21 @@ function HairPattern({ type }) {
   </svg>
 }
 
-function Header({ title, onBack, right }) {
-  return <div className="sticky top-0 z-30 flex items-center justify-between px-5 pb-3"
-    style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'rgba(8,8,8,.94)', backdropFilter: 'blur(18px)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-    <button onClick={onBack} className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center" aria-label="Back"><ChevronLeft size={22} color="rgba(255,255,255,.72)" /></button>
-    <p className="font-heading font-bold text-[15px] text-white tracking-wide">{title}</p>
-    <div className="w-10 flex justify-end">{right}</div>
+// Same circular back button used across the app (see PageHeader.jsx and
+// Scan.jsx's capture-screen header) — plain top-left button in normal flow,
+// no sticky title bar. Each stage already carries its own "HairMax" eyebrow
+// + heading in its content, so nothing is lost by dropping the bar's title.
+function Header({ onBack, right }) {
+  return <div className="flex items-center justify-between px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8 }}>
+    <button
+      onClick={onBack}
+      aria-label="Go back"
+      className="w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+    >
+      <ChevronLeft size={18} className="text-primary" />
+    </button>
+    {right}
   </div>
 }
 
@@ -57,27 +66,41 @@ function ChoiceGrid({ title, subtitle, options, value, onChange, columns = 3, vi
   </div>
 }
 
-function ConnectedIntro({ structure, scan, image, onContinue, onRescan }) {
-  return <div className="px-5 pb-10">
-    <div className="pt-7 mb-7">
-      <p className="text-[10px] tracking-[.26em] uppercase mb-2" style={{ color: GOLD }}>HairMax</p>
-      <h1 className="font-heading font-bold text-[34px] text-white leading-[1.05]">Find your best hairstyle.</h1>
+function ConnectedIntro({ structure, image, onBack, onContinue, onRescan }) {
+  // Header block ported verbatim from Scan.jsx's step 1/2 header (position,
+  // sizes, back-button style) so this screen matches it exactly instead of
+  // having its own hand-tuned treatment.
+  return <div className="h-full flex flex-col">
+    <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
+      <button
+        onClick={onBack}
+        aria-label="Go back"
+        className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+      >
+        <ChevronLeft size={18} className="text-primary" />
+      </button>
+      <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1 uppercase" style={{ color: GOLD }}>HairMax</p>
+      <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>Find your best hairstyle</h1>
     </div>
-    <div className="relative rounded-[28px] overflow-hidden mb-5" style={{ aspectRatio: '4/5', background: PANEL, border: '1px solid rgba(198,168,92,.22)' }}>
-      {image ? <img src={image} alt="Your Ascendus scan" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Scissors size={42} color={GOLD} /></div>}
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 48%, rgba(0,0,0,.9))' }} />
-      <div className="absolute left-5 right-5 bottom-5">
-        <div className="flex items-center gap-2 mb-2"><span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: GOLD }}><Check size={12} color="#080808" /></span><span className="font-heading font-bold text-[11px] tracking-wide text-white uppercase">Face analysis connected</span></div>
-        <p className="font-body text-[12px] text-white/60">Scan {scan?.id?.replace('scan-', '#') ?? ''}</p>
+    {/* Photo fills the remaining space at its native resolution (no fixed
+        aspect-ratio box shrinking it down) and the button is pinned at the
+        bottom with the same safe-area padding as Scan.jsx's previewPhoto
+        screen, instead of trailing directly under the photo. */}
+    <div className="flex-1 min-h-0 px-5">
+      <div className="w-full h-full rounded-[28px] overflow-hidden" style={{ background: PANEL }}>
+        {image ? <img src={image} alt="Your Ascendus scan" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Scissors size={42} color={GOLD} /></div>}
       </div>
     </div>
-    <div className="rounded-2xl p-4 mb-6" style={{ background: PANEL, border: '1px solid rgba(255,255,255,.07)' }}>
-      <p className="text-[9px] uppercase tracking-[.22em] mb-3" style={{ color: GOLD }}>Your structure</p>
-      {structure.connected ? <div className="space-y-2">{structure.descriptors.map(text => <div key={text} className="flex items-center gap-2"><span className="w-1 h-1 rounded-full" style={{ background: GOLD }} /><span className="font-body text-[13px] text-white/80">{text}</span></div>)}</div>
-        : <p className="font-body text-[13px] text-white/65">This scan predates measured facial geometry. Take a new scan to enable structure-based matching.</p>}
+    <div className="flex-shrink-0 px-5" style={{ paddingTop: 14, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
+      <button
+        onClick={() => structure.connected && image ? onContinue() : onRescan()}
+        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+        style={{ background: GOLD_GRADIENT, color: '#080808' }}
+      >
+        Continue
+      </button>
     </div>
-    {structure.connected && image ? <button onClick={onContinue} className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Continue</button>
-      : <button onClick={onRescan} className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Take a connected scan</button>}
   </div>
 }
 
@@ -289,10 +312,22 @@ export default function HairMaxx() {
   }
 
   const selectedQuestion = questions[question]
-  return <MotionPage style={{ background: BG }}>
-    <Header title="HairMax" onBack={back} right={stage === 'looks' ? <button onClick={() => setStage('saved')}><Bookmark size={18} color={GOLD} /></button> : null} />
+  // Intro uses the same plain "flex flex-col h-full" root Scan.jsx uses for
+  // its own step screens (real available height inherited from Layout's
+  // flex chain, no scroll) instead of MotionPage's default page-scroll
+  // (fixed calc(100vh-72px) + overflow-y-auto) — that mismatch was both the
+  // wrong proportions and why the intro screen could scroll at all. Other
+  // stages (questions/looks/saved) keep the normal scrollable behavior.
+  return <MotionPage
+    baseClassName={stage === 'intro' ? '' : 'page-scroll'}
+    className={stage === 'intro' ? 'flex flex-col h-full' : ''}
+    style={{ background: BG }}
+  >
+    {/* ConnectedIntro carries its own back button (matching Scan.jsx's step
+        header exactly), so the generic bar is skipped for that stage. */}
+    {stage !== 'intro' && <Header onBack={back} right={stage === 'looks' ? <button onClick={() => setStage('saved')}><Bookmark size={18} color={GOLD} /></button> : null} />}
     <AnimatePresence mode="wait">
-      {stage === 'intro' && <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} scan={scan} image={sourceImage} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
+      {stage === 'intro' && <motion.div key="intro" className="flex-1 min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} image={sourceImage} onBack={back} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
       {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="px-5"><ChoiceGrid {...selectedQuestion} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
       {stage === 'matching' && <motion.div key="matching" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Matching profile={profile} structure={structure} /></motion.div>}
       {stage === 'recommend_error' && <motion.div key="recommend-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[70vh] px-6 flex flex-col items-center justify-center text-center"><Sparkles size={30} color={GOLD} /><h2 className="font-heading font-bold text-[22px] text-white mt-5">Couldn’t build your looks</h2><p className="text-[13px] text-white/50 mt-2 mb-6">Your scan is safe. Try the grounded matching step again.</p><button onClick={() => beginMatching(profile)} className="px-6 py-3 rounded-2xl font-heading font-bold text-[13px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Try again</button></motion.div>}

@@ -9,36 +9,41 @@ const midpoint = (a, b) => valid(a) && valid(b)
   ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
   : null
 
-// Weighted point between a and b (t=0 → a, t=1 → b). Used to place a synthetic
-// "upper cheek" anchor below the eye without needing an unverified landmark
-// index — eyeBottomL sits right on the lower eyelid rim, so a highlight
-// anchored there alone still reads as touching the eye; blending 70% of the
-// way toward the cheekbone point moves it clearly onto the cheek instead.
-const lerp = (a, b, t) => valid(a) && valid(b)
-  ? { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
-  : null
-
 const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
+// Anchor-based template, not hand-picked landmark indices: every previous
+// attempt at this shape guessed 3-4 raw MediaPipe points and hoped they'd
+// happen to form the right triangle — which is why each attempt came out
+// wrong in a different way (through the eye, pointing up instead of
+// sideways, collapsed into a sliver). This instead defines the wedge ONCE
+// as fixed offsets from the eye's own center, scaled by that eye's own
+// width, then fits it onto whichever face is detected — same technique AR
+// face filters use. Because it's anchored to the eye and scaled by eye
+// width rather than built from independently-guessed points, it lands in
+// the same correct relative position/size on any face automatically.
+function eyeAnchoredWedge(eyeInner, eyeOuter, side) {
+  if (!valid(eyeInner) || !valid(eyeOuter)) return null
+  const center = midpoint(eyeInner, eyeOuter)
+  const width = Math.hypot(eyeOuter.x - eyeInner.x, eyeOuter.y - eyeInner.y)
+  const dir = side === 'L' ? -1 : 1 // outward = toward the ear on that side
+  return [
+    { x: center.x + dir * 1.3 * width, y: center.y },               // apex, out at eye height
+    { x: center.x + dir * 0.1 * width, y: center.y - 0.9 * width }, // base, above the eye
+    { x: center.x + dir * 0.1 * width, y: center.y + 0.9 * width }, // base, below the eye
+  ]
+}
+
 export function frontFeatureAnchors(p) {
   if (!p) return []
-  // Synthetic "upper cheek" anchors, 70% of the way from just-under-the-eye
-  // toward the cheekbone point — eyeBottomL/eyeBottomR alone sit right on
-  // the lower eyelid rim, which still reads as touching the eye. Blending
-  // toward cheekL/cheekR moves the anchor clearly onto the cheek without
-  // guessing at an unverified landmark index.
-  const upperCheekL = lerp(p.eyeBottomL, p.cheekL, 0.7)
-  const upperCheekR = lerp(p.eyeBottomR, p.cheekR, 0.7)
   return available([
     { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 90, badgeY: 74,
       regions: [region([p.jawChinL, p.chin, p.jawChinR])] },
-    // Temple → upper cheek → cheekbone point. Previously used the eye
-    // CORNERS (eyeOuterL/eyeInnerL) as two of the four vertices, which put
-    // those points directly on the eyelid — since the polygon connects its
-    // vertices in order, that drew the highlight straight across the eyes.
     { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 10, badgeY: 29,
-      regions: [region([p.templeL, upperCheekL, p.cheekL]), region([p.templeR, upperCheekR, p.cheekR])] },
+      regions: [
+        (() => { const w = eyeAnchoredWedge(p.eyeInnerL, p.eyeOuterL, 'L'); return w ? region(w) : null })(),
+        (() => { const w = eyeAnchoredWedge(p.eyeInnerR, p.eyeOuterR, 'R'); return w ? region(w) : null })(),
+      ] },
     { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 90, badgeY: 52,
       contour: region([p.jawL, p.jawMidL, p.jawChinL, p.chin, p.jawChinR, p.jawMidR, p.jawR]) },
     // Extended down through jawChin (not just jawMid) so the highlighted

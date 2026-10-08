@@ -15,7 +15,7 @@
 			     to the Mac's LAN IP, so iOS's default ATS block needs this
 			     scoped exception. Update the IP here if it changes; remove
 			     this whole block before any real App Store build. -->
-			<key>10.0.0.122</key>
+			<key>10.103.66.52</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
