@@ -202,6 +202,10 @@ export const api = {
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
   },
+  developerAccess: {
+    status: () => request('/developer-access/status'),
+    unlock: () => request('/developer-access/unlock', { method: 'POST' }),
+  },
   potential: {
     analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),
     glowUp:  (data) => request('/potential/glow-up',  { method: 'POST', body: JSON.stringify(data) }),

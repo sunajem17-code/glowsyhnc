@@ -13,19 +13,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import MotionPage from '../components/MotionPage'
-
-// Native purchase path only — the web/Stripe checkout path doesn't actually
-// complete here (see handleAscend), so this is deliberately not called for it.
-async function logAnalyticsEvent(name, params) {
-  if (!isNative()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
@@ -1321,7 +1309,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, error }) {
+function LockedRevealScreen({ scan, onAscend, onInvite, onClose, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
@@ -1410,6 +1398,17 @@ function LockedRevealScreen({ scan, onAscend, onInvite, onClose, isPurchasing, e
           >
             Invite 3 Friends
           </button>
+
+          {developerUnlockAvailable && (
+            <button
+              onClick={onDeveloperUnlock}
+              disabled={developerUnlocking || isPurchasing}
+              className="w-full py-2 font-body text-[12px] text-center disabled:opacity-40"
+              style={{ color: 'rgba(198,168,92,0.7)' }}
+            >
+              {developerUnlocking ? 'Unlocking developer access…' : 'Developer unlock'}
+            </button>
+          )}
         </div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
@@ -1433,6 +1432,8 @@ export default function ScanUnlockGate() {
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  const [developerUnlockAvailable, setDeveloperUnlockAvailable] = useState(false)
+  const [developerUnlocking, setDeveloperUnlocking] = useState(false)
   // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
   // for why isPurchasing alone can't prevent a true double-tap.
   const purchaseLockRef = useRef(false)
@@ -1451,6 +1452,13 @@ export default function ScanUnlockGate() {
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (isPremium) return
+    api.developerAccess.status()
+      .then(({ enabled }) => setDeveloperUnlockAvailable(Boolean(enabled)))
+      .catch(() => setDeveloperUnlockAvailable(false))
+  }, [isPremium])
 
   if (!currentScan) return null
 
@@ -1479,7 +1487,6 @@ export default function ScanUnlockGate() {
         if (result?.success) {
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
-          logAnalyticsEvent('purchase_completed', { plan, platform: 'native' })
           handleUnlockSuccess()
           setIsPurchasing(false)
           purchaseLockRef.current = false
@@ -1512,6 +1519,19 @@ export default function ScanUnlockGate() {
     }
   }
 
+  async function handleDeveloperUnlock() {
+    if (developerUnlocking) return
+    setDeveloperUnlocking(true)
+    setPurchaseError('')
+    try {
+      await api.developerAccess.unlock()
+      handleUnlockSuccess()
+    } catch (err) {
+      setPurchaseError(err?.message || 'Developer unlock failed')
+      setDeveloperUnlocking(false)
+    }
+  }
+
   return (
     <MotionPage
       baseClassName=""
@@ -1533,6 +1553,9 @@ export default function ScanUnlockGate() {
           scan={currentScan}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
+          developerUnlockAvailable={developerUnlockAvailable}
+          onDeveloperUnlock={handleDeveloperUnlock}
+          developerUnlocking={developerUnlocking}
           isPurchasing={isPurchasing}
           error={purchaseError}
         />
