@@ -15,6 +15,8 @@ import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
+import { getRevealRatings, getRevealView } from '../utils/revealRatings'
+import ScanWaitingText from '../components/ScanWaitingText'
 
 const G    = GOLD
 const GRAD = GOLD_GRADIENT
@@ -1406,7 +1408,6 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
         <div className="mt-3 mb-2">
-          <SocialProofTicker />
         </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
@@ -1502,24 +1503,10 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, isPurchasing, error }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false }) {
   const navigate = useNavigate()
-  const [photoReady, setPhotoReady] = useState(false)
   const facePhoto = scan?.facePhotoUrl ?? null
-  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
-  const fd = scan?.faceData ?? {}
-  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 68
-
-  // Fixed locked display values — these are shown blurred, so they
-  // function as teaser numbers, not real scores.
-  const metrics = [
-    { label: 'Overall',      pct: 61 },
-    { label: 'Potential',    pct: 88 },
-    { label: 'Symmetry',     pct: 63 },
-    { label: 'Skin Quality', pct: 68 },
-    { label: 'Jawline',      pct: 57 },
-    { label: 'Cheekbones',   pct: 51 },
-  ]
+  const metrics = getRevealRatings(scan)
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
@@ -1531,8 +1518,11 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
           Reveal your ratings
         </h1>
         <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full facial analysis with Ascendus Max
+          {unlocked ? 'Your facial ratings · scored out of 10' : 'See your full facial analysis with Ascendus Max'}
         </p>
+        {scan?.aiScore?.insights?.some(text => /demo mode/i.test(text)) && (
+          <p className="text-xs text-center mt-2" style={{ color: G }}>Preview scores — not an AI analysis</p>
+        )}
 
         {/* Face circle + card */}
         <div className="relative w-full" style={{ marginTop: 102 }}>
@@ -1540,7 +1530,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
             <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
               {facePhoto
-                ? <img src={facePhoto} alt="" loading="eager" decoding="async" onLoad={() => setPhotoReady(true)} className="w-full h-full object-cover" style={{ filter: 'brightness(1)', opacity: photoReady ? 1 : 0, transition: 'opacity .16s ease-out' }} />
+                ? <img src={facePhoto} alt="" loading="eager" decoding="async" className="w-full h-full object-cover" style={{ filter: 'brightness(1)' }} />
                 : null}
             </div>
           </div>
@@ -1548,13 +1538,17 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
           {/* Metrics card */}
           <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
             <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
-              {metrics.map(({ label, pct }, idx) => (
+              {metrics.map(({ label, value }, idx) => (
                 <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <Lock size={13} style={{ color: G, flexShrink: 0 }} />
+                    {!unlocked && <Lock size={13} style={{ color: G, flexShrink: 0 }} />}
                     <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
                   </div>
-                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
+                  {unlocked ? (
+                    <div aria-label={`${label}: ${value == null ? 'Not available' : value.toFixed(1)}`} style={{ color: '#fff', fontSize: 26, fontWeight: 700, marginBottom: 12 }}>{value == null ? 'N/A' : value.toFixed(1)}</div>
+                  ) : (
+                    <div aria-label={`${label}: Locked`} style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
+                  )}
                   <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
                 </div>
               ))}
@@ -1563,7 +1557,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
         </div>
 
         {/* CTAs */}
-        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
+        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
@@ -1575,7 +1569,18 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
           </motion.button>
 
-        </div>
+          {(import.meta.env.DEV || developerUnlockAvailable) && (
+            <button
+              onClick={onDeveloperUnlock}
+              disabled={developerUnlocking || isPurchasing}
+              className="w-full py-2 font-body text-[12px] text-center disabled:opacity-40"
+              style={{ color: 'rgba(198,168,92,0.7)' }}
+            >
+              {developerUnlocking ? 'Unlocking developer access…' : 'Developer unlock'}
+            </button>
+          )}
+
+        </div>}
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
@@ -1587,7 +1592,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, i
 
 export default function ScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
-  const { currentScan, pendingFacePhoto, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const { currentScan, pendingFacePhoto, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow, setGuestSession } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
@@ -1599,19 +1604,18 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  const [developerUnlockAvailable, setDeveloperUnlockAvailable] = useState(false)
+  const [developerUnlocking, setDeveloperUnlocking] = useState(false)
+  const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
   const displayedScan = pendingScan ? null : currentScan
-  const revealScan = currentScan ? { ...currentScan, facePhotoUrl: currentScan.facePhotoUrl || pendingFacePhoto } : currentScan
+  const revealScan = currentScan
+    ? { ...currentScan, facePhotoUrl: currentScan.facePhotoUrl || pendingFacePhoto }
+    : pendingFacePhoto
+      ? { facePhotoUrl: pendingFacePhoto }
+      : null
   // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
   // for why isPurchasing alone can't prevent a true double-tap.
   const purchaseLockRef = useRef(false)
-
-  useEffect(() => {
-    if (isPremium && !pendingScan && (directPaywall || embeddedReveal || !justUnlockedRef.current)) navigate('/results', { replace: true })
-  }, [isPremium, pendingScan, directPaywall, embeddedReveal])
-
-  useEffect(() => {
-    if (!currentScan && !directPaywall && !embeddedReveal && searchParams.get('paywall') !== '1') navigate('/scan', { replace: true })
-  }, [currentScan])
 
   useEffect(() => {
     if (!currentScan || isPremium) return
@@ -1620,21 +1624,27 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (isPremium) return
+    api.developerAccess.status()
+      .then(({ enabled }) => setDeveloperUnlockAvailable(Boolean(enabled)))
+      .catch(() => setDeveloperUnlockAvailable(false))
+  }, [isPremium])
+
   // When arriving from paywall=1 (e.g. daily check-in tap), show the paywall
   // even without a scan. Without this guard, the component returns null and the
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
-  if (!currentScan && !isPaywallRedirect && !embeddedReveal) return null
-
-  if (isPremium && pendingScan) return <div role="status" className="fixed inset-0 z-[10001] bg-black text-white flex items-center justify-center">Finishing your ratings…</div>
-  if (isPremium && !justUnlocked) return null
-
+  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     justUnlockedRef.current = true
+    // Developer/local unlock should reveal the existing results in place — do
+    // not replay the paywall slideshow or score-counting reveal animation.
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
     setJustUnlocked(true)
-    setShowUnlockSlideshow(true)
+    setShowPaywall(false)
+    setShowUnlockSlideshow(false)
     setIsPremium(true)
     updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
@@ -1685,32 +1695,57 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
     }
   }
 
+  async function handleDeveloperUnlock() {
+    if (developerUnlocking) return
+    setDeveloperUnlocking(true)
+    setPurchaseError('')
+    try {
+      try {
+        await api.developerAccess.unlock()
+      } catch (err) {
+        // A browser pointed at local API can still have a JWT issued by the
+        // deployed API. Refresh only that stale local session, then retry.
+        if (!import.meta.env.DEV || err?.status !== 401) throw err
+        const guest = await api.auth.guest()
+        setGuestSession(guest.userId, guest.token)
+        await api.developerAccess.unlock()
+      }
+      handleUnlockSuccess()
+    } catch (err) {
+      setPurchaseError(err?.message || 'Developer unlock failed')
+      setDeveloperUnlocking(false)
+    }
+  }
+
   return (
     <MotionPage
       baseClassName=""
       className="fixed inset-0 z-50 overflow-hidden dark"
       style={{ background: BG, ...((directPaywall || embeddedReveal) ? { zIndex: 10002 } : {}), '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {(isPremium || justUnlocked) ? (
-        <SwipeableResultCards
-          scan={currentScan}
-          onAscend={handleAscend}
-          onInvite={() => setShowInvite(true)}
-          onPromo={() => setShowPromo(true)}
-          isPurchasing={isPurchasing}
-          error={purchaseError}
-          isPremium={isPremium}
-        />
-      ) : (currentScan || embeddedReveal) && !isPaywallRedirect ? (
+      {revealView === 'pending' ? (
+        <ScanWaitingText ready={!pendingScan && Boolean(currentScan)} onComplete={() => setWaitingFinished(true)} />
+      ) : revealView === 'empty' ? (
+        <div className="h-full flex flex-col items-center justify-center gap-5 px-6 text-white text-center">
+          <h1 className="text-2xl font-bold">No scan to reveal yet</h1>
+          <p>Take a scan to see your ratings here.</p>
+          <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
+        </div>
+      ) : (isPremium || justUnlocked) ? (
+        <LockedRevealScreen scan={revealScan} unlocked />
+      ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || pendingFacePhoto } : revealScan}
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
+          developerUnlockAvailable={developerUnlockAvailable}
+          onDeveloperUnlock={handleDeveloperUnlock}
+          developerUnlocking={developerUnlocking}
           isPurchasing={isPurchasing}
           error={purchaseError}
         />
-      ) : null}
+      )}
 
       {/* paywall=1 redirect: showPaywall already true from useState init */}
 
@@ -1719,7 +1754,7 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
       </AnimatePresence>
 
       <AnimatePresence>
-        {showPaywall && !isPremium && (
+        {revealView === 'paywall' && (
           <ProPaywall
             scan={pendingScan ? null : currentScan}
             onClose={() => navigate('/', { replace: true })}

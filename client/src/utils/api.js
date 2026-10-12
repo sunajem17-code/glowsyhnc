@@ -67,6 +67,11 @@ async function request(path, options = {}) {
   }
   clearTimeout(timeoutId)
   if (!res.ok) {
+    if (res.status === 404 && path.startsWith('/developer-access/')) {
+      const error = new Error('Developer unlock is not deployed or enabled on this server.')
+      error.status = 404
+      throw error
+    }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
     // 502/504 are proxy/gateway errors that return HTML — bail early.
@@ -205,6 +210,10 @@ export const api = {
   },
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
+  },
+  developerAccess: {
+    status: () => request('/developer-access/status'),
+    unlock: () => request('/developer-access/unlock', { method: 'POST' }),
   },
   potential: {
     analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),
