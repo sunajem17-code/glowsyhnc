@@ -553,7 +553,9 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
               {showLive && ready && (
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
+                  {stepNum !== 2 && (
+                    <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
+                  )}
                   <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: alignment.aligned ? GOLD : '#fff', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
                     {trackingAvailable ? alignment.label : (stepNum === 2 ? 'Align your side profile' : 'Position your face')}
                   </div>
@@ -602,7 +604,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
               width: '100%', padding: '18px 0', borderRadius: 50,
               background: GOLD_GRADIENT, border: 'none', cursor: 'pointer',
               color: '#000', fontWeight: 700, fontSize: 18, fontFamily: 'inherit',
-              opacity: (!capturedUrl && (!ready || (trackingAvailable && !alignment.aligned))) ? 0.5 : 1,
+              opacity: (!capturedUrl && !ready) ? 0.5 : 1,
               boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
             }}
           >
@@ -1876,6 +1878,7 @@ export default function Scan() {
   const savedGender       = useStore(s => s.gender)
   const scans             = useStore(s => s.scans)
   const isPremium         = useStore(s => s.isPremium)
+  const setIsPremium      = useStore(s => s.setIsPremium)
   const scanCount         = useStore(s => s.scanCount)
   const userProfile       = useStore(s => s.userProfile)
   const lastScanDate      = useStore(s => s.lastScanDate)
@@ -2196,8 +2199,10 @@ export default function Scan() {
 
       let aiResult
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
-      if (token === 'demo-token') {
-        // Demo users: return mock results instead of hitting the backend
+      const localScorePreview = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AI_SCORE_FALLBACK === 'true'
+      if (token === 'demo-token' || localScorePreview) {
+        // Demo/local preview users: return mock results instead of requiring
+        // an Anthropic key. This branch is never included in production builds.
         await new Promise(r => setTimeout(r, 2500))
         // Round first, then derive tier from the SAME rounded value used for
         // overallScore — computing tier from the unrounded score can land it
@@ -2423,7 +2428,13 @@ export default function Scan() {
           new Promise(resolve => setTimeout(resolve, 700)),
         ])
       }
-      if (!paywallOpenedRef.current) navigate(isPremium ? '/results' : '/unlock', { replace: true })
+      if (!paywallOpenedRef.current) {
+        // Local browser testing can preview the complete result reveal without
+        // changing the production subscription gate.
+        const localAutoUnlock = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AUTO_UNLOCK_RESULTS === 'true'
+        if (localAutoUnlock) setIsPremium(true)
+        navigate((isPremium || localAutoUnlock) ? '/results' : '/unlock', { replace: true })
+      }
     } catch (err) {
       setScanPaywallOpen(false)
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)

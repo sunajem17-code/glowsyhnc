@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { useLocation, useNavigationType, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav, { TAB_ROOT_PATHS } from './BottomNav'
-import AchievementToast from './AchievementToast'
 import ProcessingOverlay from './ProcessingOverlay'
 import useStore from '../store/useStore'
 import { checkAchievements } from '../utils/achievements'
@@ -69,7 +68,6 @@ export default function Layout() {
       <AnimatePresence>
         {scanLaunching && <ProcessingOverlay key="scan-launch" label="Processing" />}
       </AnimatePresence>
-      <AchievementToast />
       <main className="flex-1 overflow-hidden relative">
         {/* Thin left-edge hit zone for the interruptible swipe-back gesture.
             Scoped to a 24px strip (matching iOS's own edge-pan width) so it

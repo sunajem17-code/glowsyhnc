@@ -6,6 +6,18 @@ import { GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const ISSUE_CONTENT = {
+  insufficient_face_resolution: {
+    headline: 'Your face needs to be a little closer',
+    label: 'Face detected — too small to measure',
+    desc: 'We found your face, but need more detail to measure it reliably.',
+    tips: ['Move closer to the camera', 'Keep your whole face visible', 'Use the original photo rather than a small thumbnail'],
+  },
+  facial_landmark_out_of_frame: {
+    headline: 'Keep your full face in the photo',
+    label: 'Face partly outside the frame',
+    desc: 'Some measurement points are outside the photo.',
+    tips: ['Keep your forehead and chin visible', 'Centre your face', 'Leave a little space around your face'],
+  },
   no_face: {
     headline: "We couldn't find a clear face in this photo",
     label:    'No face detected',
@@ -87,10 +99,10 @@ const ISSUE_CONTENT = {
 }
 
 const DEFAULT_CONTENT = {
-  headline: "We couldn't find a clear face in this photo",
-  label:    'No face detected',
-  desc:     "We couldn't verify your photo. Please try again.",
-  tips:     ['Show one clear face', 'Face the camera directly', 'Keep your full face in frame'],
+  headline: 'Could not complete the photo check',
+  label:    'Measurement unavailable',
+  desc:     'The photo check could not finish. This does not mean your face is missing.',
+  tips:     ['Try the photo again', 'Use the original full-size photo', 'Keep your whole face visible'],
 }
 
 export default function ScanQualityFail() {

@@ -208,13 +208,17 @@ export default function App() {
             <Route path="*" element={<PremiumOnboarding />} />
           ) : (
             <>
+              {/* Full-screen reveal must not wait for the outgoing scan outlet's
+                  nested exit animation or inherit its transformed viewport. */}
+              <Route path="/unlock" element={<ProtectedRoute><ScanUnlockGate /></ProtectedRoute>} />
+              <Route path="/results" element={<Navigate to="/unlock" replace />} />
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
               }>
                 <Route index element={<PostAuthLanding />} />
                 <Route path="scan" element={<ScanHome />} />
                 <Route path="scan/capture" element={<Scan />} />
-                <Route path="results" element={<Results />} />
+                {/* The reveal/unlock screen is the single post-scan destination. */}
                 <Route path="extras" element={<Extras />} />
                 <Route path="plan" element={<ActionPlan />} />
                 <Route path="progress" element={<Progress />} />
@@ -234,7 +238,6 @@ export default function App() {
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="physique-scan" element={<PhysiqueScan />} />
                 <Route path="physique-results" element={<PhysiqueResults />} />
-                <Route path="unlock" element={<ScanUnlockGate />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />
               </Route>

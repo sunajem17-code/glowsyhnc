@@ -1252,6 +1252,13 @@ router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async
     return res.status(400).json({ error: 'imageB64 is required' })
   }
 
+  // Explicit local-only fallback for testing with the browser uploader when
+  // the Claude credential is not present. This can never activate in Railway
+  // or any production process and is intentionally opt-in.
+  if (process.env.NODE_ENV !== 'production' && process.env.LOCAL_SCAN_VALIDATION_BYPASS === 'true') {
+    return res.json({ valid: true, faceCount: 1, issues: [], localBypass: true })
+  }
+
   // Strip data URL header — Claude needs raw base64
   const commaIdx  = imageB64.indexOf(',')
   const base64Data = commaIdx >= 0 ? imageB64.slice(commaIdx + 1) : imageB64

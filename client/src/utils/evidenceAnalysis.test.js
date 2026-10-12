@@ -19,6 +19,19 @@ function fixture() {
 
 const metric = (result, id) => result.measurements.find(row => row.id === id)
 
+test('landscape side space does not reject an otherwise identical face', () => {
+  const portrait = analyzeLandmarkEvidence(fixture(), 500, 750)
+  const landscapePoints = fixture().map(p => ({ ...p, x: (p.x * 500 + 500) / 1500 }))
+  const landscape = analyzeLandmarkEvidence(landscapePoints, 1500, 750)
+  assert.equal(portrait.status, 'measured')
+  assert.equal(landscape.status, 'measured')
+})
+
+test('a genuinely small face still fails the size check', () => {
+  const tiny = fixture().map(p => ({ ...p, x: .5 + (p.x - .5) * .2, y: .5 + (p.y - .5) * .2 }))
+  assert.equal(analyzeLandmarkEvidence(tiny, 1000, 1500).quality.checks.faceSize, false)
+})
+
 test('same exact landmarks produce identical evidence', () => {
   const first = analyzeLandmarkEvidence(fixture(), 1000, 1500)
   const second = analyzeLandmarkEvidence(fixture(), 1000, 1500)
