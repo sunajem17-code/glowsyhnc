@@ -4,7 +4,7 @@ const { authMiddleware } = require('../middleware/auth')
 const { updateUserById, getUserById, isConfigured } = require('../supabase')
 const db = require('../db')
 const { canUnlock } = require('../utils/developerAccessPolicy')
-const { createLimiter } = require('../middleware/rateLimit')
+const { createLimiter } = require('../middleware/ratelimit')
 
 const router = express.Router()
 const limit = createLimiter('developer-unlock', 10, '1 m', 60000)
