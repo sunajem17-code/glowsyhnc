@@ -1936,6 +1936,7 @@ export default function PhysiqueScan() {
         umaxScore:      aiResult.overallScore,
         glowScore:      Math.round(aiResult.overallScore * 10) / 10,
         tier:           aiResult.tier,
+        potentialScore: aiResult.potentialScore ?? null,
         aiScore:        aiResult,
         faceData: {
           aestheticScore:    aiResult.faceScore,
@@ -2046,7 +2047,6 @@ export default function PhysiqueScan() {
           angularity:       aiResult.pillars?.angularity,
           features:         aiResult.pillars?.features,
           dimorphism:       aiResult.pillars?.dimorphism,
-          potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
           hairTypeDetected: aiResult.hairType,
           faceShape:        aiResult.facialStructure,
           faceImageUrl,

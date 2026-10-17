@@ -5,6 +5,7 @@ const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middlewa
 const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
+const { calculatePotentialScore, withPotentialScore } = require('../utils/potentialScore')
 
 const router = express.Router()
 
@@ -793,7 +794,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v3', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
-      return res.json(scoreCache.get(cacheKey))
+      const cached = withPotentialScore(scoreCache.get(cacheKey))
+      scoreCache.set(cacheKey, cached)
+      return res.json(cached)
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
@@ -804,8 +807,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
       if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
-      scoreCache.set(cacheKey, sbCached)
-      return res.json(sbCached)
+      const cached = withPotentialScore(sbCached)
+      scoreCache.set(cacheKey, cached)
+      return res.json(cached)
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
@@ -910,6 +914,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     const result = {
       overallScore:      final,
+      potentialScore:    calculatePotentialScore(final),
       faceOnlyScore:     faceOnlyScore,   // face pillar avg before physique blend
       faceScore:         Math.round(faceScore    * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,

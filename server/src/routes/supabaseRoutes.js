@@ -9,6 +9,7 @@
 const express = require('express')
 const { authMiddleware: auth } = require('../middleware/auth')
 const { getSupabase, isConfigured, updateUserById } = require('../supabase')
+const { calculatePotentialScore } = require('../utils/potentialScore')
 
 const router = express.Router()
 
@@ -153,6 +154,10 @@ router.get('/scans', auth, async (req, res) => {
     // page view; if it's already a full URL (http/https), pass it through.
     const resolved = await Promise.all((scans ?? []).map(async (s) => ({
       ...s,
+      // Older scan rows may predate Potential being returned by the scoring
+      // endpoint. Backfill it in the server response using the same server-
+      // owned derivation so existing reveal screens can recover the value.
+      potential_score: s.potential_score ?? calculatePotentialScore(s.overall_score),
       face_image_url: await resolveImageUrl(sb, s.face_image_url),
       body_image_url: await resolveImageUrl(sb, s.body_image_url),
     })))

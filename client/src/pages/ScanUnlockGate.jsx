@@ -15,7 +15,7 @@ import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
-import { getRevealRatings, getRevealView } from '../utils/revealRatings'
+import { findStoredPotentialScore, getRatingColor, getRevealRatings, getRevealView } from '../utils/revealRatings'
 import ScanWaitingText from '../components/ScanWaitingText'
 
 const G    = GOLD
@@ -1506,7 +1506,23 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
-  const metrics = getRevealRatings(scan)
+  const [storedPotentialScore, setStoredPotentialScore] = useState(null)
+
+  useEffect(() => {
+    setStoredPotentialScore(null)
+    if (!unlocked || !scan || scan.aiScore?.potentialScore != null || scan.potentialScore != null) return undefined
+    let active = true
+    api.supabase.getScans()
+      .then(({ scans }) => {
+        if (active) setStoredPotentialScore(findStoredPotentialScore(scan, scans))
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [unlocked, scan?.id])
+
+  const metrics = getRevealRatings(
+    storedPotentialScore == null ? scan : { ...scan, potentialScore: storedPotentialScore },
+  )
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
@@ -1515,11 +1531,11 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
 
         {/* Header */}
         <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Reveal your ratings
+          {unlocked ? 'Your Results' : 'Reveal your ratings'}
         </h1>
-        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {unlocked ? 'Your facial ratings · scored out of 10' : 'See your full facial analysis with Ascendus Max'}
-        </p>
+        {!unlocked && <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          See your full facial analysis with Ascendus Max
+        </p>}
         {scan?.aiScore?.insights?.some(text => /demo mode/i.test(text)) && (
           <p className="text-xs text-center mt-2" style={{ color: G }}>Preview scores — not an AI analysis</p>
         )}
@@ -1542,14 +1558,18 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
                 <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                     {!unlocked && <Lock size={13} style={{ color: G, flexShrink: 0 }} />}
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
+                    <p style={{ color: '#fff', fontSize: 'clamp(11px, 3.5vw, 17px)', fontWeight: 700, fontFamily: 'inherit', letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{label}</p>
                   </div>
                   {unlocked ? (
-                    <div aria-label={`${label}: ${value == null ? 'Not available' : value.toFixed(1)}`} style={{ color: '#fff', fontSize: 26, fontWeight: 700, marginBottom: 12 }}>{value == null ? 'N/A' : value.toFixed(1)}</div>
+                    <div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} style={{ color: '#fff', fontSize: value == null ? 18 : 26, fontWeight: 700, marginBottom: 12, fontVariantNumeric: 'tabular-nums', minHeight: 31 }}>
+                      {value == null ? 'Not scored' : <>{value.toFixed(1)}<span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginLeft: 3 }}>/10</span></>}
+                    </div>
                   ) : (
                     <div aria-label={`${label}: Locked`} style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
                   )}
-                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
+                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
+                    <div style={{ height: '100%', width: unlocked && value != null ? `${value * 10}%` : unlocked ? 0 : '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor', boxShadow: unlocked && value != null ? '0 0 10px currentColor' : 'none', transition: 'width 400ms ease, color 400ms ease' }} />
+                  </div>
                 </div>
               ))}
             </div>
