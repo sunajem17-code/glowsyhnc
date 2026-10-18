@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, Lock, ChevronRight, RotateCcw } from 'lucide-react'
+import { Send, Lock, ChevronRight, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -40,7 +40,7 @@ function TypingIndicator() {
         className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
       >
-        <Sparkles size={13} style={{ color: GOLD }} />
+        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div
         className="px-4 py-3 rounded-2xl rounded-bl-sm"
@@ -94,7 +94,7 @@ function MessageBubble({ msg, isNew }) {
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
           style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Sparkles size={13} style={{ color: GOLD }} />
+          <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
         </div>
       )}
       <div
@@ -160,7 +160,7 @@ export default function AICoach() {
   // Initial greeting on mount
   useEffect(() => {
     if (messages.length > 0 || !latestScan || !isPremium) return
-    setMessages([{ role: 'assistant', content: `Scan loaded. Ask me anything. I'll tell you exactly what to work on.` }])
+    setMessages([{ role: 'assistant', content: `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, latestScan])
 
@@ -198,7 +198,7 @@ export default function AICoach() {
         return updated
       })
     } catch (err) {
-      setError(err.message || 'Something went wrong. Try again.')
+      setError(err.message || "Couldn’t connect just now. Please try again.")
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -227,11 +227,11 @@ export default function AICoach() {
             className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
           >
-            <Sparkles size={18} style={{ color: GOLD }} />
+            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-heading font-bold text-[18px] text-primary">AI Coach</h1>
+              <h1 className="font-heading font-bold text-[18px] text-primary">Adonis</h1>
               <span
                 className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
                 style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
@@ -243,7 +243,7 @@ export default function AICoach() {
               {!latestScan
                 ? 'Scan Your Face To Unlock'
                 : isPremium
-                  ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded`
+                  ? 'Your pal. Your coach. In your corner.'
                   : 'Pro required — tap to upgrade'}
             </p>
           </div>
@@ -407,7 +407,7 @@ export default function AICoach() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask your coach…"
+              placeholder="Ask Adonis anything…" aria-label="Message Adonis"
               rows={1}
               className="flex-1 bg-transparent outline-none resize-none font-body text-[14px]"
               style={{

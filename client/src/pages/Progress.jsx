@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, RotateCcw } from 'lucide-react'
+import { Send, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
@@ -9,9 +9,9 @@ import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const STARTER_PROMPTS = [
-  "What's holding my score back the most?",
-  'Give me a daily routine to look better',
-  'What should I fix first to attract more?',
+  "Where should I start?",
+  'Help me build a daily glow-up routine',
+  'How can I show up more confident?',
 ]
 
 function buildScanContext(scan, userProfile) {
@@ -30,7 +30,7 @@ function TypingIndicator() {
     <div className="flex items-end gap-3 mb-4">
       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-        <Sparkles size={14} style={{ color: GOLD }} />
+        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div className="px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1.5 items-center"
         style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -90,7 +90,7 @@ function TypewriterBubble({ text, onDone }) {
     >
       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-        <Sparkles size={14} style={{ color: GOLD }} />
+        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
         style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', borderRadius: '18px 18px 18px 4px' }}>
@@ -119,7 +119,7 @@ function MessageBubble({ msg }) {
       {isAI && (
         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-          <Sparkles size={14} style={{ color: GOLD }} />
+          <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
         </div>
       )}
       <div
@@ -182,7 +182,7 @@ export default function Progress() {
       })
       setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: "Couldn’t connect just now. Please try again." }])
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -206,13 +206,14 @@ export default function Progress() {
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-            <Sparkles size={18} style={{ color: GOLD }} />
+            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
           </div>
-          <h1 className="font-heading font-bold text-[18px] text-primary">AI Coach</h1>
+          <div><h1 className="font-heading font-bold text-[18px] text-primary">Adonis <span className="text-[10px] font-body font-normal" style={{ color: GOLD }}>AI COACH</span></h1><p className="text-[11px] text-secondary font-body">Your pal. Your coach. In your corner.</p></div>
         </div>
         {hasHistory && (
           <button
             onClick={reset}
+            aria-label="Start a new chat"
             className="w-8 h-8 flex items-center justify-center rounded-full"
             style={{ background: 'rgba(255,255,255,0.06)' }}
           >
@@ -224,10 +225,17 @@ export default function Progress() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-2">
 
+        {!hasHistory && (
+          <div className="text-center pt-2 pb-6">
+            <img src="/adonis-mascot.png" alt="Adonis, the Ascendus mascot" className="w-28 h-32 object-contain mx-auto mb-3" />
+            <h2 className="font-heading text-xl font-bold text-primary">Your glow-up pal.</h2>
+            <p className="font-body text-[13px] text-secondary mt-1">Practical guidance. Steady progress. In your corner.</p>
+          </div>
+        )}
         {/* Typewriter greeting on first load */}
         {showTypewriter && !hasHistory && (
           <TypewriterBubble
-            text="What do you need help with today?"
+            text="What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?"
             onDone={() => setChipsVisible(true)}
           />
         )}
@@ -298,13 +306,14 @@ export default function Progress() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder="Ask anything…"
+            placeholder="Ask Adonis anything…" aria-label="Message Adonis"
             className="flex-1 bg-transparent text-[14px] font-body text-primary outline-none"
             style={{ color: 'rgba(255,255,255,0.9)' }}
           />
           <motion.button
             whileTap={{ scale: 0.88 }}
             onClick={() => { triggerHaptic(); send() }}
+            aria-label="Send message"
             disabled={!input.trim() || loading}
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
             style={{
