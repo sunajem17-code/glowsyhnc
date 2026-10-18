@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { findStoredPotentialScore, getRevealRatings, getRevealView } from './revealRatings.js'
+import { findStoredPotentialScore, getRatingColor, recoverPotentialScore, getRevealRatings, getRevealView } from './revealRatings.js'
 
 test('uses named server ratings rather than unrelated pillars or fabricated potential', () => {
   const ratings = getRevealRatings({ glowScore: 7, pillars: { features: 9 }, aiScore: {
@@ -11,6 +11,21 @@ test('uses named server ratings rather than unrelated pillars or fabricated pote
 })
 test('missing scores remain unavailable instead of becoming zero', () => {
   assert.deepEqual(getRevealRatings({}).map(r => r.value), [null, null, null, null, null, null])
+})
+test('colors vary continuously through midrange scores', () => {
+  assert.notEqual(getRatingColor(5.5), getRatingColor(6.5))
+})
+test('recovers legacy Potential from the scorer without sending client scores', async () => {
+  const scan = { id: 'old-local', glowScore: 6.1, facePhotoUrl: 'data:image/jpeg;base64,test' }
+  let payload
+  const api = { supabase: { getScans: async () => ({ scans: [] }) }, ai: { score: async data => { payload = data; return { overallScore: 6.1, potentialScore: 7.5 } } } }
+  assert.equal(await recoverPotentialScore(scan, api), 7.5)
+  assert.equal(payload.faceImage, scan.facePhotoUrl)
+  assert.equal('overallScore' in payload, false)
+})
+test('does not attach Potential from a different scoring result', async () => {
+  const api = { supabase: { getScans: async () => ({ scans: [] }) }, ai: { score: async () => ({ overallScore: 8, potentialScore: 9 }) } }
+  await assert.rejects(recoverPotentialScore({ id: 'mismatch', glowScore: 6, facePhotoUrl: 'data:image/jpeg;base64,test' }, api), /does not match/)
 })
 test('matches a saved potential score to the same scan by score and timestamp', () => {
   const scan = { glowScore: 6.1, scanDate: '2026-10-17T12:00:00.000Z' }

@@ -6,6 +6,12 @@ import { GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const ISSUE_CONTENT = {
+  image_load: {
+    headline: 'Please take a new photo',
+    label: 'This photo is no longer available',
+    desc: 'The saved photo could not be opened. Take a new photo to continue.',
+    tips: ['Return to the camera', 'Take a new front photo', 'Continue without reloading the page'],
+  },
   insufficient_face_resolution: {
     headline: 'Your face needs to be a little closer',
     label: 'Face detected — too small to measure',
@@ -128,7 +134,7 @@ export default function ScanQualityFail() {
       const result = await validateScanQuality(photoUrl)
       if (result.passed) {
         navigate('/scan/capture', { replace: true, state: { recoveredFrontPhoto: photoUrl } })
-      } else if (result.state === 'RESULT') {
+      } else {
         navigate('/scan/quality-fail', { replace: true, state: { issues: result.issues, photoUrl } })
       }
     } catch (err) {

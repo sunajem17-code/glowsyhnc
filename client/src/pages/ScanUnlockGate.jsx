@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
 import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
@@ -15,7 +15,7 @@ import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
-import { findStoredPotentialScore, getRatingColor, getRevealRatings, getRevealView } from '../utils/revealRatings'
+import { recoverPotentialScore, getRatingColor, getRevealRatings, getRevealView } from '../utils/revealRatings'
 import ScanWaitingText from '../components/ScanWaitingText'
 
 const G    = GOLD
@@ -1507,16 +1507,61 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const [storedPotentialScore, setStoredPotentialScore] = useState(null)
+  const [activeView, setActiveView] = useState('results')
+  const [viewDirection, setViewDirection] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [travelY, setTravelY] = useState(0)
+  const [saveError, setSaveError] = useState('')
+  const cardRef = useRef(null)
+  const savingRef = useRef(false)
+  const transferCompleteRef = useRef(false)
+  const reduceMotion = useReducedMotion()
+
+  function showView(view) {
+    if (saving || view === activeView) return
+    setViewDirection(view === 'photo' ? 1 : -1)
+    setActiveView(view)
+  }
+
+  function addToProgress() {
+    if (savingRef.current) return
+    savingRef.current = true
+    setSaveError('')
+    try {
+      const progressSavedAt = new Date().toISOString()
+      useStore.setState(state => {
+        const latest = state.currentScan?.id === scan.id ? state.currentScan : scan
+        const saved = { ...latest, progressSavedAt: latest.progressSavedAt || progressSavedAt }
+        const exists = state.scans.some(item => item.id === scan.id)
+        return {
+          currentScan: state.currentScan?.id === scan.id ? saved : state.currentScan,
+          scans: exists ? state.scans.map(item => item.id === scan.id ? saved : item) : [saved, ...state.scans].slice(0, 100),
+        }
+      })
+      triggerHaptic()
+      const bounds = cardRef.current?.getBoundingClientRect()
+      setTravelY(bounds ? Math.max(0, window.innerHeight - 70 - (bounds.top + bounds.height / 2)) : 160)
+      setSaving(true)
+    } catch {
+      savingRef.current = false
+      setSaveError('Could not save your rating on this device. Please try again.')
+    }
+  }
 
   useEffect(() => {
     setStoredPotentialScore(null)
     if (!unlocked || !scan || scan.aiScore?.potentialScore != null || scan.potentialScore != null) return undefined
     let active = true
-    api.supabase.getScans()
-      .then(({ scans }) => {
-        if (active) setStoredPotentialScore(findStoredPotentialScore(scan, scans))
+    recoverPotentialScore(scan, api)
+      .then(potentialScore => {
+        if (!active) return
+        setStoredPotentialScore(potentialScore)
+        const patch = saved => saved?.id === scan.id
+          ? { ...saved, potentialScore, aiScore: { ...saved.aiScore, potentialScore } }
+          : saved
+        useStore.setState(state => ({ currentScan: patch(state.currentScan), scans: state.scans.map(patch) }))
       })
-      .catch(() => {})
+      .catch(err => console.warn('[Potential recovery failed]', err?.message))
     return () => { active = false }
   }, [unlocked, scan?.id])
 
@@ -1541,7 +1586,22 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
         )}
 
         {/* Face circle + card */}
-        <div className="relative w-full" style={{ marginTop: 102 }}>
+        <motion.div ref={cardRef} className="relative w-full" style={{ marginTop: activeView === 'photo' ? 20 : 102, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+          drag={unlocked && !saving ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -60 || info.velocity.x < -400) showView('photo')
+            else if (info.offset.x > 60 || info.velocity.x > 400) showView('results')
+          }}
+          animate={saving ? { scale: reduceMotion ? 1 : 0.12, y: reduceMotion ? 0 : travelY, rotate: reduceMotion ? 0 : -7, opacity: 0 } : { scale: 1, y: 0, rotate: 0, opacity: 1 }}
+          transition={{ duration: reduceMotion ? 0.15 : 0.8, ease: EASE_STANDARD }}
+          onAnimationComplete={() => {
+            if (saving && !transferCompleteRef.current) {
+              transferCompleteRef.current = true
+              navigate('/timeline', { replace: true, state: { savedScanId: scan.id } })
+            }
+          }}>
+          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
+          <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
             <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
@@ -1562,7 +1622,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
                   </div>
                   {unlocked ? (
                     <div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} style={{ color: '#fff', fontSize: value == null ? 18 : 26, fontWeight: 700, marginBottom: 12, fontVariantNumeric: 'tabular-nums', minHeight: 31 }}>
-                      {value == null ? 'Not scored' : <>{value.toFixed(1)}<span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginLeft: 3 }}>/10</span></>}
+                      {value == null ? 'Not scored' : value.toFixed(1)}
                     </div>
                   ) : (
                     <div aria-label={`${label}: Locked`} style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
@@ -1574,9 +1634,39 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
               ))}
             </div>
           </div>
-        </div>
+          </div>
+          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
+            <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
+              {facePhoto ? <img src={facePhoto} draggable={false} alt="Your original front scan photo" className="w-full h-full object-contain" /> : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
+            </div>
+          </div>}
+          </motion.div>
+        </motion.div>
 
         {/* CTAs */}
+        {unlocked && <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={addToProgress}
+          disabled={saving}
+          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
+          style={{ marginTop: 26, background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          {saving ? 'Adding to progress…' : 'Add rating to progress'}
+        </motion.button>}
+        {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
+          {[['results', 'Show results'], ['photo', 'Show face photo']].map(([view, label]) => (
+            <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view} disabled={saving}
+              onClick={() => showView(view)} onKeyDown={event => {
+                if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); showView(activeView === 'results' ? 'photo' : 'results') }
+              }} className="flex items-center justify-center" style={{ width: 32, height: 44 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
+            </button>
+          ))}
+        </div>}
+        {saving && <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-5 py-3 flex items-center gap-2" style={{ background: '#201C12', color: G, border: `1px solid ${G}`, zIndex: 20 }}>
+          <BarChart2 size={20} /> Progress
+        </motion.div>}
+        {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
         {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
+import { preserveCapture } from '../utils/capturePhoto'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
@@ -2042,7 +2043,7 @@ export default function Scan() {
   // Runs quality validation during the ProcessingOverlay loading state so the
   // check works for BOTH camera captures and library uploads (both call this).
   // FAIL-CLOSED: any error during validation blocks the scan, never silently passes.
-  async function transitionToSide(url) {
+  async function transitionToSide(url, capturedBlob = null) {
     if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Front captured')
     console.log('[ASCENDUS SCAN] 1. Scan started')
     console.log('[ASCENDUS SCAN] 2. Image captured/selected — type:', url ? url.slice(0, 40) : 'null')
@@ -2057,6 +2058,14 @@ export default function Scan() {
 
     let passed = false
     let issues = []
+    try {
+      url = await preserveCapture(url, capturedBlob)
+      setFacePhoto(url)
+    } catch {
+      setTransitioning(false)
+      navigate('/scan/quality-fail', { state: { issues: [{ code: 'image_load', severity: 'critical' }] } })
+      return
+    }
     try {
       const { validateScanQuality } = await import('../utils/scanQuality.js')
       const result = await validateScanQuality(url)
@@ -2627,11 +2636,11 @@ export default function Scan() {
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
                     triggerHaptic()
-                    const { url, forStep } = previewPhoto
+                    const { url, blob, forStep } = previewPhoto
                     if (forStep === 1) {
                       const r=previewImageRef.current?.getBoundingClientRect()
                       if(r) setCaptureFrame({left:r.left,top:r.top,width:r.width,height:r.height})
-                      transitionToSide(url)
+                      transitionToSide(url, blob)
                     } else {
                       setTransitioning(true)
                       setSidePhoto(url); setError(''); setCameraOpen(false)
@@ -2688,7 +2697,7 @@ export default function Scan() {
                   triggerHaptic()
                   if (step === 1) {
                     if(frame) setCaptureFrame(frame)
-                    transitionToSide(url)
+                    transitionToSide(url, blob)
                   } else {
                     setTransitioning(true)
                     setSidePhoto(url); setError(''); setCameraOpen(false)

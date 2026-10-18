@@ -11,6 +11,7 @@ import ProLock from '../components/ProLock'
 import { api } from '../utils/api'
 import { GOLD, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { mergeProgressHistory } from '../utils/progressHistory'
 
 const METRIC_TABS = [
   { key: 'glowScore',     label: 'Overall',  color: GOLD },
@@ -99,8 +100,9 @@ function ComparisonSlider({ before, after }) {
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
-  const { scans, streak, isPremium, token } = useStore()
-  const [history, setHistory]     = useState([])
+  const { scans, currentScan, streak, isPremium, token } = useStore()
+  const [remoteHistory, setHistory] = useState([])
+  const history = mergeProgressHistory(remoteHistory, scans, currentScan)
   const [loading, setLoading]     = useState(true)
   const [metricTab, setMetricTab] = useState(0)
   const [sharing, setSharing]     = useState(false)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import logo from '../assets/ascendus-icon.png'
-import { triggerHaptic } from '../utils/haptics'
+import useTypewriter from '../utils/useTypewriter'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -12,26 +12,6 @@ const CINEMATIC_LINES = [
   { text: 'Find your starting point with...', gold: false },
   { text: 'ASCENDUS', gold: true, pop: true, hold: 1500 },
 ]
-
-function useTypewriter(text, speed = 38, startDelay = 0) {
-  const [displayed, setDisplayed] = useState('')
-  useEffect(() => {
-    setDisplayed('')
-    if (!text) return
-    let iv
-    const t = setTimeout(() => {
-      let i = 0
-      iv = setInterval(() => {
-        i++
-        setDisplayed(text.slice(0, i))
-        triggerHaptic()
-        if (i >= text.length) clearInterval(iv)
-      }, speed)
-    }, startDelay)
-    return () => { clearTimeout(t); clearInterval(iv) }
-  }, [text, speed, startDelay])
-  return displayed
-}
 
 function DelayedTypewriter({ text, delay = 0 }) {
   const [active, setActive] = useState(false)

@@ -87,7 +87,9 @@ export default function Layout() {
             pointerEvents: swipeEnabled ? 'auto' : 'none',
           }}
         />
-        <AnimatePresence mode="wait" initial={false} onExitComplete={resetAfterExit}>
+        {/* The results card has already animated away during this handoff.
+            Reset the boundary so nested scan exits cannot hold Progress blank. */}
+        <AnimatePresence key={location.pathname === '/timeline' && location.state?.savedScanId ? `saved-${location.state.savedScanId}` : 'pages'} mode="wait" initial={false} onExitComplete={resetAfterExit}>
           <motion.div
             key={location.pathname}
             custom={swipeExit}
