@@ -1,6 +1,6 @@
 import UIKit
 import Capacitor
-
+import FirebaseCore
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -8,6 +8,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // TODO: re-enable Crashlytics once GoogleService-Info.plist is added back
+        FirebaseApp.configure()
+
         return true
     }
 
