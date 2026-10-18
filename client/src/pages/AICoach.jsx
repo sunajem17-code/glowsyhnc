@@ -7,6 +7,7 @@ import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { UPGRADE_WELCOME } from '../utils/coachWelcome'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -160,7 +161,9 @@ export default function AICoach() {
   // Initial greeting on mount
   useEffect(() => {
     if (messages.length > 0 || !latestScan || !isPremium) return
-    setMessages([{ role: 'assistant', content: `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
+    const pending = useStore.getState().upgradeWelcomePending
+    setMessages([{ role: 'assistant', content: pending ? UPGRADE_WELCOME : `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
+    if (pending) useStore.getState().setUpgradeWelcomePending(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, latestScan])
 

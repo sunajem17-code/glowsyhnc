@@ -73,7 +73,7 @@ export default function Premium() {
   useEffect(() => {
     if (searchParams.get('success') === '1') {
       api.payments.status()
-        .then(({ isPremium: active }) => { if (active) setIsPremium(true) })
+        .then(({ isPremium: active }) => { if (active) { useStore.getState().setUpgradeWelcomePending(true); setIsPremium(true) } })
         .catch(() => {})
     }
   }, [searchParams, setIsPremium])
@@ -88,6 +88,7 @@ export default function Premium() {
       if (isNative()) {
         const result = await purchasePro('monthly')
         if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)

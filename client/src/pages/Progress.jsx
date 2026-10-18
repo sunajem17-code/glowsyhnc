@@ -7,6 +7,7 @@ import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { UPGRADE_WELCOME, UPGRADE_PROMPTS } from '../utils/coachWelcome'
 
 const STARTER_PROMPTS = [
   "Where should I start?",
@@ -28,10 +29,6 @@ function buildScanContext(scan, userProfile) {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-3 mb-4">
-      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
-      </div>
       <div className="px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1.5 items-center"
         style={{ background: 'rgba(255,255,255,0.06)' }}>
         {[0, 1, 2].map(i => (
@@ -88,10 +85,6 @@ function TypewriterBubble({ text, onDone }) {
       transition={{ duration: 0.2 }}
       className="flex items-end gap-3 mb-4"
     >
-      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
-      </div>
       <div className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
         style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', borderRadius: '18px 18px 18px 4px' }}>
         {displayed}
@@ -116,12 +109,6 @@ function MessageBubble({ msg }) {
       transition={{ duration: 0.22 }}
       className={`flex gap-3 mb-4 ${isAI ? 'items-end' : 'items-end flex-row-reverse'}`}
     >
-      {isAI && (
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-          <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
-        </div>
-      )}
       <div
         className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
         style={isAI
@@ -137,6 +124,14 @@ function MessageBubble({ msg }) {
 export default function Progress() {
   const navigate = useNavigate()
   const { scans, isPremium, userProfile } = useStore()
+  const upgradeWelcomePending = useStore(s => s.upgradeWelcomePending)
+  const [upgradeWelcome, setUpgradeWelcome] = useState(false)
+  useEffect(() => {
+    if (isPremium && upgradeWelcomePending) {
+      setUpgradeWelcome(true)
+      useStore.getState().setUpgradeWelcomePending(false)
+    }
+  }, [isPremium, upgradeWelcomePending])
   const latestScan = scans?.[0] ?? null
   const scanContext = buildScanContext(latestScan, userProfile)
 
@@ -156,6 +151,7 @@ export default function Progress() {
   function reset() {
     triggerHaptic()
     setMessages([])
+    setUpgradeWelcome(false)
     setShowTypewriter(true)
     setChipsVisible(false)
     setInput('')
@@ -204,11 +200,14 @@ export default function Progress() {
         }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}>
-            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
+            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain" />
           </div>
-          <div><h1 className="font-heading font-bold text-[18px] text-primary">Adonis <span className="text-[10px] font-body font-normal" style={{ color: GOLD }}>AI COACH</span></h1><p className="text-[11px] text-secondary font-body">Your pal. Your coach. In your corner.</p></div>
+          <div>
+            <h1 className="font-heading font-bold text-[18px] text-primary">Adonis</h1>
+            <p className="text-[11px] font-body font-normal" style={{ color: GOLD }}>Ask anything</p>
+          </div>
         </div>
         {hasHistory && (
           <button
@@ -225,17 +224,11 @@ export default function Progress() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-2">
 
-        {!hasHistory && (
-          <div className="text-center pt-2 pb-6">
-            <img src="/adonis-mascot.png" alt="Adonis, the Ascendus mascot" className="w-28 h-32 object-contain mx-auto mb-3" />
-            <h2 className="font-heading text-xl font-bold text-primary">Your glow-up pal.</h2>
-            <p className="font-body text-[13px] text-secondary mt-1">Practical guidance. Steady progress. In your corner.</p>
-          </div>
-        )}
         {/* Typewriter greeting on first load */}
         {showTypewriter && !hasHistory && (
           <TypewriterBubble
-            text="What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?"
+            key={upgradeWelcome ? 'upgrade' : 'regular'}
+            text={upgradeWelcome ? UPGRADE_WELCOME : "What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?"}
             onDone={() => setChipsVisible(true)}
           />
         )}
@@ -253,7 +246,7 @@ export default function Progress() {
               transition={{ duration: 0.25 }}
               className="flex flex-wrap gap-2 mt-1 pb-4"
             >
-              {STARTER_PROMPTS.map((chip, i) => (
+              {(upgradeWelcome ? UPGRADE_PROMPTS : STARTER_PROMPTS).map((chip, i) => (
                 <motion.button
                   key={chip}
                   initial={{ opacity: 0, y: 4 }}

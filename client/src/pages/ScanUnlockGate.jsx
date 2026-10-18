@@ -1312,6 +1312,7 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
 
   async function handleClaimDiscount(result) {
     await api.payments.syncRc(result.customerInfo?.originalAppUserId)
+    useStore.getState().setUpgradeWelcomePending(true)
     setShowDiscount(false)
     onUnlock()
   }
@@ -1771,6 +1772,7 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
         const plan = 'monthly'
         const result = await purchasePro(plan)
         if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
           await api.payments.syncRc(rcUserId)
           handleUnlockSuccess()

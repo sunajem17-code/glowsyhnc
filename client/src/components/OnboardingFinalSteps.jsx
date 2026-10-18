@@ -414,6 +414,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
 
   async function handleClaimOffer(result) {
     await api.payments.syncRc(result.customerInfo?.originalAppUserId)
+    useStore.getState().setUpgradeWelcomePending(true)
     setIsPremium(true)
     setShowDiscountOffer(false)
     onPromoSuccess?.()
