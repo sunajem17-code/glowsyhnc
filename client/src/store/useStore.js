@@ -6,6 +6,8 @@ import { checkAchievements } from '../utils/achievements'
 const useStore = create(
   persist(
     (set, get) => ({
+      upgradeWelcomePending: false,
+      setUpgradeWelcomePending: (value) => set({ upgradeWelcomePending: value }),
       // Auth
       user: null,
       token: null,
@@ -15,6 +17,7 @@ const useStore = create(
       setAuth: (user, token) => set({
         user,
         token,
+        upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
@@ -28,6 +31,7 @@ const useStore = create(
       setGuestSession: (userId, token) => set({
         user: { id: userId },
         token,
+        upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: true,
         isPremium: false,
@@ -42,6 +46,7 @@ const useStore = create(
         set({
           user: null,
           token: null,
+          upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
           scans: [],
@@ -412,6 +417,7 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
+        upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,
         hairProfile: state.hairProfile,

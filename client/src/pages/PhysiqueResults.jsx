@@ -304,6 +304,7 @@ export default function PhysiqueResults() {
       if (isNative()) {
         const result = await purchasePro('monthly')
         if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
           api.payments.syncRc(result.customerInfo?.originalAppUserId).catch(() => {})
           handleUnlockSuccess()
           setIsPurchasing(false)

@@ -397,6 +397,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     try {
       const result = await purchaseDiscountedAnnual()
       if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
         const rcUserId = result.customerInfo?.originalAppUserId
         api.payments.syncRc(rcUserId).catch(() => {})
         setIsPremium(true)

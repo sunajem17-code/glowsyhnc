@@ -1308,6 +1308,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
     try {
       const result = await purchaseDiscountedAnnual()
       if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
         const rcUserId = result.customerInfo?.originalAppUserId
         api.payments.syncRc(rcUserId).catch(() => {})
         setIsPremium(true)
@@ -1674,6 +1675,7 @@ export default function ScanUnlockGate() {
         const plan = 'monthly'
         const result = await purchasePro(plan)
         if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
           api.payments.syncRc(rcUserId).catch(() => {})
           handleUnlockSuccess()

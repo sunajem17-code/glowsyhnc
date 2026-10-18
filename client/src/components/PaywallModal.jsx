@@ -286,6 +286,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
     try {
       const result = await purchasePro('weekly')
       if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
         setIsPremium(true)
         onPurchaseSuccess?.()
       }

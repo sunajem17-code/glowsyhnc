@@ -26,6 +26,7 @@ export default function PaymentSuccess() {
         try {
           const { isPremium } = await api.payments.status()
           if (isPremium) {
+            useStore.getState().setUpgradeWelcomePending(true)
             setIsPremium(true)
             // Onboarding's "Unlock Results Now" web path redirects here via a
             // hard page load (window.location.href), which tears down
