@@ -1264,6 +1264,15 @@ router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async
     return res.json({ valid: true, faceCount: 1, issues: [], localBypass: true })
   }
 
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    console.error('[validate-scan] ANTHROPIC_API_KEY is not configured on the server')
+    return res.status(503).json({
+      error: 'The photo-checking service is unavailable. Your photo has not been rejected.',
+      code: 'validation_not_configured',
+      retryable: false,
+    })
+  }
+
   // Strip data URL header — Claude needs raw base64
   const commaIdx  = imageB64.indexOf(',')
   const base64Data = commaIdx >= 0 ? imageB64.slice(commaIdx + 1) : imageB64
@@ -1315,7 +1324,7 @@ Rules:
       result = JSON.parse(jsonStr)
     } catch {
       console.error('[validate-scan] Non-JSON from Claude:', text.slice(0, 200))
-      return res.json({ valid: false, faceCount: 0, issues: [{ type: 'validation_error', message: 'Could not analyze photo. Please try again.' }] })
+      return res.status(502).json({ error: 'The photo checker could not complete this check. Please try again.', code: 'validation_unavailable', retryable: true })
     }
 
     // Sanitize — never trust raw model output shape
@@ -1328,7 +1337,7 @@ Rules:
     })
   } catch (err) {
     console.error('[validate-scan] error:', err?.message)
-    return res.status(503).json({ error: 'Validation service temporarily unavailable. Please try again.', retryable: true })
+    return res.status(503).json({ error: 'Validation service temporarily unavailable. Please try again.', code: 'validation_unavailable', retryable: true })
   }
 })
 

@@ -1,15 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Scissors, CheckSquare, CalendarCheck, Settings, TrendingUp, ChevronRight } from 'lucide-react'
+import { Scissors, CheckSquare, CalendarCheck, Settings, Users, ChevronRight } from 'lucide-react'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const CARDS = [
   {
-    to: '/timeline',
-    icon: TrendingUp,
-    title: 'Progress',
-    subtitle: 'Timeline of your recent scans and ratings',
+    to: '/community',
+    icon: Users,
+    title: 'Community',
+    subtitle: 'Connect and share your glow-up journey',
   },
   {
     to: '/hairmaxx',

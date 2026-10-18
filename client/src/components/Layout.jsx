@@ -47,6 +47,14 @@ export default function Layout() {
   const achievements       = useStore(s => s.achievements)
   const unlockAchievement  = useStore(s => s.unlockAchievement)
   const scanLaunching      = useStore(s => s.scanLaunching)
+  const setScanLaunching   = useStore(s => s.setScanLaunching)
+  const isScanCapture = location.pathname === '/scan/capture' || location.pathname === '/physique-scan'
+
+  // A cancelled scan can return to any tab, not just ScanHome. Never leave
+  // the scan-launch flag covering an unrelated page or its navigation.
+  useEffect(() => {
+    if (!isScanCapture) setScanLaunching(false)
+  }, [isScanCapture, location.key, setScanLaunching])
 
   // Check for new achievements whenever key state changes
   useEffect(() => {
@@ -66,7 +74,7 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-full bg-page">
       <AnimatePresence>
-        {scanLaunching && <ProcessingOverlay key="scan-launch" label="Processing" />}
+        {scanLaunching && isScanCapture && <ProcessingOverlay key="scan-launch" label="Processing" />}
       </AnimatePresence>
       <main className="flex-1 overflow-hidden relative">
         {/* Thin left-edge hit zone for the interruptible swipe-back gesture.

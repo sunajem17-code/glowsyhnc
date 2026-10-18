@@ -135,8 +135,14 @@ router.post('/scans', auth, async (req, res) => {
 // ── GET /supabase/scans ────────────────────────────────────────────────────────
 // Load all scans for the authenticated user.
 router.get('/scans', auth, async (req, res) => {
-  if (!requireSupabase(res)) return
   try {
+    // Local development uses SQLite and device-saved ratings. Missing cloud
+    // credentials must not turn every history refresh into a service failure.
+    if (!isConfigured() && process.env.NODE_ENV !== 'production') {
+      const { getLocalProgressHistory } = require('../utils/localProgressHistory')
+      return res.json({ scans: getLocalProgressHistory(require('../db'), req.userId), source: 'local' })
+    }
+    if (!requireSupabase(res)) return
     const sb = getSupabase()
     const { data: scans, error } = await sb
       .from('scans')

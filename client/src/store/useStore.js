@@ -1,3 +1,4 @@
+import { API_BASE } from '../utils/backend'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
@@ -282,14 +283,12 @@ const useStore = create(
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
-          const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
-          const base = `https://${API.replace(/^https?:\/\//, '')}/api`
           const headers = { Authorization: `Bearer ${token}` }
 
           // Run both fetches in parallel — cuts startup time in half
           const [statusRes, profileRes] = await Promise.all([
-            fetch(`${base}/payments/status`, { headers }),
-            fetch(`${base}/user/profile`,    { headers }),
+            fetch(`${API_BASE}/payments/status`, { headers }),
+            fetch(`${API_BASE}/user/profile`,    { headers }),
           ])
 
           // Same reasoning as the RevenueCat check above — /payments/status is

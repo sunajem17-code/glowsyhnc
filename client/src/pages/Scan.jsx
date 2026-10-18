@@ -1907,6 +1907,11 @@ export default function Scan() {
   const [step, setStep]                   = useState(recoveredFrontPhoto ? 2 : 1) // skip gender step — already collected in onboarding
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
+  const [frontTitleTaps, setFrontTitleTaps] = useState(0)
+  const [sideTitleTaps, setSideTitleTaps] = useState(0)
+  const libraryUploadRef = useRef(null)
+  const libraryUploadStepRef = useRef(1)
+  const [choosingLibraryPhoto, setChoosingLibraryPhoto] = useState(false)
   const previewImageRef = useRef(null)
   const [captureFrame, setCaptureFrame] = useState(null)
   const [gender, setLocalGender]          = useState(savedGender ?? null)
@@ -1947,6 +1952,44 @@ export default function Scan() {
   const [scanReady, setScanReady] = useState(false)
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
+
+  async function chooseLibraryPhoto() {
+    if (choosingLibraryPhoto) return
+    libraryUploadStepRef.current = step
+    triggerHaptic()
+    setError('')
+    if (!isNative()) {
+      libraryUploadRef.current?.click()
+      return
+    }
+    setChoosingLibraryPhoto(true)
+    try {
+      const url = await pickPhoto()
+      if (url) setPreviewPhoto({ url, blob: url, forStep: step })
+    } catch (err) {
+      if (!/cancel/i.test(err?.message || '')) setError('Couldn’t open your photo library. Please try again.')
+    } finally {
+      setChoosingLibraryPhoto(false)
+    }
+  }
+
+  function selectLibraryPhoto(event) {
+    const forStep = libraryUploadStepRef.current
+    const file = event.target.files?.[0]
+    event.target.value = '' // Allow choosing the same photo again.
+    if (!file) return
+    if (file.type && !file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setError('')
+      setPreviewPhoto({ url: reader.result, blob: file, forStep })
+    }
+    reader.onerror = () => setError('Couldn’t read that picture. Please choose another.')
+    reader.readAsDataURL(file)
+  }
 
   const finishAnimation = useCallback(() => {
     if (animationGateRef.current) triggerHaptic()
@@ -2538,7 +2581,7 @@ export default function Scan() {
                 else if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
                 else if (step === 2) { setFacePhoto(null); setStep(1) }
-                else { setScanLaunching(true); navigate(-1) }
+                else { setScanLaunching(false); navigate(-1) }
               }}
               aria-label="Go back"
               className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
@@ -2550,7 +2593,15 @@ export default function Scan() {
               STEP {step === 1 ? '1' : '2'} OF 2
             </p>
             <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
-              {step === 1 ? 'Take your front photo' : 'Now, your side profile'}
+              {step === 1 ? (
+                <button type="button" className="text-left" onClick={() => setFrontTitleTaps(taps => Math.min(taps + 1, 3))}>
+                  Take your front photo
+                </button>
+              ) : (
+                <button type="button" className="text-left" onClick={() => setSideTitleTaps(taps => Math.min(taps + 1, 3))}>
+                  Now, your side profile
+                </button>
+              )}
             </h1>
           </div>
         ) : (
@@ -2850,6 +2901,7 @@ export default function Scan() {
       )}
 
       {/* CTAs — pinned at bottom, same position/size on every step */}
+      <input ref={libraryUploadRef} type="file" accept="image/*" onChange={selectLibraryPhoto} className="hidden" />
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
           {(step === 1 || step === 2) && (
@@ -2870,6 +2922,18 @@ export default function Scan() {
             >
               Begin Scan
             </motion.button>
+          )}
+          {((step === 1 && frontTitleTaps >= 3) || (step === 2 && sideTitleTaps >= 3)) && (
+            <button
+              type="button"
+              onClick={chooseLibraryPhoto}
+              disabled={choosingLibraryPhoto}
+              className="w-full mt-3 py-3 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ border: `1px solid ${GOLD}`, color: GOLD }}
+            >
+              <Upload size={18} />
+              {choosingLibraryPhoto ? 'Opening library…' : 'Upload picture'}
+            </button>
           )}
         </div>
       )}

@@ -1,3 +1,4 @@
+import { API_BASE } from '../utils/backend'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -147,9 +148,7 @@ export default function DailyCheckin() {
 
     // Sync checkin to server (fire-and-forget — local state is source of truth for UI)
     if (token && token !== 'demo-token') {
-      const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
-      const base = `https://${API.replace(/^https?:\/\//, '')}/api`
-      fetch(`${base}/checkin`, {
+      fetch(`${API_BASE}/checkin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

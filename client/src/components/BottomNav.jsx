@@ -1,13 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Camera, Grid2x2, Users } from 'lucide-react'
+import { Camera, Grid2x2, TrendingUp } from 'lucide-react'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const navItems = [
   { to: '/scan',      icon: Camera,    label: 'Scan' },
-  { to: '/extras',   icon: Grid2x2,   label: 'Extras' },
+  { to: '/timeline', icon: TrendingUp, label: 'Progress' },
   { to: '/progress', image: '/adonis-mascot.png', label: 'Adonis' },
-  { to: '/community',icon: Users,     label: 'Community' },
+  { to: '/extras', icon: Grid2x2, label: 'Extras' },
 ]
 
 // Single source of truth for which routes are tab roots (lateral destinations

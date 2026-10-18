@@ -2152,9 +2152,9 @@ export default function PhysiqueScan() {
               else if (step === 1) {
                 if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
-                else { setScanLaunching(true); navigate(-1) }
+                else { setScanLaunching(false); navigate(-1) }
               } else {
-                setScanLaunching(true); navigate(-1)
+                setScanLaunching(false); navigate(-1)
               }
             }}
             aria-label="Go back"

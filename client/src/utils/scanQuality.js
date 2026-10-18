@@ -17,6 +17,7 @@
  */
 
 import { api } from './api.js'
+import { validationFailure } from './validationFailure.js'
 
 // ─── Calibration state ────────────────────────────────────────────────────────
 const CALIBRATION_KEY = 'asc_quality_calibrated'
@@ -138,12 +139,7 @@ export async function validateScanQuality(imageSource) {
   } catch (networkErr) {
     // Network/server failure — VALIDATION_ERROR, not a photo quality problem
     console.error('[ASCENDUS SCAN] AI request failed (network/server):', networkErr?.message)
-    const result = {
-      passed: false,
-      issues: [{ code: 'validation_error', title: 'Could not validate photo — please try again', advice: 'Check your connection and try again.', severity: 'critical' }],
-      state: 'ERROR',
-    }
-    return result
+    return validationFailure(networkErr)
   }
 
   // ── Parse the response ────────────────────────────────────────────────────────

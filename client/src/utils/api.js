@@ -1,9 +1,6 @@
 import useStore from '../store/useStore'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
-// In local development, use Vite's same-origin proxy. Browsers otherwise
-// block requests from 127.0.0.1 when the deployed API allows localhost only.
-const BASE = import.meta.env.DEV ? '/api' : `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
+import { API_BASE as BASE } from './backend'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -110,7 +107,7 @@ async function request(path, options = {}) {
     // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
     const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status     = res.status
-    err.errorCode  = errBody.error  // machine-readable code, e.g. 'rate_limited', 'claude_rate_limited'
+    err.errorCode  = errBody.code || errBody.error  // Prefer explicit codes; retain existing API compatibility.
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan
     throw err

@@ -1,23 +1,24 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolveBackendOrigin } from './src/utils/backend.js'
 
-const API_TARGET = process.env.VITE_API_URL
-  ? (/^https?:\/\//.test(process.env.VITE_API_URL) ? process.env.VITE_API_URL : `https://${process.env.VITE_API_URL}`)
-  : 'https://glowsyhnc-production-e16b.up.railway.app'
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const target = resolveBackendOrigin(env.VITE_API_URL || 'http://localhost:3002')
+  const proxy = Object.fromEntries(['/api', '/uploads', '/webhooks'].map(prefix => [
+    prefix, { target, changeOrigin: true },
+  ]))
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: true,
-    proxy: {
-      '/api': {
-        target: API_TARGET,
-        changeOrigin: true,
-      },
+  return {
+    plugins: [react()],
+    server: {
+      host: true,
+      port: 3000,
+      proxy,
     },
-  },
-  optimizeDeps: {
-    // Don't pre-bundle MediaPipe — it loads WASM files at runtime from /public/mediapipe/
-    exclude: ['@mediapipe/face_mesh'],
-  },
+    optimizeDeps: {
+      // Don't pre-bundle MediaPipe — it loads WASM files at runtime from /public/mediapipe/
+      exclude: ['@mediapipe/face_mesh'],
+    },
+  }
 })
