@@ -6,7 +6,7 @@ import MotionPage from '../components/MotionPage'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-import { DENSITIES, HAIR_CATALOG_VERSION, HAIR_TYPES, HAIRSTYLE_CATALOG, LENGTHS, THICKNESSES } from '../utils/hairCatalog'
+import { DENSITIES, HAIR_CATALOG_VERSION, HAIR_TYPES, HAIRSTYLE_CATALOG, LENGTHS } from '../utils/hairCatalog'
 import { conciseReason, rankHairstyles, structureFromScan } from '../utils/hairMatching'
 import { portableEvidence } from '../utils/productionAnalysis'
 import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
@@ -17,9 +17,41 @@ const PANEL = 'rgba(255,255,255,0.045)'
 
 function HairPattern({ type }) {
   const item = HAIR_TYPES.find(value => value.id === type)
-  return <svg viewBox="0 0 32 24" className="w-12 h-9" aria-hidden="true">
-    <path d={item?.pattern} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-    <path d={item?.pattern} transform="translate(0 6)" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity=".45" />
+  return <svg viewBox="0 0 32 48" className="w-8 h-10" aria-hidden="true">
+    <path d={item?.pattern} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+}
+
+function DensityDots({ density }) {
+  const strands = {
+    low: [10, 22, 34],
+    medium: [6, 12.4, 18.8, 25.2, 31.6, 38],
+    high: [6, 10, 14, 18, 22, 26, 30, 34, 38],
+  }
+  return <svg viewBox="0 0 44 44" className="w-11 h-11" aria-hidden="true">
+    <path d="M3 33 Q22 31 41 33 L40 39 Q39.5 42 35 42 H9 Q4.5 42 4 39 Z" fill="rgba(217,188,114,.28)" stroke="rgba(217,188,114,.58)" strokeWidth="1" />
+    {(strands[density] || []).map((x, index) => {
+      const sway = index % 2 ? 1.5 : -1.5
+      const tip = x + (index % 3 - 1) * 1.5
+      return <path key={index} d={`M${x} 34 C${x + sway} 27 ${x - sway} 17 ${tip} 8`} fill="none" stroke="#F3F0E7" strokeWidth="1.35" strokeLinecap="round" />
+    })}
+  </svg>
+}
+
+function LengthPortrait({ length }) {
+  const hairShapes = {
+    short: 'M12 20 C11 16 11 10 15 7 C17 5 19 5 21 5 C24 4 27 5 29 7 C33 9 34 15 32 20 L29 17 C27 15 25 14 22 14 C18 14 15 16 13 20 Z',
+    medium: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 25 L29 24 L29 17 C27 14 25 13 22 13 C18 13 15 15 14 18 L14 24 L12 25 Z',
+    long: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 24 L29 18 C27 14 25 13 22 13 C18 13 15 15 14 19 L13 24 Z',
+  }[length]
+  return <svg viewBox="0 0 44 48" className="w-12 h-12" aria-hidden="true">
+    {/* Clean, flat bust silhouettes inspired by the supplied hairstyle chart. */}
+    <path d="M13 17 C13 13 17 11 22 11 C27 11 31 13 31 17 L30 26 C29 30 26 33 22 33 C18 33 15 30 14 26 Z" fill="none" stroke="#F3F0E7" strokeWidth="1.6" strokeLinejoin="round" />
+    {length === 'long' && <path d="M15 7 C11 11 10 17 10 22 L11 36 Q12 40 15 39 L17 34 L16 17 Z M29 7 C33 11 34 17 34 22 L33 36 Q32 40 29 39 L27 34 L28 17 Z" fill="#D9BC72" />}
+    <path d={hairShapes} fill="#D9BC72" />
+    {length === 'short' && <path d="M15 16 Q15 12 17.5 9 M19 15 Q19 10 21.5 8 M23 15 Q24 10 26.5 9 M27 16 Q29 12 30 11" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
+    {length === 'medium' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M25 15 Q28 11 30 11 M29 18 Q31 15 31 13" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
+    {length === 'long' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M27 16 Q29 12 30 11 M11.5 22 Q11 29 13 36 M14 22 Q14 29 15 35 M32.5 22 Q33 29 31 36 M30 22 Q30 29 29 35" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
   </svg>
 }
 
@@ -41,25 +73,44 @@ function Header({ onBack, right }) {
   </div>
 }
 
-function ChoiceGrid({ title, subtitle, options, value, onChange, columns = 3, visual = false }) {
-  return <div className="min-h-[64vh] flex flex-col justify-center">
-    <p className="text-[10px] tracking-[.24em] uppercase mb-2" style={{ color: GOLD }}>HairMax</p>
-    <h2 className="font-heading font-bold text-[29px] text-white leading-tight">{title}</h2>
-    {subtitle && <p className="font-body text-[13px] text-secondary mt-2 mb-7">{subtitle}</p>}
-    {!subtitle && <div className="h-7" />}
-    <div className={`grid gap-3 ${columns === 2 ? 'grid-cols-2' : columns === 4 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+function ChoiceGrid({ title, subtitle, options, value, onChange, questionNumber, questionCount, questionKey, visual = false }) {
+  const details = {
+    density: { low: 'Less overall scalp coverage', medium: 'Balanced coverage and volume', high: 'Fuller coverage and volume' },
+    strandThickness: { fine: 'Thin, delicate strands', medium: 'Average strand thickness', thick: 'Thicker, coarser strands' },
+    desiredLength: { short: 'A close cut or short style', medium: 'Some length to style', long: 'Shoulder length or longer', any: 'Open to any length' },
+    maintenancePreference: { low: 'Keep daily styling simple', some: 'A little styling each day', any: 'Open to any routine' },
+  }
+  return <div className="flex-1 min-h-0 flex flex-col px-1 pb-3 pt-2">
+    <div className="grid gap-1.5 mb-8 shrink-0" style={{ gridTemplateColumns: `repeat(${questionCount}, minmax(0, 1fr))` }} aria-label={`Step ${questionNumber} of ${questionCount}`}>
+      {Array.from({ length: questionCount }, (_, index) => <span key={index} className="h-[3px] rounded-full" style={{ background: index < questionNumber ? '#F4F1EA' : 'rgba(255,255,255,.14)' }} />)}
+    </div>
+    <h2 className="font-heading font-bold text-[30px] text-white leading-[1.12] tracking-[-.025em]">{title}</h2>
+    {subtitle && <p className="font-body text-[13px] text-secondary mt-2">{subtitle}</p>}
+    <div className="mt-7 flex-1 min-h-0 flex flex-col gap-3 pb-1">
       {options.map(option => {
         const id = typeof option === 'string' ? option : option.id
-        const label = typeof option === 'string' ? option : option.label
+        const label = typeof option === 'string'
+          ? questionKey === 'density'
+            ? ({ low: 'Thin', medium: 'Medium', high: 'Thick' }[id] || id)
+            : (id === 'any' ? 'Any length' : id.charAt(0).toUpperCase() + id.slice(1))
+          : option.label
+        const description = (typeof option === 'string' ? null : option.description) || details[questionKey]?.[id] || ''
         const selected = value === id
-        return <motion.button key={id} whileTap={{ scale: .96 }} onClick={() => { triggerHaptic(); onChange(id) }}
-          className="min-h-[104px] rounded-2xl flex flex-col items-center justify-center gap-2 px-3 capitalize"
-          style={{ background: selected ? 'rgba(198,168,92,.13)' : PANEL, border: `1.5px solid ${selected ? 'rgba(198,168,92,.7)' : 'rgba(255,255,255,.08)'}`, color: selected ? GOLD : 'rgba(255,255,255,.72)' }}>
-          {visual && <HairPattern type={id} />}
-          {!visual && id === 'low' && <div className="flex gap-1">{[1,2,3].map(i => <i key={i} className="block w-0.5 h-7 bg-current" style={{ opacity: .35 + i * .12 }} />)}</div>}
-          {!visual && id === 'medium' && <div className="flex gap-1">{[1,2,3,4,5].map(i => <i key={i} className="block w-0.5 h-7 bg-current" />)}</div>}
-          {!visual && id === 'high' && <div className="flex gap-[3px]">{[1,2,3,4,5,6,7].map(i => <i key={i} className="block w-0.5 h-7 bg-current" />)}</div>}
-          <span className="font-heading font-bold text-[12px] uppercase tracking-wide">{label}</span>
+        return <motion.button key={id} whileTap={{ scale: .985 }} onClick={() => { triggerHaptic(); onChange(id) }}
+          className="w-full flex-1 min-h-[92px] rounded-[22px] flex items-center gap-4 px-5 py-4 text-left"
+          style={{ background: selected ? 'rgba(198,168,92,.09)' : 'rgba(255,255,255,.018)', border: `1.5px solid ${selected ? 'rgba(198,168,92,.65)' : 'rgba(255,255,255,.1)'}` }}>
+          <div className="w-12 h-12 shrink-0 flex items-center justify-center text-white">
+            {visual && <HairPattern type={id} />}
+            {questionKey === 'desiredLength' && ['short', 'medium', 'long'].includes(id) && <LengthPortrait length={id} />}
+            {!visual && questionKey === 'density' && <DensityDots density={id} />}
+            {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && ['low', 'medium', 'high'].includes(id) && <div className="flex items-end gap-[3px] h-7">{Array.from({ length: id === 'low' ? 3 : id === 'medium' ? 5 : 7 }, (_, index) => <i key={index} className="block w-[3px] rounded-full bg-current" style={{ height: `${12 + (index % 3) * 5}px`, opacity: .65 + (index % 2) * .2 }} />)}</div>}
+            {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && !['low', 'medium', 'high'].includes(id) && <Scissors size={25} strokeWidth={1.8} />}
+            {questionKey === 'desiredLength' && id === 'any' && <Scissors size={25} strokeWidth={1.8} />}
+          </div>
+          <div className="min-w-0">
+            <span className="block font-heading font-bold text-[17px] leading-tight" style={{ color: selected ? '#F2D77E' : '#D9BC72', textShadow: selected ? '0 0 12px rgba(217,188,114,.62), 0 0 3px rgba(255,231,160,.45)' : '0 0 9px rgba(217,188,114,.42), 0 0 2px rgba(255,231,160,.3)' }}>{label}</span>
+            {description && <span className="block mt-1 text-[13px] leading-[1.4] text-white/75">{description}</span>}
+          </div>
         </motion.button>
       })}
     </div>
@@ -213,7 +264,7 @@ export default function HairMaxx() {
   const [question, setQuestion] = useState(0)
   const [profile, setProfile] = useState(() => storedProfile?.scanId === scan?.id ? storedProfile : {
     scanId: scan?.id ?? null, hairType: ['straight', 'wavy', 'curly', 'coily'].includes(storedHairType) ? storedHairType : null,
-    density: null, strandThickness: null, desiredLength: 'any', maintenancePreference: 'any',
+    density: null, strandThickness: 'medium', desiredLength: 'any', maintenancePreference: 'any',
   })
   const [recommendations, setRecommendations] = useState([])
   const [active, setActive] = useState(0)
@@ -226,15 +277,13 @@ export default function HairMaxx() {
   }, [scan?.id, sourceImage])
 
   const questions = useMemo(() => [
-    { key: 'hairType', title: "What's your hair type?", subtitle: 'Choose your natural pattern.', options: HAIR_TYPES, columns: 2, visual: true },
-    { key: 'density', title: 'How dense is your hair?', subtitle: 'How much scalp coverage and overall volume do you have?', options: DENSITIES, columns: 3 },
-    { key: 'strandThickness', title: 'How thick are the strands?', subtitle: 'Choose how each individual strand feels.', options: THICKNESSES, columns: 3 },
+    { key: 'hairType', title: "What's your hair type?", subtitle: null, options: HAIR_TYPES, visual: true },
+    { key: 'density', title: 'How dense is your hair?', subtitle: null, options: DENSITIES, columns: 3 },
     { key: 'desiredLength', title: 'What length are you open to?', subtitle: null, options: LENGTHS, columns: 4 },
-    { key: 'maintenancePreference', title: 'How much styling do you want?', subtitle: null, options: [{ id: 'low', label: 'Low maintenance' }, { id: 'some', label: 'Some styling' }, { id: 'any', label: "Don't care" }], columns: 3 },
   ], [])
 
   function startQuestions() {
-    const reusable = storedProfile?.scanId === scan?.id && ['hairType', 'density', 'strandThickness', 'desiredLength', 'maintenancePreference'].every(key => storedProfile[key])
+    const reusable = storedProfile?.scanId === scan?.id && ['hairType', 'density', 'desiredLength'].every(key => storedProfile[key])
     if (reusable) { beginMatching(storedProfile); return }
     setQuestion(profile.hairType ? 1 : 0)
     setStage('questions')
@@ -250,7 +299,7 @@ export default function HairMaxx() {
 
   function cacheKey(nextProfile) {
     const evidenceVersion = structure.evidence?.schemaVersion ?? structure.evidence?.version ?? 'measured-v1'
-    const profileKey = ['hairType', 'density', 'strandThickness', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
+    const profileKey = ['hairType', 'density', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
     return `${scan?.id ?? 'no-scan'}|${evidenceVersion}|${profileKey}|${HAIR_CATALOG_VERSION}`
   }
 
@@ -258,7 +307,7 @@ export default function HairMaxx() {
     return items.map((item, index) => {
       const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
       const hardCompatible = style && style.compatibleHairTypes.includes(hairProfile.hairType) &&
-        style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness)
+        style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness || 'medium')
       return hardCompatible ? {
         hairstyleId: item.hairstyleId, style, rank: item.rank ?? index + 1,
         compatibility: item.compatibility ?? Math.max(72, 97 - index * 4),
@@ -271,6 +320,7 @@ export default function HairMaxx() {
   }
 
   async function beginMatching(nextProfile) {
+    nextProfile = { ...nextProfile, strandThickness: nextProfile.strandThickness || 'medium', maintenancePreference: nextProfile.maintenancePreference || 'any' }
     setHairProfile(nextProfile)
     setHairType(nextProfile.hairType)
     setActive(0)
@@ -320,7 +370,7 @@ export default function HairMaxx() {
   // stages (questions/looks/saved) keep the normal scrollable behavior.
   return <MotionPage
     baseClassName={stage === 'intro' ? '' : 'page-scroll'}
-    className={stage === 'intro' ? 'flex flex-col h-full' : ''}
+    className={stage === 'intro' ? 'flex flex-col h-full' : stage === 'questions' ? 'flex flex-col' : ''}
     style={{ background: BG }}
   >
     {/* ConnectedIntro carries its own back button (matching Scan.jsx's step
@@ -328,7 +378,7 @@ export default function HairMaxx() {
     {stage !== 'intro' && <Header onBack={back} right={stage === 'looks' ? <button onClick={() => setStage('saved')}><Bookmark size={18} color={GOLD} /></button> : null} />}
     <AnimatePresence mode="wait">
       {stage === 'intro' && <motion.div key="intro" className="flex-1 min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} image={sourceImage} onBack={back} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
-      {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="px-5"><ChoiceGrid {...selectedQuestion} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
+      {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 min-h-0 flex flex-col px-5"><ChoiceGrid {...selectedQuestion} questionKey={selectedQuestion.key} questionNumber={question + 1} questionCount={questions.length} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
       {stage === 'matching' && <motion.div key="matching" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Matching profile={profile} structure={structure} /></motion.div>}
       {stage === 'recommend_error' && <motion.div key="recommend-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[70vh] px-6 flex flex-col items-center justify-center text-center"><Sparkles size={30} color={GOLD} /><h2 className="font-heading font-bold text-[22px] text-white mt-5">Couldn’t build your looks</h2><p className="text-[13px] text-white/50 mt-2 mb-6">Your scan is safe. Try the grounded matching step again.</p><button onClick={() => beginMatching(profile)} className="px-6 py-3 rounded-2xl font-heading font-bold text-[13px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Try again</button></motion.div>}
       {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks recommendations={recommendations} active={active} setActive={setActive} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
