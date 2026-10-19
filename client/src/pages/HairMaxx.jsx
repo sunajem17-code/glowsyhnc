@@ -274,12 +274,11 @@ export default function HairMaxx() {
   const questions = useMemo(() => [
     { key: 'hairType', title: "What's your hair type?", subtitle: null, options: HAIR_TYPES, visual: true },
     { key: 'density', title: 'How dense is your hair?', subtitle: null, options: DENSITIES, columns: 3 },
-    { key: 'strandThickness', title: 'How thick is each strand?', subtitle: 'Think about one strand, rather than overall coverage.', options: ['fine', 'medium', 'thick'] },
     { key: 'desiredLength', title: 'What length are you open to?', subtitle: null, options: LENGTHS.filter(length => length !== 'any'), columns: 3 },
   ], [])
 
   function startQuestions() {
-    const reusable = storedProfile?.scanId === scan?.id && storedProfile?.catalogVersion === HAIR_CATALOG_VERSION && ['hairType', 'density', 'strandThickness', 'desiredLength'].every(key => storedProfile[key])
+    const reusable = storedProfile?.scanId === scan?.id && storedProfile?.catalogVersion === HAIR_CATALOG_VERSION && ['hairType', 'density', 'desiredLength'].every(key => storedProfile[key])
     if (reusable) { beginMatching(storedProfile); return }
     setQuestion(profile.hairType ? 1 : 0)
     setStage('questions')
