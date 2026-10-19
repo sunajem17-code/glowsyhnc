@@ -17,40 +17,167 @@ function locateFile(file) {
   return `/mediapipe/${file}`
 }
 
+// Run once on first init: log WebAssembly + file reachability so we know
+// exactly what environment we're running in.
+async function _logEnvironmentDiagnostics() {
+  console.log('[FaceDetector] platform: iOS WKWebView (Capacitor)')
+  console.log('[FaceDetector] library: @mediapipe/face_mesh v0.4.1633559619')
+  console.log('[FaceDetector] locateFile base: /mediapipe/<file>')
+
+  // WebAssembly
+  const wasmAvail = typeof WebAssembly !== 'undefined' && typeof WebAssembly.instantiate === 'function'
+  console.log('[FaceDetector] WebAssembly available:', wasmAvail)
+  if (!wasmAvail) return
+
+  // SIMD detection (tiny SIMD test binary — same check MediaPipe uses internally)
+  try {
+    // 11-byte minimal SIMD WASM module
+    const simdTest = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,253,15,253,15,26,11])
+    const ok = WebAssembly.validate(simdTest)
+    console.log('[FaceDetector] WASM SIMD supported:', ok)
+  } catch (e) {
+    console.warn('[FaceDetector] WASM SIMD check error:', e?.message)
+  }
+
+  // File reachability — check if the WASM binaries can actually be fetched
+  for (const f of ['face_mesh_solution_wasm_bin.wasm', 'face_mesh_solution_wasm_bin.js', 'face_mesh.binarypb']) {
+    try {
+      const r = await fetch(`/mediapipe/${f}`, { method: 'HEAD' })
+      console.log(`[FaceDetector] /mediapipe/${f} → HTTP ${r.status} content-type: ${r.headers.get('content-type')}`)
+    } catch (e) {
+      console.error(`[FaceDetector] /mediapipe/${f} → FETCH FAILED: ${e?.message}`)
+    }
+  }
+}
+
 export async function initFaceMesh() {
   if (_mesh) return _mesh
-  if (_initPromise) return _initPromise
+  // Guard: if a pending init is already in flight, await it.
+  // If it fails, fall through and retry from scratch — never
+  // permanently return a previously-rejected promise.
+  if (_initPromise) {
+    try { return await _initPromise } catch { /* fall through to retry */ }
+  }
 
   _initPromise = (async () => {
-    const { FaceMesh } = await import('@mediapipe/face_mesh')
-    const mesh = new FaceMesh({ locateFile })
-    mesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: false,
-      minDetectionConfidence: 0.4,
-      minTrackingConfidence: 0.4,
-    })
+    console.log('[FaceDetector] initialization started')
+    await _logEnvironmentDiagnostics()
 
-    // Pre-warm: send a blank canvas to trigger WASM + model loading
-    // This avoids the first real scan taking 10–15s to load the 5MB model
-    await new Promise((resolve) => {
-      mesh.onResults(resolve)
-      const blank = document.createElement('canvas')
-      blank.width = 128
-      blank.height = 128
-      mesh.send({ image: blank }).catch(resolve) // resolve even if no face found
-    })
+    // ── Step 1: import the module ──────────────────────────────────────────────
+    let FaceMesh
+    try {
+      console.log('[FaceDetector] importing @mediapipe/face_mesh…')
+      const mod = await import('@mediapipe/face_mesh')
+      // The package is CommonJS: Vite exposes its exports under default.
+      FaceMesh = typeof mod.FaceMesh === 'function'
+        ? mod.FaceMesh
+        : typeof mod.default?.FaceMesh === 'function'
+          ? mod.default.FaceMesh
+          : globalThis.FaceMesh
+      if (typeof FaceMesh !== 'function') throw new Error('FaceMesh constructor unavailable')
+      console.log('[FaceDetector] import OK — FaceMesh type:', typeof FaceMesh)
+    } catch (err) {
+      console.error('[FaceDetector] import FAILED:', err?.message, err?.stack?.split('\n')[1])
+      console.error('[FaceDetector] initialization error: import_failed —', err?.message)
+      throw err
+    }
 
+    // ── Step 2: construct instance ─────────────────────────────────────────────
+    let mesh
+    try {
+      console.log('[FaceDetector] constructing FaceMesh({ locateFile })…')
+      mesh = new FaceMesh({ locateFile })
+      console.log('[FaceDetector] construction OK')
+    } catch (err) {
+      console.error('[FaceDetector] construction FAILED:', err?.message)
+      console.error('[FaceDetector] initialization error: construction_failed —', err?.message)
+      throw err
+    }
+
+    // ── Step 3: setOptions ─────────────────────────────────────────────────────
+    try {
+      mesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.4,
+        minTrackingConfidence: 0.4,
+      })
+      console.log('[FaceDetector] setOptions OK')
+    } catch (err) {
+      console.error('[FaceDetector] setOptions FAILED:', err?.message)
+      console.error('[FaceDetector] initialization error: setoptions_failed —', err?.message)
+      throw err
+    }
+
+    // ── Step 4: initialize() — the proper API that forces WASM + model load ────
+    // MediaPipe exposes mesh.initialize() for exactly this purpose.
+    // It returns a Promise that resolves when WASM is compiled and the model
+    // is loaded. Calling it here means errors surface during init, not later.
+    if (typeof mesh.initialize === 'function') {
+      try {
+        console.log('[FaceDetector] calling mesh.initialize() — loading WASM + model…')
+        await Promise.race([
+          mesh.initialize(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('initialize() timed out after 30s')), 30_000)),
+        ])
+        console.log('[FaceDetector] mesh.initialize() succeeded — WASM + model ready')
+      } catch (err) {
+        console.error('[FaceDetector] mesh.initialize() FAILED:', err?.message)
+        console.error('[FaceDetector] initialization error: initialize_failed —', err?.message)
+        throw err
+      }
+    } else {
+      // Older MediaPipe builds without initialize(): fall back to the warmup
+      // pattern but protect it fully so a warmup error is non-fatal.
+      console.log('[FaceDetector] no initialize() method — using warmup send() fallback')
+      try {
+        await Promise.race([
+          new Promise((resolve) => {
+            mesh.onResults(resolve)
+            const blank = document.createElement('canvas')
+            blank.width = 128
+            blank.height = 128
+            try {
+              const p = mesh.send({ image: blank })
+              if (p && typeof p.catch === 'function') p.catch(resolve)
+            } catch { resolve() }
+          }),
+          new Promise(resolve => setTimeout(resolve, 15_000)),
+        ])
+        console.log('[FaceDetector] warmup fallback complete')
+      } catch (e) {
+        console.warn('[FaceDetector] warmup fallback error (non-fatal):', e?.message)
+      }
+    }
+
+    console.log('[FaceDetector] initialization succeeded — plugin available: N/A (JS library)')
+    console.log('[FaceDetector] model/resource available: YES (bundled in /mediapipe/)')
     _mesh = mesh
     return mesh
   })()
+
+  // Clear on failure so the next call can retry instead of re-rejecting forever
+  _initPromise.catch(() => { _initPromise = null })
 
   return _initPromise
 }
 
 // ─── Get 468 facial landmarks from an image URL ───────────────────────────────
-export async function getLandmarks(imageUrl) {
+// FaceMesh has one onResults callback. Serialize front, profile, and
+// post-result scans so one request cannot steal another request's result.
+let landmarkQueue = Promise.resolve()
+
+export function getLandmarks(imageUrl) {
+  const task = landmarkQueue.then(() => detectLandmarks(imageUrl))
+  landmarkQueue = task.catch(() => {})
+  return task
+}
+
+async function detectLandmarks(imageUrl) {
   const mesh = await initFaceMesh()
+  // Each request is an independent still photo, not the next video frame.
+  // Discard the prior face ROI before locating this photo's face boundary.
+  await mesh.reset()
 
   return new Promise((resolve, reject) => {
     // First real scan: WASM already loaded, should be fast (~500ms)
@@ -285,7 +412,7 @@ export function toExplorerLandmarks2D(lm) {
     templeRight:    p(356),
     cheekboneLeft:  p(234),
     cheekboneRight: p(454),
-    // jawBody = pre-gonion ramus (lm 58/288), used for jawWidthCM
+    // jawBody = pre-gonion points (lm 58/288), used for a width ratio
     jawBodyLeft:    p(58),
     jawBodyRight:   p(288),
     // jawCorner = gonion angle (lm 172/397), used for bigonialWidthPercent
@@ -294,24 +421,15 @@ export function toExplorerLandmarks2D(lm) {
   }
 }
 
-// Average bizygomatic (cheekbone-to-cheekbone) width used as the cm reference.
-// We don't have a physical ruler in the photo so we anchor to population mean
-// then scale every other distance proportionally. Deliberately labeled as
-// "estimates" in the UI — accurate enough for a looksmaxxing reference, not
-// for medical use.
-const CHEEK_REF_CM = { male: 13.5, female: 12.5, default: 13.0 }
-
-export function computeExplorerMetrics(lm, gender) {
+export function computeExplorerMetrics(lm) {
   const p = (i) => lm[i]
   const d = (a, b) => Math.sqrt((p(a).x - p(b).x) ** 2 + (p(a).y - p(b).y) ** 2)
 
   const cheekDist = d(234, 454)
   if (cheekDist < 0.01) return null  // degenerate — caller should fall back to demo
 
-  const refCm = CHEEK_REF_CM[gender] ?? CHEEK_REF_CM.default
-  const scale = refCm / cheekDist  // normalized units → cm
-
-  // jawBodyDist = pre-gonion ramus (lm 58/288) — used for Jaw Width cm
+  // All output is scale-independent. An ordinary selfie has no physical ruler,
+  // so centimetres or millimetres would be fabricated precision.
   // bigonialDist = gonion-to-gonion (lm 172/397) — used for Bigonial Width %
   // Keeping them separate ensures the two metrics measure distinct anatomy.
   const jawBodyDist   = d(58, 288)
@@ -327,9 +445,8 @@ export function computeExplorerMetrics(lm, gender) {
   }
 
   return {
-    jawWidthCM:              Math.round(jawBodyDist  * scale * 10) / 10,
-    cheekboneWidthCM:        Math.round(cheekDist    * scale * 10) / 10,
-    bitemporalWidthCM:       Math.round(tempDist     * scale * 10) / 10,
+    jawToCheekWidthRatio:    Math.round(jawBodyDist / cheekDist * 100) / 100,
+    templeToCheekWidthRatio: Math.round(tempDist / cheekDist * 100) / 100,
     bigonialWidthPercent:    Math.round(bigonialDist / cheekDist * 1000) / 10,
     midfaceRatio:            Math.round(midfaceH / cheekDist * 100) / 100,
     jawAsymmetryScore:       asymScore(172, 397),

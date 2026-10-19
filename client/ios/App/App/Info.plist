@@ -11,6 +11,15 @@
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
+			<!-- Live-reload dev server (see capacitor.config.ts) — plain HTTP
+			     to the Mac's LAN IP, so iOS's default ATS block needs this
+			     scoped exception. Update the IP here if it changes; remove
+			     this whole block before any real App Store build. -->
+			<key>10.103.66.52</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
 		</dict>
 	</dict>
 	<key>CAPACITOR_DEBUG</key>
@@ -35,6 +44,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ascendus uses your camera to capture photos for AI-powered facial analysis and to run a live TrueDepth face scan that measures facial geometry.</string>
 	<key>NSFaceIDUsageDescription</key>

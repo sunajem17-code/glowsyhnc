@@ -1,7 +1,6 @@
 import useStore from '../store/useStore'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
-const BASE = `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
+import { API_BASE as BASE } from './backend'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -43,7 +42,7 @@ async function request(path, options = {}) {
   }
 
   // AI scoring can take 20–40s — give it 130s. All other calls get 15s.
-  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/')
+  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/') || path.startsWith('/hair/')
   const timeoutMs = isAiCall ? 130_000 : 15_000
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -65,6 +64,11 @@ async function request(path, options = {}) {
   }
   clearTimeout(timeoutId)
   if (!res.ok) {
+    if (res.status === 404 && path.startsWith('/developer-access/')) {
+      const error = new Error('Developer unlock is not deployed or enabled on this server.')
+      error.status = 404
+      throw error
+    }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
     // 502/504 are proxy/gateway errors that return HTML — bail early.
@@ -103,7 +107,7 @@ async function request(path, options = {}) {
     // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
     const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status     = res.status
-    err.errorCode  = errBody.error  // machine-readable code, e.g. 'rate_limited', 'claude_rate_limited'
+    err.errorCode  = errBody.code || errBody.error  // Prefer explicit codes; retain existing API compatibility.
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan
     throw err
@@ -135,6 +139,7 @@ export const api = {
     analyze: (scanId) => request(`/scan/analyze/${scanId}`, { method: 'POST' }),
     history: () => request('/scan/history'),
     get: (id) => request(`/scan/${id}`),
+    stats: () => request('/scan/stats'),
   },
   plan: {
     current: () => request('/plan/current'),
@@ -163,6 +168,7 @@ export const api = {
     syncRc: (rcUserId) => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({ rcUserId }) }),
   },
   ai: {
+    validateScan: (imageB64) => request('/ai/validate-scan', { method: 'POST', body: JSON.stringify({ imageB64 }) }),
     score: (data) => request('/ai/score', { method: 'POST', body: JSON.stringify(data) }),
     scorePhysique: (data) => request('/ai/score/physique', { method: 'POST', body: JSON.stringify(data) }),
     scoreExtendedMetrics: (data) => request('/ai/score/extended-metrics', { method: 'POST', body: JSON.stringify(data) }),
@@ -172,7 +178,7 @@ export const api = {
     message: (data) => request('/coach/message', { method: 'POST', body: JSON.stringify(data) }),
   },
   hair: {
-    analyze: (data) => request('/hair/analyze', { method: 'POST', body: JSON.stringify(data) }),
+    recommend: (data) => request('/hair/recommend', { method: 'POST', body: JSON.stringify(data) }),
   },
   leaderboard: {
     get: () => request('/leaderboard'),

@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { useLocation, useNavigationType, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav, { TAB_ROOT_PATHS } from './BottomNav'
-import AchievementToast from './AchievementToast'
 import ProcessingOverlay from './ProcessingOverlay'
 import useStore from '../store/useStore'
 import { checkAchievements } from '../utils/achievements'
@@ -48,6 +47,14 @@ export default function Layout() {
   const achievements       = useStore(s => s.achievements)
   const unlockAchievement  = useStore(s => s.unlockAchievement)
   const scanLaunching      = useStore(s => s.scanLaunching)
+  const setScanLaunching   = useStore(s => s.setScanLaunching)
+  const isScanCapture = location.pathname === '/scan/capture' || location.pathname === '/physique-scan'
+
+  // A cancelled scan can return to any tab, not just ScanHome. Never leave
+  // the scan-launch flag covering an unrelated page or its navigation.
+  useEffect(() => {
+    if (!isScanCapture) setScanLaunching(false)
+  }, [isScanCapture, location.key, setScanLaunching])
 
   // Check for new achievements whenever key state changes
   useEffect(() => {
@@ -67,9 +74,8 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-full bg-page">
       <AnimatePresence>
-        {scanLaunching && <ProcessingOverlay key="scan-launch" label="Loading…" />}
+        {scanLaunching && isScanCapture && <ProcessingOverlay key="scan-launch" label="Processing" />}
       </AnimatePresence>
-      <AchievementToast />
       <main className="flex-1 overflow-hidden relative">
         {/* Thin left-edge hit zone for the interruptible swipe-back gesture.
             Scoped to a 24px strip (matching iOS's own edge-pan width) so it
@@ -89,7 +95,9 @@ export default function Layout() {
             pointerEvents: swipeEnabled ? 'auto' : 'none',
           }}
         />
-        <AnimatePresence mode="wait" initial={false} onExitComplete={resetAfterExit}>
+        {/* The results card has already animated away during this handoff.
+            Reset the boundary so nested scan exits cannot hold Progress blank. */}
+        <AnimatePresence key={location.pathname === '/timeline' && location.state?.savedScanId ? `saved-${location.state.savedScanId}` : 'pages'} mode="wait" initial={false} onExitComplete={resetAfterExit}>
           <motion.div
             key={location.pathname}
             custom={swipeExit}

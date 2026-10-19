@@ -143,7 +143,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // ── POST /api/auth/apple ──────────────────────────────────────────────────────
 router.post('/apple', authLimiter, async (req, res) => {
-  const { identityToken, name, email, guestUserId } = req.body
+  const { identityToken, name, email, guestUserId, refCode } = req.body
   if (!identityToken) return res.status(400).json({ error: 'identityToken required' })
 
   let payload
@@ -211,6 +211,19 @@ router.post('/apple', authLimiter, async (req, res) => {
         referral_code: ownCode, referral_count: 0,
         subscription_tier: 'free', created_at: new Date().toISOString(),
       })
+      // Attribute referral if a ref code was passed
+      if (refCode && typeof refCode === 'string') {
+        const { data: referrer } = await sb
+          .from('users')
+          .select('id, referral_count')
+          .eq('referral_code', refCode.toUpperCase())
+          .maybeSingle()
+        if (referrer && referrer.id !== id) {
+          await sb.from('users')
+            .update({ referral_count: (referrer.referral_count || 0) + 1 })
+            .eq('id', referrer.id)
+        }
+      }
       const safe = { id: newUser.id, name: newUser.name, email: newUser.email, subscriptionTier: 'free', createdAt: newUser.created_at, isAppleUser: true }
       return res.json({ user: safe, token: signToken(newUser.id, newUser.email) })
     }
@@ -222,6 +235,12 @@ router.post('/apple', authLimiter, async (req, res) => {
       const userName = name || 'Ascendus User'
       const ownCode = genCode()
       db.prepare('INSERT INTO users (id, name, email, apple_sub, password_hash, referral_code, subscription_tier, created_at) VALUES (?,?,?,?,?,?,?,?)').run(id, userName, appleEmail, appleSub, '', ownCode, 'free', new Date().toISOString())
+      if (refCode && typeof refCode === 'string') {
+        const referrer = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(refCode.toUpperCase())
+        if (referrer && referrer.id !== id) {
+          db.prepare('UPDATE users SET referral_count = COALESCE(referral_count, 0) + 1 WHERE id = ?').run(referrer.id)
+        }
+      }
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
     }
     const safe = { id: user.id, name: user.name, email: user.email, subscriptionTier: user.subscription_tier || 'free', createdAt: user.created_at }

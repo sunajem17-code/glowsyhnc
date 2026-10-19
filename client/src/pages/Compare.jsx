@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowLeftRight, Share2, Download, TrendingUp, Loader2, X, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ArrowLeftRight, Share2, Download, TrendingUp, Loader2, X, ChevronRight } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
@@ -617,10 +617,11 @@ export default function Compare() {
         >
           <button
             onClick={() => { triggerHaptic(); navigate(-1) }}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            aria-label="Go back"
+            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
           >
-            <ArrowLeft size={18} className="text-white" />
+            <ChevronLeft size={18} className="text-primary" />
           </button>
           <h1 className="font-heading font-bold text-[17px] text-white">Before &amp; After</h1>
           <button

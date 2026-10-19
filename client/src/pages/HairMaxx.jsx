@@ -1,925 +1,390 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  ChevronLeft, ChevronRight, X, Lock, Copy, Check,
-  Scissors, Star, StarOff, Camera, Upload, Loader2,
-  Sparkles, RotateCcw, Lightbulb,
-} from 'lucide-react'
-import useStore from '../store/useStore'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, Bookmark, Check, ChevronLeft, ChevronRight, Heart, Scissors, Sparkles, X } from 'lucide-react'
 import MotionPage from '../components/MotionPage'
+import useStore from '../store/useStore'
 import { api } from '../utils/api'
-import { takePhoto, pickPhoto, isNative } from '../utils/camera'
-import {
-  FACE_SHAPES,
-  HAIR_DENSITIES,
-  HAIRLINES,
-  FACE_PROFILES,
-  getModifiedRecommendations,
-  MAINTENANCE_COLORS,
-  MAINTENANCE_LABELS,
-} from '../utils/haircuts'
-import { GOLD, SPRING_STANDARD } from '../utils/theme'
+import { loadScanMedia } from '../utils/scanPhotoDb'
+import { DENSITIES, HAIR_CATALOG_VERSION, HAIR_TYPES, HAIRSTYLE_CATALOG, LENGTHS } from '../utils/hairCatalog'
+import { conciseReason, rankHairstyles, structureFromScan } from '../utils/hairMatching'
+import { portableEvidence } from '../utils/productionAnalysis'
+import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-// ─── Design tokens ─────────────────────────────────────────────────────────────
-const GOLD_DIM  = '#8A7140'
-const SURFACE   = '#141414'
-const SURFACE_2 = '#1C1C1C'
-const SURFACE_3 = '#242424'
-const BORDER    = '#2A2A2A'
-const TEXT_PRI  = '#F0EDE6'
-const TEXT_SEC  = '#7A7772'
-const RED       = '#E07A5F'
+const BG = '#080808'
+const PANEL = 'rgba(255,255,255,0.045)'
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-function capitalize(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : ''
+function HairPattern({ type }) {
+  const item = HAIR_TYPES.find(value => value.id === type)
+  return <svg viewBox="0 0 32 48" className="w-8 h-10" aria-hidden="true">
+    <path d={item?.pattern} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
 }
 
-async function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result // data:image/jpeg;base64,...
-      const base64 = result.split(',')[1]
-      resolve({ base64, mediaType: file.type || 'image/jpeg' })
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+function DensityDots({ density }) {
+  const strands = {
+    low: [10, 22, 34],
+    medium: [6, 12.4, 18.8, 25.2, 31.6, 38],
+    high: [6, 10, 14, 18, 22, 26, 30, 34, 38],
+  }
+  return <svg viewBox="0 0 44 44" className="w-11 h-11" aria-hidden="true">
+    <path d="M3 33 Q22 31 41 33 L40 39 Q39.5 42 35 42 H9 Q4.5 42 4 39 Z" fill="rgba(217,188,114,.28)" stroke="rgba(217,188,114,.58)" strokeWidth="1" />
+    {(strands[density] || []).map((x, index) => {
+      const sway = index % 2 ? 1.5 : -1.5
+      const tip = x + (index % 3 - 1) * 1.5
+      return <path key={index} d={`M${x} 34 C${x + sway} 27 ${x - sway} 17 ${tip} 8`} fill="none" stroke="#F3F0E7" strokeWidth="1.35" strokeLinecap="round" />
+    })}
+  </svg>
 }
 
-// ─── Step bar (manual flow) ────────────────────────────────────────────────────
-const STEPS = ['Face Shape', 'Hair Details', 'Your Cuts']
+function LengthPortrait({ length }) {
+  const hairShapes = {
+    short: 'M12 20 C11 16 11 10 15 7 C17 5 19 5 21 5 C24 4 27 5 29 7 C33 9 34 15 32 20 L29 17 C27 15 25 14 22 14 C18 14 15 16 13 20 Z',
+    medium: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 25 L29 24 L29 17 C27 14 25 13 22 13 C18 13 15 15 14 18 L14 24 L12 25 Z',
+    long: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 24 L29 18 C27 14 25 13 22 13 C18 13 15 15 14 19 L13 24 Z',
+  }[length]
+  return <svg viewBox="0 0 44 48" className="w-12 h-12" aria-hidden="true">
+    {/* Clean, flat bust silhouettes inspired by the supplied hairstyle chart. */}
+    <path d="M13 17 C13 13 17 11 22 11 C27 11 31 13 31 17 L30 26 C29 30 26 33 22 33 C18 33 15 30 14 26 Z" fill="none" stroke="#F3F0E7" strokeWidth="1.6" strokeLinejoin="round" />
+    {length === 'long' && <path d="M15 7 C11 11 10 17 10 22 L11 36 Q12 40 15 39 L17 34 L16 17 Z M29 7 C33 11 34 17 34 22 L33 36 Q32 40 29 39 L27 34 L28 17 Z" fill="#D9BC72" />}
+    <path d={hairShapes} fill="#D9BC72" />
+    {length === 'short' && <path d="M15 16 Q15 12 17.5 9 M19 15 Q19 10 21.5 8 M23 15 Q24 10 26.5 9 M27 16 Q29 12 30 11" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
+    {length === 'medium' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M25 15 Q28 11 30 11 M29 18 Q31 15 31 13" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
+    {length === 'long' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M27 16 Q29 12 30 11 M11.5 22 Q11 29 13 36 M14 22 Q14 29 15 35 M32.5 22 Q33 29 31 36 M30 22 Q30 29 29 35" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
+  </svg>
+}
 
-function StepBar({ step }) {
-  return (
-    <div className="flex items-center gap-2 mb-8">
-      {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-2 flex-1">
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold transition-all duration-300"
-              style={{
-                background: i <= step ? GOLD : SURFACE_3,
-                color: i <= step ? '#0A0A0A' : TEXT_SEC,
-                border: `1px solid ${i <= step ? GOLD : BORDER}`,
-              }}
-            >
-              {i + 1}
-            </div>
-            <span className="text-[9px] font-body whitespace-nowrap" style={{ color: i <= step ? GOLD : TEXT_SEC }}>
-              {label}
-            </span>
+// Same circular back button used across the app (see PageHeader.jsx and
+// Scan.jsx's capture-screen header) — plain top-left button in normal flow,
+// no sticky title bar. Each stage already carries its own "HairMax" eyebrow
+// + heading in its content, so nothing is lost by dropping the bar's title.
+function Header({ onBack, right }) {
+  return <div className="flex items-center justify-between px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8 }}>
+    <button
+      onClick={onBack}
+      aria-label="Go back"
+      className="w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+    >
+      <ChevronLeft size={18} className="text-primary" />
+    </button>
+    {right}
+  </div>
+}
+
+function ChoiceGrid({ title, subtitle, options, value, onChange, questionNumber, questionCount, questionKey, visual = false }) {
+  const details = {
+    density: { low: 'Less overall scalp coverage', medium: 'Balanced coverage and volume', high: 'Fuller coverage and volume' },
+    strandThickness: { fine: 'Thin, delicate strands', medium: 'Average strand thickness', thick: 'Thicker, coarser strands' },
+    desiredLength: { short: 'A close cut or short style', medium: 'Some length to style', long: 'Shoulder length or longer', any: 'Open to any length' },
+    maintenancePreference: { low: 'Keep daily styling simple', some: 'A little styling each day', any: 'Open to any routine' },
+  }
+  return <div className="flex-1 min-h-0 flex flex-col px-1 pb-3 pt-2">
+    <div className="grid gap-1.5 mb-8 shrink-0" style={{ gridTemplateColumns: `repeat(${questionCount}, minmax(0, 1fr))` }} aria-label={`Step ${questionNumber} of ${questionCount}`}>
+      {Array.from({ length: questionCount }, (_, index) => <span key={index} className="h-[3px] rounded-full" style={{ background: index < questionNumber ? '#F4F1EA' : 'rgba(255,255,255,.14)' }} />)}
+    </div>
+    <h2 className="font-heading font-bold text-[30px] text-white leading-[1.12] tracking-[-.025em]">{title}</h2>
+    {subtitle && <p className="font-body text-[13px] text-secondary mt-2">{subtitle}</p>}
+    <div className="mt-7 flex-1 min-h-0 flex flex-col gap-3 pb-1">
+      {options.map(option => {
+        const id = typeof option === 'string' ? option : option.id
+        const label = typeof option === 'string'
+          ? questionKey === 'density'
+            ? ({ low: 'Thin', medium: 'Medium', high: 'Thick' }[id] || id)
+            : (id === 'any' ? 'Any length' : id.charAt(0).toUpperCase() + id.slice(1))
+          : option.label
+        const description = (typeof option === 'string' ? null : option.description) || details[questionKey]?.[id] || ''
+        const selected = value === id
+        return <motion.button key={id} whileTap={{ scale: .985 }} onClick={() => { triggerHaptic(); onChange(id) }}
+          className="w-full flex-1 min-h-[92px] rounded-[22px] flex items-center gap-4 px-5 py-4 text-left"
+          style={{ background: selected ? 'rgba(198,168,92,.09)' : 'rgba(255,255,255,.018)', border: `1.5px solid ${selected ? 'rgba(198,168,92,.65)' : 'rgba(255,255,255,.1)'}` }}>
+          <div className="w-12 h-12 shrink-0 flex items-center justify-center text-white">
+            {visual && <HairPattern type={id} />}
+            {questionKey === 'desiredLength' && ['short', 'medium', 'long'].includes(id) && <LengthPortrait length={id} />}
+            {!visual && questionKey === 'density' && <DensityDots density={id} />}
+            {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && ['low', 'medium', 'high'].includes(id) && <div className="flex items-end gap-[3px] h-7">{Array.from({ length: id === 'low' ? 3 : id === 'medium' ? 5 : 7 }, (_, index) => <i key={index} className="block w-[3px] rounded-full bg-current" style={{ height: `${12 + (index % 3) * 5}px`, opacity: .65 + (index % 2) * .2 }} />)}</div>}
+            {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && !['low', 'medium', 'high'].includes(id) && <Scissors size={25} strokeWidth={1.8} />}
+            {questionKey === 'desiredLength' && id === 'any' && <Scissors size={25} strokeWidth={1.8} />}
           </div>
-          {i < STEPS.length - 1 && (
-            <div className="flex-1 h-px mb-4" style={{ background: i < step ? GOLD : BORDER }} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Mode selector (entry) ────────────────────────────────────────────────────
-function ModeSelector({ onAI, onManual }) {
-  return (
-    <div className="flex flex-col gap-4 pt-4">
-      <div className="mb-2">
-        <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>
-          How do you want to start?
-        </h2>
-        <p className="text-sm font-body" style={{ color: TEXT_SEC }}>
-          AI Scan gives you instant, personalized results from a photo.
-        </p>
-      </div>
-
-      {/* AI Scan option */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onAI() }}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
-        style={{ background: `${GOLD}12`, border: `1.5px solid ${GOLD}50` }}
-      >
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `${GOLD}20` }}
-        >
-          <Sparkles size={22} style={{ color: GOLD }} />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-0.5">
-            <p className="font-heading font-bold text-[15px]" style={{ color: TEXT_PRI }}>AI Head Shape Scan</p>
-            <span
-              className="text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
-              style={{ background: GOLD, color: '#0A0A0A' }}
-            >
-              NEW
-            </span>
+          <div className="min-w-0">
+            <span className="block font-heading font-bold text-[17px] leading-tight" style={{ color: selected ? '#F2D77E' : '#D9BC72', textShadow: selected ? '0 0 12px rgba(217,188,114,.62), 0 0 3px rgba(255,231,160,.45)' : '0 0 9px rgba(217,188,114,.42), 0 0 2px rgba(255,231,160,.3)' }}>{label}</span>
+            {description && <span className="block mt-1 text-[13px] leading-[1.4] text-white/75">{description}</span>}
           </div>
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>
-            Take or upload a photo. AI detects your head shape and picks your best cuts
-          </p>
-        </div>
-        <ChevronRight size={18} style={{ color: GOLD }} />
-      </motion.button>
-
-      {/* Manual option */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onManual() }}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
-        style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
-      >
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: SURFACE_3 }}>
-          <Scissors size={22} style={{ color: TEXT_SEC }} />
-        </div>
-        <div className="flex-1">
-          <p className="font-heading font-bold text-[15px] mb-0.5" style={{ color: TEXT_PRI }}>Select Manually</p>
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>Choose your face shape and hair details yourself</p>
-        </div>
-        <ChevronRight size={18} style={{ color: TEXT_SEC }} />
-      </motion.button>
+        </motion.button>
+      })}
     </div>
-  )
+  </div>
 }
 
-// ─── Photo Capture ─────────────────────────────────────────────────────────────
-function PhotoCapture({ onPhoto, onBack }) {
-  const [preview, setPreview] = useState(null)
-  const [file, setFile] = useState(null)
-  const uploadRef = useRef(null)
-
-  function handleFile(f) {
-    if (!f) return
-    setFile(f)
-    setPreview(URL.createObjectURL(f))
-  }
-
-  async function handleCamera() {
-    if (isNative()) {
-      try {
-        const dataUrl = await takePhoto()
-        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
-  }
-
-  async function handleUpload() {
-    if (isNative()) {
-      try {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) { setPreview(dataUrl); setFile(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>
-          Take or upload a photo
-        </h2>
-        <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_SEC }}>
-          Face forward, pull hair back if possible, good lighting.
-        </p>
-      </div>
-
-      {/* Preview */}
-      {preview ? (
-        <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1/1' }}>
-          <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-          <button
-            onClick={() => { triggerHaptic(); setPreview(null); setFile(null) }}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.7)' }}
-          >
-            <X size={14} style={{ color: '#fff' }} />
-          </button>
-        </div>
-      ) : (
-        <div
-          className="rounded-2xl flex flex-col items-center justify-center gap-3 py-10"
-          style={{ background: SURFACE_2, border: `1.5px dashed ${BORDER}` }}
-        >
-          <Camera size={32} style={{ color: TEXT_SEC }} />
-          <p className="text-xs font-body" style={{ color: TEXT_SEC }}>No photo selected</p>
-        </div>
-      )}
-
-      {/* Buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => { triggerHaptic(); handleCamera() }}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
-          style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
-        >
-          <Camera size={16} style={{ color: GOLD }} />
-          Camera
-        </button>
-        <button
-          onClick={() => { triggerHaptic(); handleUpload() }}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-heading font-semibold text-sm"
-          style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, color: TEXT_PRI }}
-        >
-          <Upload size={16} style={{ color: GOLD }} />
-          Upload
-        </button>
-      </div>
-
-      <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
-
-      {/* Tip */}
-      <div className="px-4 py-3 rounded-xl" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-        <p className="text-xs font-body leading-relaxed" style={{ color: GOLD_DIM }}>
-          <Lightbulb size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Tips for best results: good front-facing lighting, hair pulled back from forehead, neutral expression
-        </p>
-      </div>
-
-      {/* Analyze CTA */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { if (file) triggerHaptic(); onPhoto(file) }}
-        disabled={!file}
-        className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2"
-        style={{
-          background: file ? GOLD : SURFACE_3,
-          color: file ? '#0A0A0A' : TEXT_SEC,
-        }}
-      >
-        <Sparkles size={16} />
-        Analyze My Head Shape
-      </motion.button>
-    </div>
-  )
-}
-
-// ─── AI Loading ────────────────────────────────────────────────────────────────
-function AILoading() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 gap-5">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-        style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}30` }}
-      >
-        <Loader2 size={28} style={{ color: GOLD }} className="animate-spin" />
-      </div>
-      <div className="text-center">
-        <p className="font-heading font-bold text-base mb-1" style={{ color: TEXT_PRI }}>Analyzing your head shape…</p>
-        <p className="text-xs font-body" style={{ color: TEXT_SEC }}>This takes about 10–15 seconds</p>
-      </div>
-    </div>
-  )
-}
-
-// ─── AI Results ────────────────────────────────────────────────────────────────
-function AIResults({ result, isPremium, onUpgrade, onRescan }) {
-  const [copiedIdx, setCopiedIdx] = useState(null)
-
-  function copyScript(text, idx) {
-    triggerHaptic()
-    navigator.clipboard.writeText(text).catch(() => {})
-    setCopiedIdx(idx)
-    setTimeout(() => setCopiedIdx(null), 2000)
-  }
-
-  const shapeLabel = capitalize(result.headShape) + ' Head Shape'
-  const hairTypeLabel = capitalize(result.hairType)
-
-  return (
-    <div className="space-y-5">
-      {/* Head shape hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl px-5 py-5"
-        style={{ background: `${GOLD}10`, border: `1.5px solid ${GOLD}40` }}
-      >
-        <p className="text-[10px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>AI Detected</p>
-        <h2 className="font-heading font-bold text-2xl mb-2" style={{ color: GOLD }}>{shapeLabel}</h2>
-        <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_PRI }}>{result.headShapeDescription}</p>
-      </motion.div>
-
-      {/* Hair type */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="flex items-center gap-3 px-4 py-3 rounded-xl"
-        style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}
-      >
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: SURFACE_3 }}>
-          <Scissors size={15} style={{ color: GOLD }} />
-        </div>
-        <div>
-          <p className="text-[10px] font-body uppercase tracking-widest" style={{ color: TEXT_SEC }}>Hair Type Detected</p>
-          <p className="font-heading font-bold text-sm" style={{ color: TEXT_PRI }}>{hairTypeLabel}</p>
-        </div>
-      </motion.div>
-
-      {/* Top 3 haircuts */}
-      <div>
-        <p className="text-[10px] font-body uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>
-          Top 3 Haircuts for Your Shape
-        </p>
-
-        <div className="relative">
-          {/* Recommendations */}
-          <div className="space-y-4" style={{ filter: isPremium ? 'none' : undefined }}>
-            {result.recommendations?.map((rec, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: isPremium ? 1 : i === 0 ? 1 : 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.07 }}
-                className="rounded-2xl overflow-hidden"
-                style={{
-                  background: SURFACE_2,
-                  border: `1px solid ${i === 0 ? GOLD + '60' : BORDER}`,
-                  filter: !isPremium && i > 0 ? 'blur(5px)' : 'none',
-                  userSelect: !isPremium && i > 0 ? 'none' : 'auto',
-                }}
-              >
-                {/* Top bar */}
-                <div
-                  className="px-4 py-3 flex items-center gap-2"
-                  style={{ background: i === 0 ? `${GOLD}12` : SURFACE_3, borderBottom: `1px solid ${BORDER}` }}
-                >
-                  {i === 0 && (
-                    <span className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: GOLD, color: '#0A0A0A' }}>
-                      Best Match
-                    </span>
-                  )}
-                  <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>#{i + 1}</span>
-                </div>
-
-                <div className="px-4 py-4 space-y-3">
-                  <h3 className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>{rec.name}</h3>
-
-                  {/* Why it works */}
-                  <div className="px-3 py-2.5 rounded-xl" style={{ background: SURFACE_3 }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Why it works</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{rec.whyItWorks}</p>
-                  </div>
-
-                  {/* How to ask */}
-                  <div className="px-3 py-2.5 rounded-xl" style={{ background: `${GOLD}08`, border: `1px solid ${GOLD}25` }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>How to ask at the barber</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{rec.howToAsk}</p>
-                    <button
-                      onClick={() => copyScript(rec.howToAsk, i)}
-                      className="mt-2 flex items-center gap-1.5 text-[10px] font-heading font-semibold px-2.5 py-1.5 rounded-lg"
-                      style={{ background: copiedIdx === i ? `${GOLD}20` : SURFACE_3, color: copiedIdx === i ? GOLD : TEXT_SEC }}
-                    >
-                      {copiedIdx === i ? <Check size={11} /> : <Copy size={11} />}
-                      {copiedIdx === i ? 'Copied' : 'Copy script'}
-                    </button>
-                  </div>
-
-                  {/* Avoid */}
-                  <div className="px-3 py-2 rounded-xl" style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}>
-                    <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: RED }}>Avoid with this cut</p>
-                    <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>{rec.avoid}</p>
-                  </div>
-
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Pro lock overlay for cuts 2 & 3 */}
-          {!isPremium && (
-            <div
-              className="absolute inset-x-0 flex flex-col items-center justify-end pb-4"
-              style={{ top: '38%', background: 'linear-gradient(to bottom, transparent 0%, #141414 35%)' }}
-            >
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-                style={{ background: `${GOLD}20`, border: `1px solid ${GOLD}` }}
-              >
-                <Lock size={20} style={{ color: GOLD }} />
-              </div>
-              <p className="font-heading font-bold text-sm mb-1" style={{ color: TEXT_PRI }}>Unlock All Recommendations</p>
-              <p className="text-xs font-body mb-4 text-center px-8" style={{ color: TEXT_SEC }}>
-                See all 3 haircuts with barber scripts
-              </p>
-              <button
-                onClick={() => { triggerHaptic(); onUpgrade() }}
-                className="px-6 py-2.5 rounded-xl font-heading font-bold text-sm"
-                style={{ background: GOLD, color: '#0A0A0A' }}
-              >
-                Upgrade to Pro
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* What to avoid */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="rounded-xl px-4 py-4"
-        style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}
-      >
-        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>
-          What to avoid, and why
-        </p>
-        <p className="text-xs font-body leading-relaxed" style={{ color: `${RED}CC` }}>
-          {result.whatToAvoid}
-        </p>
-      </motion.div>
-
-      {/* Rescan */}
+function ConnectedIntro({ structure, image, onBack, onContinue, onRescan }) {
+  // Header block ported verbatim from Scan.jsx's step 1/2 header (position,
+  // sizes, back-button style) so this screen matches it exactly instead of
+  // having its own hand-tuned treatment.
+  return <div className="h-full flex flex-col">
+    <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
       <button
-        onClick={() => { triggerHaptic(); onRescan() }}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-heading font-semibold text-sm"
-        style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}
+        onClick={onBack}
+        aria-label="Go back"
+        className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
       >
-        <RotateCcw size={14} />
-        Scan Again
+        <ChevronLeft size={18} className="text-primary" />
       </button>
-
+      <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1 uppercase" style={{ color: GOLD }}>HairMax</p>
+      <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>Find your best hairstyle</h1>
     </div>
-  )
-}
-
-// ─── Existing manual flow components (unchanged) ───────────────────────────────
-export function FaceShapeSelector({ selected, onSelect }) {
-  return (
-    <div>
-      <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>Select your face shape</h2>
-      <p className="text-sm font-body mb-6" style={{ color: TEXT_SEC }}>The foundation of every good cut.</p>
-      <div className="grid grid-cols-3 gap-3">
-        {FACE_SHAPES.map(shape => {
-          const isActive = selected === shape.id
-          return (
-            <motion.button
-              key={shape.id}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => { triggerHaptic(); onSelect(shape.id) }}
-              className="flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-200"
-              style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-            >
-              <svg viewBox="0 0 100 100" width={52} height={52}>
-                <path
-                  d={shape.svgPath}
-                  fill={isActive ? `${GOLD}25` : `${TEXT_SEC}15`}
-                  stroke={isActive ? GOLD : TEXT_SEC}
-                  strokeWidth="2"
-                />
-              </svg>
-              <span className="text-xs font-heading font-semibold" style={{ color: isActive ? GOLD : TEXT_PRI }}>
-                {shape.label}
-              </span>
-            </motion.button>
-          )
-        })}
-      </div>
-      {selected && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 px-4 py-3 rounded-xl"
-          style={{ background: SURFACE_2, borderLeft: `3px solid ${GOLD}` }}
-        >
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_SEC }}>
-            {FACE_SHAPES.find(s => s.id === selected)?.description}
-          </p>
-        </motion.div>
-      )}
-    </div>
-  )
-}
-
-function HairDetailsSelector({ density, hairline, onDensity, onHairline }) {
-  return (
-    <div>
-      <h2 className="font-heading font-bold text-xl mb-1" style={{ color: TEXT_PRI }}>Hair details</h2>
-      <p className="text-sm font-body mb-6" style={{ color: TEXT_SEC }}>For precise recommendations.</p>
-      <div className="mb-6">
-        <p className="text-xs font-heading font-semibold uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>Hair Density</p>
-        <div className="grid grid-cols-3 gap-3">
-          {HAIR_DENSITIES.map(d => {
-            const isActive = density === d.id
-            return (
-              <button key={d.id} onClick={() => { triggerHaptic(); onDensity(d.id) }}
-                className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-              >
-                <span className="text-sm font-heading font-bold" style={{ color: isActive ? GOLD : TEXT_PRI }}>{d.label}</span>
-                <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>{d.sub}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      <div>
-        <p className="text-xs font-heading font-semibold uppercase tracking-widest mb-3" style={{ color: TEXT_SEC }}>Hairline</p>
-        <div className="grid grid-cols-2 gap-3">
-          {HAIRLINES.map(h => {
-            const isActive = hairline === h.id
-            return (
-              <button key={h.id} onClick={() => { triggerHaptic(); onHairline(h.id) }}
-                className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                style={{ background: isActive ? `${GOLD}15` : SURFACE_2, borderColor: isActive ? GOLD : BORDER }}
-              >
-                <span className="text-sm font-heading font-bold" style={{ color: isActive ? GOLD : TEXT_PRI }}>{h.label}</span>
-                <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>{h.sub}</span>
-              </button>
-            )
-          })}
-        </div>
+    {/* Photo fills the remaining space at its native resolution (no fixed
+        aspect-ratio box shrinking it down) and the button is pinned at the
+        bottom with the same safe-area padding as Scan.jsx's previewPhoto
+        screen, instead of trailing directly under the photo. */}
+    <div className="flex-1 min-h-0 px-5">
+      <div className="w-full h-full rounded-[28px] overflow-hidden" style={{ background: PANEL }}>
+        {image ? <img src={image} alt="Your Ascendus scan" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Scissors size={42} color={GOLD} /></div>}
       </div>
     </div>
-  )
-}
-
-function BarberScriptModal({ cut, onClose }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = () => {
-    triggerHaptic()
-    navigator.clipboard.writeText(cut.barberScript.say.replace(/"/g, ''))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-  return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ background: 'rgba(0,0,0,0.85)' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={SPRING_STANDARD}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl p-6"
-        style={{ background: SURFACE_2 }}
-        onClick={e => e.stopPropagation()}
+    <div className="flex-shrink-0 px-5" style={{ paddingTop: 14, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
+      <button
+        onClick={() => structure.connected && image ? onContinue() : onRescan()}
+        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+        style={{ background: GOLD_GRADIENT, color: '#080808' }}
       >
-        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: BORDER }} />
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-[10px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Barber Script</p>
-            <h3 className="font-heading font-bold text-lg" style={{ color: TEXT_PRI }}>{cut.name}</h3>
-          </div>
-          <button onClick={() => { triggerHaptic(); onClose() }} className="p-1.5 rounded-lg" style={{ background: SURFACE_3 }}>
-            <X size={16} style={{ color: TEXT_SEC }} />
-          </button>
-        </div>
-        <div className="rounded-2xl p-4 mb-4" style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}>
-          <p className="text-[10px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Say exactly this:</p>
-          <p className="text-sm font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.barberScript.say}</p>
-          <button onClick={handleCopy} className="mt-3 flex items-center gap-2 text-xs font-heading font-semibold px-3 py-2 rounded-xl transition-all"
-            style={{ background: copied ? `${GOLD}20` : SURFACE_2, color: copied ? GOLD : TEXT_SEC }}>
-            {copied ? <Check size={13} /> : <Copy size={13} />}
-            {copied ? 'Copied' : 'Copy script'}
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          {[
-            { label: 'Side Guard', value: cut.barberScript.sideGuard },
-            { label: 'Fade Type', value: cut.barberScript.fadeType },
-            { label: 'Top Length', value: cut.barberScript.topLength },
-            { label: 'Blend Style', value: cut.barberScript.blendStyle },
-          ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl p-3" style={{ background: SURFACE_3, border: `1px solid ${BORDER}` }}>
-              <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: TEXT_SEC }}>{label}</p>
-              <p className="text-xs font-heading font-semibold" style={{ color: TEXT_PRI }}>{value}</p>
-            </div>
-          ))}
-        </div>
-        <div className="rounded-xl p-3" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}30` }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Styling at home</p>
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.barberScript.styling}</p>
-        </div>
-        {cut.products?.length > 0 && (
-          <div className="mt-3">
-            <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Products needed</p>
-            <div className="flex flex-wrap gap-2">
-              {cut.products.map(p => (
-                <span key={p} className="text-[10px] font-body px-2.5 py-1 rounded-full"
-                  style={{ background: SURFACE_3, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>{p}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function CutCard({ cut, rank, saved, onSave, onScript, delay = 0 }) {
-  const mainColor = MAINTENANCE_COLORS[cut.maintenance] ?? GOLD
-  const mainLabel = MAINTENANCE_LABELS[cut.maintenance] ?? ''
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
-      className="rounded-2xl overflow-hidden"
-      style={{ background: SURFACE_2, border: `1px solid ${rank === 0 ? GOLD + '60' : BORDER}` }}
-    >
-      <div className="px-4 py-3 flex items-center justify-between"
-        style={{ background: rank === 0 ? `${GOLD}12` : SURFACE_3, borderBottom: `1px solid ${BORDER}` }}>
-        <div className="flex items-center gap-2">
-          {rank === 0 && <span className="text-[9px] font-heading font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: GOLD, color: '#0A0A0A' }}>Best Match</span>}
-          <span className="text-[10px] font-body" style={{ color: TEXT_SEC }}>#{rank + 1}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-bold" style={{ color: GOLD }}>{cut.matchScore}% match</span>
-          <button onClick={() => { triggerHaptic(); onSave(cut.id) }} className="p-1.5 rounded-lg transition-colors"
-            style={{ background: saved ? `${GOLD}20` : SURFACE_2 }}>
-            {saved ? <Star size={13} style={{ color: GOLD }} fill={GOLD} /> : <StarOff size={13} style={{ color: TEXT_SEC }} />}
-          </button>
-        </div>
-      </div>
-      <div className="px-4 py-4">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div>
-            <h3 className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>{cut.name}</h3>
-            <p className="text-xs font-body" style={{ color: TEXT_SEC }}>{cut.vibe}</p>
-          </div>
-          <span className="text-[9px] font-heading font-semibold px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0"
-            style={{ background: `${mainColor}18`, color: mainColor, border: `1px solid ${mainColor}30` }}>{mainLabel}</span>
-        </div>
-        <div className="mt-3 px-3 py-2.5 rounded-xl" style={{ background: SURFACE_3 }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-1" style={{ color: GOLD_DIM }}>Why it fits you</p>
-          <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_PRI }}>{cut.why}</p>
-        </div>
-        {(cut.hairlineNote || cut.densityNote) && (
-          <div className="mt-2 px-3 py-2 rounded-xl" style={{ background: `${RED}15`, border: `1px solid ${RED}30` }}>
-            <p className="text-xs font-body leading-relaxed" style={{ color: RED }}>{cut.hairlineNote || cut.densityNote}</p>
-          </div>
-        )}
-        <button onClick={() => { triggerHaptic(); onScript(cut) }}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-heading font-semibold text-sm transition-all active:scale-98"
-          style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}>
-          <Scissors size={14} />
-          View Barber Script
-        </button>
-      </div>
-    </motion.div>
-  )
-}
-
-export function ManualResultsView({ faceShape, density, hairline, savedCuts, onSave, isPremium, onUpgrade, onReset }) {
-  const [scriptCut, setScriptCut] = useState(null)
-  const profile = FACE_PROFILES[faceShape]
-  const recommendations = getModifiedRecommendations(faceShape, hairline, density)
-  const faceLabel = FACE_SHAPES.find(s => s.id === faceShape)?.label ?? faceShape
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[10px] font-body uppercase tracking-widest mb-0.5" style={{ color: GOLD_DIM }}>{faceLabel} Face</p>
-          <h2 className="font-heading font-bold text-xl" style={{ color: TEXT_PRI }}>Your Cuts</h2>
-        </div>
-        <button onClick={() => { triggerHaptic(); onReset() }} className="text-xs font-heading font-semibold px-3 py-1.5 rounded-xl"
-          style={{ background: SURFACE_2, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>Start over</button>
-      </div>
-      <div className="rounded-xl px-4 py-3 mb-5" style={{ background: SURFACE_2, borderLeft: `3px solid ${GOLD}` }}>
-        <p className="text-xs font-body leading-relaxed" style={{ color: TEXT_SEC }}>{profile.summary}</p>
-      </div>
-      <div className="mb-5 rounded-xl px-4 py-3" style={{ background: `${RED}10`, border: `1px solid ${RED}25` }}>
-        <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: RED }}>What to avoid, and why</p>
-        <p className="text-[11px] font-body leading-relaxed mb-2" style={{ color: `${RED}90` }}>{profile.avoid.reason}</p>
-        <div className="flex flex-wrap gap-1.5">
-          {profile.avoid.cuts.map(cut => (
-            <span key={cut} className="text-[10px] font-body px-2 py-0.5 rounded-full"
-              style={{ background: `${RED}18`, color: RED, border: `1px solid ${RED}25` }}>{cut}</span>
-          ))}
-        </div>
-      </div>
-      <div className="space-y-4">
-        {recommendations.map((cut, i) => (
-          <CutCard key={cut.id} cut={cut} rank={i} saved={savedCuts.includes(cut.id)}
-            onSave={onSave} onScript={setScriptCut} delay={i * 0.07} />
-        ))}
-      </div>
-      {savedCuts.length > 0 && (
-        <div className="mt-4 px-4 py-3 rounded-xl" style={{ background: SURFACE_2, border: `1px solid ${BORDER}` }}>
-          <p className="text-[9px] font-body uppercase tracking-widest mb-2" style={{ color: TEXT_SEC }}>Saved ({savedCuts.length})</p>
-          <div className="flex flex-wrap gap-2">
-            {savedCuts.map(id => {
-              const rec = recommendations.find(r => r.id === id)
-              return rec ? (
-                <span key={id} className="text-[10px] font-body px-2.5 py-1 rounded-full"
-                  style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}>{rec.name}</span>
-              ) : null
-            })}
-          </div>
-        </div>
-      )}
-      <AnimatePresence>
-        {scriptCut && <BarberScriptModal cut={scriptCut} onClose={() => setScriptCut(null)} />}
-      </AnimatePresence>
+        Continue
+      </button>
     </div>
-  )
+  </div>
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function Matching({ profile, structure }) {
+  const [step, setStep] = useState(0)
+  const steps = ['Matching styles', 'Ranking matches', 'Preparing slideshow']
+  useEffect(() => {
+    const timer = setInterval(() => setStep(value => Math.min(2, value + 1)), 700)
+    return () => clearInterval(timer)
+  }, [])
+  return <div className="min-h-[78vh] px-6 flex flex-col items-center justify-center text-center">
+    <motion.div animate={{ rotate: [0, -8, 8, 0] }} transition={{ duration: 2, repeat: Infinity }} className="w-20 h-20 rounded-[26px] flex items-center justify-center mb-7" style={{ background: 'rgba(198,168,92,.1)', border: '1px solid rgba(198,168,92,.35)', boxShadow: '0 0 50px rgba(198,168,92,.12)' }}><Scissors size={31} color={GOLD} /></motion.div>
+    <p className="text-[10px] tracking-[.26em] uppercase mb-2" style={{ color: GOLD }}>Building your looks</p>
+    <h2 className="font-heading font-bold text-[26px] text-white mb-7">Made for your face and hair.</h2>
+    <div className="w-full max-w-xs space-y-3 text-left">
+      {[`Face geometry${structure.connected ? '' : ' unavailable'}`, `${profile.hairType} hair`, `${profile.density} density`].map(text => <div key={text} className="flex items-center gap-3"><span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(198,168,92,.16)', color: GOLD }}><Check size={13} /></span><span className="text-[13px] text-white/65 capitalize">{text}</span></div>)}
+    </div>
+    <div className="mt-9 flex items-center gap-2">{steps.map((label, index) => <div key={label} className="flex items-center gap-2"><i className="block w-2 h-2 rounded-full" style={{ background: index <= step ? GOLD : 'rgba(255,255,255,.14)' }} />{index === step && <span className="text-[10px] uppercase tracking-wider text-white/45">{label}</span>}</div>)}</div>
+  </div>
+}
+
+function CatalogModelImage({ recommendation, className = '' }) {
+  const crop = recommendation.style.image
+  const x = (crop.x / (crop.sheetWidth - crop.width)) * 100
+  const y = (crop.y / (crop.sheetHeight - crop.height)) * 100
+  return <div className={`relative overflow-hidden ${className}`} role="img" aria-label={`${recommendation.style.name} model reference`}
+    style={{
+      aspectRatio: `${crop.width}/${crop.height}`,
+      backgroundColor: '#111',
+      backgroundImage: `url(${crop.sheet})`,
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: `${(crop.sheetWidth / crop.width) * 100}% ${(crop.sheetHeight / crop.height) * 100}%`,
+      backgroundPosition: `${x}% ${y}%`,
+      border: '1px solid rgba(255,255,255,.08)',
+    }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 68%, rgba(0,0,0,.36))' }} />
+    {recommendation.rank === 1 && <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[9px] font-heading font-bold uppercase tracking-wider" style={{ background: GOLD, color: '#080808' }}>Best match</div>}
+  </div>
+}
+
+function DetailSheet({ recommendation, onClose, onBarber }) {
+  const style = recommendation.style
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,.78)' }} onClick={onClose}>
+    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={SPRING_STANDARD} className="w-full max-h-[88vh] overflow-y-auto rounded-t-[30px] p-5" style={{ background: '#111', borderTop: '1px solid rgba(255,255,255,.1)' }} onClick={event => event.stopPropagation()}>
+      <div className="flex justify-between items-start mb-5"><div><p className="text-[9px] uppercase tracking-[.2em]" style={{ color: GOLD }}>Why it works</p><h3 className="font-heading font-bold text-[24px] text-white mt-1">{style.name}</h3></div><button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: PANEL }}><X size={16} color="white" /></button></div>
+      <CatalogModelImage recommendation={recommendation} className="w-full rounded-2xl mb-5" />
+      <div className="space-y-4">
+        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Why it fits you</p><p className="text-[13px] leading-relaxed text-white/80">{conciseReason(recommendation)}</p></section>
+        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Hair compatibility</p><p className="text-[13px] leading-relaxed text-white/80">{recommendation.compatibilityFactors?.length ? recommendation.compatibilityFactors.join(' · ') : 'Compatible with your selected hair type, density, and strand thickness.'}</p></section>
+        <div className="grid grid-cols-2 gap-3"><section className="rounded-xl p-3" style={{ background: PANEL }}><p className="text-[9px] uppercase text-white/40">Maintenance</p><p className="text-[13px] capitalize text-white mt-1">{style.maintenance}</p></section><section className="rounded-xl p-3" style={{ background: PANEL }}><p className="text-[9px] uppercase text-white/40">Growth</p><p className="text-[13px] text-white mt-1">{style.growth}</p></section></div>
+        <section><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">Styling</p><p className="text-[13px] leading-relaxed text-white/80">{style.styling}</p></section>
+      </div>
+      <button onClick={onBarber} className="w-full mt-6 py-4 rounded-2xl font-heading font-bold text-[14px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Show barber</button>
+    </motion.div>
+  </motion.div>
+}
+
+function BarberMode({ recommendation, onClose }) {
+  const { style } = recommendation
+  return <div className="fixed inset-0 z-[60] overflow-y-auto px-5 pb-10" style={{ background: BG, paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
+    <div className="flex items-center justify-between mb-5"><button onClick={onClose}><ArrowLeft size={22} color="white" /></button><p className="font-heading font-bold text-white">Show Barber</p><div className="w-6" /></div>
+    <CatalogModelImage recommendation={recommendation} className="w-full rounded-[26px] mb-6" />
+    <p className="text-[10px] uppercase tracking-[.22em] mb-1" style={{ color: GOLD }}>Reference</p><h2 className="font-heading font-bold text-[27px] text-white mb-6">{style.name}</h2>
+    <div className="space-y-3">{Object.entries(style.barber).map(([part, value]) => <div key={part} className="rounded-2xl p-4" style={{ background: PANEL, border: '1px solid rgba(255,255,255,.07)' }}><p className="text-[9px] uppercase tracking-wider text-white/40 mb-1">{part}</p><p className="text-[14px] text-white/85 leading-relaxed">{value}</p></div>)}</div>
+    <div className="rounded-2xl p-4 mt-3" style={{ background: 'rgba(198,168,92,.08)', border: '1px solid rgba(198,168,92,.22)' }}><p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: GOLD }}>Styling</p><p className="text-[14px] text-white/85">{style.styling}</p></div>
+  </div>
+}
+
+function Looks({ recommendations, active, setActive, savedIds, onSave, onDetails, onSaved }) {
+  const item = recommendations[active]
+  if (!item) return null
+  const go = direction => setActive(value => (value + direction + recommendations.length) % recommendations.length)
+  return <div className="px-5 pb-10">
+    <div className="pt-5 flex items-end justify-between mb-4"><div><p className="text-[10px] uppercase tracking-[.24em]" style={{ color: GOLD }}>HairMax</p><h1 className="font-heading font-bold text-[28px] text-white">Your Best Looks</h1></div><button onClick={onSaved} className="flex items-center gap-1.5 text-[11px] text-white/60"><Bookmark size={14} />{savedIds.length}</button></div>
+    <motion.div key={item.hairstyleId} drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={.18} onDragEnd={(_, info) => { if (info.offset.x < -55) go(1); if (info.offset.x > 55) go(-1) }} initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }}>
+      <div className="relative"><CatalogModelImage recommendation={item} className="w-full rounded-[28px]" /><button onClick={() => go(-1)} aria-label="Previous hairstyle" className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronLeft size={18} color="white" /></button><button onClick={() => go(1)} aria-label="Next hairstyle" className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronRight size={18} color="white" /></button></div>
+      <div className="pt-5"><div className="flex justify-between items-start"><div><p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: GOLD }}>{item.compatibility >= 90 ? 'Strong match' : 'Good match'}</p><h2 className="font-heading font-bold text-[23px] text-white">{item.style.name}</h2></div><span className="font-body text-[11px] text-white/40">{active + 1} / {recommendations.length}</span></div><p className="font-body text-[13px] text-white/60 mt-2 leading-relaxed max-w-[90%]">{conciseReason(item)}</p></div>
+      <div className="grid grid-cols-2 gap-3 mt-5"><button onClick={() => onSave(item.hairstyleId)} className="py-3.5 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[12px]" style={{ background: savedIds.includes(item.hairstyleId) ? 'rgba(198,168,92,.14)' : PANEL, color: savedIds.includes(item.hairstyleId) ? GOLD : 'white', border: '1px solid rgba(255,255,255,.08)' }}><Heart size={15} fill={savedIds.includes(item.hairstyleId) ? GOLD : 'none'} />Save</button><button onClick={() => onDetails(item)} className="py-3.5 rounded-2xl font-heading font-bold text-[12px]" style={{ background: PANEL, color: 'white', border: '1px solid rgba(255,255,255,.08)' }}>Details</button></div>
+      <div className="flex justify-center gap-1.5 mt-5">{recommendations.map((value, index) => <button key={value.hairstyleId} onClick={() => setActive(index)} className="h-1.5 rounded-full transition-all" style={{ width: index === active ? 20 : 6, background: index === active ? GOLD : 'rgba(255,255,255,.18)' }} />)}</div>
+    </motion.div>
+  </div>
+}
+
+function SavedLooks({ recommendations, savedIds, onSelect }) {
+  const saved = savedIds.map(id => recommendations.find(item => item.hairstyleId === id) ?? (() => {
+    const style = HAIRSTYLE_CATALOG.find(item => item.id === id)
+    return style ? { hairstyleId: id, style, reasons: [], compatibilityFactors: [], limitations: [] } : null
+  })()).filter(Boolean)
+  return <div className="px-5 py-6"><h1 className="font-heading font-bold text-[28px] text-white mb-1">Saved Looks</h1><p className="text-[13px] text-white/45 mb-6">Your hairstyle shortlist.</p>{saved.length ? <div className="grid grid-cols-2 gap-3">{saved.map(item => <button key={item.hairstyleId} onClick={() => onSelect(item)} className="text-left"><CatalogModelImage recommendation={item} className="w-full rounded-2xl" /><p className="font-heading font-bold text-[12px] text-white mt-2">{item.style.name}</p></button>)}</div> : <div className="rounded-2xl py-14 text-center" style={{ background: PANEL }}><Heart size={24} color={GOLD} className="mx-auto mb-3" /><p className="text-[13px] text-white/55">Save a look to compare later.</p></div>}</div>
+}
+
 export default function HairMaxx() {
   const navigate = useNavigate()
-  const { isPremium } = useStore()
+  const currentScan = useStore(state => state.currentScan)
+  const fallbackScan = useStore(state => state.scans?.[0])
+  const scan = currentScan ?? fallbackScan
+  const lastFaceScanImage = useStore(state => state.lastFaceScanImage)
+  const storedHairType = useStore(state => state.hairType)
+  const setHairType = useStore(state => state.setHairType)
+  const storedProfile = useStore(state => state.hairProfile)
+  const setHairProfile = useStore(state => state.setHairProfile)
+  const recommendationCache = useStore(state => state.hairRecommendationCache)
+  const setRecommendationCache = useStore(state => state.setHairRecommendationCache)
+  const savedIds = useStore(state => state.savedHairLookIds)
+  const toggleSaved = useStore(state => state.toggleSavedHairLook)
 
-  // AI flow state
-  const [mode, setMode]         = useState(null) // null | 'ai' | 'manual'
-  const [aiStep, setAiStep]     = useState('capture') // 'capture' | 'loading' | 'results'
-  const [aiResult, setAiResult] = useState(null)
-  const [aiError, setAiError]   = useState(null)
+  const structure = useMemo(() => structureFromScan(scan), [scan])
+  const [sourceImage, setSourceImage] = useState(lastFaceScanImage || currentScan?.facePhotoUrl || null)
+  const [stage, setStage] = useState('intro')
+  const [question, setQuestion] = useState(0)
+  const [profile, setProfile] = useState(() => storedProfile?.scanId === scan?.id ? storedProfile : {
+    scanId: scan?.id ?? null, hairType: ['straight', 'wavy', 'curly', 'coily'].includes(storedHairType) ? storedHairType : null,
+    density: null, strandThickness: 'medium', desiredLength: 'any', maintenancePreference: 'any',
+  })
+  const [recommendations, setRecommendations] = useState([])
+  const [active, setActive] = useState(0)
+  const [detail, setDetail] = useState(null)
+  const [barber, setBarber] = useState(null)
 
-  // Manual flow state
-  const [manualStep, setManualStep] = useState(0)
-  const [faceShape, setFaceShape]   = useState(null)
-  const [density, setDensity]       = useState(null)
-  const [hairline, setHairline]     = useState(null)
-  const [savedCuts, setSavedCuts]   = useState([])
+  useEffect(() => {
+    if (sourceImage || !scan?.id) return
+    loadScanMedia(scan.id).then(media => { if (media?.photo) setSourceImage(media.photo) })
+  }, [scan?.id, sourceImage])
 
-  const canNext0 = !!faceShape
-  const canNext1 = !!density && !!hairline
+  const questions = useMemo(() => [
+    { key: 'hairType', title: "What's your hair type?", subtitle: null, options: HAIR_TYPES, visual: true },
+    { key: 'density', title: 'How dense is your hair?', subtitle: null, options: DENSITIES, columns: 3 },
+    { key: 'desiredLength', title: 'What length are you open to?', subtitle: null, options: LENGTHS, columns: 4 },
+  ], [])
 
-  async function handlePhotoSubmit(file) {
-    if (!file) return
-    setAiStep('loading')
-    setAiError(null)
-    try {
-      let base64, mediaType
-      if (typeof file === 'string' && file.startsWith('data:')) {
-        // Native camera returns a dataUrl
-        const [header, data] = file.split(',')
-        base64 = data
-        mediaType = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
-      } else {
-        const result = await fileToBase64(file)
-        base64 = result.base64
-        mediaType = result.mediaType
+  function startQuestions() {
+    const reusable = storedProfile?.scanId === scan?.id && ['hairType', 'density', 'desiredLength'].every(key => storedProfile[key])
+    if (reusable) { beginMatching(storedProfile); return }
+    setQuestion(profile.hairType ? 1 : 0)
+    setStage('questions')
+  }
+
+  function answer(value) {
+    const item = questions[question]
+    const nextProfile = { ...profile, [item.key]: value, scanId: scan?.id ?? null }
+    setProfile(nextProfile)
+    if (question < questions.length - 1) setTimeout(() => setQuestion(index => index + 1), 140)
+    else beginMatching(nextProfile)
+  }
+
+  function cacheKey(nextProfile) {
+    const evidenceVersion = structure.evidence?.schemaVersion ?? structure.evidence?.version ?? 'measured-v1'
+    const profileKey = ['hairType', 'density', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
+    return `${scan?.id ?? 'no-scan'}|${evidenceVersion}|${profileKey}|${HAIR_CATALOG_VERSION}`
+  }
+
+  function resolveRecommendations(items, engine, hairProfile) {
+    return items.map((item, index) => {
+      const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
+      const hardCompatible = style && style.compatibleHairTypes.includes(hairProfile.hairType) &&
+        style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness || 'medium')
+      return hardCompatible ? {
+        hairstyleId: item.hairstyleId, style, rank: item.rank ?? index + 1,
+        compatibility: item.compatibility ?? Math.max(72, 97 - index * 4),
+        reasons: item.matchReasons ?? item.reasons ?? [],
+        relevantMeasurements: item.relevantMeasurements ?? [],
+        compatibilityFactors: item.compatibilityFactors ?? [], limitations: item.limitations ?? [],
+        engine: item.engine ?? engine,
+      } : null
+    }).filter(Boolean)
+  }
+
+  async function beginMatching(nextProfile) {
+    nextProfile = { ...nextProfile, strandThickness: nextProfile.strandThickness || 'medium', maintenancePreference: nextProfile.maintenancePreference || 'any' }
+    setHairProfile(nextProfile)
+    setHairType(nextProfile.hairType)
+    setActive(0)
+    const key = cacheKey(nextProfile)
+    if (recommendationCache?.key === key && recommendationCache.recommendations?.length) {
+      const cached = resolveRecommendations(recommendationCache.recommendations, recommendationCache.engine, nextProfile)
+      if (cached.length) {
+        setRecommendations(cached)
+        setStage('looks')
+        return
       }
-      const result = await api.hair.analyze({ imageData: base64, mediaType })
-      setAiResult(result)
-      setAiStep('results')
-    } catch (err) {
-      setAiError(err.message || 'Analysis failed. Please try again.')
-      setAiStep('capture')
     }
-  }
-
-  function handleBack() {
-    if (mode === 'ai') {
-      if (aiStep === 'results' || aiStep === 'loading') { setAiStep('capture'); setAiResult(null) }
-      else { setMode(null) }
-    } else if (mode === 'manual') {
-      if (manualStep > 0) setManualStep(s => s - 1)
-      else setMode(null)
-    } else {
-      navigate(-1)
+    setStage('matching')
+    let ranked
+    try {
+      const response = await api.hair.recommend({ hairProfile: nextProfile, analysisEvidence: portableEvidence(structure.evidence) })
+      ranked = resolveRecommendations(response.recommendations ?? [], response.engine, nextProfile)
+    } catch (error) {
+      console.error('[HairMax] Grounded recommendation request failed:', error?.message)
+      ranked = rankHairstyles(nextProfile, structure, 8).map(item => ({ ...item, engine: 'deterministic_catalog_fallback_v1' }))
     }
+    if (!ranked.length) { setRecommendations([]); setStage('recommend_error'); return }
+    setRecommendationCache({
+      key,
+      engine: ranked[0]?.engine,
+      recommendations: ranked.map(({ hairstyleId, rank, compatibility, reasons, relevantMeasurements, compatibilityFactors, limitations, engine }) => ({ hairstyleId, rank, compatibility, reasons, relevantMeasurements, compatibilityFactors, limitations, engine })),
+    })
+    setRecommendations(ranked)
+    setStage('looks')
   }
 
-  function handleManualNext() {
-    if (manualStep === 0 && canNext0) setManualStep(1)
-    else if (manualStep === 1 && canNext1) setManualStep(2)
+  function back() {
+    if (barber) { setBarber(null); return }
+    if (detail) { setDetail(null); return }
+    if (stage === 'intro') navigate(-1)
+    else if (stage === 'questions') question > 0 ? setQuestion(value => value - 1) : setStage('intro')
+    else if (stage === 'saved') setStage('looks')
+    else setStage('intro')
   }
 
-  function resetAll() {
-    setMode(null)
-    setAiStep('capture')
-    setAiResult(null)
-    setAiError(null)
-    setManualStep(0)
-    setFaceShape(null)
-    setDensity(null)
-    setHairline(null)
-  }
-
-  function toggleSave(id) {
-    setSavedCuts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
-
-  return (
-    <>
-    <MotionPage style={{ background: SURFACE }}>
-      <Helmet>
-        <title>AI Hair Analysis &amp; Hairmaxx Guide | Ascendus</title>
-        <meta name="description" content="Scan your hair type with AI and get a personalized hairmaxx routine. Identify your curl pattern, porosity, and the exact products to maximize your hair's potential." />
-        <meta name="keywords" content="hairmaxx, hair analysis, AI hair type scanner, looksmax hair, hair glow up, curl type identifier, hair routine" />
-      </Helmet>
-      {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 pb-4"
-        style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-        <button onClick={() => { triggerHaptic(); handleBack() }} className="p-2 -ml-2 rounded-xl" style={{ color: TEXT_SEC }}>
-          <ChevronLeft size={22} />
-        </button>
-        <div className="text-center">
-          <p className="font-heading font-bold text-base" style={{ color: TEXT_PRI }}>HairMaxx</p>
-          <p className="text-[9px] font-body uppercase tracking-widest" style={{ color: GOLD_DIM }}>Haircut Intelligence</p>
-        </div>
-        <div className="w-8" />
-      </div>
-
-      <div className="px-4 pt-6 pb-32">
-        {/* Manual flow step bar */}
-        {mode === 'manual' && manualStep < 2 && <StepBar step={manualStep} />}
-
-        <AnimatePresence mode="wait">
-
-          {/* ── Mode selector ── */}
-          {mode === null && (
-            <motion.div key="mode" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <ModeSelector onAI={() => setMode('ai')} onManual={() => setMode('manual')} />
-            </motion.div>
-          )}
-
-          {/* ── AI: Photo Capture ── */}
-          {mode === 'ai' && aiStep === 'capture' && (
-            <motion.div key="ai-capture" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              {aiError && (
-                <div className="mb-4 px-4 py-3 rounded-xl" style={{ background: `${RED}10`, border: `1px solid ${RED}30` }}>
-                  <p className="text-xs font-body" style={{ color: RED }}>{aiError}</p>
-                </div>
-              )}
-              <PhotoCapture onPhoto={handlePhotoSubmit} onBack={() => setMode(null)} />
-            </motion.div>
-          )}
-
-          {/* ── AI: Loading ── */}
-          {mode === 'ai' && aiStep === 'loading' && (
-            <motion.div key="ai-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AILoading />
-            </motion.div>
-          )}
-
-          {/* ── AI: Results ── */}
-          {mode === 'ai' && aiStep === 'results' && aiResult && (
-            <motion.div key="ai-results" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <AIResults
-                result={aiResult}
-                isPremium={isPremium}
-                onUpgrade={() => navigate('/premium')}
-                onRescan={() => { setAiStep('capture'); setAiResult(null) }}
-              />
-            </motion.div>
-          )}
-
-          {/* ── Manual: Face Shape ── */}
-          {mode === 'manual' && manualStep === 0 && (
-            <motion.div key="manual-0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <FaceShapeSelector selected={faceShape} onSelect={setFaceShape} />
-            </motion.div>
-          )}
-
-          {/* ── Manual: Hair Details ── */}
-          {mode === 'manual' && manualStep === 1 && (
-            <motion.div key="manual-1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <HairDetailsSelector density={density} hairline={hairline} onDensity={setDensity} onHairline={setHairline} />
-            </motion.div>
-          )}
-
-          {/* ── Manual: Results ── */}
-          {mode === 'manual' && manualStep === 2 && (
-            <motion.div key="manual-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <ManualResultsView
-                faceShape={faceShape} density={density} hairline={hairline}
-                savedCuts={savedCuts} onSave={toggleSave}
-                isPremium={isPremium} onUpgrade={() => navigate('/premium')}
-                onReset={resetAll}
-              />
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-      </div>
-    </MotionPage>
-
-    {/* Manual flow next button — kept outside MotionPage: framer-motion's
-        transform on the animated container would turn this fixed-position
-        button into one positioned relative to that container instead of
-        the viewport. */}
-    {mode === 'manual' && manualStep < 2 && (
-      <div className="fixed bottom-0 left-0 right-0 px-4 pt-4"
-        style={{
-          background: `linear-gradient(to top, ${SURFACE} 60%, transparent)`,
-          paddingBottom: 'max(32px, env(safe-area-inset-bottom, 0px))',
-        }}>
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); handleManualNext() }}
-          disabled={manualStep === 0 ? !canNext0 : !canNext1}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: (manualStep === 0 ? canNext0 : canNext1) ? GOLD : SURFACE_3,
-            color: (manualStep === 0 ? canNext0 : canNext1) ? '#0A0A0A' : TEXT_SEC,
-          }}
-        >
-          {manualStep === 1 ? <><Scissors size={16} />Get My Cuts</> : <>Next<ChevronRight size={16} /></>}
-        </motion.button>
-      </div>
-    )}
-    </>
-  )
+  const selectedQuestion = questions[question]
+  // Intro uses the same plain "flex flex-col h-full" root Scan.jsx uses for
+  // its own step screens (real available height inherited from Layout's
+  // flex chain, no scroll) instead of MotionPage's default page-scroll
+  // (fixed calc(100vh-72px) + overflow-y-auto) — that mismatch was both the
+  // wrong proportions and why the intro screen could scroll at all. Other
+  // stages (questions/looks/saved) keep the normal scrollable behavior.
+  return <MotionPage
+    baseClassName={stage === 'intro' ? '' : 'page-scroll'}
+    className={stage === 'intro' ? 'flex flex-col h-full' : stage === 'questions' ? 'flex flex-col' : ''}
+    style={{ background: BG }}
+  >
+    {/* ConnectedIntro carries its own back button (matching Scan.jsx's step
+        header exactly), so the generic bar is skipped for that stage. */}
+    {stage !== 'intro' && <Header onBack={back} right={stage === 'looks' ? <button onClick={() => setStage('saved')}><Bookmark size={18} color={GOLD} /></button> : null} />}
+    <AnimatePresence mode="wait">
+      {stage === 'intro' && <motion.div key="intro" className="flex-1 min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} image={sourceImage} onBack={back} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
+      {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 min-h-0 flex flex-col px-5"><ChoiceGrid {...selectedQuestion} questionKey={selectedQuestion.key} questionNumber={question + 1} questionCount={questions.length} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
+      {stage === 'matching' && <motion.div key="matching" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Matching profile={profile} structure={structure} /></motion.div>}
+      {stage === 'recommend_error' && <motion.div key="recommend-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[70vh] px-6 flex flex-col items-center justify-center text-center"><Sparkles size={30} color={GOLD} /><h2 className="font-heading font-bold text-[22px] text-white mt-5">Couldn’t build your looks</h2><p className="text-[13px] text-white/50 mt-2 mb-6">Your scan is safe. Try the grounded matching step again.</p><button onClick={() => beginMatching(profile)} className="px-6 py-3 rounded-2xl font-heading font-bold text-[13px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Try again</button></motion.div>}
+      {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks recommendations={recommendations} active={active} setActive={setActive} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
+      {stage === 'saved' && <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><SavedLooks recommendations={recommendations} savedIds={savedIds} onSelect={item => { setDetail(item); setStage('looks') }} /></motion.div>}
+    </AnimatePresence>
+    <AnimatePresence>{detail && <DetailSheet recommendation={detail} onClose={() => setDetail(null)} onBarber={() => { setBarber(detail); setDetail(null) }} />}</AnimatePresence>
+    {barber && <BarberMode recommendation={barber} onClose={() => setBarber(null)} />}
+  </MotionPage>
 }

@@ -9,6 +9,7 @@
 const express = require('express')
 const { authMiddleware: auth } = require('../middleware/auth')
 const { getSupabase, isConfigured, updateUserById } = require('../supabase')
+const { calculatePotentialScore } = require('../utils/potentialScore')
 
 const router = express.Router()
 
@@ -134,8 +135,14 @@ router.post('/scans', auth, async (req, res) => {
 // ── GET /supabase/scans ────────────────────────────────────────────────────────
 // Load all scans for the authenticated user.
 router.get('/scans', auth, async (req, res) => {
-  if (!requireSupabase(res)) return
   try {
+    // Local development uses SQLite and device-saved ratings. Missing cloud
+    // credentials must not turn every history refresh into a service failure.
+    if (!isConfigured() && process.env.NODE_ENV !== 'production') {
+      const { getLocalProgressHistory } = require('../utils/localProgressHistory')
+      return res.json({ scans: getLocalProgressHistory(require('../db'), req.userId), source: 'local' })
+    }
+    if (!requireSupabase(res)) return
     const sb = getSupabase()
     const { data: scans, error } = await sb
       .from('scans')
@@ -153,6 +160,10 @@ router.get('/scans', auth, async (req, res) => {
     // page view; if it's already a full URL (http/https), pass it through.
     const resolved = await Promise.all((scans ?? []).map(async (s) => ({
       ...s,
+      // Older scan rows may predate Potential being returned by the scoring
+      // endpoint. Backfill it in the server response using the same server-
+      // owned derivation so existing reveal screens can recover the value.
+      potential_score: s.potential_score ?? calculatePotentialScore(s.overall_score),
       face_image_url: await resolveImageUrl(sb, s.face_image_url),
       body_image_url: await resolveImageUrl(sb, s.body_image_url),
     })))

@@ -22,3 +22,9 @@ dist/
 .env*.local
 server/awesome-claude-agents/
 .impeccable/
+.env*
+
+# Firebase / Google config — contain API keys, must never be committed
+GoogleService-Info.plist
+google-services.json
+*.plist

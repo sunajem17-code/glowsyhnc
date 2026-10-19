@@ -81,7 +81,8 @@
       "Bash(python3 -c \"import numpy; print\\(numpy.__version__\\)\")",
       "Bash(cp face-metrics-demo.jpg face-metrics-demo.jpg.bak)",
       "Bash(cp face-metrics-demo-female.jpg face-metrics-demo-female.jpg.bak)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(xargs cat)"
     ]
   },
   "enabledMcpjsonServers": [

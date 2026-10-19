@@ -1,0 +1,47 @@
+/* Matched to the 333:723 portrait in the supplied reference. */
+.reference-scan{--scan-accent:#c6a85c;--scan-light:#e0c988;box-sizing:border-box;width:100%;height:100%;min-height:0;display:flex;align-items:center;flex-direction:column;padding-top:8px;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:400;overflow:visible}
+.reference-status{box-sizing:border-box;height:42px;flex-shrink:0;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;background:#c6a85c04;border:1px solid #c6a85c19;border-radius:28px;padding:0 18px;color:var(--scan-light);font-size:11px;letter-spacing:1.7px;white-space:nowrap}
+.reference-status:before{content:'';width:6px;height:6px;background:var(--scan-light);border-radius:50%}
+.reference-status:before{display:none}
+.reference-status{color:#e0c988;margin-bottom:3px}
+.reference-status-dot{position:relative;display:block;flex-shrink:0;width:6px;height:6px;border-radius:50%;background:#e0c988;box-shadow:0 0 6px #e0c98899}
+.reference-status-dot:after{content:'';position:absolute;inset:0;border-radius:50%;border:1px solid #e0c988;animation:reference-status-ping 1.3s ease-out infinite}
+@keyframes reference-status-ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(3);opacity:0}}
+@media(prefers-reduced-motion:reduce){.reference-status-dot:after{animation:none;display:none}}
+.reference-status,.reference-segments{position:relative;z-index:4}
+.reference-segments{display:flex;gap:4px;width:142px;height:3px;flex-shrink:0;margin-bottom:2px}
+.reference-segments i{height:3px;flex:1;border-radius:2px;background:#c6a85c26}
+.reference-segments i.is-active{background:#f4d77d;box-shadow:0 0 5px #f4d77dcc,0 0 11px #d4af3780}
+.reference-photo{position:relative;flex-shrink:0;width:min(calc(100vw - 48px),calc((100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 150px)*.8),420px);aspect-ratio:4/5;overflow:visible}
+.reference-photo-clip{position:absolute;inset:0;overflow:hidden;border-radius:28px;border:1px solid #e0c98822;background:#111110}
+.reference-photo-clip>img{position:absolute;display:block;max-width:none;object-fit:fill}
+.reference-geometry,.reference-mesh{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.reference-mesh{isolation:isolate;z-index:2}
+.reference-dimming{opacity:var(--dim-opacity,.68);animation:reference-dim-in .25s ease-out both}
+.reference-mesh{transition:opacity .25s ease-out}
+.is-focused .reference-mesh{opacity:.42}
+.reference-anchor-ripple{opacity:0;transform-box:fill-box;transform-origin:center;animation:reference-anchor-ripple .7s ease-out both;pointer-events:none}
+@keyframes reference-anchor-ripple{0%{transform:scale(.2);opacity:.42}100%{transform:scale(2.6);opacity:0}}
+.reference-region{animation:reference-region-in .45s ease-out both}
+.reference-contour-trace{stroke-dasharray:1;stroke-dashoffset:0;animation:reference-trace-in .75s ease-out both}
+.reference-intro-sweep{position:absolute;left:16%;right:16%;top:20%;height:2px;background:linear-gradient(90deg,transparent,#e0c988 15%,#fff5d9 50%,#e0c988 85%,transparent);box-shadow:0 0 5px 2px #e0c98888,0 0 13px 4px #c6a85c40;animation:reference-intro 1.3s linear both;will-change:transform}
+.reference-overlay{position:fixed;z-index:10000;pointer-events:none;overflow:visible;color:#f5efdf;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:400;isolation:isolate}
+.reference-callout{position:absolute;inset:0;overflow:visible;pointer-events:none;animation:reference-region-in .25s ease-out both}
+.reference-callout>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.reference-badge-group{position:absolute;transform:translate(-50%,-50%);width:var(--bubble-size);height:var(--bubble-size)}
+.reference-badge{box-sizing:border-box;width:100%;height:100%;border-radius:50%;border:2px solid #e0c988;background:#c6a85c30;color:#fff5db;box-shadow:0 0 12px #c6a85c28;display:grid;place-items:center;font-size:var(--counter-font);font-weight:400;font-variant-numeric:tabular-nums}
+.reference-badge.is-complete{background:#c6a85c;border-color:#e0c988;box-shadow:0 0 16px #c6a85c45}
+.reference-badge>svg{width:54%;height:54%}
+.reference-label{position:absolute;transform:translateX(-50%);width:var(--label-width);text-align:center;font-size:var(--label-font);font-weight:400;line-height:1.3;letter-spacing:.15px;text-shadow:0 1px 3px #000;white-space:normal}
+.reference-wait{color:#d0c8b4;font-size:12px;padding:12px;text-align:center}
+@keyframes reference-dim-in{from{opacity:.57}to{opacity:var(--dim-opacity,.68)}}
+@media(prefers-reduced-motion:reduce){.reference-anchor-ripple{display:none;animation:none}.reference-mesh{transition:none}}
+@keyframes reference-region-in{from{opacity:0}to{opacity:1}}
+@keyframes reference-trace-in{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.is-revealing .reference-mesh{animation:reference-mesh-reveal 1.05s cubic-bezier(.25,.1,.25,1) both}
+/* Keep the same feathered face boundary during the initial laser reveal. */
+.reference-intro-sweep{z-index:3;animation-duration:1.05s;animation-timing-function:cubic-bezier(.25,.1,.25,1)}
+@keyframes reference-intro{from{top:var(--sweep-start)}to{top:var(--sweep-end)}}
+@keyframes reference-mesh-reveal{from{clip-path:inset(0 0 calc(100% - var(--sweep-start)) 0)}to{clip-path:inset(0 0 calc(100% - var(--sweep-end)) 0)}}
+@media(prefers-reduced-motion:reduce){.is-revealing .reference-mesh{animation:none;clip-path:none}}
+@media(prefers-reduced-motion:reduce){.reference-intro-sweep{display:none}.reference-dimming,.reference-region,.reference-contour-trace,.reference-callout{animation:none}}

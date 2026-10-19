@@ -1,5 +1,6 @@
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
+import { isSevenDayFreeTrial } from './scanTrial'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -10,6 +11,31 @@ const ENTITLEMENT_ID = 'Ascendus Pro'
 let _initialized = false
 
 export const isNative = () => Capacitor.isNativePlatform()
+
+export async function getEligibleScanTrial() {
+  if (!isNative()) return null
+  await initRevenueCat()
+  const offerings = await Purchases.getOfferings()
+  const packages = offerings.current?.availablePackages || []
+  const candidates = packages.filter(p => isSevenDayFreeTrial(p.product))
+  if (!candidates.length) return null
+  const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
+    productIdentifiers: candidates.map(p => p.product.identifier),
+  })
+  return candidates.find(p => eligibility[p.product.identifier]?.status === 2) || null
+}
+
+export async function purchaseScanTrial(productId) {
+  const pkg = await getEligibleScanTrial()
+  if (!pkg || pkg.product.identifier !== productId) throw new Error('This free trial is no longer available.')
+  try {
+    const result = await Purchases.purchasePackage({ aPackage: pkg })
+    return { success: !!result.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID], customerInfo: result.customerInfo }
+  } catch (error) {
+    if (isCancelError(error)) return { success: false, reason: 'cancelled' }
+    throw error
+  }
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 export async function initRevenueCat(userId) {

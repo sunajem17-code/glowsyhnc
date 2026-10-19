@@ -119,4 +119,34 @@ router.get('/:id', authMiddleware, (req, res) => {
   })
 })
 
+// ── GET /api/scan/stats — public, no auth required ───────────────────────────
+// Returns the real total scan count from the database. No auth needed — this
+// is aggregate data, not user-specific. Cached 5 min to avoid hammering DB.
+let _statsCache = null
+let _statsCacheAt = 0
+router.get('/stats', async (req, res) => {
+  try {
+    const now = Date.now()
+    if (_statsCache && now - _statsCacheAt < 5 * 60 * 1000) {
+      return res.json(_statsCache)
+    }
+    const { getSupabase } = require('../supabase')
+    const sb = getSupabase()
+    let totalScans = null
+    if (sb) {
+      const { count, error } = await sb.from('scans').select('*', { count: 'exact', head: true })
+      if (!error) totalScans = count
+    } else {
+      const row = db.prepare('SELECT COUNT(*) as c FROM scans').get()
+      totalScans = row?.c ?? null
+    }
+    _statsCache = { totalScans }
+    _statsCacheAt = now
+    res.json(_statsCache)
+  } catch (err) {
+    console.error('[scan/stats]', err.message)
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
 module.exports = { router, persistScanResult }

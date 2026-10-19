@@ -1,3 +1,4 @@
+import { API_BASE } from '../utils/backend'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
@@ -6,6 +7,8 @@ import { checkAchievements } from '../utils/achievements'
 const useStore = create(
   persist(
     (set, get) => ({
+      upgradeWelcomePending: false,
+      setUpgradeWelcomePending: (value) => set({ upgradeWelcomePending: value }),
       // Auth
       user: null,
       token: null,
@@ -15,6 +18,7 @@ const useStore = create(
       setAuth: (user, token) => set({
         user,
         token,
+        upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
@@ -28,6 +32,7 @@ const useStore = create(
       setGuestSession: (userId, token) => set({
         user: { id: userId },
         token,
+        upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: true,
         isPremium: false,
@@ -42,6 +47,7 @@ const useStore = create(
         set({
           user: null,
           token: null,
+          upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
           scans: [],
@@ -53,6 +59,9 @@ const useStore = create(
           isPremium: false,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
+          hairProfile: null,
+          hairRecommendationCache: null,
+          savedHairLookIds: [],
           hasOnboarded: false,
           gender: null,
           userProfile: null,
@@ -177,15 +186,17 @@ const useStore = create(
       lastScanDate: null,
       setLastScanDate: (d) => set({ lastScanDate: d }),
 
-      // Pro Scan daily cap: 3 scans per calendar day (local device time)
+      // Pro Scan daily cap: 3 scans per 24h window starting from first scan of the day
       proScanCount: 0,
-      proScanDate: null,
+      proScanDate: null,       // kept for backward compat (unused now)
+      proScanFirstAt: null,    // ISO timestamp of the first scan in the current window
       recordProScan: () => set(state => {
-        const today = new Date().toDateString()
-        const sameDay = state.proScanDate === today
+        const now = Date.now()
+        const windowStart = state.proScanFirstAt ? new Date(state.proScanFirstAt).getTime() : null
+        const inWindow = windowStart && (now - windowStart) < 24 * 60 * 60 * 1000
         return {
-          proScanCount: sameDay ? state.proScanCount + 1 : 1,
-          proScanDate: today,
+          proScanCount: inWindow ? state.proScanCount + 1 : 1,
+          proScanFirstAt: inWindow ? state.proScanFirstAt : new Date().toISOString(),
         }
       }),
 
@@ -215,9 +226,26 @@ const useStore = create(
       gender: null, // null = not selected yet, 'male' | 'female'
       setGender: (g) => set({ gender: g }),
 
+      // Primary goal selected during onboarding
+      primaryGoal: null, // 'dating' | 'jawline' | 'skin' | 'glow'
+      setPrimaryGoal: (g) => set({ primaryGoal: g }),
+
       // Hair type (detected by AI or selected manually by user)
       hairType: null, // null = not set, 'straight'|'wavy'|'curly'|'coily'|'locs'|'bald'
       setHairType: (t) => set({ hairType: t }),
+
+      // HairMax keeps lightweight choices, recommended catalog ids, and reasons.
+      // Model photography is static and never stored in localStorage.
+      hairProfile: null,
+      hairRecommendationCache: null,
+      savedHairLookIds: [],
+      setHairProfile: (profile) => set({ hairProfile: profile }),
+      setHairRecommendationCache: (cache) => set({ hairRecommendationCache: cache }),
+      toggleSavedHairLook: (id) => set(state => ({
+        savedHairLookIds: state.savedHairLookIds.includes(id)
+          ? state.savedHairLookIds.filter(value => value !== id)
+          : [...state.savedHairLookIds, id],
+      })),
 
       // Premium
       isPremium: false,
@@ -255,14 +283,12 @@ const useStore = create(
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
-          const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
-          const base = `https://${API.replace(/^https?:\/\//, '')}/api`
           const headers = { Authorization: `Bearer ${token}` }
 
           // Run both fetches in parallel — cuts startup time in half
           const [statusRes, profileRes] = await Promise.all([
-            fetch(`${base}/payments/status`, { headers }),
-            fetch(`${base}/user/profile`,    { headers }),
+            fetch(`${API_BASE}/payments/status`, { headers }),
+            fetch(`${API_BASE}/user/profile`,    { headers }),
           ])
 
           // Same reasoning as the RevenueCat check above — /payments/status is
@@ -390,8 +416,12 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
+        upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,
+        hairProfile: state.hairProfile,
+        hairRecommendationCache: state.hairRecommendationCache,
+        savedHairLookIds: state.savedHairLookIds,
         userProfile: state.userProfile,
         privacySettings: state.privacySettings,
         assignedPhase: state.assignedPhase,

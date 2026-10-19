@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, Lock, ChevronRight, RotateCcw, Check } from 'lucide-react'
+import { Send, Lock, ChevronRight, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { UPGRADE_WELCOME } from '../utils/coachWelcome'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -40,7 +41,7 @@ function TypingIndicator() {
         className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
       >
-        <Sparkles size={13} style={{ color: GOLD }} />
+        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div
         className="px-4 py-3 rounded-2xl rounded-bl-sm"
@@ -94,7 +95,7 @@ function MessageBubble({ msg, isNew }) {
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
           style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Sparkles size={13} style={{ color: GOLD }} />
+          <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
         </div>
       )}
       <div
@@ -140,12 +141,9 @@ const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
-  const { scans, isPremium, userProfile, freeCoachMessages, incrementFreeCoachMessages } = useStore()
+  const { scans, isPremium, userProfile } = useStore()
   const latestScan = scans[0]
   const scanContext = buildScanContext(latestScan, userProfile)
-
-  const freeMessagesLeft = isPremium ? Infinity : Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages ?? 0))
-  const freeCoachLocked  = !isPremium && freeMessagesLeft <= 0
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -162,21 +160,23 @@ export default function AICoach() {
 
   // Initial greeting on mount
   useEffect(() => {
-    if (messages.length > 0) return
-    if (latestScan) {
-      const greeting = isPremium
-        ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything. I'll tell you exactly what to work on.`
-        : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
-      setMessages([{ role: 'assistant', content: greeting }])
-    } else if (isPremium) {
-      setMessages([{ role: 'assistant', content: 'No scan data yet. Run a scan first, then I can give you personalized advice.' }])
-    }
+    if (messages.length > 0 || !latestScan || !isPremium) return
+    const pending = useStore.getState().upgradeWelcomePending
+    setMessages([{ role: 'assistant', content: pending ? UPGRADE_WELCOME : `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
+    if (pending) useStore.getState().setUpgradeWelcomePending(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, latestScan])
 
   async function sendMessage(text) {
     const msgText = (text || input).trim()
-    if (!msgText || loading || freeCoachLocked) return
+    if (!msgText || loading) return
+
+    // No scan → redirect to scan
+    if (!latestScan) { navigate('/scan'); return }
+
+    // Not premium → open paywall immediately
+    if (!isPremium) { navigate('/unlock?paywall=1'); return }
+
     setInput('')
     setError('')
 
@@ -201,7 +201,7 @@ export default function AICoach() {
         return updated
       })
     } catch (err) {
-      setError(err.message || 'Something went wrong. Try again.')
+      setError(err.message || "Couldn’t connect just now. Please try again.")
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -230,11 +230,11 @@ export default function AICoach() {
             className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
           >
-            <Sparkles size={18} style={{ color: GOLD }} />
+            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-heading font-bold text-[18px] text-primary">AI Coach</h1>
+              <h1 className="font-heading font-bold text-[18px] text-primary">Adonis</h1>
               <span
                 className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
                 style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
@@ -243,11 +243,11 @@ export default function AICoach() {
               </span>
             </div>
             <p className="font-body text-[11px] text-secondary">
-              {isPremium
-                ? (latestScan ? `Score ${latestScan.glowScore?.toFixed(1)}/10 loaded` : 'No scan yet')
-                : freeCoachLocked
-                  ? 'Free limit reached: upgrade for unlimited'
-                  : `${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''} remaining`}
+              {!latestScan
+                ? 'Scan Your Face To Unlock'
+                : isPremium
+                  ? 'Your pal. Your coach. In your corner.'
+                  : 'Pro required — tap to upgrade'}
             </p>
           </div>
         </div>
@@ -332,7 +332,7 @@ export default function AICoach() {
             className="pt-4"
           >
             <p className="font-body text-[13px] text-secondary text-center mb-5">
-              Ask me anything about your appearance & routine
+              {latestScan && !isPremium ? 'Ask a question — Pro unlocks the answer' : 'Ask me anything about your appearance & routine'}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {STARTER_PROMPTS.map((prompt, i) => (
@@ -380,43 +380,17 @@ export default function AICoach() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input bar — or paywall when free limit reached */}
-      {freeCoachLocked ? (
+      {/* Input bar — disabled state if no scan */}
+      {!latestScan ? (
         <div className="px-4 pb-8 pt-3 flex-shrink-0">
-          <div
-            className="rounded-2xl p-4"
-            style={{
-              background: 'linear-gradient(135deg, rgba(198,168,92,0.1) 0%, rgba(198,168,92,0.04) 100%)',
-              border: '1px solid rgba(198,168,92,0.22)',
-            }}
+          <button
+            onClick={() => { triggerHaptic(); navigate('/scan') }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
           >
-            <div className="flex items-center gap-2.5 mb-2.5">
-              <Lock size={15} style={{ color: GOLD }} />
-              <p className="font-heading font-bold text-[14px]" style={{ color: GOLD }}>
-                Upgrade for unlimited answers
-              </p>
-            </div>
-            <ul className="space-y-1 mb-3">
-              {[
-                'Unlimited chat: no tokens, no limits',
-                'Personalized protocols from your scan',
-                'Updated with every new scan',
-              ].map((f, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <Check size={11} style={{ color: GOLD, marginTop: 2, flexShrink: 0 }} />
-                  <span className="font-body text-[12px] text-secondary">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={() => { triggerHaptic(); navigate('/premium') }}
-              className="w-full py-3 rounded-xl font-heading font-bold text-[13px] flex items-center justify-center gap-2"
-              style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
-            >
-              Upgrade to Pro
-              <ChevronRight size={14} />
-            </button>
-          </div>
+            Scan Your Face To Unlock
+            <ChevronRight size={16} />
+          </button>
         </div>
       ) : (
         <div
@@ -436,7 +410,7 @@ export default function AICoach() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask your coach…"
+              placeholder="Ask Adonis anything…" aria-label="Message Adonis"
               rows={1}
               className="flex-1 bg-transparent outline-none resize-none font-body text-[14px]"
               style={{

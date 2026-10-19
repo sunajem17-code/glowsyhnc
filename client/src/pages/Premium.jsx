@@ -73,7 +73,7 @@ export default function Premium() {
   useEffect(() => {
     if (searchParams.get('success') === '1') {
       api.payments.status()
-        .then(({ isPremium: active }) => { if (active) setIsPremium(true) })
+        .then(({ isPremium: active }) => { if (active) { useStore.getState().setUpgradeWelcomePending(true); setIsPremium(true) } })
         .catch(() => {})
     }
   }, [searchParams, setIsPremium])
@@ -88,6 +88,7 @@ export default function Premium() {
       if (isNative()) {
         const result = await purchasePro('monthly')
         if (result?.success) {
+          useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
@@ -247,7 +248,8 @@ export default function Premium() {
         />
         <button
           onClick={() => { triggerHaptic(); navigate(-1) }}
-          className="absolute left-4 top-14 w-9 h-9 rounded-xl flex items-center justify-center z-20"
+          aria-label="Go back"
+          className="absolute left-4 top-14 w-9 h-9 rounded-full flex items-center justify-center z-20 active:scale-95 transition-transform"
           style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
         >
           <ChevronLeft size={18} style={{ color: TEXT }} />

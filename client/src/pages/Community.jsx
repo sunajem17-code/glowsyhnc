@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag, Settings } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -234,16 +234,16 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
 }
 
 // ── Share modal (Glow-Up or Rate Me) ─────────────────────────────────────────
-function ShareModal({ onClose, onPosted, user, scans }) {
-  const latestScan  = scans[0]
-  const prevScan    = scans.find((_, i) => i > 0)
-  const scoreAfter  = latestScan?.glowScore ?? null
+function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto }) {
+  const latestScan  = scanToShare ?? scans[0]
+  const prevScan    = scanToShare ? null : scans.find((_, i) => i > 0)
+  const scoreAfter  = latestScan?.aiScore?.overallScore ?? latestScan?.glowScore ?? null
   const scoreBefore = prevScan?.glowScore   ?? null
 
   const [postType,    setPostType]    = useState('glow-up')
   const [displayName, setDisplayName] = useState(user?.name?.split(' ')[0] ?? 'Anonymous')
   const [caption,     setCaption]     = useState('')
-  const [afterPhoto,  setAfterPhoto]  = useState(latestScan?.facePhotoUrl ?? null)
+  const [afterPhoto,  setAfterPhoto]  = useState(initialPhoto ?? latestScan?.facePhotoUrl ?? null)
   const [beforePhoto, setBeforePhoto] = useState(null)
   const [ratePhoto,   setRatePhoto]   = useState(null)
   const [posting,     setPosting]     = useState(false)
@@ -1134,16 +1134,26 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Community() {
   const navigate = useNavigate()
-  const { user, scans } = useStore()
+  const location = useLocation()
+  const { user, scans, currentScan } = useStore()
+  const [shareDraft, setShareDraft] = useState(() => location.state?.shareScanId ? {
+    scanId: location.state.shareScanId, photo: location.state.sharePhoto,
+  } : null)
+  const scanToShare = shareDraft
+    ? (currentScan?.id === shareDraft.scanId ? currentScan : scans.find(scan => scan.id === shareDraft.scanId))
+    : null
 
   const [posts, setPosts]           = useState([])
   const [loading, setLoading]       = useState(true)
-  const [showShare, setShowShare]   = useState(false)
+  const [showShare, setShowShare]   = useState(Boolean(shareDraft))
   const [activePost, setActivePost] = useState(null)
 
   const displayName = user?.name?.split(' ')[0] ?? 'Anonymous'
 
   useEffect(() => { loadFeed() }, [])
+  useEffect(() => {
+    if (location.state?.shareScanId) navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, location.pathname, navigate])
 
   async function loadFeed() {
     setLoading(true)
@@ -1284,10 +1294,12 @@ export default function Community() {
         )}
         {showShare && (
           <ShareModal
-            onClose={() => setShowShare(false)}
-            onPosted={() => { setShowShare(false); loadFeed() }}
+            onClose={() => { setShowShare(false); setShareDraft(null) }}
+            onPosted={() => { setShowShare(false); setShareDraft(null); loadFeed() }}
             user={user}
             scans={scans}
+            scanToShare={scanToShare}
+            initialPhoto={shareDraft?.photo}
           />
         )}
         {activePost && (

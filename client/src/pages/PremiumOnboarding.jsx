@@ -1,3 +1,4 @@
+import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -5,7 +6,12 @@ import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLin
 import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
-import { PhotoUploadStep, AnalyzingScreen, ANALYSIS_STEPS } from './Scan'
+import hypergamyChart from '../assets/hypergamy-chart.png'
+import haloEffectImg from '../assets/halo-effect-new.png'
+import { PhotoUploadStep, AnalyzingScreen, extractScanOverlayPoints, buildMeshPathD } from './Scan'
+import { ANALYSIS_STEPS } from '../utils/analysisSteps'
+import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
+import { analyzeSideProfile } from '../utils/photoGeometry'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
@@ -13,34 +19,12 @@ import { isNative } from '../utils/iap'
 
 // ── Animated processing overlay (bars + "Processing" label) ──────────────────
 import { Capacitor } from '@capacitor/core'
-import { FirebaseAnalytics } from '@capacitor-firebase/analytics'
 import { getDeviceId } from '../utils/deviceId'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-
-// Analytics collection ships disabled by default (see GoogleService-Info.plist's
-// IS_ANALYTICS_ENABLED) and is turned on here, once the user has actually agreed
-// to it in StepConsent. No-op on web — no native bridge, and no web Firebase app
-// configured yet either.
-async function enableAnalytics() {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    await FirebaseAnalytics.setEnabled({ enabled: true })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
-
-async function logAnalyticsEvent(name, params) {
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    await FirebaseAnalytics.logEvent({ name, params })
-  } catch {
-    // analytics unavailable — not fatal, ignore
-  }
-}
+import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
@@ -53,7 +37,7 @@ const G = GOLD
 const G_DIM = 'rgba(198,168,92,0.10)'
 const G_BORDER = 'rgba(198,168,92,0.28)'
 const BG = 'var(--bg)'
-const SURFACE = '#111111'
+const SURFACE = '#0D0D0D'
 const BORDER = 'rgba(255,255,255,0.07)'
 const TEXT = 'var(--text-primary)'
 const DIM = 'var(--text-secondary)'
@@ -127,10 +111,19 @@ function BackBtn({ onBack }) {
     <button
       onClick={onBack}
       aria-label="Go back"
-      className="absolute left-5 w-9 h-9 rounded-full flex items-center justify-center z-10"
-      style={{ background: 'rgba(255,255,255,0.06)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+      className="absolute flex items-center justify-center"
+      style={{
+        top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+        left: 20,
+        width: 34,
+        height: 34,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        zIndex: 10,
+      }}
     >
-      <ChevronLeft size={18} style={{ color: DIM }} />
+      <ChevronLeft size={18} style={{ color: 'rgba(255,255,255,0.6)' }} />
     </button>
   )
 }
@@ -511,7 +504,7 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           Welcome back.
         </h1>
@@ -606,8 +599,8 @@ const UMAX_PURPLE = 'linear-gradient(180deg, #9D4EDD 0%, #7B2FBE 100%)'
 function StepGender({ data, onChange, onNext }) {
   const [selected, setSelected] = useState(null)
 
-  const MALE_BLUE   = '#4A90E2'
-  const FEMALE_PINK = '#E85D9E'
+  const MALE_BLUE   = '#FFFFFF'
+  const FEMALE_PINK = '#FFFFFF'
 
   function pick(gender) {
     triggerHaptic()
@@ -619,12 +612,10 @@ function StepGender({ data, onChange, onNext }) {
   const cardStyle = (gender) => ({
     width: 288, height: 288,
     borderRadius: 22,
-    border: '1.5px solid #262626',
+    border: `1.5px solid ${selected === gender ? '#C6A85C' : '#262626'}`,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
-    background: selected === gender
-      ? (gender === 'male' ? 'rgba(74,144,226,0.12)' : 'rgba(232,93,158,0.12)')
-      : '#141414',
+    cursor: 'pointer', transition: 'background 0.2s, border 0.2s', flexShrink: 0,
+    background: selected === gender ? 'rgba(198,168,92,0.10)' : '#0D0D0D',
   })
 
   return (
@@ -634,10 +625,10 @@ function StepGender({ data, onChange, onNext }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="px-6"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}
       >
-        <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>
-          Are you male or female?
+        <h1 className="font-heading font-bold text-[28px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em', textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          What's Your Gender
         </h1>
       </motion.div>
 
@@ -652,7 +643,7 @@ function StepGender({ data, onChange, onNext }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <MarsIcon color={MALE_BLUE} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
+            <div style={{ color: selected === 'male' ? '#C6A85C' : '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Male</div>
           </div>
         </motion.div>
 
@@ -666,7 +657,7 @@ function StepGender({ data, onChange, onNext }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <VenusIcon color={FEMALE_PINK} />
-            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
+            <div style={{ color: selected === 'female' ? '#C6A85C' : '#ffffff', fontWeight: 700, fontSize: 24, marginTop: 8 }}>Female</div>
           </div>
         </motion.div>
       </div>
@@ -723,10 +714,269 @@ function StepReferral({ onNext }) {
         </motion.div>
       </div>
 
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleContinue}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: GOLD_GRADIENT,
+            border: 'none', cursor: 'pointer',
+            color: '#000000', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+          }}
+        >
+          Continue
+        </motion.button>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP CONSEQUENCES ────────────────────────────────────────────────────────
+const CONSEQUENCES = [
+  {
+    icon:  '⚠️',
+    color: '#EF4444',
+    text:  'A limited dating life — your pool narrows every year you let this slide.',
+  },
+  {
+    icon:  '🔁',
+    color: '#F97316',
+    text:  'The confidence spiral: rejection → insecurity → less effort → more rejection.',
+  },
+  {
+    icon:  '📉',
+    color: '#EF4444',
+    text:  'Studies show appearance directly impacts perceived competence and hireability.',
+  },
+  {
+    icon:  '⏳',
+    color: '#F97316',
+    text:  'Your peak window is now. The habits you build in your 20s define your 30s.',
+  },
+]
+
+function StepConsequences({ onNext }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: '#0a0a0a',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', color: '#EF4444', textTransform: 'uppercase', marginBottom: 10 }}>
+            REALITY CHECK
+          </p>
+          <h1
+            className="font-heading font-bold leading-tight"
+            style={{ fontSize: 27, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: 8 }}
+          >
+            What staying the same actually costs you
+          </h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+            Most people know something is off. Few do anything about it.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Consequence list */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px', gap: 12 }}>
+        {CONSEQUENCES.map((c, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.08 + i * 0.09, duration: 0.32, ease: 'easeOut' }}
+            style={{
+              display:      'flex',
+              gap:          14,
+              alignItems:   'flex-start',
+              background:   `${c.color}0D`,
+              border:       `1px solid ${c.color}28`,
+              borderRadius: 14,
+              padding:      '14px 16px',
+            }}
+          >
+            <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.5, margin: 0 }}>
+              {c.text}
+            </p>
+          </motion.div>
+        ))}
+
+        {/* Divider callout */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.35 }}
+          style={{
+            marginTop: 4,
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: 'rgba(198,168,92,0.06)',
+            border: '1px solid rgba(198,168,92,0.22)',
+            textAlign: 'center',
+          }}
+        >
+          <p style={{ fontSize: 13, color: '#C6A85C', fontWeight: 600, margin: 0, lineHeight: 1.45 }}>
+            Ascendus shows you exactly where you are — and the fastest path to where you want to be.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onNext() }}
+          style={{
+            width: '100%', padding: '22px 0',
+            borderRadius: 50,
+            background: GOLD_GRADIENT,
+            border: 'none', cursor: 'pointer',
+            color: '#000000', fontWeight: 700, fontSize: 20,
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
+          }}
+        >
+          I'm ready to change this
+        </motion.button>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP TESTIMONIALS ────────────────────────────────────────────────────────
+const TESTIMONIALS = [
+  {
+    handle:  '@samhakimii',
+    rating:  5,
+    quote:   'My face looks so different after only 2 weeks. Almost have hollow cheeks now.',
+    initials:'SH',
+    color:   '#C6A85C',
+  },
+  {
+    handle:  '@kylejordan_',
+    rating:  5,
+    quote:   'Went from a 6.1 to a 7.4 after my 12 week plan.',
+    initials:'KJ',
+    color:   '#60A5FA',
+  },
+  {
+    handle:  '@marcov.fit',
+    rating:  5,
+    quote:   'The only app that helps me take action instead of just pointing out flaws.',
+    initials:'MV',
+    color:   '#34C759',
+  },
+]
+
+function StarRow({ n = 5 }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 2 }}>
+      {Array.from({ length: n }).map((_, i) => (
+        <Star key={i} size={12} fill="#C6A85C" stroke="none" />
+      ))}
+    </span>
+  )
+}
+
+function StepTestimonials({ onNext }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: '#0a0a0a',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          {/* Star cluster */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ display: 'inline-flex', gap: 3 }}>
+              {[0,1,2,3,4].map(i => <Star key={i} size={18} fill="#C6A85C" stroke="none" />)}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#C6A85C', fontFamily: 'inherit' }}>4.9</span>
+          </div>
+
+          <h1
+            className="font-heading font-bold leading-tight"
+            style={{ fontSize: 28, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: 6 }}
+          >
+            See why thousands are ascending
+          </h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 0 }}>
+            Real results from real people.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Cards */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px', gap: 12 }}>
+        {TESTIMONIALS.map((t, i) => (
+          <motion.div
+            key={t.handle}
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 + i * 0.1, duration: 0.35, ease: 'easeOut' }}
+            style={{
+              background:   '#0D0D0D',
+              border:       '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 16,
+              padding:      '16px 18px',
+              display:      'flex',
+              gap:          14,
+              alignItems:   'flex-start',
+            }}
+          >
+            {/* Avatar */}
+            <div style={{
+              width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+              background: `${t.color}22`,
+              border:     `1.5px solid ${t.color}55`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: t.color, fontFamily: 'inherit' }}>
+                {t.initials}
+              </span>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', fontFamily: 'inherit' }}>
+                  {t.handle}
+                </span>
+                <StarRow n={t.rating} />
+              </div>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, margin: 0 }}>
+                "{t.quote}"
+              </p>
+            </div>
+          </motion.div>
+        ))}
+
+        {/* Trust badge */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.46, duration: 0.35 }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 0 0',
+          }}
+        >
+        </motion.div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { triggerHaptic(); onNext() }}
           style={{
             width: '100%', padding: '22px 0',
             borderRadius: 50,
@@ -753,10 +1003,12 @@ function StepNotifications({ onNext }) {
     setLoading(true)
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
-      const result = await PushNotifications.requestPermissions()
-      if (result.receive === 'granted') await PushNotifications.register()
-    } catch {
-      // not available on web or permission unavailable — proceed anyway
+      const status = await PushNotifications.requestPermissions()
+      if (status.receive === 'granted') {
+        await PushNotifications.register()
+      }
+    } catch (err) {
+      console.warn('[Notifications] requestPermissions failed (non-fatal):', err?.message)
     }
     setLoading(false)
     onNext()
@@ -787,7 +1039,7 @@ function StepNotifications({ onNext }) {
         </motion.div>
       </div>
 
-      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleEnable}
@@ -814,13 +1066,45 @@ function StepNotifications({ onNext }) {
 
 
 // ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
-function StepAuth({ onNext }) {
-  const [loading, setLoading] = useState(null) // 'apple' | 'google' | null
-  const [error, setError]     = useState('')
+function StepAuth({ onNext, onSkip }) {
+  const [loading, setLoading]       = useState(null) // 'apple' | 'google' | 'email' | null
+  const [error, setError]           = useState('')
+  const [titleTaps, setTitleTaps]   = useState(0)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [passInput, setPassInput]   = useState('')
   const setAuth = useStore(s => s.setAuth)
   const isAuthenticated = useStore(s => s.isAuthenticated)
   const isGuest         = useStore(s => s.isGuest)
   const user            = useStore(s => s.user)
+
+  function handleTitleTap() {
+    const next = titleTaps + 1
+    setTitleTaps(next)
+    if (next >= 5) { setShowEmailForm(true); setTitleTaps(0) }
+  }
+
+  async function handleEmailLogin() {
+    if (!emailInput || !passInput) return
+    triggerHaptic()
+    setError('')
+    setLoading('email')
+    try {
+      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, password: passInput }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Login failed')
+      setAuth(data.user, data.token)
+      onNext()
+    } catch (err) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setLoading(null)
+    }
+  }
 
   // Already signed in on native — skip this step (web stays for dev visibility)
   useEffect(() => {
@@ -833,34 +1117,46 @@ function StepAuth({ onNext }) {
     setLoading('apple')
     try {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-      const appleResult = await SignInWithApple.authorize({
-        clientId: 'com.ascendus.app',
-        scopes: 'email name',
-        nonce: Math.random().toString(36).substring(2, 15),
-      })
+      const appleResult = await Promise.race([
+        SignInWithApple.authorize({
+          clientId: 'com.ascendus.app',
+          scopes: 'email name',
+          nonce: Math.random().toString(36).substring(2, 15),
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+      ])
       const identityToken = appleResult?.response?.identityToken
       if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
 
-      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-      const authRes = await fetch(`${API_BASE}/api/auth/apple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identityToken,
-          user: appleResult.response.user,
-          email: appleResult.response.email,
-          fullName: appleResult.response.fullName,
-          guestUserId: isGuest ? user?.id : undefined,
-        }),
-      })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20_000)
+      let authRes
+      try {
+        authRes = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identityToken,
+            user: appleResult.response.user,
+            email: appleResult.response.email,
+            fullName: appleResult.response.fullName,
+            guestUserId: isGuest ? user?.id : undefined,
+            refCode: sessionStorage.getItem('asc_ref_code') || undefined,
+          }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
       const authData = await authRes.json()
       if (!authRes.ok) throw new Error(authData.error || 'Authentication failed')
       setAuth(authData.user, authData.token)
       onNext()
     } catch (err) {
-      if (err?.message?.toLowerCase().includes('cancel')) {
-        // user dismissed the sheet — not an error
-      } else {
+      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
+        || err?.message?.toLowerCase().includes('cancel')
+        || err?.message?.toLowerCase().includes('dismissed')
+      if (!isCancelled) {
         setError(err.message || 'Sign in failed. Please try again.')
       }
     } finally {
@@ -876,10 +1172,11 @@ function StepAuth({ onNext }) {
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', position: 'relative' }}>
       <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" style={{ color: '#ffffff', letterSpacing: '-0.02em' }}>Create your account</h1>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>Create your account</h1>
         </motion.div>
+        <button onClick={onNext} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', paddingTop: 6 }}>Skip</button>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
@@ -934,23 +1231,652 @@ function StepAuth({ onNext }) {
           </span>
         </motion.button>
 
+        {showEmailForm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={passInput}
+              onChange={e => setPassInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
+            />
+            <button
+              onClick={handleEmailLogin}
+              disabled={!!loading}
+              style={{ width: '100%', padding: '16px 0', borderRadius: 50, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
+            >
+              {loading === 'email' ? 'Signing in…' : 'Sign in'}
+            </button>
+          </div>
+        )}
+
         {error ? (
           <p className="text-center font-body text-[12px]" style={{ color: '#E85D9E' }}>{error}</p>
         ) : null}
 
-        {/* TODO: remove before launch */}
-        <button
-          onClick={() => { triggerHaptic(); onNext() }}
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', marginTop: 8, textDecoration: 'underline' }}
+      </div>
+    </div>
+  )
+}
+
+// ── Halo Effect SVG Diagram ───────────────────────────────────────────────────
+function HaloEffectDiagram() {
+  const G = '#C6A85C'
+  return (
+    <svg viewBox="0 0 340 220" width="100%" style={{ display: 'block' }} xmlns="http://www.w3.org/2000/svg">
+      {/* Background */}
+      <rect width="340" height="220" fill="#111111" rx="14"/>
+
+      {/* Divider */}
+      <line x1="170" y1="16" x2="170" y2="204" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+
+      {/* ── LEFT: Higher Attractiveness ── */}
+      <text x="85" y="28" textAnchor="middle" fill="white" fontFamily="sans-serif" fontSize="11" fontWeight="700">Higher Attractiveness</text>
+
+      {/* Golden glow behind face */}
+      <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#C6A85C" stopOpacity="0.35"/>
+        <stop offset="100%" stopColor="#C6A85C" stopOpacity="0"/>
+      </radialGradient>
+      <ellipse cx="85" cy="95" rx="52" ry="60" fill="url(#glow)"/>
+
+      {/* Attractive face */}
+      {/* Head */}
+      <ellipse cx="85" cy="88" rx="30" ry="36" fill="#3d2b1f"/>
+      {/* Hair */}
+      <path d="M55 72 Q57 48 85 44 Q113 48 115 72 Q105 56 85 54 Q65 56 55 72Z" fill="#5a3515"/>
+      {/* Side hair */}
+      <path d="M55 72 Q52 80 54 90" stroke="#5a3515" strokeWidth="4" fill="none" strokeLinecap="round"/>
+      <path d="M115 72 Q118 80 116 90" stroke="#5a3515" strokeWidth="4" fill="none" strokeLinecap="round"/>
+      {/* Strong jawline */}
+      <path d="M58 100 Q60 124 85 130 Q110 124 112 100" fill="#3a2518"/>
+      {/* Eyes */}
+      <ellipse cx="74" cy="84" rx="6" ry="5" fill="white"/>
+      <ellipse cx="96" cy="84" rx="6" ry="5" fill="white"/>
+      <ellipse cx="75" cy="84" rx="3" ry="3" fill="#1a0f08"/>
+      <ellipse cx="97" cy="84" rx="3" ry="3" fill="#1a0f08"/>
+      <ellipse cx="76" cy="83" rx="1" ry="1" fill="white"/>
+      <ellipse cx="98" cy="83" rx="1" ry="1" fill="white"/>
+      {/* Eyebrows strong */}
+      <path d="M68 78 Q74 75 80 77" stroke="#4a2e10" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <path d="M90 77 Q96 75 102 78" stroke="#4a2e10" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      {/* Nose */}
+      <path d="M85 88 L82 100 Q85 103 88 100 L85 88" fill="#2e1f10" opacity="0.6"/>
+      {/* Confident smile */}
+      <path d="M73 110 Q85 120 97 110" stroke="#c07850" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      {/* Chin */}
+      <path d="M75 124 Q85 132 95 124" stroke="#2e1f10" strokeWidth="1.5" fill="none"/>
+      {/* Collar / suit */}
+      <path d="M55 140 Q60 130 75 132 L85 140 L95 132 Q110 130 115 140 L120 160 L50 160Z" fill="#2a2a2a"/>
+      <path d="M75 132 L85 148 L95 132" fill="#3a3a3a"/>
+      <rect x="83" y="132" width="4" height="16" fill="#e8e0d0" opacity="0.4"/>
+
+      {/* Gold pills left */}
+      {/* Row 1 */}
+      <rect x="26" y="163" width="72" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="62" y="174" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Trustworthy</text>
+      <rect x="102" y="163" width="60" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="132" y="174" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Competent</text>
+      {/* Row 2 */}
+      <rect x="16" y="183" width="58" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="45" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Confident</text>
+      <rect x="78" y="183" width="60" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="108" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Successful</text>
+      <rect x="142" y="183" width="52" height="16" rx="8" fill="rgba(198,168,92,0.2)" stroke={G} strokeWidth="0.8"/>
+      <text x="168" y="194" textAnchor="middle" fill={G} fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Likeable</text>
+
+      {/* ── RIGHT: Lower Attractiveness ── */}
+      <text x="255" y="28" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontFamily="sans-serif" fontSize="11" fontWeight="700">Lower Attractiveness</text>
+
+      {/* Plain face */}
+      <ellipse cx="255" cy="90" rx="28" ry="34" fill="#222222" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+      {/* Sparse hair */}
+      <path d="M227 76 Q232 62 255 60 Q270 62 275 70" stroke="rgba(255,255,255,0.2)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M228 76 Q225 68 230 62" stroke="rgba(255,255,255,0.15)" strokeWidth="2" fill="none"/>
+      {/* Eyes droopy */}
+      <ellipse cx="244" cy="86" rx="5.5" ry="4" fill="rgba(255,255,255,0.7)"/>
+      <ellipse cx="266" cy="86" rx="5.5" ry="4" fill="rgba(255,255,255,0.7)"/>
+      <ellipse cx="244" cy="87" rx="3" ry="2.5" fill="#555"/>
+      <ellipse cx="266" cy="87" rx="3" ry="2.5" fill="#555"/>
+      {/* Bags under eyes */}
+      <path d="M239 91 Q244 94 249 91" stroke="rgba(255,255,255,0.15)" strokeWidth="1" fill="none"/>
+      <path d="M261 91 Q266 94 271 91" stroke="rgba(255,255,255,0.15)" strokeWidth="1" fill="none"/>
+      {/* Nose bulbous */}
+      <ellipse cx="255" cy="102" rx="6" ry="5" fill="#2a2a2a" stroke="rgba(255,255,255,0.1)" strokeWidth="0.8"/>
+      {/* Frown */}
+      <path d="M244 114 Q255 108 266 114" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      {/* Jowls */}
+      <path d="M229 108 Q226 118 232 124" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none"/>
+      <path d="M281 108 Q284 118 278 124" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none"/>
+      {/* Worn shirt */}
+      <path d="M227 142 Q232 132 245 134 L255 142 L265 134 Q278 132 283 142 L288 162 L222 162Z" fill="#2a2520"/>
+      <path d="M245 134 L255 150 L265 134" fill="#332d28"/>
+
+      {/* Gray pills right */}
+      <rect x="178" y="163" width="72" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="214" y="174" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Less Capable</text>
+      <rect x="254" y="163" width="80" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="294" y="174" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Less Trustworthy</text>
+
+      <rect x="178" y="183" width="62" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="209" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Overlooked</text>
+      <rect x="244" y="183" width="52" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="270" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Average</text>
+      <rect x="300" y="183" width="32" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+      <text x="316" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="7.5" fontWeight="600">Forget.</text>
+    </svg>
+  )
+}
+
+// ── STEP: Halo Effect / Why Looksmax ─────────────────────────────────────────
+const HALO_LINES = [
+  "People judge your character\nbased on your face in 3 seconds",
+  "Make every second count",
+]
+
+function HaloTypewriter({ start }) {
+  const [lineIdx, setLineIdx] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const idx = useRef(0)
+
+  useEffect(() => {
+    if (!start) return
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
+    setLineIdx(0)
+  }, [start])
+
+  useEffect(() => {
+    if (!start) return
+    triggerPageHaptic()
+  }, [start, lineIdx])
+
+  useEffect(() => {
+    if (!start) return
+    const text = HALO_LINES[lineIdx]
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
+    const id = setInterval(() => {
+      if (idx.current < text.length) {
+        setDisplayed(text.slice(0, idx.current + 1))
+        idx.current++
+      } else {
+        clearInterval(id)
+        if (lineIdx === 0) {
+          setTimeout(() => {
+            setDisplayed('')
+            setTimeout(() => setLineIdx(1), 300)
+          }, 1200)
+        } else {
+          setDone(true)
+        }
+      }
+    }, 28)
+    return () => clearInterval(id)
+  }, [start, lineIdx])
+
+  const cursor = start && !done ? (
+    <motion.span
+      animate={{ opacity: [1, 0] }}
+      transition={{ duration: 0.5, repeat: Infinity }}
+      style={{ color: '#C6A85C', marginLeft: 1 }}
+    >|</motion.span>
+  ) : null
+  const displayLines = displayed.split('\n')
+  return (
+    <span style={{ whiteSpace: 'pre-line' }}>
+      {displayLines.map((line, i) => (
+        <span key={i}>
+          {line}
+          {i === displayLines.length - 1 ? cursor : '\n'}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function HaloSubTypewriter({ start }) {
+  const text = 'What impression are you making?'
+  const [displayed, setDisplayed] = useState('')
+  const idx = useRef(0)
+
+  useEffect(() => {
+    if (!start) return
+    // delay until main typewriter is roughly done (~2 lines × chars × 28ms + pauses ≈ 3.5s)
+    const delay = setTimeout(() => {
+      triggerPageHaptic()
+      idx.current = 0
+      setDisplayed('')
+      const id = setInterval(() => {
+        idx.current++
+        setDisplayed(text.slice(0, idx.current))
+        if (idx.current >= text.length) clearInterval(id)
+      }, 24)
+      return () => clearInterval(id)
+    }, 200)
+    return () => clearTimeout(delay)
+  }, [start])
+
+  return <span>{displayed}</span>
+}
+
+function StepHaloEffect({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const TEXT = '#FFFFFF'
+  const [imgLoaded, setImgLoaded] = useState(false)
+  useEffect(() => {
+    const img = new Image()
+    img.src = haloEffectImg
+  }, [])
+  return (
+    <div
+      style={{ position: 'absolute', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
+      {/* Content */}
+      <div style={{ flex: '1 1 0', minHeight: 0, overflow: 'hidden', padding: '0 24px 0', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <h1 className="font-heading font-bold text-[28px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          Your face<br />speaks before you do
+        </h1>
+        <div style={{ margin: '-200px -24px 0', paddingTop: '5%', paddingBottom: '5%' }}>
+          <img
+            src={haloEffectImg}
+            alt="The Halo Effect"
+            onLoad={() => setImgLoaded(true)}
+            style={{ display: 'block', width: '91%', margin: '0 auto', mixBlendMode: 'screen' }}
+          />
+        </div>
+      </div>
+
+      {/* Gold text */}
+      <div style={{ flexShrink: 0, padding: '8px 24px', transform: 'translateY(-60px) scale(1.45)', transformOrigin: 'center' }}>
+        <p
+          className="font-heading font-extrabold text-[16px] leading-snug"
+          style={{ color: G, textAlign: 'center', textShadow: `0 0 24px rgba(198,168,92,0.8)`, letterSpacing: '-0.01em' }}
         >
-          Skip for now (dev only)
-        </button>
+          <HaloSubTypewriter start={true} />
+        </p>
+      </div>
+
+      {/* Bottom button */}
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <GoldBtn label="Next" onClick={onNext} />
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Hypergamy ───────────────────────────────────────────────────────────
+function StepHypergamy({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const G_BORDER = 'rgba(198,168,92,0.28)'
+  const TEXT = '#FFFFFF'
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#0A0A0A' }}>
+      {/* Header + chart — padded so card doesn't overlap */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '0 24px 12px' }}>
+        <BackBtn onBack={onBack} />
+        <h1 className="font-heading font-bold text-[24px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
+          Dating apps changed the rules.
+        </h1>
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', marginBottom: 16 }}>
+          The top 20% get 80% of the attention — unless you optimize your structure.
+        </p>
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: `1.5px solid ${G_BORDER}` }}>
+          <img src={hypergamyChart} alt="Hypergamy data chart" style={{ display: 'block', width: '100%' }} />
+        </div>
+      </div>
+
+      {/* Bottom card — locked to bottom */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 24px' }}>
+        <div style={{
+          background: '#0D0D0D',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 24,
+          padding: '12px 16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <h2 className="font-heading font-bold text-[14px]" style={{ color: TEXT, letterSpacing: '-0.01em', margin: 0 }}>
+            Hypergamy
+          </h2>
+          <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+            Modern dating apps changed the math completely. Women now have instant access to top tier profiles globally, meaning the average guy is no longer just competing locally. Right now 80% of attention goes to the top 20% of men, leaving the rest nearly invisible in a crowded digital marketplace.{' '}
+            <span style={{ color: 'rgba(255,255,255,0.88)' }}>The good news is it is not about luck. It is all about optimization.</span>{' '}
+            Once you figure out where you actually stand structurally, you can stop guessing, start maximizing your potential, and command the attention you deserve.
+          </p>
+          <GoldBtn label="Find out where you rank" onClick={onNext} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP: Why Appearance Matters ──────────────────────────────────────────────
+function StepWhyAppearance({ onNext, onBack }) {
+  const G = '#C6A85C'
+  const G_BORDER = 'rgba(198,168,92,0.28)'
+  const TEXT = '#FFFFFF'
+  const BG = '#0A0A0A'
+  const stats = [
+    { value: '12%', label: 'Higher average earnings', sub: 'Reported among more attractive workers', cite: 'Hamermesh & Biddle, 1994' },
+    { value: '72%', label: 'Say appearance affects first impressions', sub: 'Within seconds', cite: 'OnePoll Survey, 2019' },
+    { value: '3×', label: 'More likely to be rated positively in competence, trust & likeability', sub: '', cite: 'Dion, Berscheid & Walster, 1972' },
+  ]
+  return (
+    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+      <div className="flex-1 flex flex-col justify-start pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="font-heading font-bold text-[28px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}
+        >
+          Appearance isn't shallow, it's strategic
+        </motion.h1>
+        <div className="flex flex-col gap-3 mt-5">
+          {stats.map((s, i) => (
+            <motion.div
+              key={s.value}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut', delay: 0.25 + i * 0.1 }}
+              className="rounded-2xl px-6 py-4" style={{ background: '#0D0D0D', border: '1px solid rgba(255,255,255,0.07)', height: 150, display: 'flex', alignItems: 'center' }}>
+              <div className="flex items-center gap-5" style={{ width: '100%' }}>
+                <span className="font-heading font-bold text-[36px] shrink-0 w-20 text-center" style={{ color: G, textShadow: `0 0 18px rgba(198,168,92,0.7), 0 0 40px rgba(198,168,92,0.35)` }}>{s.value}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-heading font-semibold text-[16px] leading-snug" style={{ color: 'rgba(255,255,255,0.9)' }}>{s.label}</span>
+                  {s.sub ? <span className="font-heading font-semibold text-[16px] leading-snug" style={{ color: 'rgba(255,255,255,0.9)' }}>{s.sub}</span> : null}
+                  {s.cite ? <p className="font-heading font-bold text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em' }}>{s.cite}</p> : null}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <GoldBtn label="Next" onClick={onNext} />
       </div>
     </div>
   )
 }
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
+// ── STEP: Cinematic Closer ────────────────────────────────────────────────────
+function useTypewriter(text, speed = 38) {
+  const [displayed, setDisplayed] = useState('')
+  useEffect(() => {
+    setDisplayed('')
+    if (!text) return
+    let i = 0
+    const iv = setInterval(() => {
+      i++
+      setDisplayed(text.slice(0, i))
+      triggerHaptic()
+      if (i >= text.length) clearInterval(iv)
+    }, speed)
+    return () => clearInterval(iv)
+  }, [text, speed])
+  return displayed
+}
+
+function StepCinematic({ onNext }) {
+  const lines = [
+    { text: 'Looks shape how the world sees you', gold: false },
+    { text: 'They can shape first impressions', gold: false },
+    { text: "Now it's time to see where you stand", gold: false },
+    { text: 'Scan your face and...', gold: false },
+    { text: 'ASCEND WITH US', gold: true },
+  ]
+  const [lineIdx, setLineIdx] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  const displayed = useTypewriter(lines[lineIdx]?.text, 55)
+
+  useEffect(() => {
+    // Light tap as each new line starts — skip lineIdx 0 on mount (feels like a jolt on open)
+    if (lineIdx > 0) triggerPageHaptic()
+  }, [lineIdx])
+
+  useEffect(() => {
+    let cancelled = false
+    const line = lines[lineIdx]
+    const dur = line?.text.length * 55 + 1600
+    const t = setTimeout(() => {
+      if (cancelled) return
+      if (lineIdx < lines.length - 1) {
+        setLineIdx(i => i + 1)
+      } else {
+        setLeaving(true)
+        setTimeout(() => { if (!cancelled) onNext() }, 700)
+      }
+    }, dur)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [lineIdx, onNext])
+
+  function handleTap() {
+    triggerHaptic()
+    if (lineIdx < lines.length - 1) {
+      setLineIdx(i => i + 1)
+    } else {
+      onNext()
+    }
+  }
+
+  return (
+    <motion.div
+      onClick={handleTap}
+      animate={{ opacity: leaving ? 0 : 1 }}
+      transition={{ duration: 0.6, ease: 'easeIn' }}
+      style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 50% 40%, #1a1a1a 0%, #000000 70%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '0 36px', cursor: 'pointer',
+      }}
+    >
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={lineIdx}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.35 } }}
+          className="font-heading font-bold text-center"
+          style={{
+            fontSize: lines[lineIdx]?.gold ? 36 : 32,
+            whiteSpace: 'normal',
+            lineHeight: 1.25,
+            letterSpacing: lines[lineIdx]?.gold ? '0.04em' : '-0.02em',
+            color: lines[lineIdx]?.gold ? '#C6A85C' : '#ffffff',
+            textShadow: lines[lineIdx]?.gold
+              ? '0 0 30px rgba(198,168,92,0.7), 0 0 60px rgba(198,168,92,0.3)'
+              : '0 0 20px rgba(198,168,92,0.25)',
+          }}
+        >
+          {displayed}
+        </motion.p>
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+// ── STEP: Primary Goal ───────────────────────────────────────────────────────
+const GoalIconDating = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>
+    <path d="M7.5 9.5c0 .687.265 1.383.697 1.844l3.009 3.264a1.14 1.14 0 0 0 .407.314 1 1 0 0 0 .783-.004 1.14 1.14 0 0 0 .398-.31l3.008-3.264A2.77 2.77 0 0 0 16.5 9.5 2.5 2.5 0 0 0 12 8a2.5 2.5 0 0 0-4.5 1.5"/>
+  </svg>
+)
+const GoalIconJawline = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5c.28 0 .5.22.5.5a2.5 2.5 0 1 0 5 0c0-.81-.7-1.8 0-2.5Z"/>
+  </svg>
+)
+const GoalIconSkin = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/>
+    <path d="M20 2v4"/><path d="M22 4h-4"/>
+    <circle cx="4" cy="20" r="2"/>
+  </svg>
+)
+const GoalIconGlow = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
+    <path d="M5 21h14"/>
+  </svg>
+)
+
+const PRIMARY_GOAL_OPTIONS = [
+  {
+    key: 'dating',
+    Icon: GoalIconDating,
+    label: 'Dating & Social Confidence',
+    desc: 'Feel more confident in photos, dating apps, and in person',
+  },
+  {
+    key: 'jawline',
+    Icon: GoalIconJawline,
+    label: 'Jawline & Face Shape',
+    desc: 'Define your jawline, improve lower face structure, and optimize facial posture',
+  },
+  {
+    key: 'skin',
+    Icon: GoalIconSkin,
+    label: 'Skin Quality & Tone',
+    desc: 'Clear up acne, fix texture, and build a simple high-impact skincare routine',
+  },
+  {
+    key: 'glow',
+    Icon: GoalIconGlow,
+    label: 'Total Glow-Up & Symmetry',
+    desc: 'Get a complete breakdown of your facial features and discover where to focus first',
+  },
+]
+
+// ── STEP: Attractiveness Impact ───────────────────────────────────────────────
+function StepAttractivenessImpact({ onNext, onBack }) {
+  const bars = [
+    { label: 'Dating',       pct: 80, gold: true },
+    { label: 'Popularity',   pct: 65 },
+    { label: 'Career Oppt.', pct: 40 },
+    { label: 'Income',       pct: 30 },
+  ]
+  const touchStartX = useRef(null)
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX }
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (dx < -50) onNext()
+    else if (dx > 50) onBack()
+  }
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ background: '#0A0A0A', display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
+      {/* Top text — same position as every other page */}
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 22px)' }}>
+        <h1 className="font-heading font-bold text-[28px] leading-tight mb-2" style={{ color: TEXT, letterSpacing: '-0.02em', textShadow: '0 0 24px rgba(255,255,255,0.25)' }}>
+          How looks shape your life
+        </h1>
+        <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          99 out of 100 people don't realize how much attractiveness affects them in their day to day life
+        </p>
+      </div>
+
+      {/* Bars — fill remaining space */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '24px 24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', flex: 1 }}>
+          {bars.map(({ label, pct, gold }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span className="font-heading font-semibold text-[17px]" style={{ width: 110, color: gold ? G : 'rgba(255,255,255,0.75)', flexShrink: 0 }}>{label}</span>
+              <div style={{ flex: 1, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  borderRadius: 6,
+                  background: gold ? 'linear-gradient(90deg, #D4AF6A 0%, #C6A85C 100%)' : 'rgba(255,255,255,0.9)',
+                  boxShadow: gold ? '0 0 20px rgba(198,168,92,1), 0 0 50px rgba(198,168,92,0.6), 0 0 80px rgba(198,168,92,0.3)' : 'none',
+                }} />
+              </div>
+              <span className="font-heading font-bold text-[17px]" style={{ width: 44, textAlign: 'right', color: gold ? G : 'rgba(255,255,255,0.75)', flexShrink: 0 }}>{pct}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom button — same position as every other page */}
+      <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <GoldBtn label="Next" onClick={onNext} />
+      </div>
+    </div>
+  )
+}
+
+function StepPrimaryGoal({ data, onChange, onNext, onBack }) {
+  const selected = data.primaryGoal || ''
+
+  function pick(key) {
+    triggerHaptic()
+    onChange('primaryGoal', key)
+    setTimeout(onNext, 220)
+  }
+
+  return (
+    <div className="flex flex-col h-full px-6" style={{ background: BG }}>
+      <div className="flex-1 flex flex-col justify-start pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)' }}>
+        <motion.h1
+          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="font-heading font-bold text-[28px] leading-tight"
+          style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 16, textShadow: '0 0 24px rgba(255,255,255,0.25)' }}
+        >
+          What do you want to improve first?
+        </motion.h1>
+
+        <div className="flex flex-col gap-3 mt-6">
+          {PRIMARY_GOAL_OPTIONS.map(({ key, Icon, label, desc }, i) => {
+            const isSelected = selected === key
+            return (
+              <motion.button
+                key={key}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => pick(key)}
+                className="flex items-center gap-4 px-5 rounded-2xl text-left transition-all duration-150"
+                style={{
+                  height: 130,
+                  background: isSelected ? 'rgba(198,168,92,0.10)' : SURFACE,
+                  border: `1.5px solid ${isSelected ? G : BORDER}`,
+                }}
+              >
+                <span className="leading-none flex-shrink-0" style={{ color: '#fff' }}><Icon /></span>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-heading font-extrabold text-[17px] leading-snug mb-0.5"
+                    style={{ color: G, textShadow: '0 0 18px rgba(198,168,92,0.6)' }}
+                  >
+                    {label}
+                  </p>
+                  <p className="font-body font-bold text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                    {desc}
+                  </p>
+                </div>
+              </motion.button>
+            )
+          })}
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 const FOCUS_OPTIONS = [
   { key: 'jawline',   Icon: Bone,      label: 'Jawline & Chin' },
   { key: 'skin',      Icon: Sparkles,  label: 'Skin Quality' },
@@ -964,6 +1890,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
   const selected = data.improvementFocus || []
 
   function toggle(key) {
+    triggerHaptic()
     const next = selected.includes(key)
       ? selected.filter(k => k !== key)
       : [...selected, key]
@@ -973,7 +1900,7 @@ function StepImprovementFocus({ data, onChange, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <div className="mb-5">
           <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
             What would you most want to improve?
@@ -1074,7 +2001,7 @@ function StepSocialProof({ onNext, onBack }) {
       <BackBtn onBack={onBack} />
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 pt-20 pb-4">
+      <div className="flex-1 overflow-y-auto px-6 pb-4">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -1146,7 +2073,7 @@ function StepHeight({ data, onChange, onNext, onBack, units }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How tall are you?
         </h1>
@@ -1192,7 +2119,7 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20">
+      <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How much do you weigh?
         </h1>
@@ -1295,7 +2222,7 @@ function StepBMI({ data, onNext, onBack }) {
   return (
     <div className="flex flex-col h-full px-6">
       <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center pt-20 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center overflow-y-auto">
 
         {/* BMI value */}
         <motion.div
@@ -1374,7 +2301,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
   return (
     <div className="flex flex-col h-full" style={{ background: '#080808' }}>
       <BackBtn onBack={onBack} />
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      <div className="px-6">
         <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>
           {stepLabel}
         </p>
@@ -1391,7 +2318,7 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
 
       <div className="px-3 pb-3">
         <PhotoUploadStep
-          stepNum={1}
+          stepNum={photoType === 'side' ? 2 : 1}
           heroLayout
           photoType={photoType}
           guide={null}
@@ -1417,13 +2344,52 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [sidePhoto, setSidePhoto]       = useState(null)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [slowAnalysis, setSlowAnalysis] = useState(false)
+  const [liveAnalysisResult, setLiveAnalysisResult] = useState(null)
+  const [analysisPoints, setAnalysisPoints] = useState(null)
+  const [analysisLandmarks, setAnalysisLandmarks] = useState(null)
+  const [sideAnalysisPoints, setSideAnalysisPoints] = useState(null)
+  const [sideAnalysisLandmarks, setSideAnalysisLandmarks] = useState(null)
+  const [sideDetectionPending, setSideDetectionPending] = useState(false)
+  const [meshPathD, setMeshPathD] = useState(null)
   const [error, setError]               = useState('')
   const [rateLimited, setRateLimited]   = useState(false)
   const [quotaExhausted, setQuotaExhausted] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
+  const frontLandmarksRef = useRef(null)
+  const animationGateRef = useRef(null)
   const sideTriggerRef = useRef(null)
   const faceTriggerRef = useRef(null)
+  const finishAnimation = useCallback(() => {
+    animationGateRef.current?.()
+    animationGateRef.current = null
+  }, [])
+
+  function ensureFrontLandmarks(url) {
+    if (!url) return Promise.resolve(null)
+    if (frontLandmarksRef.current?.url === url) return frontLandmarksRef.current.promise
+    setAnalysisPoints(null)
+    setMeshPathD(null)
+    const promise = import('../utils/faceLandmarks.js')
+      .then(({ getLandmarks }) => getLandmarks(url))
+      .then(lm => {
+        setAnalysisLandmarks(lm)
+        const points = extractScanOverlayPoints(lm)
+        if (points) setAnalysisPoints(points)
+        import('@mediapipe/face_mesh').then(mod => {
+          const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
+          const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
+          if (path) setMeshPathD(path)
+        }).catch(() => {})
+        return { points, landmarks: lm }
+      })
+      .catch(err => {
+        console.warn('[PremiumOnboarding] Front landmark mapping unavailable:', err?.message)
+        return null
+      })
+    frontLandmarksRef.current = { url, promise }
+    return promise
+  }
   // Countdown → auto-retry with the same photos
   useEffect(() => {
     if (!rateLimited) return
@@ -1471,11 +2437,20 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setPhase('analyzing')
     setError('')
     setAnalysisStep(0)
+    setLiveAnalysisResult(null)
+    setSideAnalysisPoints(null)
+    setSideAnalysisLandmarks(null)
+    setSideDetectionPending(!!side)
+    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
-    // Start the visual progress timer immediately so the bar advances as soon as
-    // the analyzing screen appears — not after toBase64 finishes (which can take
-    // several seconds for large camera photos, leaving the bar stuck at 5%).
-    const stageTimer = setInterval(() => setAnalysisStep(prev => Math.min(prev + 1, 3)), 1800)
+    // Fire MediaPipe landmark detection in parallel with the AI call so
+    // FacialAnalysisOverlay gets real per-user coordinates instead of null.
+    let frontLandmarksPromise = Promise.resolve(null)
+    if (face) {
+      setAnalysisStep(1)
+      frontLandmarksPromise = ensureFrontLandmarks(face)
+    }
+
     const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
     try {
@@ -1483,7 +2458,53 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
       if (sideB64) setSidePhoto(sideB64)
+      let sideLandmarksPromise = Promise.resolve(null)
+      let sideProfileGeometryResult = null
+      if (sideB64) {
+        if (Capacitor.isNativePlatform()) {
+          sideLandmarksPromise = analyzeSideProfile(sideB64).then(result => {
+            sideProfileGeometryResult = result
+            const profilePoints = result?.detected ? profilePointsFromVision(result.landmarks) : null
+            if (profilePoints) setSideAnalysisPoints(profilePoints)
+            return profilePoints
+          }).catch(err => {
+            console.warn('[PremiumOnboarding] Profile mapping unavailable:', err?.message)
+            return null
+          })
+            .finally(() => setSideDetectionPending(false))
+        } else {
+          sideLandmarksPromise = frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+            .then(({ getLandmarks }) => getLandmarks(sideB64))
+            .then(lm => {
+              setSideAnalysisLandmarks(lm)
+              const profilePoints = profilePointsFromMesh(lm)
+              setSideAnalysisPoints(profilePoints)
+              return profilePoints
+            })
+            .catch(err => {
+              console.warn('[PremiumOnboarding] Profile mapping unavailable:', err?.message)
+              return null
+            })
+            .finally(() => setSideDetectionPending(false))
+        }
+      } else {
+        setSideDetectionPending(false)
+      }
       setSlowAnalysis(false)
+      const frontDetection = await frontLandmarksPromise
+      if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      const detectedSidePoints = sideB64 ? await sideLandmarksPromise : null
+      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      const sideProfileGeometry = sideProfileGeometryResult?.detected
+        ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
+        : null
+      const analysisEvidence = await buildProductionEvidence({
+        frontImage: faceB64,
+        frontLandmarks: frontDetection.landmarks,
+        qualityGate: { passed: true, state: 'SUCCESS', source: 'onboarding_capture_gate' },
+        sideProfileGeometry: sideProfileGeometryResult,
+      })
+      setAnalysisStep(2)
 
       // Wait for the silent guest session to resolve before calling the
       // authenticated API. If the user reaches analysis faster than the
@@ -1493,20 +2514,22 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       let aiResult
       try {
         setScanInFlight(true)
-        aiResult = await Promise.race([
-          api.ai.score({ faceImage: faceB64, sideImage: sideB64, gender: gender || 'male' }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)),
-        ])
+        aiResult = await requestProductionAnalysis({
+          apiClient: api,
+          faceImage: faceB64,
+          sideImage: sideB64,
+          sideProfileGeometry,
+          evidence: analysisEvidence,
+          gender: gender || 'male',
+        })
       } finally {
         setScanInFlight(false)
-        clearInterval(stageTimer)
         clearTimeout(slowTimer)
         setSlowAnalysis(false)
       }
 
+      setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
-      await new Promise(r => setTimeout(r, 350))
-      setAnalysisStep(4)
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
@@ -1520,6 +2543,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         glowScore:      Math.round(aiResult.overallScore * 10) / 10,
         tier:           aiResult.tier,
         aiScore:        aiResult,
+        analysisEvidence: aiResult.analysisEvidence,
         faceData: {
           aestheticScore:    aiResult.faceScore,
           pillars:           null,
@@ -1535,6 +2559,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
       }
 
+      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation. Please retry the scan.')), 30000))])
       onDone(scanRecord)
     } catch (err) {
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
@@ -1630,7 +2655,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
       </div>
     )
   }
@@ -1670,9 +2695,20 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       onBack={onBack}
       error={error}
       buttonLabel={facePhoto ? 'Continue' : 'Begin Scan'}
-      onButton={() => {
+      onButton={async () => {
         if (!facePhoto) faceTriggerRef.current?.()
-        else { enableAnalytics(); setPhase('side'); setError('') }
+        else {
+          try {
+            const { validateScanQuality } = await import('../utils/scanQuality.js')
+            const quality = await validateScanQuality(facePhoto)
+            if (!quality.passed) {
+              setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo.')
+              return
+            }
+            ensureFrontLandmarks(facePhoto)
+            setPhase('side'); setError('')
+          } catch { setError('Could not check the photo. Please try again.') }
+        }
       }}
       extra={<ConsentMicroText />}
     />
@@ -1856,20 +2892,46 @@ function Slide3() {
 
 const SLIDE_COMPONENTS = [Slide1, Slide2, Slide3]
 
-function IntroSlides({ onDone }) {
+function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
   const [slide, setSlide] = useState(0)
   const [dir, setDir] = useState(1)
+  const [authLoading, setAuthLoading] = useState(null) // 'apple' | 'google' | null
+  const [authError, setAuthError] = useState('')
   const total = SLIDE_COMPONENTS.length
+  const isLast = slide === total - 1
 
   function next() {
     if (slide < total - 1) { setDir(1); setSlide(s => s + 1) }
     else onDone()
   }
 
+  async function handleApple() {
+    triggerHaptic()
+    setAuthError('')
+    setAuthLoading('apple')
+    try {
+      await onAppleSignIn()
+    } catch (err) {
+      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
+        || err?.message?.toLowerCase().includes('cancel')
+        || err?.message?.toLowerCase().includes('dismissed')
+      if (!isCancelled) setAuthError(err?.message || 'Sign in failed. Please try again.')
+    } finally {
+      setAuthLoading(null)
+    }
+  }
+
+  function handleGoogle() {
+    triggerHaptic()
+    setAuthError('Google Sign In coming soon.')
+  }
+
   const SlideContent = SLIDE_COMPONENTS[slide]
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: '#0A0A0A' }}>
+      <AnimatePresence>{authLoading && <ProcessingOverlay key="proc" />}</AnimatePresence>
+
       {/* Skip */}
       <button
         onClick={onDone}
@@ -1907,26 +2969,102 @@ function IntroSlides({ onDone }) {
         </motion.div>
       </AnimatePresence>
 
-      {/* CTA */}
-      <div className="px-6 pb-12 flex-shrink-0">
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={next}
-          className="w-full py-4 font-heading font-bold text-[15px]"
-          style={{
-            background: slide < total - 1
-              ? `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`
-              : SLIDE_GOLD,
-            color: '#000000',
-            borderRadius: slide < total - 1 ? 16 : 12,
-            boxShadow: slide < total - 1
-              ? '0 4px 20px rgba(198,168,92,0.3)'
-              : '0 2px 12px rgba(198,168,92,0.5)',
-            letterSpacing: '0.02em',
-          }}
-        >
-          {slide < total - 1 ? 'Continue' : "Let's Get Started"}
-        </motion.button>
+      {/* CTA area */}
+      <div className="px-6 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <AnimatePresence mode="wait">
+          {isLast ? (
+            <motion.div
+              key="auth-buttons"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              {authError ? (
+                <p style={{ textAlign: 'center', color: '#EF4444', fontSize: 13, marginBottom: 4 }}>{authError}</p>
+              ) : null}
+
+              {/* Google */}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleGoogle}
+                disabled={!!authLoading}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 50,
+                  background: '#ffffff', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: 'pointer', opacity: authLoading === 'apple' ? 0.5 : 1,
+                }}
+              >
+                {authLoading === 'google' ? (
+                  <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                )}
+                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#000', letterSpacing: '-0.01em' }}>
+                  {authLoading === 'google' ? 'Signing in…' : 'Sign in with Google'}
+                </span>
+              </motion.button>
+
+              {/* Apple */}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleApple}
+                disabled={!!authLoading}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 50,
+                  background: '#0a0a0a', border: '1.5px solid rgba(255,255,255,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: authLoading ? 'not-allowed' : 'pointer', opacity: authLoading === 'google' ? 0.5 : 1,
+                }}
+              >
+                {authLoading === 'apple' ? (
+                  <Loader2 size={22} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.81 3.22.82.94-.17 1.83-.89 3.13-.96 1.69-.09 2.96.64 3.78 1.82-3.47 2.08-2.67 6.62.87 7.89-.62 1.48-1.46 2.94-3 3.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                )}
+                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#fff', letterSpacing: '-0.01em' }}>
+                  {authLoading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+                </span>
+              </motion.button>
+
+              {/* Already have an account / continue quiz */}
+              <button
+                onClick={onDone}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'inherit', paddingTop: 4 }}
+              >
+                Continue without signing in →
+              </button>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="continue-btn"
+              whileTap={{ scale: 0.97 }}
+              onClick={next}
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full py-4 font-heading font-bold text-[15px]"
+              style={{
+                background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
+                color: '#000000',
+                borderRadius: 16,
+                boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+                letterSpacing: '0.02em',
+                border: 'none', cursor: 'pointer',
+              }}
+            >
+              Continue
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -1942,6 +3080,7 @@ export default function PremiumOnboarding() {
   const setLegalConsented  = useStore(s => s.setLegalConsented)
   const setAgeConfirmed    = useStore(s => s.setAgeConfirmed)
   const setGender          = useStore(s => s.setGender)
+  const setPrimaryGoal     = useStore(s => s.setPrimaryGoal)
   const setAssignedPhase   = useStore(s => s.setAssignedPhase)
   const setUnits           = useStore(s => s.setUnits)
   const setAuth            = useStore(s => s.setAuth)
@@ -1990,7 +3129,7 @@ export default function PremiumOnboarding() {
   const [signingIn, setSigningIn] = useState(false)
 
   const [formData, setFormData] = useState({
-    gender: '', goal: '',
+    gender: '', goal: '', primaryGoal: '',
     improvementFocus: [],
     ...draft?.formData,
   })
@@ -1999,6 +3138,7 @@ export default function PremiumOnboarding() {
   useEffect(() => {
     saveDraft({ step, formData })
   }, [step, formData, isAuthenticated])
+
 
   function updateField(key, value) {
     if (key === '_units') {
@@ -2053,7 +3193,6 @@ export default function PremiumOnboarding() {
       }
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
-      logAnalyticsEvent('scan_completed', { tier: scanRecord?.tier, score: scanRecord?.umaxScore, source: 'onboarding' })
 
       // Extended metrics (30-metric breakdown) were split into a separate,
       // slower follow-up call for latency — fire it now, non-blocking, so
@@ -2100,6 +3239,7 @@ export default function PremiumOnboarding() {
   function handleFinalDone() {
     clearDraft()
     setGender(formData.gender || null)
+    if (formData.primaryGoal) setPrimaryGoal(formData.primaryGoal)
     setLegalConsented()
     setAgeConfirmed()
     // If user skipped auth, set a guest session so ProtectedRoute doesn't block
@@ -2108,15 +3248,47 @@ export default function PremiumOnboarding() {
       useStore.getState().setAuth({ id: 'guest', name: 'Guest', email: '' }, 'demo-token')
     }
     setHasOnboarded()
-    logAnalyticsEvent('onboarding_completed', { source: 'notifications_step' })
   }
 
   // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
-  const TOTAL_STEPS = 4
+  const TOTAL_STEPS = 9
+
+  // Apple sign-in handler used from both IntroSlides and StepAuth
+  async function handleAppleSignInFromSlide() {
+    if (!Capacitor.isNativePlatform()) throw new Error('Apple Sign In is only available on iOS.')
+    const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
+    const result = await Promise.race([
+      SignInWithApple.authorize({
+        clientId: 'com.ascendus.app',
+        scopes: 'email name',
+        nonce: Math.random().toString(36).substring(2, 15),
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+    ])
+    const token = result?.response?.identityToken
+    if (!token) throw new Error('Apple Sign In did not return a valid token')
+    const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName, refCode: sessionStorage.getItem('asc_ref_code') || undefined }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Authentication failed')
+    setAuth(data.user, data.token)
+    clearDraft()
+    setHasOnboarded()
+    navigate('/')
+  }
 
   // Intro slides (shown before the quiz for new users)
   if (!introDone) {
-    return <IntroSlides onDone={() => setIntroDone(true)} />
+    return (
+      <IntroSlides
+        onDone={() => setIntroDone(true)}
+        onAppleSignIn={handleAppleSignInFromSlide}
+        onGoogleSignIn={() => {}}
+      />
+    )
   }
 
   // Sign in mode
@@ -2157,8 +3329,7 @@ export default function PremiumOnboarding() {
       const token = result?.response?.identityToken
       if (!token) throw new Error('No identity token returned')
 
-      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-      const res = await fetch(`${API_BASE}/api/auth/apple`, {
+      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2182,12 +3353,15 @@ export default function PremiumOnboarding() {
     }
   }
 
-  // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
+  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=notifications, 5=testimonials, 6=cinematic
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
-    <StepReferral key="referral" onNext={goNext} />,
+    <StepHaloEffect key="haloEffect" onNext={goNext} onBack={goBack} />,
+    <StepWhyAppearance key="whyAppearance" onNext={goNext} onBack={goBack} />,
+    <StepPrimaryGoal key="primaryGoal" data={formData} onChange={updateField} onNext={goNext} onBack={goBack} />,
     <StepNotifications key="notifications" onNext={goNext} />,
-    <StepAuth key="auth" onNext={handleFinalDone} />,
+    <StepTestimonials key="testimonials" onNext={goNext} />,
+    <StepCinematic key="cinematic" onNext={handleFinalDone} />,
   ]
 
   return (
@@ -2196,29 +3370,16 @@ export default function PremiumOnboarding() {
       className="relative flex flex-col h-full overflow-hidden dark"
       style={{ background: '#0a0a0a', '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {/* Umax-style story progress bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 'env(safe-area-inset-top, 0px)',
-          left: 0, right: 0,
-          display: 'flex',
-          gap: 4,
-          padding: '12px 16px 0',
-          zIndex: 20,
-        }}
-      >
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <div
-            key={i}
-            style={{
-              flex: 1, height: 3, borderRadius: 99,
-              background: i <= step ? '#ffffff' : 'rgba(255,255,255,0.25)',
-              transition: 'background 0.3s',
-            }}
-          />
-        ))}
-      </div>
+      {/* Progress bar — hidden on cinematic (last) step */}
+      {step < steps.length - 1 && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0' }}>
+            {steps.slice(0, -1).map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? '#FFFFFF' : 'rgba(255,255,255,0.15)', transition: 'background 0.3s' }} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence mode="wait" custom={dir}>
         <motion.div

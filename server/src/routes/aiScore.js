@@ -5,6 +5,7 @@ const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middlewa
 const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
+const { calculatePotentialScore, withPotentialScore } = require('../utils/potentialScore')
 
 const router = express.Router()
 
@@ -152,6 +153,43 @@ function stripPrefix(dataUrl) {
   return dataUrl.replace(/^data:image\/\w+;base64,/, '')
 }
 
+function sanitizeAnalysisEvidence(input) {
+  if (!input || typeof input !== 'object') return null
+  const cleanRows = (rows, max = 40) => Array.isArray(rows) ? rows.slice(0, max).map(row => ({
+    id: typeof row?.id === 'string' ? row.id.slice(0, 80) : null,
+    value: Number.isFinite(row?.value) ? Math.round(row.value * 10000) / 10000 : null,
+    unit: typeof row?.unit === 'string' ? row.unit.slice(0, 20) : null,
+    source: typeof row?.source === 'string' ? row.source.slice(0, 60) : null,
+    formula: typeof row?.formula === 'string' ? row.formula.slice(0, 240) : null,
+    assessable: row?.assessable === true,
+    reason: typeof row?.reason === 'string' ? row.reason.slice(0, 100) : null,
+    landmarksUsed: Array.isArray(row?.landmarksUsed) ? row.landmarksUsed.slice(0, 12).map(point => ({
+      index: Number.isInteger(point?.index) ? point.index : null,
+      label: typeof point?.label === 'string' ? point.label.slice(0, 40) : null,
+    })) : [],
+  })).filter(row => row.id) : []
+  return {
+    schemaVersion: typeof input.schemaVersion === 'string' ? input.schemaVersion.slice(0, 20) : null,
+    status: input.status === 'measured' ? 'measured' : 'additional_image_required',
+    reason: typeof input.reason === 'string' ? input.reason.slice(0, 100) : null,
+    pose: input.pose && typeof input.pose === 'object' ? {
+      orientation: input.pose.orientation === 'front' ? 'front' : null,
+      rollDegrees: Number.isFinite(input.pose.rollDegrees) ? input.pose.rollDegrees : null,
+      yawProxy: Number.isFinite(input.pose.yawProxy) ? input.pose.yawProxy : null,
+      pitchProxy: Number.isFinite(input.pose.pitchProxy) ? input.pose.pitchProxy : null,
+      acceptable: input.pose.acceptable === true,
+    } : null,
+    measurements: cleanRows(input.measurements),
+    notAssessable: cleanRows(input.notAssessable),
+    profile: input.profile && typeof input.profile === 'object' ? {
+      status: input.profile.status === 'measured' ? 'measured' : 'not_assessable',
+      reason: typeof input.profile.reason === 'string' ? input.profile.reason.slice(0, 100) : null,
+      measurements: cleanRows(input.profile.measurements, 10),
+      notAssessable: cleanRows(input.profile.notAssessable, 10),
+    } : null,
+  }
+}
+
 // ── CALL 1: Core score — Face + Grooming + 4 Pillars (+ optional side profile) ──
 // Focused on facial structure, grooming, and the 4 aesthetic pillars. This is
 // deliberately the SMALL/FAST call — the 30-metric extended breakdown lives in
@@ -162,7 +200,7 @@ function stripPrefix(dataUrl) {
 // not image/input processing.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
-async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null) {
+async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null, analysisEvidence = null) {
   const client = getClient()
   const isFemale = gender === 'female'
   const hasSide = !!sideBase64
@@ -176,6 +214,10 @@ async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null
   const measuredGeometryNote = (hasSide && sideProfileGeometry?.facialConvexityDegrees != null)
     ? `\nMEASURED REFERENCE (from on-device landmark detection, not a visual estimate): facial convexity angle ≈ ${sideProfileGeometry.facialConvexityDegrees.toFixed(1)}°. A straighter/more obtuse angle reads as a flatter profile; a sharper angle reads as more convex/protrusive. Use this as a factual anchor for jawline_projection and chin_projection — don't contradict it without clear photographic reason, but your visual read still governs profile_score and nose_bridge.`
     : ''
+
+  const evidenceNote = analysisEvidence?.status === 'measured'
+    ? `\n\nDETERMINISTIC PHOTOGRAPHIC EVIDENCE (calculated before this call):\n${JSON.stringify(analysisEvidence)}\nTreat these ratios as the authoritative measured geometry. Do not describe your own visual estimate as a measurement. The numeric appearance scores below remain a legacy subjective product output and must not be described as objective geometry.`
+    : '\n\nNo reliable deterministic geometry was supplied. Do not invent measurements.'
 
   const profileSection = hasSide ? `
 
@@ -312,17 +354,7 @@ HAIR TYPE DETECTION — look at the hair visible in the photo and classify:
 - "bald"       → shaved head or very close cut with no texture visible
 - "unknown"    → hair not visible or cannot be determined from photo
 
-PERCEIVED ETHNICITY — classify the most visually apparent ethnic background from facial features only. Use the closest single match:
-- "white"         → Northern/Southern/Eastern European ancestry
-- "black"         → Sub-Saharan African ancestry
-- "east_asian"    → East Asian (Chinese, Japanese, Korean, Southeast Asian)
-- "south_asian"   → South Asian (Indian, Pakistani, Bangladeshi, Sri Lankan)
-- "latino"        → Latin American or Hispanic (regardless of skin tone)
-- "middle_eastern"→ Arab, Persian, Turkish, or Levantine ancestry
-- "mixed"         → Clearly mixed or ambiguous — cannot confidently assign one group
-Base this only on visual facial features visible in the photo. If uncertain, use "mixed".
-
-FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe:
+FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"):
 - jawline: sharpness, gonial angle definition, and visible edge clarity
 - cheekbones: height, prominence, and forward projection of the malar bones
 - symmetry: left-right balance of features, spacing, and facial midline
@@ -330,7 +362,9 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
-${profileSection}
+${profileSection}${evidenceNote}
+
+VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
 KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
@@ -341,7 +375,6 @@ Return ONLY this JSON — no markdown, nothing else:
   "grooming_score": <number 1.0–10.0>,
   "facial_structure": "<soft/round|average|defined|strong>",
   "hair_type": "<straight|wavy|curly|coily|locs|bald|unknown>",
-  "perceived_ethnicity": "<white|black|east_asian|south_asian|latino|middle_eastern|mixed>",
   "pillars": {
     "harmony": <number 1.0–10.0>,
     "angularity": <number 1.0–10.0>,
@@ -359,6 +392,9 @@ Return ONLY this JSON — no markdown, nothing else:
   "key_strengths": ["<strength 1>", "<strength 2>"],
   "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
   "top_improvement": "<single most impactful improvement>",
+  "visual_observations": [
+    { "id": "<allowed id>", "category": "<skin|hair|grooming>", "source": "visual_observation", "confidence": "<low|medium|high>", "images_supporting": ["<front|profile>"], "limitations": ["<relevant limitation>"] }
+  ],
   "face_metrics": {
     "jawline":                { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
     "cheekbones":             { "score": <number 1.0–10.0>, "descriptor": "<max 10 words>" },
@@ -404,7 +440,7 @@ async function getExtendedMetrics(faceBase64, faceMediaType, gender) {
 
 SCORE DISTRIBUTION — every score is 1.0–10.0, a bell curve across the general population: 5.0 = true average (most people), 3.0 = below average (common, not rare), 7.0 = above average (a real, achievable good score), 9.0 = genuinely exceptional (rare, top few percent). Use the full range — do not compress everyone into 6–8.
 
-EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
+EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"). Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
 
 eyes:
 - orbital_depth: depth-set vs. protruding position of the eye socket relative to the brow and cheekbone plane
@@ -569,7 +605,7 @@ function shapeExtendedMetrics(em) {
 }
 
 // ── CALL 2: Physique Scoring (optional — only when bodyImage provided) ────────
-async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', bodyGeometry = null) {
+async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', bodyGeometry = null, height = null, weight = null) {
   const client = getClient()
   const isFemale = gender === 'female'
 
@@ -638,7 +674,7 @@ Return ONLY this JSON — no markdown, nothing else:
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
-        { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique. Return ONLY the JSON.` },
+        { type: 'text',  text: `Score this ${isFemale ? 'woman' : 'man'}'s physique.${height ? ` Height: ${height}.` : ''}${weight ? ` Weight: ${weight}.` : ''} Use height and weight to calibrate frame and leanness expectations — a heavier person at the same visible leanness scores differently than a lighter one. Return ONLY the JSON.` },
       ],
     }],
   })
@@ -735,6 +771,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     }
 
     const { faceImage, sideImage, bodyImage, gender = 'male', previousScore, bodyGeometry, sideProfileGeometry } = req.body
+    const analysisEvidence = sanitizeAnalysisEvidence(req.body.analysisEvidence)
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
@@ -757,7 +794,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v3', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
-      return res.json(scoreCache.get(cacheKey))
+      const cached = withPotentialScore(scoreCache.get(cacheKey))
+      scoreCache.set(cacheKey, cached)
+      return res.json(cached)
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
@@ -768,8 +807,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
       if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
-      scoreCache.set(cacheKey, sbCached)
-      return res.json(sbCached)
+      const cached = withPotentialScore(sbCached)
+      scoreCache.set(cacheKey, cached)
+      return res.json(cached)
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
@@ -794,7 +834,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.log('[aiScore] STEP 1 — Face scoring...')
       const tFaceStart = Date.now()
       const facePromise = withRetry(
-        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry),
+        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry, analysisEvidence),
         'face'
       ).then(result => {
         console.log(`[aiScore:TIMING] STEP 1 (face) took ${Date.now() - tFaceStart}ms`)
@@ -874,13 +914,28 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 
     const result = {
       overallScore:      final,
+      potentialScore:    calculatePotentialScore(final),
       faceOnlyScore:     faceOnlyScore,   // face pillar avg before physique blend
       faceScore:         Math.round(faceScore    * 10) / 10,
       groomingScore:     Math.round(groomingScore * 10) / 10,
       tier,
       facialStructure:    faceResult.facial_structure,
       hairType:           faceResult.hair_type ?? 'unknown',
-      perceivedEthnicity: faceResult.perceived_ethnicity ?? 'mixed',
+      visualObservations: Array.isArray(faceResult.visual_observations)
+        ? faceResult.visual_observations.slice(0, 12).map(observation => ({
+            id: typeof observation?.id === 'string' ? observation.id : null,
+            category: typeof observation?.category === 'string' ? observation.category : null,
+            source: 'visual_observation',
+            confidence: ['low', 'medium', 'high'].includes(observation?.confidence) ? observation.confidence : 'low',
+            imagesSupporting: Array.isArray(observation?.images_supporting) ? observation.images_supporting.slice(0, 2) : [],
+            limitations: Array.isArray(observation?.limitations) ? observation.limitations.map(String).slice(0, 3) : [],
+          })).filter(observation => observation.id)
+        : [],
+      evidenceSummary: analysisEvidence,
+      scoreClassification: {
+        overall: 'legacy_subjective_visual_assessment',
+        objectiveReplacementStatus: 'not_validated',
+      },
       faceSubScores: {
         symmetry:          r(faceSub.symmetry),
         jawlineDefinition: r(faceSub.jawline_definition),
@@ -918,7 +973,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       // held up waiting on it. 'pending' tells the client to fire that
       // follow-up call and patch the result in once it resolves.
       extendedMetrics: null,
-      extendedMetricsStatus: 'pending',
+      extendedMetricsStatus: 'unsupported_removed',
       // Side profile — null when no side photo was provided
       hasSideProfile: !!sideBase64,
       profileScore:   faceResult.profile?.profile_score ?? null,
@@ -988,7 +1043,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
     }
 
-    const { bodyImage, gender = 'male', bodyGeometry } = req.body
+    const { bodyImage, gender = 'male', bodyGeometry, height, weight } = req.body
     if (!bodyImage) {
       return res.status(400).json({ error: 'Body image is required' })
     }
@@ -996,12 +1051,12 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
     const bodyMediaType = getMediaType(bodyImage)
     const bodyBase64    = stripPrefix(bodyImage)
 
-    console.log('[aiScore:physique-only] Inputs — gender:', gender)
+    console.log('[aiScore:physique-only] Inputs — gender:', gender, 'height:', height, 'weight:', weight)
 
     await acquireSlot()
     let physiqueResult
     try {
-      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry), 'physique-only')
+      physiqueResult = await withRetry(() => getPhysiqueScore(bodyBase64, bodyMediaType, gender, bodyGeometry, height, weight), 'physique-only')
       console.log('[aiScore:physique-only] OK — overall:', physiqueResult.overall)
     } finally {
       releaseSlot()
@@ -1188,6 +1243,101 @@ Respond ONLY with valid JSON — no extra text:
   } catch (err) {
     console.error('[workout-plan] error:', err.message)
     res.status(500).json({ error: 'Plan generation failed', fallback: true })
+  }
+})
+
+// ── POST /api/ai/validate-scan ────────────────────────────────────────────────
+// First-scan face validation using Claude vision.
+// Returns { valid, faceCount, issues: [{type, message}] }.
+// The image is NEVER stored, cached, logged, or used for model training.
+// Rate-limited separately from scoring (validations are cheap; haiku model).
+router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async (req, res) => {
+  const { imageB64 } = req.body
+  if (!imageB64 || typeof imageB64 !== 'string') {
+    return res.status(400).json({ error: 'imageB64 is required' })
+  }
+
+  // Explicit local-only fallback for testing with the browser uploader when
+  // the Claude credential is not present. This can never activate in Railway
+  // or any production process and is intentionally opt-in.
+  if (process.env.NODE_ENV !== 'production' && process.env.LOCAL_SCAN_VALIDATION_BYPASS === 'true') {
+    return res.json({ valid: true, faceCount: 1, issues: [], localBypass: true })
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    console.error('[validate-scan] ANTHROPIC_API_KEY is not configured on the server')
+    return res.status(503).json({
+      error: 'The photo-checking service is unavailable. Your photo has not been rejected.',
+      code: 'validation_not_configured',
+      retryable: false,
+    })
+  }
+
+  // Strip data URL header — Claude needs raw base64
+  const commaIdx  = imageB64.indexOf(',')
+  const base64Data = commaIdx >= 0 ? imageB64.slice(commaIdx + 1) : imageB64
+  const header     = commaIdx >= 0 ? imageB64.slice(0, commaIdx) : ''
+  const mediaType  = (/image\/(jpeg|png|webp)/.exec(header) ?? [])[0] || 'image/jpeg'
+
+  try {
+    const client = getClient()
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64Data },
+          },
+          {
+            type: 'text',
+            text: `Analyze this image and determine if it is suitable for a facial analysis scan.
+
+Return ONLY a JSON object — no markdown, no explanation, just raw JSON:
+
+{
+  "valid": boolean,
+  "faceCount": number,
+  "issues": [{"type": string, "message": string}]
+}
+
+Rules:
+- valid=true ONLY when ALL conditions are met: exactly 1 clearly visible human face, face is large enough to fill a reasonable portion of the frame, not severely cropped, image is not severely blurry, lighting is sufficient to see facial features
+- valid=false for: 0 faces, >1 person, flowers, landscapes, waterfalls, animals, objects, extreme blur, extreme darkness, face cropped at edges, face too tiny/distant
+- faceCount: integer, count of human faces (0 for non-person images)
+- issues: [] when valid=true; specific issues when valid=false
+- issue type values: "no_face", "not_a_person", "multiple_faces", "too_far", "too_close", "face_cropped", "too_dark", "too_blurry"
+- issue messages: short and actionable (e.g. "No face detected", "Move closer to the camera")
+- DO NOT reject for: glasses, slight head angle, moderate shadows, normal indoor lighting, dark skin, facial hair, makeup, minor tilt`
+          },
+        ],
+      }],
+    })
+
+    const text = (response.content[0]?.text ?? '').trim()
+    let result
+    try {
+      // Strip any accidental markdown fencing Claude might add despite instructions
+      const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/, '').trim()
+      result = JSON.parse(jsonStr)
+    } catch {
+      console.error('[validate-scan] Non-JSON from Claude:', text.slice(0, 200))
+      return res.status(502).json({ error: 'The photo checker could not complete this check. Please try again.', code: 'validation_unavailable', retryable: true })
+    }
+
+    // Sanitize — never trust raw model output shape
+    return res.json({
+      valid:     result.valid === true,
+      faceCount: Number.isInteger(result.faceCount) ? Math.max(0, result.faceCount) : 0,
+      issues:    Array.isArray(result.issues)
+        ? result.issues.slice(0, 5).map(i => ({ type: String(i.type || 'unknown'), message: String(i.message || '') }))
+        : [],
+    })
+  } catch (err) {
+    console.error('[validate-scan] error:', err?.message)
+    return res.status(503).json({ error: 'Validation service temporarily unavailable. Please try again.', code: 'validation_unavailable', retryable: true })
   }
 })
 
