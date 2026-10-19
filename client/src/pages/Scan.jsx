@@ -25,12 +25,13 @@ import { scheduleRescanNotification } from '../utils/notifications'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
+import { createLiveFaceAlignment, getAlignment, shouldBlockPhotoCapture } from '../utils/liveFaceAlignment'
 import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 import ScanPortrait from '../components/ScanPortrait'
 import ScanUnlockGate from './ScanUnlockGate'
 import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresentation'
+import { validationFailure } from '../utils/validationFailure'
 
 async function uploadScanPhoto(imageData) {
   const commaIdx = imageData.indexOf(',')
@@ -381,7 +382,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   }, [ready, capturedUrl, facingMode])
 
   function capture() {
-    if (trackingAvailable && !alignment.aligned) return
+    if (shouldBlockPhotoCapture(stepNum, trackingAvailable, alignment.aligned)) return
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
@@ -2117,8 +2118,9 @@ export default function Scan() {
     } catch (err) {
       // Fail-CLOSED: if the validator itself throws, block the scan
       console.error('[Scan] Quality check error (fail-closed):', err?.message)
-      passed = false
-      issues = [{ code: 'validation_error', title: 'Could not validate photo — please try again', advice: 'Please try again.', severity: 'critical' }]
+      const failure = validationFailure(err)
+      passed = failure.passed
+      issues = failure.issues
     }
 
     if (!passed) {
@@ -2153,8 +2155,9 @@ export default function Scan() {
         qIssues = qResult.issues
       } catch (err) {
         console.error('[Scan] startAnalysis quality gate error (fail-closed):', err?.message)
-        qPassed = false
-        qIssues = [{ code: 'validation_error', title: 'Could not validate photo', advice: 'Please try again.', severity: 'critical' }]
+        const failure = validationFailure(err)
+        qPassed = failure.passed
+        qIssues = failure.issues
       }
       if (!qPassed) {
         navigate('/scan/quality-fail', { state: { issues: qIssues, photoUrl: facePhoto } })
@@ -2262,6 +2265,7 @@ export default function Scan() {
         const demoScore = Math.round((6.8 + (Math.random() - 0.5) * 0.6) * 10) / 10
         const demoTier  = getTier(demoScore, g)
         aiResult = {
+          demoMode:        true,
           overallScore:    demoScore,
           faceScore:       Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
           faceOnlyScore:   Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
@@ -2420,6 +2424,9 @@ export default function Scan() {
       // via lastFaceScanImage — fall back to that so ARKit-only scans still
       // get a real thumbnail.
       ;(async () => {
+        // Demo/local preview scores are synthetic and must remain device-only;
+        // never write client-generated ratings into server-owned scan history.
+        if (aiResult.demoMode) return
         let faceImageUrl = null
         const photoForUpload = faceB64
         if (photoForUpload) {

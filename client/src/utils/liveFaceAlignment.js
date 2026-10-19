@@ -44,3 +44,7 @@ export function getAlignment(frame, profile) {
   if (!profile && frame.yaw > 0.18) return { label: 'Look straight ahead', aligned: false }
   return { label: 'Hold still', aligned: true }
 }
+
+export function shouldBlockPhotoCapture(stepNum, trackingAvailable, aligned) {
+  return stepNum !== 2 && trackingAvailable && !aligned
+}

@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
 import { Camera, ChevronRight } from 'lucide-react'
-import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { BACKEND_ORIGIN } from '../utils/backend'
+import { getHistoryScoreColor } from '../utils/scanHistory'
 
 function thumbnail(url) {
   if (!url) return null
@@ -13,14 +13,6 @@ function thumbnail(url) {
 function fmt(dateStr) {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function scoreColor(s) {
-  if (s == null) return 'rgba(255,255,255,0.4)'
-  if (s >= 8) return '#C6A85C'
-  if (s >= 6) return '#6EE7B7'
-  if (s >= 4) return '#FCD34D'
-  return '#F87171'
 }
 
 // ── Single scan row ───────────────────────────────────────────────────────────
@@ -66,7 +58,7 @@ export default function ScanHistoryRow({ scan, onTap, index }) {
         {scan.tier && (
           <span
             className="font-heading font-bold text-[10px] tracking-wide mt-0.5 inline-block"
-            style={{ color: GOLD }}
+            style={{ color: getHistoryScoreColor(score) }}
           >
             {scan.tier.toUpperCase()}
           </span>
@@ -78,7 +70,7 @@ export default function ScanHistoryRow({ scan, onTap, index }) {
         {score != null && (
           <p
             className="font-heading font-bold text-[22px]"
-            style={{ color: scoreColor(score), letterSpacing: '-0.02em' }}
+            style={{ color: getHistoryScoreColor(score), letterSpacing: '-0.02em' }}
           >
             {score.toFixed(1)}
           </p>

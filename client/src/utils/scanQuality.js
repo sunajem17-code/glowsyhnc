@@ -1,22 +1,25 @@
 /**
- * scanQuality.js — v8 (AI-based validation)
+ * scanQuality.js — local-first scan validation
  * ─────────────────────────────────────────────────────────────────────────────
- * FIRST SCAN: Claude vision API validates the face photo server-side.
- * No local face detector. No MediaPipe. No WASM. No init_failed.
+ * Localhost: bundled MediaPipe checks that exactly one face is present; the
+ * photo is never sent over the network. Hosted app: Claude vision validates
+ * the face photo server-side.
  *
  * THREE STATES (never conflated):
- *   VALIDATION_SUCCESS  — AI confirmed exactly 1 face, all issues non-critical.
+ *   VALIDATION_SUCCESS  — checker confirmed exactly 1 face.
  *                         → start facial analysis.
- *   VALIDATION_RESULT   — AI ran cleanly but found a problem (no face, multiple
+ *   VALIDATION_RESULT   — checker ran cleanly but found a problem (no face, multiple
  *                         faces, etc.). → show ScanQualityFail with the reason.
  *   VALIDATION_ERROR    — Network/server/AI system failure. NOT a photo problem.
  *                         → show a retryable technical error, never a photo-
  *                         quality rejection.
  *
- * PASS CRITERION:  valid === true  AND  faceCount === 1
+ * PASS CRITERION:  exactly one face detected
  */
 
 import { api } from './api.js'
+import { getFaceCount } from './faceLandmarks.js'
+import { isLocalScanOrigin, validateWithLocalFaceMesh } from './localScanValidation.js'
 import { validationFailure } from './validationFailure.js'
 
 // ─── Calibration state ────────────────────────────────────────────────────────
@@ -92,6 +95,13 @@ function mapIssue(aiIssue) {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 export async function validateScanQuality(imageSource) {
+  // Keep localhost scans private and usable without starting the AI backend.
+  // Production continues through the server-side Claude validator below.
+  if (isLocalScanOrigin()) {
+    console.log('[ASCENDUS SCAN] Running local MediaPipe face validation; photo stays on this device')
+    return validateWithLocalFaceMesh(imageSource, getFaceCount)
+  }
+
   console.log('[ASCENDUS SCAN] 4. Starting AI face validation')
 
   // ── Convert image to base64 ──────────────────────────────────────────────────

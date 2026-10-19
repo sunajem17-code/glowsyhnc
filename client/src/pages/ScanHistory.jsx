@@ -11,6 +11,7 @@ import { triggerHaptic } from '../utils/haptics'
 
 import ScanHistoryRow from '../components/ScanHistoryRow'
 import { mergeScanHistory } from '../utils/scanHistory'
+import { getProgressScore } from '../utils/progressHistory'
 
 function fmt(dateStr) {
   if (!dateStr) return ''
@@ -64,14 +65,11 @@ function ProGate({ onUpgrade }) {
 }
 
 // ── Trend chart ───────────────────────────────────────────────────────────────
-function TrendChart({ scans }) {
+function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall' }) {
   const data = [...scans]
-    .filter(s => s.glowScore != null)
     .reverse()
-    .map(s => ({
-      label: fmt(s.analyzedAt || s.scan_date),
-      score: typeof s.glowScore === 'number' ? s.glowScore : parseFloat(s.glowScore),
-    }))
+    .map(s => ({ label: fmt(s.analyzedAt || s.scan_date || s.created_at), score: getProgressScore(s, mode, metric) }))
+    .filter(point => point.score != null)
 
   if (data.length < 2) return null
 
@@ -86,7 +84,7 @@ function TrendChart({ scans }) {
       <div className="flex items-center gap-2 mb-4 px-2">
         <TrendingUp size={15} style={{ color: GOLD }} />
         <p className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: GOLD }}>
-          SCORE OVER TIME
+          {label.toUpperCase()} OVER TIME
         </p>
       </div>
       <ResponsiveContainer width="100%" height={140}>
@@ -129,10 +127,17 @@ export default function ScanHistory() {
   const localScans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)
   const token = useStore(s => s.token)
+  const refreshProStatus = useStore(s => s.refreshProStatus)
   const [historySnapshot, setScans] = useState({ token, scans: [] })
   const scans = mergeScanHistory(historySnapshot.token === token ? historySnapshot.scans : [], localScans, currentScan)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // The app-wide premium flag may still be stale when returning from checkout.
+  // Refresh the authoritative entitlement as soon as this gated page is opened.
+  useEffect(() => {
+    refreshProStatus({ force: true })
+  }, [refreshProStatus, token])
 
   useEffect(() => {
     if (!isPremium) { setLoading(false); return }
@@ -183,7 +188,7 @@ export default function ScanHistory() {
   )
 }
 
-export function ScanHistoryContent({ scans, loading, error, isPremium, onViewScan, onUpgrade, embedded = false }) {
+export function ScanHistoryContent({ scans, loading, error, isPremium, onViewScan, onUpgrade, embedded = false, chartMode = 'face', chartMetric = 'overall', chartLabel = 'Overall', emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
   return (<>
       {/* Body */}
       {!isPremium ? (
@@ -200,14 +205,14 @@ export function ScanHistoryContent({ scans, loading, error, isPremium, onViewSca
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
           <Camera size={44} style={{ color: 'rgba(255,255,255,0.12)' }} />
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            No scans yet. Complete your first scan to see your history here.
+            {emptyMessage}
           </p>
         </div>
       ) : (
         <div className={embedded ? "pb-4" : "flex-1 overflow-y-auto px-5 pb-8"}>
           {!embedded && loading && <p role="status" className="text-xs text-secondary mb-3">Refreshing history…</p>}
           {!embedded && error && <p role="status" className="text-xs text-secondary mb-3">Showing scans saved on this device. Server history couldn’t refresh.</p>}
-          <TrendChart scans={scans} />
+          <TrendChart scans={scans} mode={chartMode} metric={chartMetric} label={chartLabel} />
           <p className="font-heading font-bold text-[11px] tracking-[0.14em] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
             {scans.length} SCAN{scans.length !== 1 ? 'S' : ''}
           </p>

@@ -3,6 +3,26 @@ function parseField(value, fallback) {
   try { return JSON.parse(value) ?? fallback } catch { return fallback }
 }
 
+const SCORE_COLOR_STOPS = [
+  { score: 0, rgb: [239, 68, 68] },
+  { score: 5, rgb: [250, 204, 21] },
+  { score: 10, rgb: [34, 197, 94] },
+]
+
+export function getHistoryScoreColor(value) {
+  if (value == null || !Number.isFinite(Number(value))) return 'rgba(255,255,255,0.4)'
+  const score = Math.max(0, Math.min(10, Number(value)))
+  const upperIndex = SCORE_COLOR_STOPS.findIndex(stop => stop.score >= score)
+  if (upperIndex <= 0) return '#EF4444'
+  if (upperIndex === -1) return '#22C55E'
+
+  const lower = SCORE_COLOR_STOPS[upperIndex - 1]
+  const upper = SCORE_COLOR_STOPS[upperIndex]
+  const progress = (score - lower.score) / (upper.score - lower.score)
+  const channels = lower.rgb.map((channel, index) => Math.round(channel + (upper.rgb[index] - channel) * progress))
+  return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('').toUpperCase()}`
+}
+
 export function normalizeHistoryScan(scan) {
   return {
     ...scan,

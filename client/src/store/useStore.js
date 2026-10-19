@@ -258,11 +258,11 @@ const useStore = create(
       // Refresh Pro status from server — call after payment, trial activation, or app foreground
       // Throttled: won't re-run if called within 60s of the last successful refresh.
       _lastProRefresh: 0,
-      refreshProStatus: async () => {
+      refreshProStatus: async ({ force = false } = {}) => {
         const { token, isAuthenticated, _lastProRefresh } = get()
         if (!isAuthenticated || !token || token === 'demo-token') return
         // Throttle: skip if we refreshed within the last 60 seconds
-        if (Date.now() - _lastProRefresh < 60_000) return
+        if (!force && Date.now() - _lastProRefresh < 60_000) return
         set({ _lastProRefresh: Date.now() })
         try {
           // 0. On iOS check RevenueCat entitlements first (source of truth for IAP).

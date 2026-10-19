@@ -15,5 +15,6 @@ test('missing configuration and server failures never reject the photo or blame 
 test('expired sessions and rate limits have distinct recovery paths', () => {
   assert.equal(validationFailure({ status: 401 }).issues[0].code, 'validation_session_expired')
   assert.equal(validationFailure({ status: 429 }).issues[0].code, 'validation_rate_limited')
-  assert.equal(validationFailure(new Error('fetch failed')).issues[0].code, 'validation_error')
+  assert.equal(validationFailure(new Error('Server unavailable')).issues[0].code, 'validation_unavailable')
+  assert.equal(validationFailure(new Error('Request timed out. Please check your connection.')).issues[0].code, 'validation_unavailable')
 })

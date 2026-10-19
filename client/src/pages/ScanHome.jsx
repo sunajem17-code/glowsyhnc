@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, ChevronRight, Dumbbell, Moon, History } from 'lucide-react'
+import { Camera, Dumbbell, Moon } from 'lucide-react'
 import useStore from '../store/useStore'
-const isPremiumSelector = s => s.isPremium
 const setScanLaunchingSelector = s => s.setScanLaunching
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
@@ -118,83 +117,9 @@ function PhysiqueScanCard({ onBegin }) {
   )
 }
 
-function PastResultCard({ scan, onView }) {
-  const photo = scan?.facePhotoUrl ?? scan?.photos?.face ?? null
-  const dateLabel = scan?.analyzedAt
-    ? new Date(scan.analyzedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    : null
-
-  if (!scan) {
-    return (
-      <CardShell
-        eyebrow="PAST SCANS"
-        title="No Scans Yet"
-        body="Past scans will appear here once you complete your first scan."
-        cta="Start a Scan"
-        icon={Camera}
-        onAction={() => {}}
-        visualClassName="aspect-[4/5] flex-shrink-0"
-        visual={
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: '#0a0a0a' }}>
-            <Camera size={48} style={{ color: 'rgba(255,255,255,0.1)' }} />
-            <p className="font-body text-[13px] text-center px-6" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              Past scans will appear here
-            </p>
-          </div>
-        }
-      />
-    )
-  }
-
-  return (
-    <CardShell
-      eyebrow="LAST SCAN"
-      title="Past Result"
-      body={dateLabel ? `Your last scan: ${dateLabel}.` : 'Your most recent scan.'}
-      cta="Results"
-      icon={ChevronRight}
-      onAction={onView}
-      visual={
-        <>
-          {photo ? (
-            <img src={photo} alt="Last scan" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Camera size={48} style={{ color: 'rgba(255,255,255,0.15)' }} />
-            </div>
-          )}
-          <div
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 45%)' }}
-          />
-          {scan.glowScore != null && (
-            <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
-              <div>
-                <p className="font-body text-[11px] text-white/60 uppercase tracking-wide mb-0.5">Glow Score</p>
-                <p className="font-heading font-bold text-[28px] text-white leading-none">{scan.glowScore.toFixed(1)}</p>
-              </div>
-              {scan.tier && (
-                <span
-                  className="font-heading font-bold text-[11px] px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(198,168,92,0.2)', color: GOLD, border: `1px solid ${GOLD}55` }}
-                >
-                  {scan.tier.toUpperCase()}
-                </span>
-              )}
-            </div>
-          )}
-        </>
-      }
-    />
-  )
-}
-
 export default function ScanHome() {
   const navigate = useNavigate()
   const scans = useStore(s => s.scans)
-  const currentScan = useStore(s => s.currentScan)
-  const setCurrentScan = useStore(s => s.setCurrentScan)
-  const isPremium = useStore(isPremiumSelector)
   const streak = useStore(s => s.streak)
   const proScanCount = useStore(s => s.proScanCount)
   const proScanFirstAt = useStore(s => s.proScanFirstAt)
@@ -223,8 +148,6 @@ export default function ScanHome() {
     navigate(path)
   }
 
-  const latestScan = scans?.[0] ?? null
-
   const windowStart = proScanFirstAt ? new Date(proScanFirstAt).getTime() : null
   const inWindow = windowStart && (Date.now() - windowStart) < 24 * 60 * 60 * 1000
   const atLimit = inWindow && proScanCount >= DAILY_SCAN_LIMIT
@@ -237,29 +160,10 @@ export default function ScanHome() {
 
   const hasScans = scans?.length > 0
 
-  // Cards: Face Scan → Physique Scan → History (always shown in dots, locked until first scan)
+  // Keep scan selection focused on the face and physique scan flows.
   const cards = [
     { id: 'face',    el: <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} /> },
     { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/physique-scan')} /> },
-    ...(!limitMessage ? [{ id: 'history', el: (
-      <CardShell
-        eyebrow="SCAN HISTORY"
-        title="Past Scans"
-        body="View all your previous scan results and track your score over time."
-        cta="View History"
-        icon={History}
-        onAction={() => navigate('/history')}
-        visualClassName="aspect-[4/5] flex-shrink-0"
-        visual={
-          <>
-            <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
-              <History size={48} style={{ color: 'rgba(198,168,92,0.35)' }} />
-            </div>
-            <FaceScanOverlay loop={false} showDots={false} />
-          </>
-        }
-      />
-    )}] : []),
   ]
 
   function goTo(idx) {

@@ -5,7 +5,7 @@ import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
   User, Crown, Ruler, Bell, Palette, Trash2, LogOut,
-  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
+  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square, RefreshCw,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -15,6 +15,7 @@ import { triggerHaptic } from '../utils/haptics'
 import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
 import { useDeleteAccount } from '../utils/useDeleteAccount'
+import { isDeveloperRefreshAvailable, getDeveloperRefreshState } from '../utils/developerRefresh'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -165,6 +166,20 @@ export default function Settings() {
     clearAllScanData()
     await clearAllScanMedia().catch(err => console.warn('[Settings] clearAllScanMedia failed:', err))
     setClearConfirm(false)
+  }
+
+  async function handleDeveloperRefresh() {
+    const confirmed = window.confirm(
+      'Clear local scans, progress, check-ins, and scan photos, then reopen the app after onboarding? Your sign-in, premium status, and onboarding answers will be kept. Cloud data will not be changed.'
+    )
+    if (!confirmed) return
+
+    useStore.setState(getDeveloperRefreshState())
+    await clearAllScanMedia().catch(err => console.warn('[Settings] dev refresh media cleanup failed:', err))
+    for (const key of ['asc_pro_splash_shown', 'asc_reveal_shown', 'asc_post_onboard_dest', 'ascendus_onboarding_draft']) {
+      try { sessionStorage.removeItem(key) } catch {}
+    }
+    window.location.replace(`${window.location.origin}/scan`)
   }
 
   async function openLink(url) {
@@ -499,6 +514,12 @@ export default function Settings() {
             value="support@ascendus.com"
             onPress={() => openMailto('support@ascendus.com', 'Support Request')}
           />
+          {isDeveloperRefreshAvailable() && <SettingsRow
+            icon={RefreshCw}
+            label="Dev Refresh"
+            value="Clear local test data and restart after onboarding"
+            onPress={handleDeveloperRefresh}
+          />}
         </div>
 
         {/* App version */}

@@ -103,10 +103,10 @@ const ISSUE_CONTENT = {
     tips:     ['Your photo is kept for retry', 'Try the same photo again in a moment'],
   },
   validation_unavailable: {
-    headline: 'Photo checker unavailable',
-    label:    'Service unavailable',
-    desc:     'The photo-checking service is unavailable. Your photo has not been rejected.',
-    tips:     ['Your photo is kept for retry', 'Try again when the service is available'],
+    headline: 'Couldn’t reach the photo checker',
+    label:    'Connection interrupted',
+    desc:     'The checker didn’t respond, so your photo was not evaluated or rejected.',
+    tips:     ['Your photo is kept for retry', 'Try the same photo again when the service is reachable'],
   },
   validation_session_expired: {
     headline: 'Sign in to continue',

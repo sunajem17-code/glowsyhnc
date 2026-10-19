@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
@@ -15,7 +16,10 @@ import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
-import { recoverPotentialScore, getRatingColor, getRevealRatings, getRevealView } from '../utils/revealRatings'
+import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
+import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { getProgressSaveFlight } from '../utils/progressSaveAnimation'
+import { isLocalDeveloperPreview } from '../utils/developerUnlock'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 
@@ -1506,15 +1510,21 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const savedScans = useStore(state => state.scans)
-  const [storedPotentialScore, setStoredPotentialScore] = useState(null)
+  const [recoveredRatingValues, setRecoveredRatingValues] = useState(null)
+  const [isRecoveringRatings, setIsRecoveringRatings] = useState(false)
+  const [ratingsRecoveryError, setRatingsRecoveryError] = useState('')
   const [activeView, setActiveView] = useState('results')
-  const [comparisonScanId, setComparisonScanId] = useState('')
   const [viewDirection, setViewDirection] = useState(1)
   const [saveError, setSaveError] = useState('')
+  const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
+  const [saveFlight, setSaveFlight] = useState(null)
+  const saveFlightIdRef = useRef(0)
+  const resultsCardRef = useRef(null)
+  const progressButtonRef = useRef(null)
   const reduceMotion = useReducedMotion()
 
   function showView(view) {
@@ -1543,38 +1553,90 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
     }
   }
 
-  function shareResult() {
+  function saveToProgress() {
     if (!saveResult()) return
     triggerHaptic()
-    navigate('/community', { state: { shareScanId: scan.id, sharePhoto: facePhoto } })
-  }
+    setProgressAdded(true)
+    const openProgress = () => navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
+    if (reduceMotion) {
+      openProgress()
+      return
+    }
 
-  function closeResults() {
-    if (!saveResult()) return
-    triggerHaptic()
-    navigate('/scan', { replace: true })
+    const source = activeView === 'results'
+      ? resultsCardRef.current
+      : document.getElementById(`scan-${activeView}-panel`)
+    const flight = getProgressSaveFlight(
+      source?.getBoundingClientRect(),
+      progressButtonRef.current?.getBoundingClientRect(),
+    )
+    if (flight) setSaveFlight({ ...flight, id: ++saveFlightIdRef.current })
+    else openProgress()
   }
 
   useEffect(() => {
-    setStoredPotentialScore(null)
-    if (!unlocked || !scan || scan.aiScore?.potentialScore != null || scan.potentialScore != null) return undefined
+    setRecoveredRatingValues(null)
+    setIsRecoveringRatings(false)
+    setRatingsRecoveryError('')
+    if (!unlocked || !scan || getRevealRatings(scan).every(({ value }) => value != null)) return undefined
     let active = true
-    recoverPotentialScore(scan, api)
-      .then(potentialScore => {
+    setIsRecoveringRatings(true)
+    recoverMissingRevealRatings(scan, api)
+      .then(({ values }) => {
         if (!active) return
-        setStoredPotentialScore(potentialScore)
-        const patch = saved => saved?.id === scan.id
-          ? { ...saved, potentialScore, aiScore: { ...saved.aiScore, potentialScore } }
-          : saved
+        setRecoveredRatingValues(values)
+        if (getRevealRatings(scan).some((rating, index) => rating.value == null && values[index] == null)) {
+          setRatingsRecoveryError('The scoring service did not return every rating. Please run the scan again while connected.')
+        }
+        const patch = saved => {
+          if (saved?.id !== scan.id) return saved
+          const existingRatings = getRevealRatings(saved)
+          const aiScore = { ...saved.aiScore }
+          if (existingRatings[1].value == null && values[1] != null) aiScore.potentialScore = values[1]
+          const faceMetricKeys = [null, null, 'symmetry', 'skinQuality', 'jawline', 'cheekbones']
+          const faceMetrics = { ...aiScore.faceMetrics }
+          faceMetricKeys.forEach((key, index) => {
+            if (key && existingRatings[index].value == null && values[index] != null) {
+              faceMetrics[key] = { ...faceMetrics[key], score: values[index] }
+            }
+          })
+          if (Object.keys(faceMetrics).length) aiScore.faceMetrics = faceMetrics
+          return {
+            ...saved,
+            potentialScore: existingRatings[1].value == null ? values[1] ?? saved.potentialScore : saved.potentialScore,
+            aiScore,
+          }
+        }
         useStore.setState(state => ({ currentScan: patch(state.currentScan), scans: state.scans.map(patch) }))
       })
-      .catch(err => console.warn('[Potential recovery failed]', err?.message))
+      .catch(err => {
+        console.warn('[Reveal rating recovery failed]', err?.message)
+        if (active) setRatingsRecoveryError('Some ratings are missing from this saved scan and could not be recalculated. Please run the scan again while connected.')
+      })
+      .finally(() => { if (active) setIsRecoveringRatings(false) })
     return () => { active = false }
   }, [unlocked, scan?.id])
 
-  const metrics = getRevealRatings(
-    storedPotentialScore == null ? scan : { ...scan, potentialScore: storedPotentialScore },
-  )
+  const recoveredScan = recoveredRatingValues
+    ? {
+        ...scan,
+        potentialScore: recoveredRatingValues[1] ?? scan?.potentialScore,
+        aiScore: {
+          ...scan?.aiScore,
+          potentialScore: scan?.aiScore?.potentialScore ?? recoveredRatingValues[1],
+          faceMetrics: {
+            ...scan?.aiScore?.faceMetrics,
+            ...Object.fromEntries(['symmetry', 'skinQuality', 'jawline', 'cheekbones']
+              .map((key, offset) => [key, recoveredRatingValues[offset + 2] == null || getRevealRatings(scan)[offset + 2].value != null
+                ? scan?.aiScore?.faceMetrics?.[key]
+                : { ...scan?.aiScore?.faceMetrics?.[key], score: recoveredRatingValues[offset + 2] }]))
+              .filter(([, metric]) => metric != null),
+          },
+        },
+      }
+    : scan
+  const metrics = getRevealRatings(recoveredScan)
+  const resultsHeading = unlocked ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
@@ -1583,20 +1645,19 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
 
         {/* Header */}
         <div className="relative w-full">
-        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2 px-12" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          {unlocked ? 'Your Results' : 'Reveal your ratings'}
+        <h1 className={`font-heading font-bold text-[32px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? getUnlockedResultsHeadingStyle(resultsHeading) : {}) }}>
+          {resultsHeading}
         </h1>
-        {unlocked && <button type="button" aria-label="Close results" onClick={closeResults}
-          className="absolute right-0 top-0 w-11 h-11 rounded-full flex items-center justify-center"
-          style={{ color: '#fff', background: 'rgba(255,255,255,0.08)' }}><X size={20} /></button>}
         </div>
-        {!unlocked && <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full facial analysis with Ascendus Max
-        </p>}
-        {scan?.aiScore?.insights?.some(text => /demo mode/i.test(text)) && (
-          <p className="text-xs text-center mt-2" style={{ color: G }}>Preview scores — not an AI analysis</p>
-        )}
-
+        <div className="h-5 flex items-start justify-center">
+          {unlocked ? (
+            <span aria-hidden="true" />
+          ) : (
+            <p className="font-body text-[14px] text-center leading-5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              See your full facial analysis with Ascendus Max
+            </p>
+          )}
+        </div>
         {/* Face circle + card */}
         <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
           drag={unlocked ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
@@ -1618,28 +1679,51 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
           </div>
 
           {/* Metrics card */}
-          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+          <div ref={resultsCardRef} className="w-full rounded-3xl pt-14 pb-10 px-4" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
             <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
-              {metrics.map(({ label, value }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    {!unlocked && <Lock size={13} style={{ color: G, flexShrink: 0 }} />}
-                    <p style={{ color: '#fff', fontSize: 'clamp(11px, 3.5vw, 17px)', fontWeight: 700, fontFamily: 'inherit', letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{label}</p>
+              {metrics.map(({ label, value }, idx) => {
+                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun })
+                const metricTextStyles = getRevealMetricTextStyles()
+                return (
+                <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
+                    <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
+                    <motion.span
+                      aria-hidden="true"
+                      initial={ratingAnimation.lock.initial}
+                      animate={ratingAnimation.lock.animate}
+                      transition={ratingAnimation.lock.transition}
+                      style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    >
+                      <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
+                    </motion.span>
                   </div>
                   {unlocked ? (
-                    <div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} style={{ color: '#fff', fontSize: value == null ? 18 : 26, fontWeight: 700, marginBottom: 12, fontVariantNumeric: 'tabular-nums', minHeight: 31 }}>
-                      {value == null ? 'Not scored' : value.toFixed(1)}
-                    </div>
+                    <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                      {value == null ? isRecoveringRatings ? 'Scoring…' : 'Unavailable' : value.toFixed(1)}
+                    </motion.div>
                   ) : (
-                    <div aria-label={`${label}: Locked`} style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
+                    <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
+                    </div>
                   )}
                   <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
-                    <div style={{ height: '100%', width: unlocked && value != null ? `${value * 10}%` : unlocked ? 0 : '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor', boxShadow: unlocked && value != null ? '0 0 10px currentColor' : 'none', transition: 'width 400ms ease, color 400ms ease' }} />
+                    <motion.div
+                      key={unlocked ? 'revealed' : 'locked'}
+                      initial={ratingAnimation.bar.initial}
+                      animate={ratingAnimation.bar.animate}
+                      transition={ratingAnimation.bar.transition}
+                      style={{ height: '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
+                    />
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
+          {unlocked && activeView === 'results' && (
+            <p className="font-heading leading-5 text-center" style={{ ...getRevealMetricTextStyles().brand, marginTop: 8 }}>Ascendus</p>
+          )}
           </div>
           {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
             <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
@@ -1647,19 +1731,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
             </div>
           </div>}
           {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} selectedId={comparisonScanId} onSelectScan={setComparisonScanId} />}
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} />}
           </div>}
           </motion.div>
         </motion.div>
 
         {/* CTAs */}
         {unlocked && <motion.button
+          ref={progressButtonRef}
           whileTap={{ scale: 0.97 }}
-          onClick={shareResult}
+          onClick={saveToProgress}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
-          style={{ marginTop: 26, background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          <Share2 size={20} /> Share
+          {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
         </motion.button>}
         {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
           {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
@@ -1671,19 +1756,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
                   const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
                   showView(RESULT_VIEWS[index])
                 }
-              }} className="flex items-center justify-center" style={{ width: 32, height: 44 }}>
+              }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
             </button>
           ))}
         </div>}
         {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
+        {ratingsRecoveryError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{ratingsRecoveryError}</p>}
         {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
             disabled={isPurchasing}
-            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+            className="w-full py-5 rounded-2xl font-heading font-normal text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{ background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 400, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
             {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
@@ -1704,6 +1790,40 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, d
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
+      {saveFlight && typeof document !== 'undefined' && createPortal(
+        <motion.div
+          aria-hidden="true"
+          initial={{ ...saveFlight.from, borderRadius: 24, opacity: 1 }}
+          animate={{ ...saveFlight.to, borderRadius: 22, opacity: 1 }}
+          transition={{ duration: 0.72, ease: [0.22, 0.8, 0.2, 1] }}
+          onAnimationComplete={() => {
+            if (saveFlightIdRef.current !== saveFlight.id) return
+            setSaveFlight(null)
+            navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
+          }}
+          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(209,183,109,0.9)', boxShadow: '0 0 28px rgba(209,183,109,0.35)', pointerEvents: 'none' }}
+        >
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ delay: 0.3, duration: 0.18 }}
+            style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(180deg, transparent 38%, rgba(0,0,0,0.86) 100%)' }}
+          >
+            {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />}
+            <div style={{ position: 'relative', color: '#D1B76D', font: '800 12px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.16em' }}>ASCENDUS</div>
+            <div style={{ position: 'relative', color: '#fff', font: '800 42px "Plus Jakarta Sans", sans-serif' }}>{metrics[0]?.value?.toFixed(1) ?? '—'}</div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.45 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.43, duration: 0.2, ease: 'easeOut' }}
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1B76D' }}
+          >
+            <Check size={23} strokeWidth={3} />
+          </motion.div>
+        </motion.div>,
+        document.body,
+      )}
     </motion.div>
   )
 }
@@ -1719,6 +1839,7 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
   const [showPaywall, setShowPaywall]       = useState(directPaywall || searchParams.get('paywall') === '1')
   const [showPromo, setShowPromo]           = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
+  const [revealRun, setRevealRun] = useState(0)
   const justUnlockedRef = useRef(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
@@ -1727,9 +1848,10 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
   const [developerUnlockAvailable, setDeveloperUnlockAvailable] = useState(false)
   const [developerUnlocking, setDeveloperUnlocking] = useState(false)
   const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
-  const displayedScan = pendingScan ? null : currentScan
-  const revealScan = currentScan
-    ? { ...currentScan, facePhotoUrl: currentScan.facePhotoUrl || pendingFacePhoto }
+  const completedDemoScan = completeDemoRevealRatings(currentScan)
+  const displayedScan = pendingScan ? null : completedDemoScan
+  const revealScan = completedDemoScan
+    ? { ...completedDemoScan, facePhotoUrl: completedDemoScan.facePhotoUrl || pendingFacePhoto }
     : pendingFacePhoto
       ? { facePhotoUrl: pendingFacePhoto }
       : null
@@ -1758,8 +1880,8 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
   const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     justUnlockedRef.current = true
-    // Developer/local unlock should reveal the existing results in place — do
-    // not replay the paywall slideshow or score-counting reveal animation.
+    // Replay only the compact lock-to-score animation on the existing card.
+    setRevealRun(run => run + 1)
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
     setJustUnlocked(true)
@@ -1820,6 +1942,19 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
     if (developerUnlocking) return
     setDeveloperUnlocking(true)
     setPurchaseError('')
+
+    // Local-only UI preview: reveal this scan without changing persisted Pro
+    // entitlement or contacting a backend that may not be running locally.
+    // The real server-authoritative unlock path below is unchanged elsewhere.
+    if (isLocalDeveloperPreview()) {
+      setRevealRun(run => run + 1)
+      setJustUnlocked(true)
+      setShowPaywall(false)
+      setShowUnlockSlideshow(false)
+      setDeveloperUnlocking(false)
+      return
+    }
+
     try {
       try {
         await api.developerAccess.unlock()
@@ -1853,7 +1988,7 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
           <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
         </div>
       ) : (isPremium || justUnlocked) ? (
-        <LockedRevealScreen scan={revealScan} unlocked />
+        <LockedRevealScreen scan={revealScan} unlocked revealRun={revealRun} />
       ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || pendingFacePhoto } : revealScan}

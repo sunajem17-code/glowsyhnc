@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getComparisonScans, mergeScanHistory, normalizeHistoryScan } from './scanHistory.js'
+import { getComparisonScans, getHistoryScoreColor, mergeScanHistory, normalizeHistoryScan } from './scanHistory.js'
 import { getRevealRatings } from './revealRatings.js'
 
 test('comparison excludes the current scan and its server alias, and keeps other completed scans', () => {
@@ -39,4 +39,14 @@ test('legacy results normalize safely and incomplete captures stay out of histor
   assert.equal(legacy.bodyData, null)
   assert.deepEqual(legacy.insights, ['Tip'])
   assert.equal(mergeScanHistory([], [{ id: 'unfinished' }], null).length, 0)
+})
+
+test('history score colors move from red through yellow to green with score', () => {
+  assert.equal(getHistoryScoreColor(0), '#EF4444')
+  assert.equal(getHistoryScoreColor(5), '#FACC15')
+  assert.equal(getHistoryScoreColor(10), '#22C55E')
+  assert.notEqual(getHistoryScoreColor(5.5), getHistoryScoreColor(6.5))
+  assert.equal(getHistoryScoreColor(12), '#22C55E')
+  assert.equal(getHistoryScoreColor(-2), '#EF4444')
+  assert.equal(getHistoryScoreColor(null), 'rgba(255,255,255,0.4)')
 })

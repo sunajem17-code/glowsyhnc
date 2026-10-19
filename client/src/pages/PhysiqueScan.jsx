@@ -1925,19 +1925,27 @@ export default function PhysiqueScan() {
       await minDisplayPromise
       setAnalysisStep(4)
 
+      // The body-only scoring endpoint returns { physiqueScore }, whereas
+      // older local demo data used to return the score fields at the root.
+      // Normalize once so results and Progress history both use the real score.
+      const physiqueScore = aiResult?.physiqueScore ?? aiResult?.physiqueResult ?? aiResult
+      const physiqueOverall = Number(physiqueScore?.overall ?? physiqueScore?.overallPhysique ?? aiResult?.overallScore)
+      const physiqueScoredAt = new Date().toISOString()
       const scanRecord = {
         id:             `scan-${Date.now()}`,
-        scanDate:       new Date().toISOString(),
-        analyzedAt:     new Date().toISOString(),
+        scanType:       'physique',
+        progressSavedAt: physiqueScoredAt,
+        scanDate:       physiqueScoredAt,
+        analyzedAt:     physiqueScoredAt,
         facePhotoUrl:   faceB64,
         sidePhotoUrl:   sideB64 ?? null,
         hasSideProfile: aiResult.hasSideProfile ?? false,
         gender:         g,
-        umaxScore:      aiResult.overallScore,
-        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
+        umaxScore:      Number.isFinite(physiqueOverall) ? physiqueOverall : null,
+        glowScore:      Number.isFinite(physiqueOverall) ? Math.round(physiqueOverall * 10) / 10 : null,
         tier:           aiResult.tier,
         potentialScore: aiResult.potentialScore ?? null,
-        aiScore:        aiResult,
+        aiScore:        physiqueScore,
         faceData: {
           aestheticScore:    aiResult.faceScore,
           pillars:           null,
@@ -1961,7 +1969,7 @@ export default function PhysiqueScan() {
         // happens here — see the Training Plan flow's own body-photo step.)
         sideProfileGeometry:  sideProfileGeometry ?? undefined,
         // Physique score from scorePhysique API — used by WorkoutPlan/Routine Tracker
-        physiqueScore:        aiResult.physiqueScore ?? null,
+        physiqueScore,
         bodyPhotoUrl:         faceB64,
       }
 
