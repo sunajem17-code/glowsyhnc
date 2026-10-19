@@ -1255,7 +1255,7 @@ function SocialProofTicker() {
             }}
           >
             <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{notif.flag}</span>
-            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'nowrap' }}>
+            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'normal' }}>
               <span style={{ color: 'rgba(198,168,92,0.92)', fontWeight: 600 }}>{notif.name}</span>
               {' from '}{notif.country}{' just unlocked their results'}
             </p>
@@ -1414,7 +1414,9 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
-        <div className="mt-3 mb-2">
+        <div className="mt-3 mb-3">
+          <SocialProofTicker />
+          <p className="text-center font-body text-[10px] mt-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Sample activity</p>
         </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (

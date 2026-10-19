@@ -189,7 +189,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <UpdatePrompt />
-      <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F7F5F0] dark:bg-[#121212] text-[#121212] dark:text-white" role="status" aria-live="polite">
+          <p className="font-body text-sm">Loading your next screen…</p>
+        </div>
+      }>
       <AnimatePresence mode="wait">
         <Routes>
           {/* Legal pages + payment return — always accessible */}

@@ -11,3 +11,10 @@ export function isSevenDayFreeTrial(product) {
   const daysPerUnit = { DAY: 1, WEEK: 7 }
   return daysPerUnit[intro.periodUnit] * intro.periodNumberOfUnits * intro.cycles === 7
 }
+
+// Exit-intent trial renews on the existing monthly product only.
+export function isMonthlyExitTrial(product) {
+  return product?.identifier === 'com.ascendus.app.monthly'
+    && product.subscriptionPeriod === 'P1M'
+    && isSevenDayFreeTrial(product)
+}

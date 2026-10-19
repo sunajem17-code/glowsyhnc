@@ -6,7 +6,7 @@ import { triggerHaptic } from '../utils/haptics'
 const navItems = [
   { to: '/scan',      icon: Camera,    label: 'Scan' },
   { to: '/timeline', icon: TrendingUp, label: 'Progress' },
-  { to: '/progress', image: '/adonis-mascot.png', label: 'Adonis' },
+  { to: '/progress', image: '/adonis-nav.png', label: 'Adonis' },
   { to: '/extras', icon: Grid2x2, label: 'Extras' },
 ]
 

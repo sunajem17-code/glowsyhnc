@@ -329,16 +329,15 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </p>
         <p className="font-body text-[11px] font-semibold tracking-[0.16em] mb-3"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          A SPECIAL ONE TIME OFFER
+          {trial ? '7 DAYS FREE · MONTHLY PLAN' : 'MONTHLY FREE TRIAL'}
         </p>
         <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
-          Your first 7 days are completely free
+          {checking ? 'Checking your trial eligibility…' : trial ? 'Your first 7 days are completely free' : 'This trial is not available for your account on this device.'}
         </p>
 
-        <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-body text-[22px] line-through" style={{ color: 'rgba(255,255,255,0.35)' }}>$4.99</span>
-          <span className="font-heading font-bold text-[26px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial?.product?.introPrice?.priceString || '$0.00'}</span>
-        </div>
+        {trial && <div className="flex items-center justify-center gap-2 mb-5">
+          <span className="font-heading font-bold text-[26px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
+        </div>}
 
         {trial && <p className="font-body text-[11px] leading-relaxed mb-3" style={{ color: DIM }}>
           {trialRenewalText(trial.product)}
@@ -354,7 +353,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : 'Start free trial'}
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 7 days free' : 'Trial unavailable'}
         </button>
       </motion.div>
     </motion.div>
