@@ -1,0 +1,710 @@
+[
+  {
+    "id": "coil_crop",
+    "name": "Coil Crop",
+    "appearance": "Black / Afro-diasporic",
+    "compatibleHairTypes": [
+      "coily"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "low",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep the coils close and even.",
+      "sides": "Low taper at the temples and neckline.",
+      "back": "Low taper at the temples and neckline.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use a light leave-in conditioner; style gently and avoid pulling at the roots.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/black-afrodiasporic-short-4c-low-density.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "twist_out",
+    "name": "Rounded Twist-out",
+    "appearance": "Black / Afro-diasporic",
+    "compatibleHairTypes": [
+      "coily"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep 8–10 cm of natural coil volume and shape a rounded outline.",
+      "sides": "Preserve side volume with a subtle temple taper.",
+      "back": "Preserve side volume with a subtle temple taper.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a light leave-in conditioner; style gently and avoid pulling at the roots.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/black-afrodiasporic-medium-4b-medium-density.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "long_locs",
+    "name": "Shoulder-length Locs",
+    "appearance": "Black / Afro-diasporic",
+    "compatibleHairTypes": [
+      "coily"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Preserve established locs to shoulder length.",
+      "sides": "Tidy the perimeter without cutting the locs short.",
+      "back": "Tidy the perimeter without cutting the locs short.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a light leave-in conditioner; style gently and avoid pulling at the roots.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/black-afrodiasporic-long-locs-high-density.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "straight_crew",
+    "name": "Straight Crew Cut",
+    "appearance": "East Asian",
+    "compatibleHairTypes": [
+      "straight"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "medium",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep the top short with a little extra length in front.",
+      "sides": "Blend closely around the ears and neckline.",
+      "back": "Blend closely around the ears and neckline.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/east-asian-short-1a-low-density.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "layered_wolf",
+    "name": "Layered Wolf Cut",
+    "appearance": "East Asian",
+    "compatibleHairTypes": [
+      "straight",
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "low",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Create soft connected layers with a textured fringe.",
+      "sides": "Keep length around the ears and upper nape.",
+      "back": "Keep length around the ears and upper nape.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/east-asian-medium-1c-wolf-cut.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "straight_layers",
+    "name": "Long Straight Layers",
+    "appearance": "East Asian",
+    "compatibleHairTypes": [
+      "straight"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep shoulder-length hair with light face-framing layers.",
+      "sides": "Scissor cut; preserve length and avoid a fade.",
+      "back": "Scissor cut; preserve length and avoid a fade.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/east-asian-long-1b-layered.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "side_swept_crop",
+    "name": "Side-swept Crop",
+    "appearance": "South Asian / Indian",
+    "compatibleHairTypes": [
+      "straight"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "low",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep a short textured top and a soft side-swept fringe.",
+      "sides": "Low taper with a natural blend.",
+      "back": "Low taper with a natural blend.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/south-asian-indian-short-1b-crop.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "wavy_layers",
+    "name": "Wavy Layers",
+    "appearance": "South Asian / Indian",
+    "compatibleHairTypes": [
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep layered waves reaching the ears with a loose side sweep.",
+      "sides": "Scissor blend and retain length through the nape.",
+      "back": "Scissor blend and retain length through the nape.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/south-asian-indian-medium-2b-wavy.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "long_loose_curls",
+    "name": "Long Loose Curls",
+    "appearance": "South Asian / Indian",
+    "compatibleHairTypes": [
+      "wavy",
+      "curly"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep shoulder-length curls with long layers, accounting for shrinkage.",
+      "sides": "Retain the natural outline around the shoulders.",
+      "back": "Retain the natural outline around the shoulders.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use curl cream on damp hair and diffuse or air dry.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/south-asian-indian-long-2c-3a-curls.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "compact_crop",
+    "name": "Compact Textured Crop",
+    "appearance": "European",
+    "compatibleHairTypes": [
+      "straight",
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "low",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep a compact textured top and short soft fringe.",
+      "sides": "Short taper above the ears.",
+      "back": "Short taper above the ears.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/european-short-1c-crop.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "wavy_shag",
+    "name": "Wavy Shag",
+    "appearance": "European",
+    "compatibleHairTypes": [
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "low",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Create loose layers and a soft fringe without removing all the weight.",
+      "sides": "Leave texture around the ears and upper nape.",
+      "back": "Leave texture around the ears and upper nape.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/european-medium-2b-shag.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "long_curtain_curls",
+    "name": "Long Curtain Curls",
+    "appearance": "European",
+    "compatibleHairTypes": [
+      "wavy",
+      "curly"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep long layers with a loose center part below the jaw.",
+      "sides": "Preserve shoulder-length curls; no fade.",
+      "back": "Preserve shoulder-length curls; no fade.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use curl cream on damp hair and diffuse or air dry.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/european-long-2c-curtain-curls.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "short_curly_taper",
+    "name": "Short Curly Taper",
+    "appearance": "Latino",
+    "compatibleHairTypes": [
+      "curly"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "medium",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep a compact curly top and trim with shrinkage in mind.",
+      "sides": "Low taper around the temples and neckline.",
+      "back": "Low taper around the temples and neckline.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use curl cream on damp hair and diffuse or air dry.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/latino-short-3a-low-taper.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "side_part_waves",
+    "name": "Side-parted Waves",
+    "appearance": "Latino",
+    "compatibleHairTypes": [
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep defined layered waves with a natural side part.",
+      "sides": "Retain weight around the ears and nape.",
+      "back": "Retain weight around the ears and nape.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/latino-medium-2b-waves.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "long_waves",
+    "name": "Long Layered Waves",
+    "appearance": "Latino",
+    "compatibleHairTypes": [
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Preserve shoulder length with soft layers and a center part.",
+      "sides": "Scissor cut the perimeter; keep the length.",
+      "back": "Scissor cut the perimeter; keep the length.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/latino-long-2c-waves.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "short_taper",
+    "name": "Textured Taper",
+    "appearance": "MENA",
+    "compatibleHairTypes": [
+      "straight",
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "short",
+    "maintenance": "low",
+    "visualEffects": {
+      "topHeight": "low",
+      "foreheadExposure": "medium",
+      "sideWidth": "low",
+      "jawEmphasis": "medium"
+    },
+    "barber": {
+      "top": "Keep a short textured top with a compact fringe.",
+      "sides": "Subtle taper with a connected blend.",
+      "back": "Subtle taper with a connected blend.",
+      "taper": "Keep the outline natural."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Suitable for a shorter cut",
+    "image": {
+      "src": "/hairmaxx/catalog/mena-short-1c-taper.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "brushed_back_layers",
+    "name": "Brushed-back Layers",
+    "appearance": "Mixed heritage",
+    "compatibleHairTypes": [
+      "wavy",
+      "curly"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "medium",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "medium",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep enough curl and length to brush loosely away from the face.",
+      "sides": "Scissor blend with length around the ears and nape.",
+      "back": "Scissor blend with length around the ears and nape.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use curl cream on damp hair and diffuse or air dry.",
+    "growth": "Requires length around the ears",
+    "image": {
+      "src": "/hairmaxx/catalog/mixed-medium-2c-layered.png",
+      "width": 1094,
+      "height": 1438
+    }
+  },
+  {
+    "id": "long_center_waves",
+    "name": "Long Center-part Waves",
+    "appearance": "MENA / mixed",
+    "compatibleHairTypes": [
+      "wavy"
+    ],
+    "compatibleDensity": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "compatibleThickness": [
+      "fine",
+      "medium",
+      "thick"
+    ],
+    "length": "long",
+    "maintenance": "medium",
+    "visualEffects": {
+      "topHeight": "medium",
+      "foreheadExposure": "medium",
+      "sideWidth": "high",
+      "jawEmphasis": "low"
+    },
+    "barber": {
+      "top": "Keep shoulder-length waves with a natural center part.",
+      "sides": "Long connected layers; no fade.",
+      "back": "Long connected layers; no fade.",
+      "taper": "Preserve length; discuss your growth goal with your barber."
+    },
+    "styling": "Use a small amount of light styling cream and shape with your fingers.",
+    "growth": "Requires shoulder-length growth",
+    "image": {
+      "src": "/hairmaxx/catalog/mena-mixed-long-2b-waves.png",
+      "width": 1094,
+      "height": 1438
+    }
+  }
+]

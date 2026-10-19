@@ -1,4 +1,4 @@
-import catalog from '../../../server/src/catalog/hairCatalog.json' with { type: 'json' }
+import catalog from '../data/hairCatalog.json' with { type: 'json' }
 
 export const HAIR_CATALOG_VERSION = '2026-10-18-individual-portraits-v2'
 export const HAIRSTYLE_CATALOG = catalog
