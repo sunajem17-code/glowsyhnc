@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronRight } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
@@ -113,15 +113,7 @@ export default function ScanTimeline() {
     <MotionPage className="px-4">
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <button
-          onClick={() => { triggerHaptic(); navigate(-1) }}
-          aria-label="Go back"
-          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
-        >
-          <ChevronLeft size={18} className="text-primary" />
-        </button>
+      <div className="flex items-center mb-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex-1">
           <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>
             Progress

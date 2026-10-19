@@ -100,7 +100,10 @@ export default function DailyCheckin() {
   const [skincarePm, setSkincarePm] = useState(todayCheckin?.skincarePm ?? false)
   const [exerciseDone, setExerciseDone] = useState(todayCheckin?.exercisesDone ?? false)
   const [mood, setMood] = useState(todayCheckin?.moodScore ?? 0)
-  const [submitted, setSubmitted] = useState(alreadyDone)
+  // `submitted` represents this visit's celebration only. A saved check-in
+  // should show the form as completed when reopened, without replaying the
+  // success screen or its redirect.
+  const [submitted, setSubmitted] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   const streakFlameRef = useRef(null)
 
@@ -116,15 +119,17 @@ export default function DailyCheckin() {
   // auto-submit into the streak success screen a beat later — completing
   // the day should feel like it just happened, not wait on a extra tap.
   useEffect(() => {
-    if (completionScore < 5 || submitted || celebrating) return
+    if (alreadyDone || completionScore < 5 || submitted || celebrating) return
     triggerHaptic()
     setCelebrating(true)
     const timer = setTimeout(() => { handleSubmit() }, 1100)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completionScore, submitted, celebrating])
+  }, [alreadyDone, completionScore, submitted, celebrating])
 
   function handleSubmit() {
+    if (alreadyDone) return
+
     const checkin = {
       id: `checkin-${Date.now()}`,
       date: today,
@@ -382,7 +387,12 @@ export default function DailyCheckin() {
 
           {/* Once all 5 are checked, the FlameBurst effect above takes over
               and auto-submits — no manual button needed at that point. */}
-          {completionScore < 5 && (
+          {alreadyDone ? (
+            <div className="flex items-center justify-center gap-2 py-4 rounded-2xl border-2 font-heading font-bold text-[15px]" style={{ background: `${GOLD}14`, color: GOLD, borderColor: GOLD, boxShadow: '0 0 18px rgba(198,168,92,0.25), inset 0 0 14px rgba(198,168,92,0.08)', textShadow: GOLD_GLOW }}>
+              <CheckCircle2 size={18} style={{ filter: GOLD_ICON_GLOW }} />
+              Today's check-in is complete
+            </div>
+          ) : completionScore < 5 && (
             <button
               onClick={() => { triggerHaptic(); handleSubmit() }}
               disabled={completionScore === 0}
