@@ -57,11 +57,7 @@ export function rankHairstyles(profile, structure, limit = 8) {
     return true
   })
 
-  const fallback = candidates.length >= 3 ? candidates : HAIRSTYLE_CATALOG.filter(style =>
-    style.compatibleHairTypes.includes(profile.hairType) && style.compatibleDensity.includes(profile.density) && style.compatibleThickness.includes(profile.strandThickness)
-  )
-
-  return fallback.map(style => {
+  return candidates.map(style => {
     const reasons = []
     let score = 55
     score += effectScore(style, structure, reasons)

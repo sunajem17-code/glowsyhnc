@@ -11,6 +11,9 @@ import { conciseReason, rankHairstyles, structureFromScan } from '../utils/hairM
 import { portableEvidence } from '../utils/productionAnalysis'
 import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import shortLengthPortrait from '../assets/hair-length/short.png'
+import mediumLengthPortrait from '../assets/hair-length/medium.png'
+import longLengthPortrait from '../assets/hair-length/long.png'
 
 const BG = '#080808'
 const PANEL = 'rgba(255,255,255,0.045)'
@@ -18,41 +21,33 @@ const PANEL = 'rgba(255,255,255,0.045)'
 function HairPattern({ type }) {
   const item = HAIR_TYPES.find(value => value.id === type)
   return <svg viewBox="0 0 32 48" className="w-8 h-10" aria-hidden="true">
-    <path d={item?.pattern} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d={item?.pattern} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 }
 
 function DensityDots({ density }) {
   const strands = {
-    low: [10, 22, 34],
-    medium: [6, 12.4, 18.8, 25.2, 31.6, 38],
-    high: [6, 10, 14, 18, 22, 26, 30, 34, 38],
+    low: [8, 17, 27, 36],
+    medium: [5, 11, 17, 23, 29, 35, 41],
+    high: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40],
   }
-  return <svg viewBox="0 0 44 44" className="w-11 h-11" aria-hidden="true">
-    <path d="M3 33 Q22 31 41 33 L40 39 Q39.5 42 35 42 H9 Q4.5 42 4 39 Z" fill="rgba(217,188,114,.28)" stroke="rgba(217,188,114,.58)" strokeWidth="1" />
+  return <svg viewBox="0 0 44 44" className="w-[68px] h-[68px]" aria-hidden="true">
+    <path d="M3 33 Q22 30 41 33 L40 39 Q39.5 42 35 42 H9 Q4.5 42 4 39 Z" fill="rgba(217,188,114,.3)" stroke="rgba(217,188,114,.72)" strokeWidth="1.5" />
     {(strands[density] || []).map((x, index) => {
-      const sway = index % 2 ? 1.5 : -1.5
+      const sway = index % 2 ? 2 : -2
       const tip = x + (index % 3 - 1) * 1.5
-      return <path key={index} d={`M${x} 34 C${x + sway} 27 ${x - sway} 17 ${tip} 8`} fill="none" stroke="#F3F0E7" strokeWidth="1.35" strokeLinecap="round" />
+      return <path key={index} d={`M${x} 34 C${x + sway} 27 ${x - sway} 17 ${tip} 8`} fill="none" stroke="#F3F0E7" strokeWidth="1.7" strokeLinecap="round" />
     })}
   </svg>
 }
 
 function LengthPortrait({ length }) {
-  const hairShapes = {
-    short: 'M12 20 C11 16 11 10 15 7 C17 5 19 5 21 5 C24 4 27 5 29 7 C33 9 34 15 32 20 L29 17 C27 15 25 14 22 14 C18 14 15 16 13 20 Z',
-    medium: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 25 L29 24 L29 17 C27 14 25 13 22 13 C18 13 15 15 14 18 L14 24 L12 25 Z',
-    long: 'M11 22 C10 17 10 10 15 7 C17 5 20 5 22 5 C26 4 29 6 31 9 C35 13 34 19 33 22 L31 24 L29 18 C27 14 25 13 22 13 C18 13 15 15 14 19 L13 24 Z',
+  const portrait = {
+    short: shortLengthPortrait,
+    medium: mediumLengthPortrait,
+    long: longLengthPortrait,
   }[length]
-  return <svg viewBox="0 0 44 48" className="w-12 h-12" aria-hidden="true">
-    {/* Clean, flat bust silhouettes inspired by the supplied hairstyle chart. */}
-    <path d="M13 17 C13 13 17 11 22 11 C27 11 31 13 31 17 L30 26 C29 30 26 33 22 33 C18 33 15 30 14 26 Z" fill="none" stroke="#F3F0E7" strokeWidth="1.6" strokeLinejoin="round" />
-    {length === 'long' && <path d="M15 7 C11 11 10 17 10 22 L11 36 Q12 40 15 39 L17 34 L16 17 Z M29 7 C33 11 34 17 34 22 L33 36 Q32 40 29 39 L27 34 L28 17 Z" fill="#D9BC72" />}
-    <path d={hairShapes} fill="#D9BC72" />
-    {length === 'short' && <path d="M15 16 Q15 12 17.5 9 M19 15 Q19 10 21.5 8 M23 15 Q24 10 26.5 9 M27 16 Q29 12 30 11" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
-    {length === 'medium' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M25 15 Q28 11 30 11 M29 18 Q31 15 31 13" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
-    {length === 'long' && <path d="M13 19 Q13 13 16 10 M17 16 Q17 11 20 8 M21 15 Q23 9 25.5 8 M27 16 Q29 12 30 11 M11.5 22 Q11 29 13 36 M14 22 Q14 29 15 35 M32.5 22 Q33 29 31 36 M30 22 Q30 29 29 35" fill="none" stroke="#D9BC72" strokeWidth="1.25" strokeLinecap="round" />}
-  </svg>
+  return <img src={portrait} alt="" aria-hidden="true" className="w-16 h-16 object-contain" style={{ mixBlendMode: 'screen' }} />
 }
 
 // Same circular back button used across the app (see PageHeader.jsx and
@@ -75,7 +70,7 @@ function Header({ onBack, right }) {
 
 function ChoiceGrid({ title, subtitle, options, value, onChange, questionNumber, questionCount, questionKey, visual = false }) {
   const details = {
-    density: { low: 'Less overall scalp coverage', medium: 'Balanced coverage and volume', high: 'Fuller coverage and volume' },
+    density: { low: 'More scalp visible, less overall coverage', medium: 'Balanced coverage across your scalp', high: 'Fuller coverage with less scalp showing' },
     strandThickness: { fine: 'Thin, delicate strands', medium: 'Average strand thickness', thick: 'Thicker, coarser strands' },
     desiredLength: { short: 'A close cut or short style', medium: 'Some length to style', long: 'Shoulder length or longer', any: 'Open to any length' },
     maintenancePreference: { low: 'Keep daily styling simple', some: 'A little styling each day', any: 'Open to any routine' },
@@ -91,25 +86,24 @@ function ChoiceGrid({ title, subtitle, options, value, onChange, questionNumber,
         const id = typeof option === 'string' ? option : option.id
         const label = typeof option === 'string'
           ? questionKey === 'density'
-            ? ({ low: 'Thin', medium: 'Medium', high: 'Thick' }[id] || id)
+            ? ({ low: 'Low density', medium: 'Medium density', high: 'High density' }[id] || id)
             : (id === 'any' ? 'Any length' : id.charAt(0).toUpperCase() + id.slice(1))
           : option.label
         const description = (typeof option === 'string' ? null : option.description) || details[questionKey]?.[id] || ''
         const selected = value === id
         return <motion.button key={id} whileTap={{ scale: .985 }} onClick={() => { triggerHaptic(); onChange(id) }}
-          className="w-full flex-1 min-h-[92px] rounded-[22px] flex items-center gap-4 px-5 py-4 text-left"
+          className={`w-full flex-1 ${['density', 'desiredLength'].includes(questionKey) ? 'min-h-[116px]' : 'min-h-[92px]'} rounded-[22px] flex items-center gap-4 px-5 py-4 text-left`}
           style={{ background: selected ? 'rgba(198,168,92,.09)' : 'rgba(255,255,255,.018)', border: `1.5px solid ${selected ? 'rgba(198,168,92,.65)' : 'rgba(255,255,255,.1)'}` }}>
-          <div className="w-12 h-12 shrink-0 flex items-center justify-center text-white">
+          <div className={`${['density', 'desiredLength'].includes(questionKey) ? 'w-[72px] h-[72px]' : 'w-12 h-12'} shrink-0 flex items-center justify-center text-white`}>
             {visual && <HairPattern type={id} />}
             {questionKey === 'desiredLength' && ['short', 'medium', 'long'].includes(id) && <LengthPortrait length={id} />}
             {!visual && questionKey === 'density' && <DensityDots density={id} />}
             {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && ['low', 'medium', 'high'].includes(id) && <div className="flex items-end gap-[3px] h-7">{Array.from({ length: id === 'low' ? 3 : id === 'medium' ? 5 : 7 }, (_, index) => <i key={index} className="block w-[3px] rounded-full bg-current" style={{ height: `${12 + (index % 3) * 5}px`, opacity: .65 + (index % 2) * .2 }} />)}</div>}
             {!visual && questionKey !== 'density' && questionKey !== 'desiredLength' && !['low', 'medium', 'high'].includes(id) && <Scissors size={25} strokeWidth={1.8} />}
-            {questionKey === 'desiredLength' && id === 'any' && <Scissors size={25} strokeWidth={1.8} />}
           </div>
           <div className="min-w-0">
-            <span className="block font-heading font-bold text-[17px] leading-tight" style={{ color: selected ? '#F2D77E' : '#D9BC72', textShadow: selected ? '0 0 12px rgba(217,188,114,.62), 0 0 3px rgba(255,231,160,.45)' : '0 0 9px rgba(217,188,114,.42), 0 0 2px rgba(255,231,160,.3)' }}>{label}</span>
-            {description && <span className="block mt-1 text-[13px] leading-[1.4] text-white/75">{description}</span>}
+            <span className={`block font-heading font-bold ${['density', 'desiredLength'].includes(questionKey) ? 'text-[19px]' : 'text-[17px]'} leading-tight`} style={{ color: selected ? '#F2D77E' : '#D9BC72', textShadow: selected ? '0 0 12px rgba(217,188,114,.62), 0 0 3px rgba(255,231,160,.45)' : '0 0 9px rgba(217,188,114,.42), 0 0 2px rgba(255,231,160,.3)' }}>{label}</span>
+            {description && <span className={`block mt-1 ${['density', 'desiredLength'].includes(questionKey) ? 'text-[16px]' : 'text-[15px]'} font-medium leading-[1.35] text-white/90`}>{description}</span>}
           </div>
         </motion.button>
       })}
@@ -173,22 +167,13 @@ function Matching({ profile, structure }) {
   </div>
 }
 
-function CatalogModelImage({ recommendation, className = '' }) {
-  const crop = recommendation.style.image
-  const x = (crop.x / (crop.sheetWidth - crop.width)) * 100
-  const y = (crop.y / (crop.sheetHeight - crop.height)) * 100
-  return <div className={`relative overflow-hidden ${className}`} role="img" aria-label={`${recommendation.style.name} model reference`}
-    style={{
-      aspectRatio: `${crop.width}/${crop.height}`,
-      backgroundColor: '#111',
-      backgroundImage: `url(${crop.sheet})`,
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: `${(crop.sheetWidth / crop.width) * 100}% ${(crop.sheetHeight / crop.height) * 100}%`,
-      backgroundPosition: `${x}% ${y}%`,
-      border: '1px solid rgba(255,255,255,.08)',
-    }}>
-    <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 68%, rgba(0,0,0,.36))' }} />
-    {recommendation.rank === 1 && <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[9px] font-heading font-bold uppercase tracking-wider" style={{ background: GOLD, color: '#080808' }}>Best match</div>}
+function CatalogModelImage({ recommendation, className = '', compact = false }) {
+  const [failed, setFailed] = useState(false)
+  const src = recommendation.style.image.src
+  useEffect(() => setFailed(false), [src])
+  return <div className={`relative overflow-hidden ${className}`} style={{ aspectRatio: '4 / 5', background: 'radial-gradient(ellipse at 50% 45%, #25221b, #0c0c0c 80%)' }}>
+    {failed ? <div className="absolute inset-0 flex items-center justify-center text-white/60 text-sm">Photo unavailable</div>
+      : <img src={src} alt={`${recommendation.style.name} hairstyle reference`} draggable={false} onError={() => setFailed(true)} className="w-full h-full object-contain object-bottom" loading={compact ? 'lazy' : 'eager'} />}
   </div>
 }
 
@@ -220,17 +205,27 @@ function BarberMode({ recommendation, onClose }) {
   </div>
 }
 
-function Looks({ recommendations, active, setActive, savedIds, onSave, onDetails, onSaved }) {
-  const item = recommendations[active]
-  if (!item) return null
-  const go = direction => setActive(value => (value + direction + recommendations.length) % recommendations.length)
-  return <div className="px-5 pb-10">
-    <div className="pt-5 flex items-end justify-between mb-4"><div><p className="text-[10px] uppercase tracking-[.24em]" style={{ color: GOLD }}>HairMax</p><h1 className="font-heading font-bold text-[28px] text-white">Your Best Looks</h1></div><button onClick={onSaved} className="flex items-center gap-1.5 text-[11px] text-white/60"><Bookmark size={14} />{savedIds.length}</button></div>
-    <motion.div key={item.hairstyleId} drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={.18} onDragEnd={(_, info) => { if (info.offset.x < -55) go(1); if (info.offset.x > 55) go(-1) }} initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }}>
-      <div className="relative"><CatalogModelImage recommendation={item} className="w-full rounded-[28px]" /><button onClick={() => go(-1)} aria-label="Previous hairstyle" className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronLeft size={18} color="white" /></button><button onClick={() => go(1)} aria-label="Next hairstyle" className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,.55)' }}><ChevronRight size={18} color="white" /></button></div>
-      <div className="pt-5"><div className="flex justify-between items-start"><div><p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: GOLD }}>{item.compatibility >= 90 ? 'Strong match' : 'Good match'}</p><h2 className="font-heading font-bold text-[23px] text-white">{item.style.name}</h2></div><span className="font-body text-[11px] text-white/40">{active + 1} / {recommendations.length}</span></div><p className="font-body text-[13px] text-white/60 mt-2 leading-relaxed max-w-[90%]">{conciseReason(item)}</p></div>
-      <div className="grid grid-cols-2 gap-3 mt-5"><button onClick={() => onSave(item.hairstyleId)} className="py-3.5 rounded-2xl flex items-center justify-center gap-2 font-heading font-bold text-[12px]" style={{ background: savedIds.includes(item.hairstyleId) ? 'rgba(198,168,92,.14)' : PANEL, color: savedIds.includes(item.hairstyleId) ? GOLD : 'white', border: '1px solid rgba(255,255,255,.08)' }}><Heart size={15} fill={savedIds.includes(item.hairstyleId) ? GOLD : 'none'} />Save</button><button onClick={() => onDetails(item)} className="py-3.5 rounded-2xl font-heading font-bold text-[12px]" style={{ background: PANEL, color: 'white', border: '1px solid rgba(255,255,255,.08)' }}>Details</button></div>
-      <div className="flex justify-center gap-1.5 mt-5">{recommendations.map((value, index) => <button key={value.hairstyleId} onClick={() => setActive(index)} className="h-1.5 rounded-full transition-all" style={{ width: index === active ? 20 : 6, background: index === active ? GOLD : 'rgba(255,255,255,.18)' }} />)}</div>
+function Looks({ recommendations, active, setActive }) {
+  const item = recommendations[Math.min(active, recommendations.length - 1)]
+  if (!item) return <p className="px-6 py-12 text-white/60 text-center">No cuts match these preferences yet.</p>
+  const go = direction => {
+    if (recommendations.length < 2) return
+    triggerHaptic()
+    setActive(value => (value + direction + recommendations.length) % recommendations.length)
+  }
+  return <div className="px-5 pt-3 pb-6 max-w-lg mx-auto">
+    <motion.div key={item.hairstyleId}
+      drag={recommendations.length > 1 ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }} dragElastic={.18}
+      onDragEnd={(_, info) => { if (info.offset.x < -45) go(1); else if (info.offset.x > 45) go(-1) }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}
+      tabIndex={0} role="group" aria-roledescription="slide"
+      aria-label={`${item.style.name}, ${active + 1} of ${recommendations.length}. Swipe or use arrow keys to change haircut.`}
+      onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); go(1) } else if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1) } }}
+      className="rounded-[28px] overflow-hidden border border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C6A85C]"
+      style={{ background: '#111', touchAction: 'pan-y' }}>
+      <CatalogModelImage recommendation={item} className="w-full h-[62svh] max-h-[620px] min-h-[280px]" />
+      <h1 className="px-5 py-5 text-center font-heading font-bold text-[25px] leading-tight text-white">{item.style.name}</h1>
     </motion.div>
   </div>
 }
@@ -279,11 +274,12 @@ export default function HairMaxx() {
   const questions = useMemo(() => [
     { key: 'hairType', title: "What's your hair type?", subtitle: null, options: HAIR_TYPES, visual: true },
     { key: 'density', title: 'How dense is your hair?', subtitle: null, options: DENSITIES, columns: 3 },
-    { key: 'desiredLength', title: 'What length are you open to?', subtitle: null, options: LENGTHS, columns: 4 },
+    { key: 'strandThickness', title: 'How thick is each strand?', subtitle: 'Think about one strand, rather than overall coverage.', options: ['fine', 'medium', 'thick'] },
+    { key: 'desiredLength', title: 'What length are you open to?', subtitle: null, options: LENGTHS.filter(length => length !== 'any'), columns: 3 },
   ], [])
 
   function startQuestions() {
-    const reusable = storedProfile?.scanId === scan?.id && ['hairType', 'density', 'desiredLength'].every(key => storedProfile[key])
+    const reusable = storedProfile?.scanId === scan?.id && storedProfile?.catalogVersion === HAIR_CATALOG_VERSION && ['hairType', 'density', 'strandThickness', 'desiredLength'].every(key => storedProfile[key])
     if (reusable) { beginMatching(storedProfile); return }
     setQuestion(profile.hairType ? 1 : 0)
     setStage('questions')
@@ -299,7 +295,7 @@ export default function HairMaxx() {
 
   function cacheKey(nextProfile) {
     const evidenceVersion = structure.evidence?.schemaVersion ?? structure.evidence?.version ?? 'measured-v1'
-    const profileKey = ['hairType', 'density', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
+    const profileKey = ['hairType', 'density', 'strandThickness', 'desiredLength', 'maintenancePreference'].map(key => nextProfile[key]).join('|')
     return `${scan?.id ?? 'no-scan'}|${evidenceVersion}|${profileKey}|${HAIR_CATALOG_VERSION}`
   }
 
@@ -320,7 +316,7 @@ export default function HairMaxx() {
   }
 
   async function beginMatching(nextProfile) {
-    nextProfile = { ...nextProfile, strandThickness: nextProfile.strandThickness || 'medium', maintenancePreference: nextProfile.maintenancePreference || 'any' }
+    nextProfile = { ...nextProfile, catalogVersion: HAIR_CATALOG_VERSION, strandThickness: nextProfile.strandThickness || 'medium', maintenancePreference: nextProfile.maintenancePreference || 'any' }
     setHairProfile(nextProfile)
     setHairType(nextProfile.hairType)
     setActive(0)
@@ -338,6 +334,7 @@ export default function HairMaxx() {
     try {
       const response = await api.hair.recommend({ hairProfile: nextProfile, analysisEvidence: portableEvidence(structure.evidence) })
       ranked = resolveRecommendations(response.recommendations ?? [], response.engine, nextProfile)
+      if (!ranked.length) ranked = rankHairstyles(nextProfile, structure, 18)
     } catch (error) {
       console.error('[HairMax] Grounded recommendation request failed:', error?.message)
       ranked = rankHairstyles(nextProfile, structure, 8).map(item => ({ ...item, engine: 'deterministic_catalog_fallback_v1' }))
@@ -358,6 +355,7 @@ export default function HairMaxx() {
     if (stage === 'intro') navigate(-1)
     else if (stage === 'questions') question > 0 ? setQuestion(value => value - 1) : setStage('intro')
     else if (stage === 'saved') setStage('looks')
+    else if (stage === 'looks') { setQuestion(questions.length - 1); setStage('questions') }
     else setStage('intro')
   }
 
@@ -375,13 +373,13 @@ export default function HairMaxx() {
   >
     {/* ConnectedIntro carries its own back button (matching Scan.jsx's step
         header exactly), so the generic bar is skipped for that stage. */}
-    {stage !== 'intro' && <Header onBack={back} right={stage === 'looks' ? <button onClick={() => setStage('saved')}><Bookmark size={18} color={GOLD} /></button> : null} />}
+    {stage !== 'intro' && <Header onBack={back} />}
     <AnimatePresence mode="wait">
       {stage === 'intro' && <motion.div key="intro" className="flex-1 min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} image={sourceImage} onBack={back} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
       {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 min-h-0 flex flex-col px-5"><ChoiceGrid {...selectedQuestion} questionKey={selectedQuestion.key} questionNumber={question + 1} questionCount={questions.length} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
       {stage === 'matching' && <motion.div key="matching" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Matching profile={profile} structure={structure} /></motion.div>}
       {stage === 'recommend_error' && <motion.div key="recommend-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[70vh] px-6 flex flex-col items-center justify-center text-center"><Sparkles size={30} color={GOLD} /><h2 className="font-heading font-bold text-[22px] text-white mt-5">Couldn’t build your looks</h2><p className="text-[13px] text-white/50 mt-2 mb-6">Your scan is safe. Try the grounded matching step again.</p><button onClick={() => beginMatching(profile)} className="px-6 py-3 rounded-2xl font-heading font-bold text-[13px]" style={{ background: GOLD_GRADIENT, color: '#080808' }}>Try again</button></motion.div>}
-      {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks recommendations={recommendations} active={active} setActive={setActive} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
+      {stage === 'looks' && <motion.div key="looks" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Looks structure={structure} onEdit={() => { setQuestion(0); setStage('questions') }} recommendations={recommendations} active={active} setActive={setActive} savedIds={savedIds} onSave={toggleSaved} onDetails={setDetail} onSaved={() => setStage('saved')} /></motion.div>}
       {stage === 'saved' && <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><SavedLooks recommendations={recommendations} savedIds={savedIds} onSelect={item => { setDetail(item); setStage('looks') }} /></motion.div>}
     </AnimatePresence>
     <AnimatePresence>{detail && <DetailSheet recommendation={detail} onClose={() => setDetail(null)} onBarber={() => { setBarber(detail); setDetail(null) }} />}</AnimatePresence>
