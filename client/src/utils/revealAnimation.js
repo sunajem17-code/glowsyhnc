@@ -12,7 +12,7 @@ export function getRevealMetricTextStyles() {
       textTransform: 'uppercase',
     },
     lock: {
-      color: REVEAL_LABEL,
+      color: REVEAL_GOLD,
       filter: 'none',
     },
     brand: {

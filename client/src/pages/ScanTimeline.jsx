@@ -11,12 +11,14 @@ import { triggerHaptic } from '../utils/haptics'
 import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from '../utils/progressHistory'
 import { ScanHistoryContent } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
+import { hasPremiumUiAccess } from '../utils/developerUnlock'
 import StreakFlame from '../components/StreakFlame'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { scans, currentScan, streak, isPremium, token } = useStore()
+  const { scans, currentScan, streak, isPremium, developerPreviewUnlocked, token, refreshProStatus } = useStore()
+  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const [historySnapshot, setHistory] = useState({ token, scans: [] })
   const remoteHistory = historySnapshot.token === token ? historySnapshot.scans : []
@@ -46,6 +48,13 @@ export default function ScanTimeline() {
   const streakCompletedToday = streak.current > 0
     && Boolean(streak.lastDate)
     && new Date(streak.lastDate).toDateString() === new Date().toDateString()
+
+  // Progress embeds the same gated Scan History content as /history. Refresh
+  // the authoritative entitlement here too, so a recently completed purchase
+  // cannot leave this screen showing its stale locked state.
+  useEffect(() => {
+    refreshProStatus({ force: true })
+  }, [refreshProStatus, token])
 
   useEffect(() => {
     if (!streakFlameFlight) return undefined
@@ -104,7 +113,7 @@ export default function ScanTimeline() {
     const saved = currentScan?.id === entry.id ? currentScan
       : scans.find(scan => scan.id === entry.id || scan.serverScanId === entry.id)
     setCurrentScan(saved || normalizeHistoryScan(entry))
-    navigate('/unlock')
+    navigate('/unlock', { state: { source: 'progress-card', returnTo: '/timeline' } })
   }
 
 
@@ -212,7 +221,7 @@ export default function ScanTimeline() {
         </div>
       )}
 
-      {activeHistory.length >= 2 && isPremium && (
+      {activeHistory.length >= 2 && canAccessProUi && (
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
                   { label: 'First Score',   value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
@@ -239,7 +248,7 @@ export default function ScanTimeline() {
         <ScanHistoryContent
           embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading}
           error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
-          isPremium={isPremium} onViewScan={viewHistoryScan} onUpgrade={() => navigate('/premium')}
+          isPremium={canAccessProUi} onViewScan={viewHistoryScan} onUpgrade={() => navigate('/premium')}
           chartMode={progressMode} chartMetric={progressMetric}
           chartLabel={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'}
           emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}

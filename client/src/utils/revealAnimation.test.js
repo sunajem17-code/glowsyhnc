@@ -13,7 +13,7 @@ test('unlocked metric labels and locks use neutral gray without glow', () => {
     textTransform: 'uppercase',
   })
   assert.deepEqual(styles.lock, {
-    color: '#A3A3A3',
+    color: '#D1B76D',
     filter: 'none',
   })
   assert.deepEqual(styles.value, {
@@ -34,7 +34,7 @@ test('locked metric labels keep the same neutral gray as the revealed card', () 
     textShadow: 'none',
     textTransform: 'uppercase',
   })
-  assert.equal(styles.lock.color, styles.label.color)
+  assert.equal(styles.lock.color, '#D1B76D')
 })
 
 test('unlocked results add the Ascendus signature wordmark style', () => {

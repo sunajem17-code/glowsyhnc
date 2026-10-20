@@ -182,6 +182,7 @@ export default function Settings() {
     window.location.replace(`${window.location.origin}/scan`)
   }
 
+
   async function openLink(url) {
     if (Capacitor.isNativePlatform()) {
       await Browser.open({ url }).catch(() => {})

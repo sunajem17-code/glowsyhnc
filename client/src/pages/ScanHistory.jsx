@@ -11,6 +11,7 @@ import { triggerHaptic } from '../utils/haptics'
 
 import ScanHistoryRow from '../components/ScanHistoryRow'
 import { mergeScanHistory } from '../utils/scanHistory'
+import { hasPremiumUiAccess } from '../utils/developerUnlock'
 import { getProgressScore } from '../utils/progressHistory'
 
 function fmt(dateStr) {
@@ -123,6 +124,8 @@ function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall
 export default function ScanHistory() {
   const navigate = useNavigate()
   const isPremium = useStore(s => s.isPremium)
+  const developerPreviewUnlocked = useStore(s => s.developerPreviewUnlocked)
+  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const localScans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)
@@ -140,7 +143,7 @@ export default function ScanHistory() {
   }, [refreshProStatus, token])
 
   useEffect(() => {
-    if (!isPremium) { setLoading(false); return }
+    if (!canAccessProUi) { setLoading(false); return }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -151,7 +154,7 @@ export default function ScanHistory() {
       .catch(err => { if (!cancelled) setError(err.message || 'Failed to load history') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [isPremium, token])
+  }, [canAccessProUi, token])
 
   function viewScan(scan) {
     setCurrentScan(scan)
@@ -183,7 +186,7 @@ export default function ScanHistory() {
         </h1>
       </div>
 
-      <ScanHistoryContent scans={scans} loading={loading} error={error} isPremium={isPremium} onViewScan={viewScan} onUpgrade={() => navigate('/premium')} />
+      <ScanHistoryContent scans={scans} loading={loading} error={error} isPremium={canAccessProUi} onViewScan={viewScan} onUpgrade={() => navigate('/premium')} />
     </MotionPage>
   )
 }

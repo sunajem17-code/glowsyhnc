@@ -21,6 +21,7 @@ const useStore = create(
         upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: false,
+        developerPreviewUnlocked: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
         // while the async RevenueCat / server check completes.
         isPremium:
@@ -36,6 +37,7 @@ const useStore = create(
         isAuthenticated: true,
         isGuest: true,
         isPremium: false,
+        developerPreviewUnlocked: false,
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
@@ -50,6 +52,7 @@ const useStore = create(
           upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
+          developerPreviewUnlocked: false,
           scans: [],
           currentPlan: null,
           currentScan: null,
@@ -250,6 +253,9 @@ const useStore = create(
       // Premium
       isPremium: false,
       setIsPremium: (v) => set({ isPremium: v }),
+      // Session-only local preview access; intentionally excluded from persist.partialize.
+      developerPreviewUnlocked: false,
+      setDeveloperPreviewUnlocked: (v) => set({ developerPreviewUnlocked: v }),
 
       // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
       showUnlockSlideshow: false,

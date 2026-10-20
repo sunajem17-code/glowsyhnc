@@ -20,3 +20,4 @@ test('developer refresh clears local scan flow while preserving onboarding and a
   assert.equal('isPremium' in reset, false)
   assert.equal('token' in reset, false)
 })
+
