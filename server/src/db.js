@@ -110,6 +110,14 @@ db.exec(`
   );
 `)
 
+// Per-account snapshots; no client-provided entitlement or score is updated here.
+db.exec(`CREATE TABLE IF NOT EXISTS personalized_recommendations (
+  user_id TEXT NOT NULL,
+  context_key TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  PRIMARY KEY (user_id, context_key)
+);`)
+
 // Community tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS community_posts (

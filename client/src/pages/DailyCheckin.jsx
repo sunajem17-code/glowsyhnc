@@ -1,4 +1,4 @@
-import { API_BASE } from '../utils/backend'
+import { api } from '../utils/api'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -103,6 +103,8 @@ export default function DailyCheckin() {
   // `submitted` represents this visit's celebration only. A saved check-in
   // should show the form as completed when reopened, without replaying the
   // success screen or its redirect.
+  const submitting = useRef(false)
+  const [saveError, setSaveError] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   const streakFlameRef = useRef(null)
@@ -119,16 +121,18 @@ export default function DailyCheckin() {
   // auto-submit into the streak success screen a beat later — completing
   // the day should feel like it just happened, not wait on a extra tap.
   useEffect(() => {
-    if (alreadyDone || completionScore < 5 || submitted || celebrating) return
+    if (alreadyDone || completionScore < 5 || submitted || saveError) return
     triggerHaptic()
     setCelebrating(true)
     const timer = setTimeout(() => { handleSubmit() }, 1100)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alreadyDone, completionScore, submitted, celebrating])
+  }, [alreadyDone, completionScore, submitted, saveError])
 
-  function handleSubmit() {
-    if (alreadyDone) return
+  async function handleSubmit() {
+    if (alreadyDone || submitting.current) return
+    submitting.current = true
+    setSaveError(false)
 
     const checkin = {
       id: `checkin-${Date.now()}`,
@@ -140,33 +144,32 @@ export default function DailyCheckin() {
       moodScore: mood,
       completedAt: new Date().toISOString(),
     }
-    addCheckin(checkin)
-
-    // Update streak locally
-    const lastDate = streak.lastDate
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const isConsecutive = lastDate === yesterday.toDateString()
-    updateStreak({
-      current: isConsecutive ? streak.current + 1 : 1,
-      longest: Math.max(streak.longest, isConsecutive ? streak.current + 1 : 1),
-      lastDate: today,
-    })
-
-    // Sync checkin to server (fire-and-forget — local state is source of truth for UI)
-    if (token && token !== 'demo-token') {
-      fetch(`${API_BASE}/checkin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          waterGlasses: water,
-          skincareAm,
-          skincarePm,
-          exercisesDone: exerciseDone,
-          moodScore: mood,
-        }),
-      }).catch(() => { /* offline — streak syncs on next login */ })
-    }
+    try {
+      if (token && token !== 'demo-token') {
+        const { streak: saved } = await api.checkin.create({
+          waterGlasses: water, skincareAm, skincarePm,
+          exercisesDone: exerciseDone, moodScore: mood,
+        })
+        // Do not apply a response after the user has changed accounts.
+        if (useStore.getState().token !== token) return
+        updateStreak({
+          current: saved.current_streak,
+          longest: saved.longest_streak,
+          lastDate: new Date(saved.last_checkin_date + 'T12:00:00').toDateString(),
+        })
+      } else {
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        const current = streak.lastDate === today ? streak.current
+          : streak.lastDate === yesterday.toDateString() ? streak.current + 1 : 1
+        updateStreak({ current, longest: Math.max(streak.longest, current), lastDate: today })
+      }
+      addCheckin(checkin)
+    } catch {
+      setSaveError(true)
+      setCelebrating(false)
+      return
+    } finally { submitting.current = false }
 
     // Reschedule tomorrow's streak reminder (fire-and-forget)
     scheduleStreakReminder().catch(() => {})
@@ -387,6 +390,7 @@ export default function DailyCheckin() {
 
           {/* Once all 5 are checked, the FlameBurst effect above takes over
               and auto-submits — no manual button needed at that point. */}
+          {saveError && <p role="alert" className="text-sm text-center" style={{ color: TEXT_DIM }}>Check-in was not saved. Please try again.</p>}
           {alreadyDone ? (
             <div className="flex items-center justify-center gap-2 py-4 rounded-2xl border-2 font-heading font-bold text-[15px]" style={{ background: `${GOLD}14`, color: GOLD, borderColor: GOLD, boxShadow: '0 0 18px rgba(198,168,92,0.25), inset 0 0 14px rgba(198,168,92,0.08)', textShadow: GOLD_GLOW }}>
               <CheckCircle2 size={18} style={{ filter: GOLD_ICON_GLOW }} />

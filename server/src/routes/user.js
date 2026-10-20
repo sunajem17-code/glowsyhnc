@@ -102,6 +102,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
   if (sb) {
     // Delete FK-dependent tables first, then the user row
     const sbTables = [
+      'personalized_recommendations',
       'task_completions',
       'daily_checkins',
       'streaks',
@@ -178,6 +179,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
     // Also try direct user_id column in case schema differs
     try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] task_completions by user delete skipped:', err.message) }
     db.prepare('DELETE FROM daily_checkins WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM personalized_recommendations WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM streaks WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM action_plans WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM scans WHERE user_id = ?').run(userId)

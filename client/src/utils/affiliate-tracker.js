@@ -1,3 +1,4 @@
+import { amazonProductUrl } from './amazonAffiliate'
 /**
  * Ascendus Affiliate Tracker
  * Tracks product clicks with UTM attribution and fires to the backend
@@ -12,21 +13,21 @@ export const AFFILIATE_PRODUCTS = {
   cerave_moisturiser: {
     name:     'CeraVe Moisturising Cream',
     category: 'skin',
-    url:      'https://www.amazon.ca/dp/B00TTD9BRC?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B00TTD9BRC'),
     reason:   'Your skin score is one of the fastest metrics to move. CeraVe restores your moisture barrier in 2 weeks — clearer, smoother skin directly raises your Ascendus skin pillar score.',
     icon:     '🧴',
   },
   vitamin_c_serum: {
     name:     'TruSkin Vitamin C Serum',
     category: 'skin',
-    url:      'https://www.amazon.ca/dp/B01M0LXRGE?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B01M0LXRGE'),
     reason:   'Uneven skin tone and dullness are two of the biggest skin score killers. Vitamin C serum visibly brightens and evens your complexion in 4–6 weeks — expect a measurable score jump on your next rescan.',
     icon:     '✨',
   },
   sunscreen_spf50: {
     name:     'EltaMD UV Clear SPF 46',
     category: 'skin',
-    url:      'https://www.amazon.ca/dp/B002MSN3QQ?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B002MSN3QQ'),
     reason:   'UV damage is the #1 cause of skin score decline over time. One daily application of SPF 46 stops future damage and lets your current routine actually work — the single highest ROI skincare purchase you can make.',
     icon:     '☀️',
   },
@@ -34,14 +35,14 @@ export const AFFILIATE_PRODUCTS = {
   mastic_gum: {
     name:     'FALIM Mastic Gum (100 pcs)',
     category: 'jawline',
-    url:      'https://www.amazon.ca/dp/B00BTHZNBQ?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B00BTHZNBQ'),
     reason:   'Jaw definition is a direct input into your Angularity pillar score. FALIM is 10x harder than regular gum — 20 minutes daily builds the masseter muscle. Most users see visible jaw definition within 8 weeks.',
     icon:     '🦷',
   },
   jawliner_gum: {
     name:     'Jawliner Chewing Gum',
     category: 'jawline',
-    url:      'https://www.amazon.ca/dp/B08NJFNMJM?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B08NJFNMJM'),
     reason:   'Engineered specifically for jaw training — 3 resistance levels mean you progress as you get stronger. Pairs directly with your 12-week plan to push your Angularity score higher faster than diet or gym work alone.',
     icon:     '💪',
   },
@@ -49,21 +50,21 @@ export const AFFILIATE_PRODUCTS = {
   minoxidil_beard: {
     name:     'Kirkland 5% Minoxidil (6-month)',
     category: 'grooming',
-    url:      'https://www.amazon.ca/dp/B001W6LQMY?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B001W6LQMY'),
     reason:   'A full beard dramatically improves your Dimorphism and Grooming scores by adding facial masculinity and framing your jaw. Minoxidil is the only clinically proven method — results appear in 3–4 months. This 6-month supply completes a full growth cycle.',
     icon:     '🧔',
   },
   derma_roller: {
     name:     'Derma Roller 0.5mm',
     category: 'grooming',
-    url:      'https://www.amazon.ca/dp/B00QIUQHCY?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B00QIUQHCY'),
     reason:   'Microneedling triggers collagen production and doubles minoxidil absorption when used together. Used weekly it also visibly tightens skin texture — two direct inputs into your skin and grooming scores simultaneously.',
     icon:     '🔬',
   },
   brow_gel: {
     name:     'Boy Brow Grooming Pomade',
     category: 'grooming',
-    url:      'https://www.amazon.ca/dp/B073XZGC3M?tag=ascendusapp05-20',
+    url:      amazonProductUrl('B073XZGC3M'),
     reason:   'Brow thickness and definition are among the most heavily weighted grooming metrics in your Ascendus scan. Structured brows frame the orbital area and lift your perceived facial harmony score — highest visual impact per dollar of any grooming product.',
     icon:     '🖤',
   },

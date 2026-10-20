@@ -16,6 +16,7 @@ import ShareCardModal from '../components/ShareCardModal'
 import DevRankCard from '../components/DevRankCard'
 import ProLock from '../components/ProLock'
 import PaywallModal from '../components/PaywallModal'
+import { amazonSearchUrl } from '../utils/amazonAffiliate'
 import { GOLD_GRADIENT } from '../utils/theme'
 
 // ─── Tier color map ───────────────────────────────────────────────────────────
@@ -317,6 +318,9 @@ export default function Results() {
   const [showShareCard,    setShowShareCard]     = useState(false)
   const [showPaywall,      setShowPaywall]       = useState(false)
   const [hairOpen,         setHairOpen]          = useState(false)
+  const [personalized, setPersonalized] = useState(null)
+  const [recommendationError, setRecommendationError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const [products,         setProducts]          = useState([])
   const [productsLoading,  setProductsLoading]   = useState(false)
   const [productsFetched,  setProductsFetched]   = useState(false)
@@ -357,24 +361,35 @@ export default function Results() {
     return () => clearTimeout(t)
   }, [isPremium, isNewScan, revealDone])
 
-  // Products fetch — must be above the early return to satisfy Rules of Hooks
+  // Scope requests to the signed-in account and scan; ignore late responses.
   useEffect(() => {
-    if (!currentScan || activeTab !== 'products' || productsFetched || !isPremium) return
+    setProducts([])
+    setPersonalized(null)
+    setProductsFetched(false)
+    setRecommendationError(false)
+    setProductsLoading(false)
+    if (!currentScan || !user?.id || !isPremium) return
+    let cancelled = false
     const { faceData: fd, aiScore: ai, pillars: sp, gender: g } = currentScan
     const observationToIssue = { visible_acne: 'acne', visible_scarring: 'scarring', visible_oiliness: 'oiliness', visible_dark_circles: 'dark_circles', visible_dullness: 'dullness' }
-    const issues = (ai?.visualObservations ?? []).map(observation => observationToIssue[observation.id]).filter(Boolean)
     setProductsLoading(true)
     api.products.recommendations({
-      weaknesses:    ai?.keyWeaknesses ?? [],
-      skinIssues:    issues,
+      scanId: currentScan.id ?? currentScan.analyzedAt ?? null,
+      weaknesses: ai?.keyWeaknesses ?? [],
+      skinIssues: (ai?.visualObservations ?? []).map(o => observationToIssue[o.id]).filter(Boolean),
+      skinScore: fd?.skinClarity ?? null,
       groomingScore: ai?.groomingScore ?? null,
-      pillars:       sp ?? ai?.pillars ?? null,
-      gender:        g,
-    }).then(({ products: recs }) => { setProducts(recs || []); setProductsFetched(true) })
-      .catch(() => { setProducts([]); setProductsFetched(true) })
-      .finally(() => setProductsLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, productsFetched, isPremium, currentScan])
+      pillars: sp ?? ai?.pillars ?? {},
+      gender: g ?? 'male',
+    }).then(data => {
+      if (cancelled) return
+      setPersonalized(data)
+      setProducts(data.products || [])
+      setProductsFetched(true)
+    }).catch(() => { if (!cancelled) setRecommendationError(true) })
+      .finally(() => { if (!cancelled) setProductsLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.id, isPremium, currentScan, retry])
 
   if (!currentScan) {
     return (
@@ -415,32 +430,8 @@ export default function Results() {
   const skinIsClear   = skinScore != null && skinScore >= 7.5
   const skinPotential = skinScore != null ? Math.min(10, skinScore + (skinScore < 5 ? 2.5 : skinScore < 7 ? 1.8 : 1.2)).toFixed(1) : null
 
-  const skinAMRoutine = skinIsClear ? [
-    'Gentle cleanser (CeraVe Hydrating or La Roche-Posay Toleriane)',
-    'Vitamin C serum 10–15%',
-    'Lightweight moisturizer',
-    'SPF 50 (non-negotiable)',
-  ] : [
-    'Gentle cleanser (CeraVe or La Roche-Posay)',
-    skinIssues.includes('scarring')     ? 'Vitamin C serum 15%'  : null,
-    skinIssues.includes('oiliness')     ? 'Niacinamide 10%'      : null,
-    skinIssues.includes('dark_circles') ? 'Caffeine eye cream'   : null,
-    'Lightweight moisturizer',
-    'SPF 50 (non-negotiable)',
-  ].filter(Boolean)
-
-  const skinPMRoutine = skinIsClear ? [
-    'Gentle cleanser',
-    'Retinol 0.025–0.05% 2×/week',
-    'Peptide moisturizer',
-  ] : [
-    'Gentle cleanser',
-    skinIssues.includes('acne')     ? 'Benzoyl Peroxide 2.5%'        : null,
-    skinIssues.includes('dullness') ? 'AHA/glycolic acid 2–3×/week'  : null,
-    skinIssues.includes('scarring') ? 'Retinol 0.3% (start 1×/week)' : null,
-    skinIssues.includes('oiliness') ? 'Niacinamide 10%'              : null,
-    'Moisturizer',
-  ].filter(Boolean)
+  const skinAMRoutine = personalized?.routine?.am ?? []
+  const skinPMRoutine = personalized?.routine?.pm ?? []
 
   // Pillar defs
   const mascFemLabel = gender === 'female' ? 'Femininity' : 'Dimorphism'
@@ -451,7 +442,6 @@ export default function Results() {
     { key: 'dimorphism', label: mascFemLabel,  detail: gender === 'female' ? 'Soft features · Femininity' : 'Jaw strength · Hunter eyes' },
   ]
 
-  function amazonUrl(q) { return `https://www.amazon.com/s?k=${encodeURIComponent(q)}` }
 
   // ── Percentile label ──────────────────────────────────────────────────────
   const pctLabel = glowScore == null ? null
@@ -996,6 +986,8 @@ export default function Results() {
               )
             })}
 
+            {productsLoading && <p className="text-[10px] text-secondary font-body">Loading your saved routine…</p>}
+            {recommendationError && <button onClick={() => setRetry(n => n + 1)} className="text-xs text-secondary">Could not load your routine. Tap to retry.</button>}
             {/* AM/PM routine */}
             <div className="grid grid-cols-2 gap-2">
               <div className="p-3 rounded-xl" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
@@ -1054,7 +1046,11 @@ export default function Results() {
         <p className="text-[10px] text-secondary font-body mb-4 leading-snug">
           Products matched to your scan · Selected from your improvement areas and skin analysis.
         </p>
+        <p className="text-xs text-secondary font-body mb-4 leading-snug">
+          As an Amazon Associate I earn from qualifying purchases.
+        </p>
 
+        {recommendationError && <button onClick={() => setRetry(n => n + 1)} className="text-xs text-secondary">Could not load recommendations. Tap to retry.</button>}
         {productsLoading && (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
@@ -1082,8 +1078,8 @@ export default function Results() {
 
         {!productsLoading && products.map((product, i) => (
           <motion.a key={i}
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(product.searchQuery || product.name)}`}
-            target="_blank" rel="noopener noreferrer"
+            href={amazonSearchUrl(product.searchQuery || product.name)}
+            target="_blank" rel="sponsored noopener noreferrer"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
             className="flex items-center gap-3 py-3 border-b border-default no-underline active:opacity-70 transition-opacity group">

@@ -1,9 +1,13 @@
 const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const { authMiddleware } = require('../middleware/auth')
-const { verifyToken, resolvePro } = require('../middleware/claudeGate')
+const { requirePro, claudeLimit } = require('../middleware/claudeGate')
 const db = require('../db')
 
+const { getSupabase } = require('../supabase')
+const { normalizeContext, contextKey, validProducts, createPersonalizationStore } = require('../services/personalization')
+const { skincareRoutine } = require('../utils/skincareRoutine')
+const saved = createPersonalizationStore(db, getSupabase)
 const router = express.Router()
 
 // ── Static fallback product database ────────────────────────────────────────
@@ -54,15 +58,31 @@ router.get('/recommended', authMiddleware, (req, res) => {
 //
 // Calls Claude Haiku to generate 3–6 products tailored to the user's specific
 // weak areas. Falls back to the static database if the API is unavailable.
-// Uses verifyToken (accepts demo users) + resolvePro (sets req.isPro).
-router.post('/recommendations', verifyToken, resolvePro, async (req, res) => {
+// JWT account isolation and server-side Pro entitlement apply to saved and new results.
+router.post('/recommendations', authMiddleware, requirePro, claudeLimit, async (req, res) => {
+  let context
+  try { context = normalizeContext(req.body) }
+  catch { return res.status(400).json({ error: 'invalid_context' }) }
+  const key = contextKey(context)
+  try {
+    const existing = await saved.get(req.userId, key)
+    if (existing) return res.json(existing)
+  } catch { return res.status(503).json({ error: 'personalization_unavailable' }) }
+  const routine = skincareRoutine(context.skinIssues, context.skinScore)
+  async function respond(products, source) {
+    try {
+      const result = await saved.save(req.userId, key, { products, routine, source })
+      return res.json(result)
+    } catch { return res.status(503).json({ error: 'personalization_save_failed' }) }
+  }
+
   const {
     weaknesses   = [],
     skinIssues   = [],
     groomingScore,
     pillars      = {},
     gender       = 'male',
-  } = req.body
+  } = context
 
   // ── Build context string for the prompt ───────────────────────────────────
   const weaknessList   = weaknesses.length  > 0 ? weaknesses.join(', ')  : 'none listed'
@@ -119,9 +139,9 @@ Rules:
       const jsonMatch = raw.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         const products = JSON.parse(jsonMatch[0])
-        if (Array.isArray(products) && products.length > 0) {
+        if (validProducts(products)) {
           console.log('[products] Haiku generated', products.length, 'recommendations')
-          return res.json({ products, source: 'ai' })
+          return await respond(products.map(({ name, description, searchQuery }) => ({ name, description, searchQuery })), 'ai')
         }
       }
       console.warn('[products] Haiku response could not be parsed as JSON array — falling back')
@@ -144,10 +164,7 @@ Rules:
     .slice(0, 5)
     .map(({ id, tags: _t, ...p }) => p)
 
-  res.json({
-    products: fallback.length >= 2 ? fallback : PRODUCTS.slice(0, 5).map(({ id, tags: _t, ...p }) => p),
-    source: 'fallback',
-  })
+  return respond(fallback.length >= 2 ? fallback : PRODUCTS.slice(0, 5).map(({ id, tags: _t, ...p }) => p), 'fallback')
 })
 
 module.exports = router

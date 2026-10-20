@@ -1,43 +1,43 @@
 const express = require('express')
-const { v4: uuid } = require('uuid')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
-
+const { getSupabase } = require('../supabase')
+const { createLimiter } = require('../middleware/ratelimit')
+const { checkinValues, saveLocalCheckin } = require('../services/checkin')
 const router = express.Router()
-
-router.post('/', authMiddleware, (req, res) => {
-  const { waterGlasses, skincareAm, skincarePm, exercisesDone, moodScore } = req.body
-  const today = new Date().toISOString().split('T')[0]
-
+const limit = createLimiter('checkin', 120, '1 h', 3600000)
+async function checkinLimit(req, res, next) {
+  if (!await limit(req.userId)) return res.status(429).json({ error: 'rate_limited' })
+  next()
+}
+router.post('/', authMiddleware, checkinLimit, async (req, res) => {
+  let values
+  try { values = checkinValues(req.body) }
+  catch { return res.status(400).json({ error: 'invalid_checkin' }) }
   try {
-    const id = uuid()
-    db.prepare(`INSERT OR REPLACE INTO daily_checkins
-      (id, user_id, checkin_date, water_glasses, skincare_am, skincare_pm, exercises_done, mood_score)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, req.userId, today, waterGlasses ?? 0, skincareAm ? 1 : 0, skincarePm ? 1 : 0, exercisesDone ? 1 : 0, moodScore ?? 0)
-
-    // Update streak
-    const streakRow = db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.userId)
-    if (streakRow) {
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yStr = yesterday.toISOString().split('T')[0]
-      const isConsecutive = streakRow.last_checkin_date === yStr
-      const newCurrent = isConsecutive ? streakRow.current_streak + 1 : 1
-      const newLongest = Math.max(streakRow.longest_streak, newCurrent)
-      db.prepare('UPDATE streaks SET current_streak = ?, longest_streak = ?, last_checkin_date = ? WHERE user_id = ?')
-        .run(newCurrent, newLongest, today, req.userId)
+    const sb = getSupabase()
+    let streak
+    if (sb) {
+      const { data, error } = await sb.rpc('record_daily_checkin', {
+        p_user_id: req.userId, p_water: values.water, p_mood: values.mood,
+        p_am: values.am, p_pm: values.pm, p_exercises: values.exercises,
+      })
+      if (error) throw error
+      streak = data
+    } else streak = saveLocalCheckin(db, req.userId, values)
+    res.json({ success: true, streak })
+  } catch { res.status(503).json({ error: 'checkin_unavailable' }) }
+})
+router.get('/history', authMiddleware, checkinLimit, async (req, res) => {
+  try {
+    const sb = getSupabase()
+    if (sb) {
+      const { data, error } = await sb.from('daily_checkins').select('*').eq('user_id', req.userId).order('checkin_date', { ascending: false }).limit(30)
+      if (error) throw error
+      return res.json({ checkins: data })
     }
-
-    res.json({ success: true })
-  } catch (err) {
-    res.status(500).json({ error: 'internal_error' })
-  }
+    const checkins = db.prepare('SELECT * FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 30').all(req.userId)
+    res.json({ checkins })
+  } catch { res.status(503).json({ error: 'checkin_unavailable' }) }
 })
-
-router.get('/history', authMiddleware, (req, res) => {
-  const checkins = db.prepare('SELECT * FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 30').all(req.userId)
-  res.json({ checkins })
-})
-
 module.exports = router
