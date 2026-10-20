@@ -16,6 +16,7 @@ import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
 import { useDeleteAccount } from '../utils/useDeleteAccount'
 import { isDeveloperRefreshAvailable, getDeveloperRefreshState } from '../utils/developerRefresh'
+import { isLocalDeveloperPreview } from '../utils/developerUnlock'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout, setIsPremium,
+    user, isGuest, isPremium, logout, setIsPremium, isLocalProPreview, setLocalProPreview,
     theme, toggleTheme,
     units, setUnits,
     clearAllScanData,
@@ -408,16 +409,24 @@ export default function Settings() {
           />
           <SettingsRow
             icon={Crown}
-            label={isPremium ? 'Ascendus Premium' : 'Free Plan'}
-            value={isPremium ? 'Tap to manage or cancel' : 'Tap to upgrade'}
-            onPress={handleManageSubscription}
+            label={isLocalProPreview ? 'Local Pro Preview' : isPremium ? 'Ascendus Premium' : 'Free Plan'}
+            value={isLocalProPreview ? 'Pro screens previewed on this development device' : isPremium ? 'Tap to manage or cancel' : 'Tap to upgrade'}
+            onPress={isLocalProPreview ? undefined : handleManageSubscription}
             rightElement={
-              isPremium
+              isLocalProPreview
+                ? <span className="font-heading font-bold text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>LOCAL PREVIEW</span>
+                : isPremium
                 ? <span className="font-heading font-bold text-[11px] px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>✦ PREMIUM</span>
                 : <ChevronRight size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             }
           />
+          {isLocalDeveloperPreview() && <SettingsRow
+            icon={Crown}
+            label="Local Pro Preview"
+            value="Unlock Pro screens on this development device only"
+            rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
+          />}
         </div>
 
         {/* ── Preferences ── */}

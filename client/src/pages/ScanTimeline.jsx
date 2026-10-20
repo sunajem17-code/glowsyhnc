@@ -13,6 +13,7 @@ import { ScanHistoryContent } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
 import { hasPremiumUiAccess } from '../utils/developerUnlock'
 import StreakFlame from '../components/StreakFlame'
+import { loadScanMedia } from '../utils/scanPhotoDb'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
@@ -109,10 +110,16 @@ export default function ScanTimeline() {
     ? (getProgressScore(latestScan, progressMode, 'overall') - getProgressScore(firstScan, progressMode, 'overall')).toFixed(1) : null
   const improvementNum = improvement !== null ? parseFloat(improvement) : null
 
-  function viewHistoryScan(entry) {
+  async function viewHistoryScan(entry) {
     const saved = currentScan?.id === entry.id ? currentScan
       : scans.find(scan => scan.id === entry.id || scan.serverScanId === entry.id)
-    setCurrentScan(saved || normalizeHistoryScan(entry))
+    const selected = saved || normalizeHistoryScan(entry)
+    const media = selected?.id ? await loadScanMedia(selected.id) : null
+    setCurrentScan({ ...selected, facePhotoUrl: selected.facePhotoUrl || media?.photo || null })
+    if (isPhysiqueProgressScan(entry)) {
+      navigate('/physique-results', { state: { source: 'progress-card', returnTo: '/timeline' } })
+      return
+    }
     navigate('/unlock', { state: { source: 'progress-card', returnTo: '/timeline' } })
   }
 

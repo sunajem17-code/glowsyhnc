@@ -3170,6 +3170,11 @@ export default function PremiumOnboarding() {
       setPendingFacePhoto(scanRecord.facePhotoUrl)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
+      if (scanRecord.facePhotoUrl) {
+        import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+          saveScanMedia(scanRecord.id, { photo: scanRecord.facePhotoUrl })
+        ).catch(err => console.warn('[OnboardingScan] Could not persist scan photo:', err?.message))
+      }
       setAssignedPhase(phase)
 
       // Fire-and-forget: MediaPipe landmark extraction for FaceMetricsExplorer

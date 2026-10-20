@@ -1973,6 +1973,12 @@ export default function PhysiqueScan() {
         bodyPhotoUrl:         faceB64,
       }
 
+      // Keep each physique photo keyed to its own score record. The local
+      // Zustand history intentionally strips large data URLs on persistence.
+      import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+        saveScanMedia(scanRecord.id, { photo: faceB64 })
+      ).catch(err => console.warn('[PhysiqueScan] Could not persist scan photo:', err?.message))
+
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
       const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, assignedPh, g)
       setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
@@ -2019,50 +2025,9 @@ export default function PhysiqueScan() {
           })
       }
 
-      // Persist to Supabase (non-blocking). Upload the real scan photo to
-      // Supabase Storage first (private 'scan-images' bucket, already wired
-      // up server-side but never actually called until now) so the scan
-      // row's face_image_url is a real storage path, not empty — this is
-      // what powers Scan History thumbnails / Before-After on the Progress
-      // page across app restarts, instead of relying on localStorage (which
-      // deliberately strips photo data URLs to avoid a quota crash).
-      // For a Live-Face-Scan-only capture (no separate static photo taken),
-      // faceB64 is null but the AR capture's own photo is still available
-      // via lastFaceScanImage — fall back to that so ARKit-only scans still
-      // get a real thumbnail.
-      ;(async () => {
-        let faceImageUrl = null
-        const photoForUpload = faceB64
-        if (photoForUpload) {
-          try {
-            const commaIdx = photoForUpload.indexOf(',')
-            const header = commaIdx >= 0 ? photoForUpload.slice(0, commaIdx) : ''
-            const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
-            const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
-            const uploadResult = await api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' })
-            faceImageUrl = uploadResult?.path || null
-          } catch (err) {
-            console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
-          }
-        }
-
-        api.supabase.saveScan({
-          overallScore:     aiResult.overallScore,
-          tier:             aiResult.tier,
-          faceScore:        aiResult.faceScore,
-          groomingScore:    aiResult.groomingScore,
-          harmony:          aiResult.pillars?.harmony,
-          angularity:       aiResult.pillars?.angularity,
-          features:         aiResult.pillars?.features,
-          dimorphism:       aiResult.pillars?.dimorphism,
-          hairTypeDetected: aiResult.hairType,
-          faceShape:        aiResult.facialStructure,
-          faceImageUrl,
-          gender:           g,
-          assignedPhase:    assignedPh?.toLowerCase(),
-          tasks,
-        }).catch(() => {})
-      })()
+      // Physique scorecards and their photos are stored locally per scan. The
+      // face-only cloud route cannot represent physique metrics, so avoid
+      // creating a misleading face-only history row here.
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()

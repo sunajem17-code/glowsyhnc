@@ -1876,8 +1876,10 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
   const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
   const completedDemoScan = completeDemoRevealRatings(currentScan)
   const displayedScan = pendingScan ? null : completedDemoScan
+  // A saved history row must only ever show its own photo. Falling back to the
+  // pending upload here made old cards inherit the newest scan's image.
   const revealScan = completedDemoScan
-    ? { ...completedDemoScan, facePhotoUrl: completedDemoScan.facePhotoUrl || pendingFacePhoto }
+    ? { ...completedDemoScan, facePhotoUrl: completedDemoScan.facePhotoUrl || null }
     : pendingFacePhoto
       ? { facePhotoUrl: pendingFacePhoto }
       : null
@@ -2021,7 +2023,7 @@ export default function ScanUnlockGate({ directPaywall = false, embeddedReveal =
         <LockedRevealScreen scan={revealScan} unlocked savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
       ) : (
         <LockedRevealScreen
-          scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || pendingFacePhoto } : revealScan}
+          scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}
           savedProgressCard={Boolean(progressCardReturnTo)}
           onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })}
           referralCode={referralCode}

@@ -44,7 +44,9 @@ export function mergeProgressHistory(remoteScans, localScans, currentScan) {
     if (!Number.isFinite(overall)) continue
     const date = scan.scanDate ?? scan.analyzedAt
     const match = rows.find(row => row.id === scan.id || row.id === scan.serverScanId || (
-      Number(row.overall_score) === overall && Math.abs(Date.parse(row.created_at) - Date.parse(date)) < 60000
+      isPhysiqueProgressScan(row) === isPhysiqueProgressScan(scan)
+      && Number(row.overall_score) === overall
+      && Math.abs(Date.parse(row.created_at) - Date.parse(date)) < 60000
     ))
     if (match) continue
     rows.push({
@@ -57,9 +59,11 @@ export function mergeProgressHistory(remoteScans, localScans, currentScan) {
       grooming_score: scan.aiScore?.groomingScore,
       physiqueScore: scan.physiqueScore ?? scan.aiScore?.physiqueScore ?? null,
       aiScore: scan.aiScore ?? null,
+      facePhotoUrl: scan.facePhotoUrl ?? scan.bodyPhotoUrl ?? scan.face_photo_url ?? scan.body_photo_url ?? null,
       faceSubScores: scan.aiScore?.faceSubScores ?? null,
       faceData: scan.faceData ?? null,
-      face_image_url: scan.facePhotoUrl || null,
+      face_image_url: scan.facePhotoUrl ?? scan.bodyPhotoUrl ?? scan.face_photo_url ?? scan.body_photo_url ?? null,
+      body_image_url: scan.bodyPhotoUrl ?? scan.body_photo_url ?? scan.facePhotoUrl ?? null,
       tier: scan.tier,
     })
   }

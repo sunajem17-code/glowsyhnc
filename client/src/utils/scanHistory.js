@@ -31,7 +31,7 @@ export function normalizeHistoryScan(scan) {
     faceData: parseField(scan.faceData ?? scan.face_data, null),
     bodyData: parseField(scan.bodyData ?? scan.body_data, null),
     insights: parseField(scan.insights, []),
-    facePhotoUrl: scan.facePhotoUrl || scan.face_photo_url || scan.face_image_url || null,
+    facePhotoUrl: scan.facePhotoUrl || scan.face_photo_url || scan.face_image_url || scan.bodyPhotoUrl || scan.body_photo_url || scan.body_image_url || null,
     analyzedAt: scan.analyzedAt || scan.analyzed_at || scan.scanDate || scan.scan_date || scan.created_at,
     tier: scan.tier ?? scan.aiScore?.tier ?? parseField(scan.faceData ?? scan.face_data, null)?.tier ?? null,
   }

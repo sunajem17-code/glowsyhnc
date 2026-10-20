@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, ChevronRight } from 'lucide-react'
 import { triggerHaptic } from '../utils/haptics'
 import { BACKEND_ORIGIN } from '../utils/backend'
 import { getHistoryScoreColor } from '../utils/scanHistory'
+import { loadScanMedia } from '../utils/scanPhotoDb'
 
 function thumbnail(url) {
   if (!url) return null
@@ -17,7 +19,16 @@ function fmt(dateStr) {
 
 // ── Single scan row ───────────────────────────────────────────────────────────
 export default function ScanHistoryRow({ scan, onTap, index }) {
-  const thumb = thumbnail(scan.facePhotoUrl || scan.face_photo_url)
+  const [storedPhoto, setStoredPhoto] = useState(null)
+  const directPhoto = scan.facePhotoUrl || scan.face_photo_url || scan.face_image_url || scan.bodyPhotoUrl || scan.body_photo_url || scan.body_image_url
+  useEffect(() => {
+    let active = true
+    if (!directPhoto && scan.id) {
+      loadScanMedia(scan.id).then(media => { if (active) setStoredPhoto(media?.photo ?? null) })
+    }
+    return () => { active = false }
+  }, [scan.id, directPhoto])
+  const thumb = thumbnail(directPhoto || storedPhoto)
   const date = fmt(scan.analyzedAt || scan.scan_date)
   const score = scan.glowScore != null
     ? (typeof scan.glowScore === 'number' ? scan.glowScore : parseFloat(scan.glowScore))

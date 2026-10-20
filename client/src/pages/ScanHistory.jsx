@@ -12,7 +12,8 @@ import { triggerHaptic } from '../utils/haptics'
 import ScanHistoryRow from '../components/ScanHistoryRow'
 import { mergeScanHistory } from '../utils/scanHistory'
 import { hasPremiumUiAccess } from '../utils/developerUnlock'
-import { getProgressScore } from '../utils/progressHistory'
+import { getProgressScore, isPhysiqueProgressScan } from '../utils/progressHistory'
+import { loadScanMedia } from '../utils/scanPhotoDb'
 
 function fmt(dateStr) {
   if (!dateStr) return ''
@@ -156,9 +157,10 @@ export default function ScanHistory() {
     return () => { cancelled = true }
   }, [canAccessProUi, token])
 
-  function viewScan(scan) {
-    setCurrentScan(scan)
-    navigate('/unlock')
+  async function viewScan(scan) {
+    const media = scan?.id ? await loadScanMedia(scan.id) : null
+    setCurrentScan({ ...scan, facePhotoUrl: scan.facePhotoUrl || media?.photo || null })
+    navigate(isPhysiqueProgressScan(scan) ? '/physique-results' : '/unlock')
   }
 
   return (

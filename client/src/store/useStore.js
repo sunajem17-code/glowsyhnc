@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
 import { checkAchievements } from '../utils/achievements'
+import { isLocalDeveloperPreview } from '../utils/developerUnlock'
 
 const useStore = create(
   persist(
@@ -14,6 +15,26 @@ const useStore = create(
       token: null,
       isAuthenticated: false,
       isGuest: false,
+      isLocalProPreview: false,
+      isLocalProPreviewConfigured: false,
+      _premiumBeforeLocalPreview: false,
+      setLocalProPreview: (enabled) => set(state => {
+        if (enabled && !isLocalDeveloperPreview()) return state
+        if (enabled) {
+          return {
+            isLocalProPreview: true,
+            isLocalProPreviewConfigured: true,
+            _premiumBeforeLocalPreview: state.isLocalProPreview ? state._premiumBeforeLocalPreview : state.isPremium,
+            isPremium: true,
+          }
+        }
+        return {
+          isLocalProPreview: false,
+          isLocalProPreviewConfigured: true,
+          isPremium: state._premiumBeforeLocalPreview,
+          _premiumBeforeLocalPreview: false,
+        }
+      }),
 
       setAuth: (user, token) => set({
         user,
@@ -24,7 +45,7 @@ const useStore = create(
         developerPreviewUnlocked: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
         // while the async RevenueCat / server check completes.
-        isPremium:
+        isPremium: (get().isLocalProPreview && isLocalDeveloperPreview()) ||
           user?.subscriptionTier === 'premium' ||
           user?.subscription_tier === 'premium' ||
           user?.is_pro === true ||
@@ -36,8 +57,8 @@ const useStore = create(
         upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: true,
-        isPremium: false,
         developerPreviewUnlocked: false,
+        isPremium: get().isLocalProPreview && isLocalDeveloperPreview(),
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
@@ -60,6 +81,8 @@ const useStore = create(
           todayCheckin: null,
           streak: { current: 0, longest: 0, lastDate: null },
           isPremium: false,
+          isLocalProPreview: false,
+          _premiumBeforeLocalPreview: false,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
           hairProfile: null,
@@ -285,7 +308,7 @@ const useStore = create(
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              set({ isPremium: isPro })
+              set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPro }))
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
@@ -303,7 +326,7 @@ const useStore = create(
           // just as trustworthy as an explicit true and should actually apply.
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
-            set({ isPremium })
+            set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPremium }))
           }
 
           // /user/profile is different — it's a general profile hydration
@@ -320,6 +343,7 @@ const useStore = create(
             set(state => ({
               user: { ...state.user, ...fresh },
               isPremium:
+                (state.isLocalProPreview && isLocalDeveloperPreview()) ||
                 fresh?.subscriptionTier === 'premium' ||
                 fresh?.subscription_tier === 'premium' ||
                 fresh?.is_pro === true ||
@@ -386,6 +410,28 @@ const useStore = create(
     }),
     {
       name: 'ascendus-storage',
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...persistedState }
+        // First local-dev launch gets the requested preview automatically;
+        // after that, the Settings toggle's saved choice is respected.
+        if (isLocalDeveloperPreview() && !merged.isLocalProPreviewConfigured) {
+          merged.isLocalProPreview = true
+          merged._premiumBeforeLocalPreview = Boolean(merged.isPremium)
+          merged.isPremium = true
+        }
+        // Never let a development preview carry over as premium access in a
+        // production build that happens to reuse this local storage.
+        if (!isLocalDeveloperPreview() && merged.isLocalProPreview) {
+          merged.isLocalProPreview = false
+          merged.isPremium = merged._premiumBeforeLocalPreview ?? Boolean(
+            merged.user?.subscriptionTier === 'premium' ||
+            merged.user?.subscription_tier === 'premium' ||
+            merged.user?.is_pro === true
+          )
+          merged._premiumBeforeLocalPreview = false
+        }
+        return merged
+      },
       // Normalize any glowScore stored in the old 0-100 scale back to 0-10
       onRehydrateStorage: () => (state) => {
         if (!state) return
@@ -422,6 +468,9 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
+        isLocalProPreview: isLocalDeveloperPreview() && state.isLocalProPreview,
+        isLocalProPreviewConfigured: isLocalDeveloperPreview() && state.isLocalProPreviewConfigured,
+        _premiumBeforeLocalPreview: isLocalDeveloperPreview() ? state._premiumBeforeLocalPreview : false,
         upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,

@@ -2363,6 +2363,11 @@ export default function Scan() {
       if (faceB64) setPendingFacePhoto(faceB64)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
+      if (faceB64) {
+        import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+          saveScanMedia(scanRecord.id, { photo: faceB64 })
+        ).catch(err => console.warn('[Scan] Could not persist scan photo:', err?.message))
+      }
       setScanReady(true)
       setAssignedPhase(assignedPh)
       recordProScan()

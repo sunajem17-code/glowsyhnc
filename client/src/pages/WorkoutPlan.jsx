@@ -373,12 +373,17 @@ export default function WorkoutPlan() {
   const navigate       = useNavigate()
   const currentScan    = useStore(s => s.currentScan)
   const setCurrentScan = useStore(s => s.setCurrentScan)
+  const scans           = useStore(s => s.scans)
   const gender         = useStore(s => s.gender) ?? currentScan?.gender ?? 'male'
   const isPremium      = useStore(s => s.isPremium)
   const userProfile    = useStore(s => s.userProfile)
   const setUserProfile = useStore(s => s.setUserProfile)
 
-  const physiqueScores = currentScan?.physiqueScore
+  const latestPhysiqueScan = [...scans, ...(currentScan?.scanType === 'physique' ? [currentScan] : [])]
+    .filter(scan => scan?.scanType === 'physique' && scan?.physiqueScore)
+    .sort((a, b) => (Date.parse(b.scanDate ?? b.analyzedAt) || 0) - (Date.parse(a.scanDate ?? a.analyzedAt) || 0))[0]
+  const physiqueSourceScan = latestPhysiqueScan ?? (currentScan?.physiqueScore ? currentScan : null)
+  const physiqueScores = physiqueSourceScan?.physiqueScore
 
   // ── Body stats (height/weight) — collected here instead of onboarding, so
   // they're gathered when actually needed (training-phase calculation) rather
@@ -462,6 +467,7 @@ export default function WorkoutPlan() {
     setCurrentScan({
       id: currentScan?.id ?? `scan-${Date.now()}`,
       scanDate: currentScan?.scanDate ?? new Date().toISOString(),
+      ...physiqueSourceScan,
       ...currentScan,
       gender,
       physiqueScore,
@@ -527,7 +533,7 @@ export default function WorkoutPlan() {
   // "Plan active · <split>" without needing this page open.
   useEffect(() => {
     if (plan?.split && currentScan?.trainingSplit !== plan.split) {
-      setCurrentScan({ ...currentScan, trainingSplit: plan.split })
+      setCurrentScan({ ...physiqueSourceScan, ...currentScan, physiqueScore: physiqueScores, trainingSplit: plan.split })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan])
