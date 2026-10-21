@@ -100,7 +100,9 @@ export async function initFaceMesh() {
     // ── Step 3: setOptions ─────────────────────────────────────────────────────
     try {
       mesh.setOptions({
-        maxNumFaces: 1,
+        // Two is enough to reject an accidental second person during local
+        // photo validation; geometry consumers continue using the first face.
+        maxNumFaces: 2,
         refineLandmarks: false,
         minDetectionConfidence: 0.4,
         minTrackingConfidence: 0.4,
@@ -174,8 +176,18 @@ export function getLandmarks(imageUrl) {
   landmarkQueue = next.catch(() => {})
   return next
 }
-async function detectLandmarks(imageUrl) {
+
+export function getFaceCount(imageUrl) {
+  const task = landmarkQueue.then(() => detectLandmarks(imageUrl, { faceCountOnly: true }))
+  landmarkQueue = task.catch(() => {})
+  return task
+}
+
+async function detectLandmarks(imageUrl, { faceCountOnly = false } = {}) {
   const mesh = await initFaceMesh()
+  // Each request is an independent still photo, not the next video frame.
+  // Discard the prior face ROI before locating this photo's face boundary.
+  await mesh.reset()
 
   return new Promise((resolve, reject) => {
     // First real scan: WASM already loaded, should be fast (~500ms)
@@ -186,7 +198,12 @@ async function detectLandmarks(imageUrl) {
 
     mesh.onResults((results) => {
       clearTimeout(timeout)
-      const lm = results.multiFaceLandmarks?.[0]
+      const faces = results.multiFaceLandmarks || []
+      if (faceCountOnly) {
+        resolve(Math.min(faces.length, 2))
+        return
+      }
+      const lm = faces[0]
       if (!lm || lm.length < 468) {
         reject(new Error('No face detected. Ensure the photo shows a clear front-facing face'))
         return

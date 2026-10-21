@@ -41,7 +41,7 @@ function TypingIndicator() {
         className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
       >
-        <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
+        <img src="/adonis-coach-gold.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div
         className="px-4 py-3 rounded-2xl rounded-bl-sm"
@@ -95,7 +95,7 @@ function MessageBubble({ msg, isNew }) {
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
           style={{ background: 'rgba(198,168,92,0.15)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
+          <img src="/adonis-coach-gold.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
         </div>
       )}
       <div
@@ -142,6 +142,10 @@ const FREE_COACH_LIMIT = 3
 export default function AICoach() {
   const navigate = useNavigate()
   const { scans, isPremium, userProfile } = useStore()
+  const freeCoachMessages = useStore(s => s.freeCoachMessages)
+  const incrementFreeCoachMessages = useStore(s => s.incrementFreeCoachMessages)
+  const freeMessagesLeft = Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages || 0))
+  const freeCoachLocked = !isPremium && freeMessagesLeft === 0
   const latestScan = scans[0]
   const scanContext = buildScanContext(latestScan, userProfile)
 
@@ -230,7 +234,7 @@ export default function AICoach() {
             className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
           >
-            <img src="/adonis-mascot.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
+            <img src="/adonis-coach-gold.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
           </div>
           <div>
             <div className="flex items-center gap-2">

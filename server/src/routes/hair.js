@@ -5,25 +5,10 @@ const { withRetry } = require('../utils/withRetry')
 
 const router = express.Router()
 
-const HAIR_CATALOG = [
-  ['textured_crop', ['straight','wavy'], ['low','medium','high'], ['fine','medium','thick'], 'short', 'low', { topHeight:'low', foreheadExposure:'low', sideWidth:'low' }],
-  ['french_crop', ['straight','wavy'], ['low','medium','high'], ['fine','medium','thick'], 'short', 'low', { topHeight:'low', foreheadExposure:'low', sideWidth:'low' }],
-  ['caesar', ['straight','wavy','curly'], ['low','medium','high'], ['fine','medium','thick'], 'short', 'low', { topHeight:'low', foreheadExposure:'low', sideWidth:'medium' }],
-  ['crew_cut', ['straight','wavy'], ['medium','high'], ['medium','thick'], 'short', 'low', { topHeight:'medium', foreheadExposure:'high', sideWidth:'low' }],
-  ['buzz_cut', ['straight','wavy','curly','coily'], ['low','medium','high'], ['fine','medium','thick'], 'short', 'low', { topHeight:'none', foreheadExposure:'high', sideWidth:'low' }],
-  ['low_taper_fringe', ['straight','wavy','curly','coily'], ['low','medium','high'], ['fine','medium','thick'], 'medium', 'medium', { topHeight:'low', foreheadExposure:'low', sideWidth:'medium' }],
-  ['mid_taper_texture', ['straight','wavy','curly'], ['medium','high'], ['medium','thick'], 'medium', 'medium', { topHeight:'medium', foreheadExposure:'medium', sideWidth:'low' }],
-  ['curly_taper', ['curly','coily'], ['medium','high'], ['fine','medium','thick'], 'medium', 'low', { topHeight:'medium', foreheadExposure:'medium', sideWidth:'medium' }],
-  ['curly_fringe', ['curly','coily'], ['medium','high'], ['medium','thick'], 'medium', 'medium', { topHeight:'low', foreheadExposure:'low', sideWidth:'medium' }],
-  ['curtains', ['straight','wavy'], ['medium','high'], ['fine','medium','thick'], 'medium', 'medium', { topHeight:'low', foreheadExposure:'medium', sideWidth:'high' }],
-  ['side_part', ['straight','wavy'], ['low','medium','high'], ['fine','medium','thick'], 'medium', 'medium', { topHeight:'medium', foreheadExposure:'medium', sideWidth:'medium' }],
-  ['messy_fringe', ['straight','wavy','curly'], ['low','medium','high'], ['fine','medium','thick'], 'medium', 'low', { topHeight:'low', foreheadExposure:'low', sideWidth:'medium' }],
-  ['slick_back', ['straight','wavy'], ['medium','high'], ['medium','thick'], 'long', 'high', { topHeight:'medium', foreheadExposure:'high', sideWidth:'low' }],
-  ['quiff', ['straight','wavy'], ['medium','high'], ['medium','thick'], 'medium', 'high', { topHeight:'high', foreheadExposure:'high', sideWidth:'low' }],
-  ['pompadour', ['straight','wavy'], ['medium','high'], ['medium','thick'], 'long', 'high', { topHeight:'high', foreheadExposure:'high', sideWidth:'medium' }],
-  ['modern_mullet', ['straight','wavy','curly'], ['medium','high'], ['medium','thick'], 'long', 'medium', { topHeight:'medium', foreheadExposure:'medium', sideWidth:'low' }],
-  ['flow', ['straight','wavy','curly'], ['medium','high'], ['medium','thick'], 'long', 'medium', { topHeight:'low', foreheadExposure:'medium', sideWidth:'high' }],
-].map(([id, hairTypes, densities, thicknesses, length, maintenance, visualEffects]) => ({ id, hairTypes, densities, thicknesses, length, maintenance, visualEffects }))
+const HAIR_CATALOG = require('../catalog/hairCatalog.json').map(style => ({
+  ...style, hairTypes: style.compatibleHairTypes, densities: style.compatibleDensity,
+  thicknesses: style.compatibleThickness,
+}))
 
 function sanitizeHairProfile(input) {
   const allowed = (value, values, fallback = null) => values.includes(value) ? value : fallback
@@ -93,7 +78,7 @@ router.post('/recommend', verifyToken, claudeLimit, async (req, res) => {
     if (!measurements.length) return res.status(400).json({ error: 'Measured Ascendus scan evidence is required' })
 
     let candidates = eligibleStyles(profile)
-    if (candidates.length < 3) candidates = HAIR_CATALOG.filter(style => style.hairTypes.includes(profile.hairType) && style.densities.includes(profile.density) && style.thicknesses.includes(profile.strandThickness))
+    // Keep length and maintenance preferences even when fewer styles qualify.
     fallback = deterministicRecommendations(candidates, profile, measurements)
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return res.json({ engine: 'deterministic_catalog_fallback_v1', scanId: profile.scanId, recommendations: fallback })

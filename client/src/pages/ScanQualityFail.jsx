@@ -2,10 +2,28 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import MotionPage from '../components/MotionPage'
-import { GOLD_GRADIENT } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const ISSUE_CONTENT = {
+  image_load: {
+    headline: 'Please take a new photo',
+    label: 'This photo is no longer available',
+    desc: 'The saved photo could not be opened. Take a new photo to continue.',
+    tips: ['Return to the camera', 'Take a new front photo', 'Continue without reloading the page'],
+  },
+  insufficient_face_resolution: {
+    headline: 'Your face needs to be a little closer',
+    label: 'Face detected — too small to measure',
+    desc: 'We found your face, but need more detail to measure it reliably.',
+    tips: ['Move closer to the camera', 'Keep your whole face visible', 'Use the original photo rather than a small thumbnail'],
+  },
+  facial_landmark_out_of_frame: {
+    headline: 'Keep your full face in the photo',
+    label: 'Face partly outside the frame',
+    desc: 'Some measurement points are outside the photo.',
+    tips: ['Keep your forehead and chin visible', 'Centre your face', 'Leave a little space around your face'],
+  },
   no_face: {
     headline: "We couldn't find a clear face in this photo",
     label:    'No face detected',
@@ -79,18 +97,36 @@ const ISSUE_CONTENT = {
     tips:     ['Hold your phone at eye level — not above or below', 'Look straight ahead, not up at the ceiling or down at the floor', 'Keep your chin roughly parallel to the ground'],
   },
   validation_error: {
-    headline: 'Could not validate your photo',
-    label:    'Technical error',
-    desc:     'A technical issue prevented us from checking your photo.',
-    tips:     ['Check your internet connection', 'Try again in a moment', 'Retake the photo if the issue continues'],
+    headline: 'Photo check interrupted',
+    label:    'Check not completed',
+    desc:     'We couldn’t complete the photo check. Your photo has not been rejected.',
+    tips:     ['Your photo is kept for retry', 'Try the same photo again in a moment'],
+  },
+  validation_unavailable: {
+    headline: 'Couldn’t reach the photo checker',
+    label:    'Connection interrupted',
+    desc:     'The checker didn’t respond, so your photo was not evaluated or rejected.',
+    tips:     ['Your photo is kept for retry', 'Try the same photo again when the service is reachable'],
+  },
+  validation_session_expired: {
+    headline: 'Sign in to continue',
+    label:    'Session expired',
+    desc:     'Your session needs to be refreshed before we can check your photo.',
+    tips:     ['Sign in again', 'Then return to your scan'],
+  },
+  validation_rate_limited: {
+    headline: 'Please wait before retrying',
+    label:    'Too many photo checks',
+    desc:     'The photo checker has received too many requests. Your photo has not been rejected.',
+    tips:     ['Keep this photo', 'Wait a little before trying again'],
   },
 }
 
 const DEFAULT_CONTENT = {
-  headline: "We couldn't find a clear face in this photo",
-  label:    'No face detected',
-  desc:     "We couldn't verify your photo. Please try again.",
-  tips:     ['Show one clear face', 'Face the camera directly', 'Keep your full face in frame'],
+  headline: 'Could not complete the photo check',
+  label:    'Measurement unavailable',
+  desc:     'The photo check could not finish. This does not mean your face is missing.',
+  tips:     ['Try the photo again', 'Use the original full-size photo', 'Keep your whole face visible'],
 }
 
 export default function ScanQualityFail() {
@@ -105,10 +141,13 @@ export default function ScanQualityFail() {
     .sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3))[0]
 
   const content = ISSUE_CONTENT[topIssue?.code] ?? DEFAULT_CONTENT
-  const canRetryPhoto = topIssue?.code === 'validation_error' && !!photoUrl
+  const isServiceError = topIssue?.code?.startsWith('validation_')
+  const canRetryPhoto = isServiceError && topIssue?.code !== 'validation_session_expired' && !!photoUrl
+  const errorColor = isServiceError ? GOLD : '#EF4444'
 
   async function tryAgain() {
     triggerHaptic()
+    if (topIssue?.code === 'validation_session_expired') { navigate('/auth', { replace: true }); return }
     if (!canRetryPhoto) { navigate('/scan/capture', { replace: true }); return }
     setRetrying(true)
     try {
@@ -116,7 +155,7 @@ export default function ScanQualityFail() {
       const result = await validateScanQuality(photoUrl)
       if (result.passed) {
         navigate('/scan/capture', { replace: true, state: { recoveredFrontPhoto: photoUrl } })
-      } else if (result.state === 'RESULT') {
+      } else {
         navigate('/scan/quality-fail', { replace: true, state: { issues: result.issues, photoUrl } })
       }
     } catch (err) {
@@ -143,8 +182,8 @@ export default function ScanQualityFail() {
         transition={{ duration: 0.28 }}
         className="flex-shrink-0 mb-3"
       >
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: '#EF4444' }}>
-          PHOTO NEEDS A FIX
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: errorColor }}>
+          {isServiceError ? 'PHOTO CHECK PAUSED' : 'PHOTO NEEDS A FIX'}
         </p>
         <h1 className="font-heading font-bold text-[24px] leading-tight" style={{ letterSpacing: '-0.02em', color: '#FFFFFF' }}>
           {content.headline}
@@ -159,7 +198,7 @@ export default function ScanQualityFail() {
         className="flex-shrink-0 w-full rounded-2xl overflow-hidden relative"
         style={{
           aspectRatio: '4/5',
-          boxShadow: '0 0 0 2px #EF4444, 0 0 20px rgba(239,68,68,0.35)',
+          boxShadow: isServiceError ? `0 0 0 2px ${GOLD}` : '0 0 0 2px #EF4444, 0 0 20px rgba(239,68,68,0.35)',
         }}
       >
         {photoUrl
@@ -179,8 +218,8 @@ export default function ScanQualityFail() {
         >
           <div className="flex items-center gap-2 mb-1">
             <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(239,68,68,0.3)', border: '1.5px solid #EF4444' }}>
-              <span style={{ color: '#EF4444', fontSize: 11, fontWeight: 800, lineHeight: 1 }}>✕</span>
+              style={{ background: isServiceError ? 'rgba(198,168,92,0.15)' : 'rgba(239,68,68,0.3)', border: `1.5px solid ${errorColor}` }}>
+              <span style={{ color: errorColor, fontSize: 11, fontWeight: 800, lineHeight: 1 }}>{isServiceError ? '!' : '✕'}</span>
             </div>
             <p className="font-heading font-bold text-[15px]" style={{ color: '#FFFFFF' }}>{content.label}</p>
           </div>
@@ -198,7 +237,7 @@ export default function ScanQualityFail() {
         className="flex-shrink-0 mt-5 mb-6"
       >
         <p className="font-heading font-bold text-[15px] tracking-[0.12em] mb-4" style={{ color: 'rgba(255,255,255,0.45)' }}>
-          HOW TO FIX IT
+          {isServiceError ? 'WHAT TO DO NEXT' : 'HOW TO FIX IT'}
         </p>
         <div className="flex flex-col gap-3">
           {content.tips.map((tip, i) => (
@@ -226,7 +265,7 @@ export default function ScanQualityFail() {
         className="flex-shrink-0 w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
         style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
       >
-        {retrying ? 'Checking Photo…' : canRetryPhoto ? 'Try Again' : 'Retake Photo'}
+        {retrying ? 'Checking Photo…' : topIssue?.code === 'validation_session_expired' ? 'Sign In' : canRetryPhoto ? 'Try Again' : 'Retake Photo'}
       </motion.button>
     </MotionPage>
   )

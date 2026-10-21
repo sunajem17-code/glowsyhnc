@@ -1,4 +1,4 @@
-import { isCurrentAssessment, assessmentScale } from '../utils/assessment'
+import { isCurrentAssessment } from '../utils/assessment'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,25 +10,15 @@ import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-
-function thumbnail(url) {
-  if (!url) return null
-  if (url.startsWith('http')) return url
-  return `${API_BASE}${url}`
-}
+import ScanHistoryRow from '../components/ScanHistoryRow'
+import { mergeScanHistory } from '../utils/scanHistory'
+import { hasPremiumUiAccess } from '../utils/developerUnlock'
+import { getProgressScore, isPhysiqueProgressScan } from '../utils/progressHistory'
+import { loadScanMedia } from '../utils/scanPhotoDb'
 
 function fmt(dateStr) {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function scoreColor(s) {
-  if (s == null) return 'rgba(255,255,255,0.4)'
-  if (s >= 8) return '#C6A85C'
-  if (s >= 6) return '#6EE7B7'
-  if (s >= 4) return '#FCD34D'
-  return '#F87171'
 }
 
 // ── Custom recharts tooltip ───────────────────────────────────────────────────
@@ -78,14 +68,11 @@ function ProGate({ onUpgrade }) {
 }
 
 // ── Trend chart ───────────────────────────────────────────────────────────────
-function TrendChart({ scans }) {
+function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall' }) {
   const data = [...scans]
-    .filter(s => s.glowScore != null)
     .reverse()
-    .map(s => ({
-      label: fmt(s.analyzedAt || s.scan_date),
-      score: typeof s.glowScore === 'number' ? s.glowScore : parseFloat(s.glowScore),
-    }))
+    .map(s => ({ label: fmt(s.analyzedAt || s.scan_date || s.created_at), score: getProgressScore(s, mode, metric) }))
+    .filter(point => point.score != null)
 
   if (data.length < 2) return null
 
@@ -100,7 +87,7 @@ function TrendChart({ scans }) {
       <div className="flex items-center gap-2 mb-4 px-2">
         <TrendingUp size={15} style={{ color: GOLD }} />
         <p className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: GOLD }}>
-          SCORE OVER TIME
+          {label.toUpperCase()} OVER TIME
         </p>
       </div>
       <ResponsiveContainer width="100%" height={140}>
@@ -114,6 +101,7 @@ function TrendChart({ scans }) {
           />
           <YAxis
             domain={[min, max]}
+            tickFormatter={value => Number(value).toFixed(1)}
             tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
             axisLine={false}
             tickLine={false}
@@ -134,112 +122,46 @@ function TrendChart({ scans }) {
   )
 }
 
-// ── Single scan row ───────────────────────────────────────────────────────────
-function ScanRow({ scan, onTap, index }) {
-  const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
-  const thumb = thumbnail(scan.facePhotoUrl || scan.face_photo_url)
-  const date = fmt(scan.analyzedAt || scan.scan_date)
-  const score = scan.glowScore != null
-    ? (typeof scan.glowScore === 'number' ? scan.glowScore : parseFloat(scan.glowScore))
-    : null
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.25 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => { triggerHaptic(); onTap(scan) }}
-      className="w-full text-left flex items-center gap-4"
-      style={{
-        background: '#141414', border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 18, padding: '14px 14px 14px 14px',
-        marginBottom: 10,
-      }}
-    >
-      {/* Thumbnail */}
-      <div style={{
-        width: 58, height: 58, borderRadius: 14, overflow: 'hidden',
-        background: '#222', flexShrink: 0,
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}>
-        {thumb ? (
-          <img src={thumb} alt="Scan" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Camera size={20} style={{ color: 'rgba(255,255,255,0.2)' }} />
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="font-heading font-semibold text-[15px] text-primary leading-tight">{date}</p>
-        {assessment && <p className="text-xs mt-1" style={{ color: GOLD }}>Subjective appearance feedback · saved on this device</p>}
-        {!assessment && <p className="text-xs mt-1 opacity-50">Original legacy rubric</p>}
-        {scan.tier && (
-          <span
-            className="font-heading font-bold text-[10px] tracking-wide mt-0.5 inline-block"
-            style={{ color: GOLD }}
-          >
-            {scan.tier.toUpperCase()}
-          </span>
-        )}
-      </div>
-
-      {/* Score */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {assessment && <p className="text-lg font-bold" style={{ color: GOLD }}>{assessment.scoreRange ? `${assessment.scoreRange.min}–${assessment.scoreRange.max} / ${assessmentScale(assessment.rubricVersion).max} ${assessmentScale(assessment.rubricVersion).unit}` : 'Withheld'}</p>}
-        {!assessment && score != null && (
-          <p
-            className="font-heading font-bold text-[22px]"
-            style={{ color: scoreColor(score), letterSpacing: '-0.02em' }}
-          >
-            {score.toFixed(1)}
-          </p>
-        )}
-        <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.25)' }} />
-      </div>
-    </motion.button>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ScanHistory() {
   const navigate = useNavigate()
   const isPremium = useStore(s => s.isPremium)
+  const developerPreviewUnlocked = useStore(s => s.developerPreviewUnlocked)
+  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
   const setCurrentScan = useStore(s => s.setCurrentScan)
-  const [scans, setScans] = useState(() => useStore.getState().scans.filter(isCurrentAssessment))
+  const localScans = useStore(s => s.scans)
+  const currentScan = useStore(s => s.currentScan)
+  const token = useStore(s => s.token)
+  const refreshProStatus = useStore(s => s.refreshProStatus)
+  const [historySnapshot, setScans] = useState({ token, scans: [] })
+  const scans = mergeScanHistory(historySnapshot.token === token ? historySnapshot.scans : [], localScans, currentScan)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // The app-wide premium flag may still be stale when returning from checkout.
+  // Refresh the authoritative entitlement as soon as this gated page is opened.
   useEffect(() => {
-    if (!isPremium) { setLoading(false); return }
+    refreshProStatus({ force: true })
+  }, [refreshProStatus, token])
+
+  useEffect(() => {
+    if (!canAccessProUi) { setLoading(false); return }
+    let cancelled = false
+    setLoading(true)
+    setError(null)
     api.scan.history()
       .then(data => {
-        const list = (data?.scans ?? []).map(s => ({
-          id:            s.id,
-          glowScore:     s.glow_score,
-          faceTotalScore: s.face_total_score,
-          bodyTotalScore: s.body_total_score,
-          presentationScore: s.presentation_score,
-          faceData:      s.faceData ?? (s.face_data ? JSON.parse(s.face_data) : null),
-          bodyData:      s.bodyData ?? (s.body_data ? JSON.parse(s.body_data) : null),
-          insights:      s.insights ?? [],
-          facePhotoUrl:  s.face_photo_url,
-          analyzedAt:    s.analyzed_at,
-          scan_date:     s.scan_date,
-          tier:          s.faceData?.tier ?? null,
-        }))
-        setScans([...useStore.getState().scans.filter(isCurrentAssessment), ...list].sort((a, b) => new Date(b.analyzedAt || b.scan_date) - new Date(a.analyzedAt || a.scan_date)))
+        if (!cancelled) setScans({ token, scans: data?.scans ?? [] })
       })
-      .catch(err => { if (!useStore.getState().scans.some(isCurrentAssessment)) setError(err.message || 'Failed to load history') })
-      .finally(() => setLoading(false))
-  }, [isPremium])
+      .catch(err => { if (!cancelled) setError(err.message || 'Failed to load history') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [canAccessProUi, token])
 
-  function viewScan(scan) {
-    setCurrentScan(scan)
-    navigate('/results')
+  async function viewScan(scan) {
+    const media = scan?.id ? await loadScanMedia(scan.id) : null
+    setCurrentScan({ ...scan, facePhotoUrl: scan.facePhotoUrl || media?.photo || null })
+    navigate(isPhysiqueProgressScan(scan) ? '/physique-results' : '/unlock')
   }
 
   return (
@@ -267,14 +189,21 @@ export default function ScanHistory() {
         </h1>
       </div>
 
+      <ScanHistoryContent scans={scans} loading={loading} error={error} isPremium={canAccessProUi} onViewScan={viewScan} onUpgrade={() => navigate('/premium')} />
+    </MotionPage>
+  )
+}
+
+export function ScanHistoryContent({ scans, loading, error, isPremium, onViewScan, onUpgrade, embedded = false, chartMode = 'face', chartMetric = 'overall', chartLabel = 'Overall', emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
+  return (<>
       {/* Body */}
       {!isPremium ? (
-        <ProGate onUpgrade={() => navigate('/premium')} />
-      ) : loading ? (
+        <ProGate onUpgrade={onUpgrade} />
+      ) : loading && scans.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading…</p>
         </div>
-      ) : error ? (
+      ) : error && scans.length === 0 ? (
         <div className="flex-1 flex items-center justify-center px-8 text-center">
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{error}</p>
         </div>
@@ -282,20 +211,21 @@ export default function ScanHistory() {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
           <Camera size={44} style={{ color: 'rgba(255,255,255,0.12)' }} />
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            No scans yet. Complete your first scan to see your history here.
+            {emptyMessage}
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-5 pb-8">
-          <TrendChart scans={scans} />
+        <div className={embedded ? "pb-4" : "flex-1 overflow-y-auto px-5 pb-8"}>
+          {!embedded && loading && <p role="status" className="text-xs text-secondary mb-3">Refreshing history…</p>}
+          {!embedded && error && <p role="status" className="text-xs text-secondary mb-3">Showing scans saved on this device. Server history couldn’t refresh.</p>}
+          <TrendChart scans={scans.filter(scan => !isCurrentAssessment(scan))} mode={chartMode} metric={chartMetric} label={chartLabel} />
           <p className="font-heading font-bold text-[11px] tracking-[0.14em] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
             {scans.length} SCAN{scans.length !== 1 ? 'S' : ''}
           </p>
           {scans.map((scan, i) => (
-            <ScanRow key={scan.id} scan={scan} index={i} onTap={viewScan} />
+            <ScanHistoryRow key={scan.id} scan={scan} index={i} onTap={onViewScan} />
           ))}
         </div>
       )}
-    </MotionPage>
-  )
+  </>)
 }

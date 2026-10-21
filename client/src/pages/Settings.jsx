@@ -5,7 +5,7 @@ import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
   User, Crown, Ruler, Bell, Palette, Trash2, LogOut,
-  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
+  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square, RefreshCw,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -15,6 +15,8 @@ import { triggerHaptic } from '../utils/haptics'
 import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
 import { useDeleteAccount } from '../utils/useDeleteAccount'
+import { isDeveloperRefreshAvailable, getDeveloperRefreshState } from '../utils/developerRefresh'
+import { isLocalDeveloperPreview } from '../utils/developerUnlock'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -101,7 +103,7 @@ export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout,
+    user, isGuest, isPremium, logout, setIsPremium, isLocalProPreview, setLocalProPreview,
     theme, toggleTheme,
     units, setUnits,
     clearAllScanData,
@@ -166,6 +168,21 @@ export default function Settings() {
     await clearAllScanMedia().catch(err => console.warn('[Settings] clearAllScanMedia failed:', err))
     setClearConfirm(false)
   }
+
+  async function handleDeveloperRefresh() {
+    const confirmed = window.confirm(
+      'Clear local scans, progress, check-ins, and scan photos, then reopen the app after onboarding? Your sign-in, premium status, and onboarding answers will be kept. Cloud data will not be changed.'
+    )
+    if (!confirmed) return
+
+    useStore.setState(getDeveloperRefreshState())
+    await clearAllScanMedia().catch(err => console.warn('[Settings] dev refresh media cleanup failed:', err))
+    for (const key of ['asc_pro_splash_shown', 'asc_reveal_shown', 'asc_post_onboard_dest', 'ascendus_onboarding_draft']) {
+      try { sessionStorage.removeItem(key) } catch {}
+    }
+    window.location.replace(`${window.location.origin}/scan`)
+  }
+
 
   async function openLink(url) {
     if (Capacitor.isNativePlatform()) {
@@ -392,16 +409,24 @@ export default function Settings() {
           />
           <SettingsRow
             icon={Crown}
-            label={isPremium ? 'Ascendus Premium' : 'Free Plan'}
-            value={isPremium ? 'Tap to manage or cancel' : 'Tap to upgrade'}
-            onPress={handleManageSubscription}
+            label={isLocalProPreview ? 'Local Pro Preview' : isPremium ? 'Ascendus Premium' : 'Free Plan'}
+            value={isLocalProPreview ? 'Pro screens previewed on this development device' : isPremium ? 'Tap to manage or cancel' : 'Tap to upgrade'}
+            onPress={isLocalProPreview ? undefined : handleManageSubscription}
             rightElement={
-              isPremium
+              isLocalProPreview
+                ? <span className="font-heading font-bold text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>LOCAL PREVIEW</span>
+                : isPremium
                 ? <span className="font-heading font-bold text-[11px] px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>✦ PREMIUM</span>
                 : <ChevronRight size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             }
           />
+          {isLocalDeveloperPreview() && <SettingsRow
+            icon={Crown}
+            label="Local Pro Preview"
+            value="Unlock Pro screens on this development device only"
+            rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
+          />}
         </div>
 
         {/* ── Preferences ── */}
@@ -499,6 +524,12 @@ export default function Settings() {
             value="support@ascendus.com"
             onPress={() => openMailto('support@ascendus.com', 'Support Request')}
           />
+          {isDeveloperRefreshAvailable() && <SettingsRow
+            icon={RefreshCw}
+            label="Dev Refresh"
+            value="Clear local test data and restart after onboarding"
+            onPress={handleDeveloperRefresh}
+          />}
         </div>
 
         {/* App version */}

@@ -22,6 +22,7 @@ const Results        = lazy(() => import('./pages/Results'))
 const ActionPlan     = lazy(() => import('./pages/ActionPlan'))
 const Progress       = lazy(() => import('./pages/Progress'))
 const DailyCheckin   = lazy(() => import('./pages/DailyCheckin'))
+const Streak         = lazy(() => import('./pages/Streak'))
 const Profile        = lazy(() => import('./pages/Profile'))
 const Premium        = lazy(() => import('./pages/Premium'))
 const HairMaxx       = lazy(() => import('./pages/HairMaxx'))
@@ -190,7 +191,11 @@ export default function App() {
     <BrowserRouter>
       <UpdatePrompt />
       <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
-      <Suspense fallback={<div className="min-h-screen bg-[#F7F5F0] dark:bg-[#121212]" />}>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F7F5F0] dark:bg-[#121212] text-[#121212] dark:text-white" role="status" aria-live="polite">
+          <p className="font-body text-sm">Loading your next screen…</p>
+        </div>
+      }>
       <AnimatePresence mode="wait">
         <Routes>
           {/* Legal pages + payment return — always accessible */}
@@ -210,17 +215,22 @@ export default function App() {
             <Route path="*" element={<PremiumOnboarding />} />
           ) : (
             <>
+              {/* Full-screen reveal must not wait for the outgoing scan outlet's
+                  nested exit animation or inherit its transformed viewport. */}
+              <Route path="/unlock" element={<ProtectedRoute><ScanUnlockGate /></ProtectedRoute>} />
+              <Route path="/results" element={<Navigate to="/unlock" replace />} />
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
               }>
                 <Route index element={<PostAuthLanding />} />
                 <Route path="scan" element={<ScanHome />} />
                 <Route path="scan/capture" element={<Scan />} />
-                <Route path="results" element={<Results />} />
+                {/* The reveal/unlock screen is the single post-scan destination. */}
                 <Route path="extras" element={<Extras />} />
                 <Route path="plan" element={<ActionPlan />} />
                 <Route path="progress" element={<Progress />} />
                 <Route path="checkin" element={<DailyCheckin />} />
+                <Route path="streak" element={<Streak />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="premium" element={<Navigate to="/unlock?paywall=1" replace />} />
                 <Route path="hairmaxx" element={<HairMaxx />} />
@@ -236,7 +246,6 @@ export default function App() {
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="physique-scan" element={<PhysiqueScan />} />
                 <Route path="physique-results" element={<PhysiqueResults />} />
-                <Route path="unlock" element={<ScanUnlockGate />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />
               </Route>

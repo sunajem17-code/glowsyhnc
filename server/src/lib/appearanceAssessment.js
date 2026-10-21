@@ -1,4 +1,4 @@
-const rubric = require('../../../client/src/utils/assessmentRubric.json')
+const rubric = require('./assessmentRubric.json')
 const VERSION = rubric.version
 const SCALE = rubric.scale
 const DIMENSIONS = ['facialHarmony', 'eyeArea', 'lowerFace', 'midfaceCheeks', 'noseLips', 'skinPresentation', 'facialBalance', 'visibleSymmetry', 'distinctiveQualities']

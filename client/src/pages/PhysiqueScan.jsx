@@ -1925,18 +1925,27 @@ export default function PhysiqueScan() {
       await minDisplayPromise
       setAnalysisStep(4)
 
+      // The body-only scoring endpoint returns { physiqueScore }, whereas
+      // older local demo data used to return the score fields at the root.
+      // Normalize once so results and Progress history both use the real score.
+      const physiqueScore = aiResult?.physiqueScore ?? aiResult?.physiqueResult ?? aiResult
+      const physiqueOverall = Number(physiqueScore?.overall ?? physiqueScore?.overallPhysique ?? aiResult?.overallScore)
+      const physiqueScoredAt = new Date().toISOString()
       const scanRecord = {
         id:             `scan-${Date.now()}`,
-        scanDate:       new Date().toISOString(),
-        analyzedAt:     new Date().toISOString(),
+        scanType:       'physique',
+        progressSavedAt: physiqueScoredAt,
+        scanDate:       physiqueScoredAt,
+        analyzedAt:     physiqueScoredAt,
         facePhotoUrl:   faceB64,
         sidePhotoUrl:   sideB64 ?? null,
         hasSideProfile: aiResult.hasSideProfile ?? false,
         gender:         g,
-        umaxScore:      aiResult.overallScore,
-        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
+        umaxScore:      Number.isFinite(physiqueOverall) ? physiqueOverall : null,
+        glowScore:      Number.isFinite(physiqueOverall) ? Math.round(physiqueOverall * 10) / 10 : null,
         tier:           aiResult.tier,
-        aiScore:        aiResult,
+        potentialScore: aiResult.potentialScore ?? null,
+        aiScore:        physiqueScore,
         faceData: {
           aestheticScore:    aiResult.faceScore,
           pillars:           null,
@@ -1960,9 +1969,15 @@ export default function PhysiqueScan() {
         // happens here — see the Training Plan flow's own body-photo step.)
         sideProfileGeometry:  sideProfileGeometry ?? undefined,
         // Physique score from scorePhysique API — used by WorkoutPlan/Routine Tracker
-        physiqueScore:        aiResult.physiqueScore ?? null,
+        physiqueScore,
         bodyPhotoUrl:         faceB64,
       }
+
+      // Keep each physique photo keyed to its own score record. The local
+      // Zustand history intentionally strips large data URLs on persistence.
+      import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+        saveScanMedia(scanRecord.id, { photo: faceB64 })
+      ).catch(err => console.warn('[PhysiqueScan] Could not persist scan photo:', err?.message))
 
       const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
       const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, assignedPh, g)
@@ -2010,51 +2025,9 @@ export default function PhysiqueScan() {
           })
       }
 
-      // Persist to Supabase (non-blocking). Upload the real scan photo to
-      // Supabase Storage first (private 'scan-images' bucket, already wired
-      // up server-side but never actually called until now) so the scan
-      // row's face_image_url is a real storage path, not empty — this is
-      // what powers Scan History thumbnails / Before-After on the Progress
-      // page across app restarts, instead of relying on localStorage (which
-      // deliberately strips photo data URLs to avoid a quota crash).
-      // For a Live-Face-Scan-only capture (no separate static photo taken),
-      // faceB64 is null but the AR capture's own photo is still available
-      // via lastFaceScanImage — fall back to that so ARKit-only scans still
-      // get a real thumbnail.
-      ;(async () => {
-        let faceImageUrl = null
-        const photoForUpload = faceB64
-        if (photoForUpload) {
-          try {
-            const commaIdx = photoForUpload.indexOf(',')
-            const header = commaIdx >= 0 ? photoForUpload.slice(0, commaIdx) : ''
-            const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
-            const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
-            const uploadResult = await api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' })
-            faceImageUrl = uploadResult?.path || null
-          } catch (err) {
-            console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
-          }
-        }
-
-        api.supabase.saveScan({
-          overallScore:     aiResult.overallScore,
-          tier:             aiResult.tier,
-          faceScore:        aiResult.faceScore,
-          groomingScore:    aiResult.groomingScore,
-          harmony:          aiResult.pillars?.harmony,
-          angularity:       aiResult.pillars?.angularity,
-          features:         aiResult.pillars?.features,
-          dimorphism:       aiResult.pillars?.dimorphism,
-          potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
-          hairTypeDetected: aiResult.hairType,
-          faceShape:        aiResult.facialStructure,
-          faceImageUrl,
-          gender:           g,
-          assignedPhase:    assignedPh?.toLowerCase(),
-          tasks,
-        }).catch(() => {})
-      })()
+      // Physique scorecards and their photos are stored locally per scan. The
+      // face-only cloud route cannot represent physique metrics, so avoid
+      // creating a misleading face-only history row here.
 
       setLastScanDate(new Date().toISOString())
       incrementScanCount()
@@ -2152,9 +2125,9 @@ export default function PhysiqueScan() {
               else if (step === 1) {
                 if (cameraOpen) { setCameraOpen(false) }
                 else if (previewPhoto) { setPreviewPhoto(null); setCameraOpen(true) }
-                else { setScanLaunching(true); navigate(-1) }
+                else { setScanLaunching(false); navigate(-1) }
               } else {
-                setScanLaunching(true); navigate(-1)
+                setScanLaunching(false); navigate(-1)
               }
             }}
             aria-label="Go back"

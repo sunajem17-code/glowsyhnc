@@ -1,172 +1,132 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
-import { TrendingUp, Calendar, ArrowLeftRight, Share2, Download, Trophy, Camera, Star, Flame, Sprout, Target, TrendingDown, ChevronLeft } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import ProLock from '../components/ProLock'
 import { api } from '../utils/api'
-import { GOLD, EASE_STANDARD } from '../utils/theme'
+import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
-
-const METRIC_TABS = [
-  { key: 'glowScore',     label: 'Overall',  color: GOLD },
-  { key: 'faceScore',     label: 'Face',     color: '#F5A623' },
-  { key: 'groomingScore', label: 'Grooming', color: '#E07A5F' },
-]
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + w - r, y)
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-  ctx.lineTo(x + w, y + h - r)
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-  ctx.lineTo(x + r, y + h)
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-  ctx.lineTo(x, y + r)
-  ctx.quadraticCurveTo(x, y, x + r, y)
-  ctx.closePath()
-}
-
-function drawShareCard(canvas, firstScan, latestScan) {
-  const W = 600, H = 300
-  canvas.width  = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')
-  const diff    = latestScan.overall_score - firstScan.overall_score
-  const diffStr = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
-  const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-
-  ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, W, H)
-  ctx.fillStyle = GOLD; ctx.fillRect(0, 0, W, 5)
-
-  ctx.fillStyle = '#1E1E1E'; roundRect(ctx, 18, 18, 220, 222, 14); ctx.fill()
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#888'; ctx.font = '600 11px Inter, system-ui'; ctx.fillText('FIRST SCAN', 128, 52)
-  ctx.fillStyle = GOLD; ctx.font = 'bold 54px Inter, system-ui'; ctx.fillText(firstScan.overall_score.toFixed(1), 128, 118)
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Inter, system-ui'; ctx.fillText(firstScan.tier || '', 128, 146)
-  ctx.fillStyle = '#666'; ctx.font = '11px Inter, system-ui'; ctx.fillText(fmtDate(firstScan.created_at), 128, 168)
-
-  ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(300, 100, 30, 0, Math.PI * 2); ctx.stroke()
-  ctx.fillStyle = GOLD; ctx.font = 'bold 28px Inter, system-ui'; ctx.fillText('↑', 300, 112)
-  ctx.fillStyle = diff >= 0 ? GOLD : '#E07A5F'; ctx.font = 'bold 20px Inter, system-ui'; ctx.fillText(diffStr, 300, 156)
-  ctx.fillStyle = '#888'; ctx.font = '11px Inter, system-ui'; ctx.fillText('points', 300, 174)
-
-  ctx.fillStyle = '#1E1E1E'; roundRect(ctx, 362, 18, 220, 222, 14); ctx.fill()
-  ctx.fillStyle = GOLD; ctx.font = '600 11px Inter, system-ui'; ctx.fillText('NOW', 472, 52)
-  ctx.font = 'bold 54px Inter, system-ui'; ctx.fillText(latestScan.overall_score.toFixed(1), 472, 118)
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Inter, system-ui'; ctx.fillText(latestScan.tier || '', 472, 146)
-  ctx.fillStyle = '#666'; ctx.font = '11px Inter, system-ui'; ctx.fillText(fmtDate(latestScan.created_at), 472, 168)
-
-  ctx.fillStyle = GOLD; ctx.fillRect(0, H - 34, W, 34)
-  ctx.fillStyle = '#121212'; ctx.font = 'bold 12px Inter, system-ui'
-  ctx.textAlign = 'left'; ctx.fillText('ascendus.store', 18, H - 11)
-  ctx.textAlign = 'right'; ctx.fillText('Track your glow up ✨', W - 18, H - 11)
-}
-
-function ComparisonSlider({ before, after }) {
-  const [sliderPos, setSliderPos] = useState(50)
-  const containerRef = useRef()
-
-  function handleMove(e) {
-    const rect = containerRef.current.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const pos = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100))
-    setSliderPos(pos)
-  }
-
-  return (
-    <div ref={containerRef} className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-col-resize select-none"
-      onMouseMove={handleMove} onTouchMove={handleMove}>
-      <img src={before} alt="before" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-        <img src={after} alt="after" className="absolute inset-0 h-full object-cover" style={{ width: `${100 / (sliderPos / 100)}%` }} />
-      </div>
-      <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg" style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
-          <ArrowLeftRight size={14} style={{ color: GOLD }} />
-        </div>
-      </div>
-      <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/50 rounded-lg"><p className="text-white text-xs font-body">Before</p></div>
-      <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/50 rounded-lg"><p className="text-white text-xs font-body">After</p></div>
-    </div>
-  )
-}
+import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from '../utils/progressHistory'
+import { ScanHistoryContent } from './ScanHistory'
+import { normalizeHistoryScan } from '../utils/scanHistory'
+import { hasPremiumUiAccess } from '../utils/developerUnlock'
+import StreakFlame from '../components/StreakFlame'
+import { loadScanMedia } from '../utils/scanPhotoDb'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
-  const { scans, streak, isPremium, token } = useStore()
-  const [history, setHistory]     = useState([])
+  const location = useLocation()
+  const { scans, currentScan, streak, isPremium, developerPreviewUnlocked, token, refreshProStatus } = useStore()
+  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
+  const setCurrentScan = useStore(s => s.setCurrentScan)
+  const [historySnapshot, setHistory] = useState({ token, scans: [] })
+  const remoteHistory = historySnapshot.token === token ? historySnapshot.scans : []
+  const history = mergeProgressHistory(remoteHistory, scans, currentScan)
+  const [progressMode, setProgressMode] = useState('face')
+  const [progressMetric, setProgressMetric] = useState('overall')
+  const faceHistory = history.filter(scan => !isPhysiqueProgressScan(scan) && getProgressScore(scan, 'face', 'overall') != null)
+  const physiqueHistory = history.filter(scan => isPhysiqueProgressScan(scan) && getProgressScore(scan, 'physique', 'overall') != null)
+  const activeHistory = progressMode === 'physique' ? physiqueHistory : faceHistory
+  const metricOptions = progressMode === 'physique'
+    ? [
+        { key: 'overall', label: 'Overall' }, { key: 'proportions', label: 'Proportions' },
+        { key: 'leanness', label: 'Leanness' }, { key: 'frame', label: 'Frame' },
+        { key: 'posture', label: 'Posture' }, { key: 'presentation', label: 'Presentation' },
+      ]
+    : [
+        { key: 'overall', label: 'Overall' }, { key: 'potential', label: 'Potential' },
+        { key: 'symmetry', label: 'Symmetry' }, { key: 'skin', label: 'Skin' }, { key: 'jawline', label: 'Jawline' },
+      ]
   const [loading, setLoading]     = useState(true)
-  const [metricTab, setMetricTab] = useState(0)
-  const [sharing, setSharing]     = useState(false)
-  const canvasRef = useRef()
+  const [historyError, setHistoryError] = useState(false)
+  const [flameFlight, setFlameFlight] = useState(null)
+  const streakIconRef = useRef(null)
   const isDemo = !token || token === 'demo-token'
+  const streakFlameFlight = location.state?.streakFlameFlight === true
+  const flameOrigin = location.state?.flameOrigin ?? null
+  const streakCompletedToday = streak.current > 0
+    && Boolean(streak.lastDate)
+    && new Date(streak.lastDate).toDateString() === new Date().toDateString()
+
+  // Progress embeds the same gated Scan History content as /history. Refresh
+  // the authoritative entitlement here too, so a recently completed purchase
+  // cannot leave this screen showing its stale locked state.
+  useEffect(() => {
+    refreshProStatus({ force: true })
+  }, [refreshProStatus, token])
 
   useEffect(() => {
-    if (isDemo) { setLoading(false); return }
-    api.supabase.getScans()
-      .then(({ scans: h }) => setHistory(h || []))
-      .catch(() => setHistory([]))
-      .finally(() => setLoading(false))
-  }, [isDemo])
+    if (!streakFlameFlight) return undefined
+    let finishTimer
+    const startTimer = setTimeout(() => {
+      const target = streakIconRef.current?.getBoundingClientRect()
+      if (!flameOrigin || !target) {
+        navigate('/timeline', { replace: true, state: null })
+        return
+      }
 
-  const chartData = [...history].reverse().map((s, i) => ({
-    label:         `Scan ${i + 1}`,
-    date:          new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    glowScore:     Number(s.overall_score),
-    faceScore:     s.face_score      != null ? Number(s.face_score)     : null,
-    groomingScore: s.grooming_score  != null ? Number(s.grooming_score) : null,
-  }))
-
-  const firstScan      = history.length > 0 ? history[history.length - 1] : null
-  const latestScan     = history.length > 0 ? history[0] : null
-  const bestScore      = history.length > 0 ? Math.max(...history.map(h => Number(h.overall_score))) : null
-  const improvement    = firstScan && latestScan
-    ? (Number(latestScan.overall_score) - Number(firstScan.overall_score)).toFixed(1) : null
-  const improvementNum = improvement !== null ? parseFloat(improvement) : null
-  const hasEnoughData  = history.length >= 2
-  const activeMetric   = METRIC_TABS[metricTab]
-
-  const handleShare = useCallback(async () => {
-    if (!firstScan || !latestScan || sharing) return
-    setSharing(true)
-    try {
-      await document.fonts.ready
-      const canvas = canvasRef.current
-      drawShareCard(canvas, firstScan, latestScan)
-      const diff    = Number(latestScan.overall_score) - Number(firstScan.overall_score)
-      const diffStr = diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], 'glow-up.png', { type: 'image/png' })
-        try {
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'My Glow Up', text: `I improved ${diffStr} points on Ascendus! 🔥 ascendus.store` })
-          } else {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url; a.download = 'glow-up.png'
-            document.body.appendChild(a); a.click(); document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-        } catch (shareErr) {
-          if (shareErr.name !== 'AbortError') console.warn('Share failed:', shareErr)
-        }
-        setSharing(false)
-      }, 'image/png')
-    } catch (err) {
-      console.error('Share card failed:', err)
-      setSharing(false)
+      const fromCenterX = flameOrigin.left + flameOrigin.width / 2
+      const fromCenterY = flameOrigin.top + flameOrigin.height / 2
+      const toCenterX = target.left + target.width / 2
+      const toCenterY = target.top + target.height / 2
+      setFlameFlight({
+        origin: flameOrigin,
+        deltaX: toCenterX - fromCenterX,
+        deltaY: toCenterY - fromCenterY,
+        scale: Math.min(target.width / flameOrigin.width, target.height / flameOrigin.height),
+      })
+      // Keep a cleanup fallback in case the motion completion event is
+      // interrupted by a resize or the page being backgrounded mid-flight.
+      finishTimer = setTimeout(() => {
+        setFlameFlight(null)
+        navigate('/timeline', { replace: true, state: null })
+      }, 1500)
+    }, 450)
+    return () => {
+      clearTimeout(startTimer)
+      if (finishTimer) clearTimeout(finishTimer)
     }
-  }, [firstScan, latestScan, sharing])
+  }, [flameOrigin, streakFlameFlight, navigate])
+
+  useEffect(() => {
+    let cancelled = false
+    setHistoryError(false)
+    if (isDemo) { setLoading(false); return }
+    setLoading(true)
+    api.supabase.getScans()
+      .then(({ scans: h }) => { if (!cancelled) setHistory({ token, scans: h || [] }) })
+      .catch(() => { if (!cancelled) setHistoryError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token, isDemo])
+
+  const firstScan      = activeHistory.length > 0 ? activeHistory[activeHistory.length - 1] : null
+  const latestScan     = activeHistory.length > 0 ? activeHistory[0] : null
+  const activeScores = activeHistory.map(scan => getProgressScore(scan, progressMode, 'overall')).filter(Number.isFinite)
+  const bestScore      = activeScores.length ? Math.max(...activeScores) : null
+  const improvement    = firstScan && latestScan
+    ? (getProgressScore(latestScan, progressMode, 'overall') - getProgressScore(firstScan, progressMode, 'overall')).toFixed(1) : null
+  const improvementNum = improvement !== null ? parseFloat(improvement) : null
+
+  async function viewHistoryScan(entry) {
+    const saved = currentScan?.id === entry.id ? currentScan
+      : scans.find(scan => scan.id === entry.id || scan.serverScanId === entry.id)
+    const selected = saved || normalizeHistoryScan(entry)
+    const media = selected?.id ? await loadScanMedia(selected.id) : null
+    setCurrentScan({ ...selected, facePhotoUrl: selected.facePhotoUrl || media?.photo || null })
+    if (isPhysiqueProgressScan(entry)) {
+      navigate('/physique-results', { state: { source: 'progress-card', returnTo: '/timeline' } })
+      return
+    }
+    navigate('/unlock', { state: { source: 'progress-card', returnTo: '/timeline' } })
+  }
+
+
 
   return (
     <MotionPage className="px-4">
-      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
@@ -178,7 +138,7 @@ export default function ScanTimeline() {
         >
           <ChevronLeft size={18} className="text-primary" />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>
             Progress
           </h1>
@@ -187,11 +147,46 @@ export default function ScanTimeline() {
       </div>
 
       {/* Overview stats */}
+      <div className="mb-4">
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)' }} role="tablist" aria-label="Progress type">
+          {[
+            { key: 'face', label: 'Face' },
+            { key: 'physique', label: 'Physique' },
+          ].map(({ key, label }) => {
+            const selected = progressMode === key
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => { setProgressMode(key); setProgressMetric('overall'); triggerHaptic() }}
+                className="py-2.5 rounded-xl font-heading font-semibold text-sm transition-colors"
+                style={{ color: selected ? '#0A0A0A' : 'rgba(255,255,255,0.58)', background: selected ? GOLD : 'transparent' }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 overflow-x-auto mt-3 pb-1" role="group" aria-label="Score graph metric">
+          {metricOptions.map(({ key, label }) => {
+            const selected = progressMetric === key
+            return (
+              <button key={key} type="button" onClick={() => setProgressMetric(key)}
+                aria-pressed={selected}
+                className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-body transition-colors"
+                style={{ color: selected ? GOLD : 'rgba(255,255,255,0.55)', border: `1px solid ${selected ? 'rgba(198,168,92,0.55)' : 'rgba(255,255,255,0.12)'}`, background: selected ? 'rgba(198,168,92,0.1)' : 'transparent' }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Total Scans',    value: history.length || scans.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} /> },
+          { label: `${progressMode === 'face' ? 'Face' : 'Physique'} Scans`, value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} /> },
           { label: 'Best Score',     value: bestScore != null ? bestScore.toFixed(1) : 'N/A', icon: <Trophy size={20} style={{ color: GOLD }} /> },
-          { label: 'Current Streak', value: streak.current > 0 ? `${streak.current}d` : 'N/A', icon: <Flame size={20} style={{ color: '#FF6B35' }} /> },
         ].map(({ label, value, icon }) => (
           <div key={label} className="card text-center py-3">
             <div className="flex justify-center mb-0.5">{icon}</div>
@@ -199,30 +194,41 @@ export default function ScanTimeline() {
             <p className="text-[10px] text-secondary font-body">{label}</p>
           </div>
         ))}
+        <button
+          type="button"
+          onClick={() => { triggerHaptic(); navigate('/streak') }}
+          aria-label={`Open current streak details, ${streak.current} days`}
+          className="card relative text-center py-3 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ outlineColor: GOLD }}
+        >
+          <ChevronRight size={14} className="absolute right-2 top-2 text-secondary" aria-hidden="true" />
+          <div ref={streakIconRef} className="flex justify-center mb-0.5 w-6 h-6">
+            <Flame
+              size={20}
+              className={streakCompletedToday && !streakFlameFlight ? 'fire-icon' : ''}
+              style={streakCompletedToday && !streakFlameFlight
+                ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 8px rgba(198,168,92,0.8))' }
+                : { color: 'rgba(255,255,255,0.32)' }}
+            />
+          </div>
+          <p className="font-mono font-bold text-lg text-primary">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
+          <p className="text-[10px] text-secondary font-body">Current Streak</p>
+        </button>
       </div>
 
-      {/* Chart / empty state */}
-      {loading ? (
-        <div className="card mb-4 flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: GOLD, borderTopColor: 'transparent' }} />
+      {/* History refresh never blocks saved results or page navigation. */}
+      {loading && (
+        <p role="status" className="text-xs text-secondary font-body mb-4">
+          {history.length > 0 ? 'Refreshing scan history…' : 'Loading scan history…'}
+        </p>
+      )}
+      {historyError && (
+        <div role="status" className="flex items-center justify-between gap-3 mb-4 text-xs text-secondary font-body">
+          <span>{history.length > 0 ? 'Couldn’t refresh scan history. Showing your saved results.' : 'Couldn’t load scan history.'}</span>
         </div>
-      ) : !hasEnoughData ? (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }}
-          className="card mb-4 flex flex-col items-center gap-3 py-10 text-center">
-          <TrendingUp size={40} style={{ color: GOLD }} />
-          <p className="font-heading font-bold text-base text-primary">
-            {history.length === 0 ? 'Complete your first scan to start tracking your glow up' : 'Take one more scan to unlock your progress chart'}
-          </p>
-          <p className="text-xs text-secondary font-body max-w-[220px]">Your score history will appear here after two scans</p>
-          <button onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
-            className="mt-1 px-5 py-2 rounded-xl text-sm font-heading font-bold text-white" style={{ background: GOLD }}>
-            Start a Scan
-          </button>
-        </motion.div>
-      ) : (
-        <>
-          {isPremium ? (
-            <>
+      )}
+
+      {activeHistory.length >= 2 && canAccessProUi && (
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
                   { label: 'First Score',   value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
@@ -242,144 +248,47 @@ export default function ScanTimeline() {
                 ))}
               </div>
 
-              <div className="card mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-heading font-bold text-base text-primary">Score Timeline</h2>
-                  <span className="text-xs font-heading font-bold px-2 py-1 rounded-lg"
-                    style={{ background: improvementNum >= 0 ? `${GOLD}1A` : 'rgba(224,122,95,0.12)', color: improvementNum >= 0 ? GOLD : '#E07A5F' }}>
-                    {improvementNum >= 0 ? '+' : ''}{improvement} pts
-                  </span>
-                </div>
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  {METRIC_TABS.map((m, i) => (
-                    <button key={m.key} onClick={() => { triggerHaptic(); setMetricTab(i) }}
-                      className="text-[10px] font-heading font-bold px-2.5 py-1 rounded-full transition-all"
-                      style={metricTab === i ? { background: m.color, color: '#fff' } : { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)' }}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor={activeMetric.color} stopOpacity={0.25} />
-                        <stop offset="100%" stopColor={activeMetric.color} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: 'Inter' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 11 }}
-                      formatter={(v) => [v != null ? Number(v).toFixed(1) : 'N/A', activeMetric.label]} />
-                    <Area type="monotone" dataKey={activeMetric.key} stroke={activeMetric.color} strokeWidth={2.5} fill="url(#areaGrad)"
-                      connectNulls dot={{ r: 4, fill: activeMetric.color, strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6, fill: activeMetric.color }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: EASE_STANDARD }} className="card mb-4 overflow-hidden">
-                <div className="h-1 -mx-4 -mt-4 mb-4" style={{ background: `linear-gradient(90deg, ${GOLD}, #F5D98E)` }} />
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${GOLD}1A` }}>
-                    <Share2 size={20} style={{ color: GOLD }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-heading font-bold text-sm text-primary">Share My Glow Up</p>
-                    <p className="text-xs text-secondary font-body truncate">
-                      {Number(firstScan.overall_score).toFixed(1)} → {Number(latestScan.overall_score).toFixed(1)} · {improvementNum >= 0 ? '+' : ''}{improvement} pts
-                    </p>
-                  </div>
-                  <button onClick={() => { triggerHaptic(); handleShare() }} disabled={sharing}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-heading font-bold text-white disabled:opacity-60 flex-shrink-0"
-                    style={{ background: GOLD }}>
-                    {sharing ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Download size={13} />Share</>}
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          ) : (
-            <ProLock solid onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Progress Graph & Share Card" description="Track your score over time and share your glow-up with Pro." className="mb-4" />
-          )}
-        </>
       )}
 
-      {/* Scan photo timeline */}
-      {history.length > 0 && (
-        <div className="mb-4">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
-            <Calendar size={16} className="text-secondary" /> Scan History
-          </h2>
-          {isPremium ? (
-            <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-2">
-              {history.map((scan, i) => (
-                <div key={scan.id ?? i} className="flex-shrink-0 w-24 rounded-2xl overflow-hidden" style={{ border: '2px solid transparent' }}>
-                  <div className="relative">
-                    <img src={scan.face_image_url || 'https://placehold.co/96x96/C6A85C/white?text=Scan'}
-                      alt={`Scan ${i + 1}`} className="w-24 h-24 object-cover" />
-                    <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70">
-                      <p className="text-white text-[9px] font-mono font-bold">
-                        {scan.overall_score != null ? Number(scan.overall_score).toFixed(1) : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-card px-1.5 py-1">
-                    <p className="text-[9px] text-secondary font-body text-center">
-                      {new Date(scan.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <ProLock solid onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Scan History" description="All your scan photos and score history, in one place." />
-          )}
-        </div>
-      )}
-
-      {/* Before & After */}
-      {history.length >= 2 && (
-        <div className="mb-4">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
-            <ArrowLeftRight size={16} className="text-secondary" /> Before &amp; After
-          </h2>
-          {isPremium ? (
-            <ComparisonSlider
-              before={history[history.length - 1]?.face_image_url || 'https://placehold.co/400x400/gray/white?text=Before'}
-              after={history[0]?.face_image_url || 'https://placehold.co/400x400/C6A85C/white?text=After'}
-            />
-          ) : (
-            <ProLock solid onUpgrade={() => { triggerHaptic(); navigate('/premium') }}
-              label="Before & After Comparison" description="Drag-slider photo comparison of your first scan vs. your latest." />
-          )}
-        </div>
-      )}
-
-      {/* Milestones */}
-      {hasEnoughData && (
-        <div className="mb-6">
-          <h2 className="font-heading font-bold text-base text-primary mb-3 flex items-center gap-2">
-            <Trophy size={16} style={{ color: GOLD }} /> Milestones
-          </h2>
-          {[
-            { icon: <Target size={20} style={{ color: GOLD }} />, text: 'First scan completed', date: new Date(firstScan.created_at).toLocaleDateString() },
-            improvementNum > 0 && { icon: <TrendingUp size={20} style={{ color: '#34C759' }} />, text: `Score improved by ${improvement} points` },
-            bestScore >= 7.5 && { icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} />, text: `Reached ${bestScore.toFixed(1)}, ${latestScan.tier || 'elite tier'}` },
-          ].filter(Boolean).map((m, i) => (
-            <div key={i} className="flex items-center gap-3 py-2.5 border-b border-default last:border-0">
-              <span className="flex-shrink-0">{m.icon}</span>
-              <div>
-                <p className="text-sm font-body text-primary">{m.text}</p>
-                {m.date && <p className="text-[10px] text-secondary font-body">{m.date}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <section aria-label="Scan History" className="mt-2">
+        <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
+        <ScanHistoryContent
+          embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading}
+          error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
+          isPremium={canAccessProUi} onViewScan={viewHistoryScan} onUpgrade={() => navigate('/premium')}
+          chartMode={progressMode} chartMetric={progressMetric}
+          chartLabel={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'}
+          emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
+        />
+      </section>
 
       <div className="pb-8" />
+      {flameFlight && createPortal(
+        <motion.div
+          initial={{ x: 0, y: 0, scale: 1 }}
+          animate={{ x: flameFlight.deltaX, y: flameFlight.deltaY, scale: flameFlight.scale }}
+          transition={{ duration: 1.05, ease: [0.22, 0.8, 0.3, 1] }}
+          onAnimationComplete={() => {
+            setFlameFlight(null)
+            navigate('/timeline', { replace: true, state: null })
+          }}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: flameFlight.origin.left,
+            top: flameFlight.origin.top,
+            width: flameFlight.origin.width,
+            height: flameFlight.origin.height,
+            transformOrigin: 'center center',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            willChange: 'transform',
+          }}
+        >
+          <StreakFlame size={flameFlight.origin.width} />
+        </motion.div>,
+        document.body,
+      )}
     </MotionPage>
   )
 }

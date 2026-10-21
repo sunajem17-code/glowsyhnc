@@ -75,9 +75,12 @@ export function analyzeLandmarkEvidence(landmarks, width, height) {
   const eyeToChin = points.chin.y - eyeMid.y
   const pitchProxy = eyeToChin > 0 ? (points.noseTip.y - eyeMid.y) / eyeToChin : null
   const faceWidthFraction = cheekWidth / width
+  // Use the short edge for framing: extra horizontal webcam background must
+  // not reject the same face that passes in a portrait capture.
+  const faceShortEdgeFraction = cheekWidth / Math.min(width, height)
   const landmarkMargin = Math.min(...Object.values(points).flatMap(p => [p.x / width, p.y / height, 1 - p.x / width, 1 - p.y / height]))
   const checks = {
-    faceSize: faceWidthFraction >= 0.25,
+    faceSize: faceShortEdgeFraction >= 0.25,
     roll: Math.abs(rollDegrees) <= 8,
     yaw: yawProxy <= 0.22, // loosened from 0.12 — real mobile selfies routinely hit 0.13–0.18
     pitch: pitchProxy != null && pitchProxy >= 0.15 && pitchProxy <= 0.55,
@@ -92,6 +95,7 @@ export function analyzeLandmarkEvidence(landmarks, width, height) {
   const assessable = failedChecks.length === 0
   const quality = {
     source: SOURCE, faceWidthFraction: round(faceWidthFraction), landmarkMarginFraction: round(landmarkMargin),
+    faceShortEdgeFraction: round(faceShortEdgeFraction),
     checks, failedChecks,
     limitations: ['Blur, lighting, occlusion, expression and face count are validated separately by the photo-quality gate'],
   }

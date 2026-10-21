@@ -4,6 +4,7 @@ import './onboardingMotion.css'
 import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
 import { presentationGate } from '../utils/scanPresentation'
+import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1095,8 +1096,7 @@ function StepAuth({ onNext, onSkip }) {
     setError('')
     setLoading('email')
     try {
-      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailInput, password: passInput }),
@@ -1134,12 +1134,11 @@ function StepAuth({ onNext, onSkip }) {
       const identityToken = appleResult?.response?.identityToken
       if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
 
-      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 20_000)
       let authRes
       try {
-        authRes = await fetch(`${API_BASE}/api/auth/apple`, {
+        authRes = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3093,6 +3092,11 @@ export default function PremiumOnboarding() {
       setPendingFacePhoto(scanRecord.facePhotoUrl)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
+      if (scanRecord.facePhotoUrl) {
+        import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
+          saveScanMedia(scanRecord.id, { photo: scanRecord.facePhotoUrl })
+        ).catch(err => console.warn('[OnboardingScan] Could not persist scan photo:', err?.message))
+      }
       setAssignedPhase(phase)
 
       // Fire-and-forget: MediaPipe landmark extraction for FaceMetricsExplorer
@@ -3190,8 +3194,7 @@ export default function PremiumOnboarding() {
     ])
     const token = result?.response?.identityToken
     if (!token) throw new Error('Apple Sign In did not return a valid token')
-    const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-    const res = await fetch(`${API_BASE}/api/auth/apple`, {
+    const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName, refCode: sessionStorage.getItem('asc_ref_code') || undefined }),
@@ -3253,8 +3256,7 @@ export default function PremiumOnboarding() {
       const token = result?.response?.identityToken
       if (!token) throw new Error('No identity token returned')
 
-      const API_BASE = (import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app').replace(/\/$/, '')
-      const res = await fetch(`${API_BASE}/api/auth/apple`, {
+      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

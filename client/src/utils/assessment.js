@@ -1,4 +1,4 @@
-import rubric from './assessmentRubric.json' with { type: 'json' }
+import rubric from '../../../server/src/lib/assessmentRubric.json' with { type: 'json' }
 import previousRubric from './assessmentRubricV1.json' with { type: 'json' }
 export const ASSESSMENT_VERSION = rubric.version
 export function assessmentRubric(version = ASSESSMENT_VERSION) {

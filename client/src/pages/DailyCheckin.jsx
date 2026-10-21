@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { API_BASE } from '../utils/backend'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { CheckCircle2, Circle, ChevronLeft, Flame, Droplets, Dumbbell, Moon, Sun, Heart, Sparkles, Frown, Meh, SmilePlus, Smile, Laugh } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
+import StreakFlame from '../components/StreakFlame'
 import { scheduleStreakReminder } from '../utils/notifications'
 import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -31,40 +33,6 @@ function GlossyCard({ children, className = '' }) {
   return (
     <div className={`rounded-2xl p-4 ${className}`} style={{ background: '#0D0D0D', border: '1px solid rgba(255,255,255,0.07)' }}>
       {children}
-    </div>
-  )
-}
-
-// Fires once when the last of the 5 habits gets checked off — a gold flame
-// scales in with a particle burst radiating from it (same radiating-dots
-// technique as UnlockRevealSlideshow's ParticleBurst), then the caller
-// auto-submits into the existing success screen a beat later so completing
-// the day feels like an event, not just another checkbox.
-function FlameBurst() {
-  const PARTICLES = 14
-  const angles = Array.from({ length: PARTICLES }, (_, i) => (i / PARTICLES) * 360)
-  return (
-    <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 80 }}>
-      {angles.map((angle, i) => {
-        const rad = (angle * Math.PI) / 180
-        const dist = 70 + Math.random() * 50
-        return (
-          <motion.div
-            key={i}
-            initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-            animate={{ opacity: 0, x: Math.cos(rad) * dist, y: Math.sin(rad) * dist, scale: 0.2 }}
-            transition={{ duration: 0.7 + Math.random() * 0.3, ease: [0.2, 0, 0.8, 1] }}
-            style={{ position: 'absolute', width: 5, height: 5, borderRadius: 3, background: GOLD, filter: GOLD_ICON_GLOW }}
-          />
-        )
-      })}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.4 }}
-        animate={{ opacity: 1, scale: [0.4, 1.3, 1] }}
-        transition={{ duration: 0.5, ease: EASE_STANDARD }}
-      >
-        <Flame size={72} style={{ color: GOLD, filter: 'drop-shadow(0 0 24px rgba(198,168,92,0.8))' }} fill={GOLD} />
-      </motion.div>
     </div>
   )
 }
@@ -98,8 +66,11 @@ export default function DailyCheckin() {
   const [skincarePm, setSkincarePm] = useState(todayCheckin?.skincarePm ?? false)
   const [exerciseDone, setExerciseDone] = useState(todayCheckin?.exercisesDone ?? false)
   const [mood, setMood] = useState(todayCheckin?.moodScore ?? 0)
-  const [submitted, setSubmitted] = useState(alreadyDone)
-  const [celebrating, setCelebrating] = useState(false)
+  // `submitted` represents this visit's celebration only. A saved check-in
+  // should show the form as completed when reopened, without replaying the
+  // success screen or its redirect.
+  const [submitted, setSubmitted] = useState(false)
+  const streakFlameRef = useRef(null)
 
   const completionScore = [
     water >= WATER_GOAL,
@@ -109,19 +80,9 @@ export default function DailyCheckin() {
     mood > 0,
   ].filter(Boolean).length
 
-  // The moment all 5 habits are checked off, play the flame burst and then
-  // auto-submit into the streak success screen a beat later — completing
-  // the day should feel like it just happened, not wait on a extra tap.
-  useEffect(() => {
-    if (completionScore < 5 || submitted || celebrating) return
-    triggerHaptic()
-    setCelebrating(true)
-    const timer = setTimeout(() => { handleSubmit() }, 1100)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completionScore, submitted, celebrating])
-
   function handleSubmit() {
+    if (alreadyDone) return
+
     const checkin = {
       id: `checkin-${Date.now()}`,
       date: today,
@@ -147,9 +108,7 @@ export default function DailyCheckin() {
 
     // Sync checkin to server (fire-and-forget — local state is source of truth for UI)
     if (token && token !== 'demo-token') {
-      const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
-      const base = `https://${API.replace(/^https?:\/\//, '')}/api`
-      fetch(`${base}/checkin`, {
+      fetch(`${API_BASE}/checkin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -169,11 +128,16 @@ export default function DailyCheckin() {
   }
 
   // Success is a self-contained celebration, not a data recap — no header,
-  // no exit button, it just holds on the streak reveal and hands off to the
-  // dashboard on its own once it's done playing.
+  // no exit button; after the reveal, the lit flame flies into Progress.
   useEffect(() => {
     if (!submitted) return
-    const timer = setTimeout(() => navigate('/'), 3200)
+    const timer = setTimeout(() => {
+      const rect = streakFlameRef.current?.getBoundingClientRect()
+      const flameOrigin = rect
+        ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+        : null
+      navigate('/timeline', { state: { streakFlameFlight: true, flameOrigin } })
+    }, 2400)
     return () => clearTimeout(timer)
   }, [submitted]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -188,17 +152,13 @@ export default function DailyCheckin() {
           style={{ width: 440, height: 440, borderRadius: '50%', background: 'radial-gradient(circle, rgba(198,168,92,0.3) 0%, transparent 70%)' }}
         />
         <motion.div
+          ref={streakFlameRef}
           initial={{ opacity: 0, scale: 0.3, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 220, damping: 15, delay: 0.05 }}
           className="mb-6 relative"
         >
-          <motion.div
-            animate={{ scale: [1, 1.07, 1] }}
-            transition={{ duration: 1.7, repeat: Infinity, ease: EASE_STANDARD, delay: 0.6 }}
-          >
-            <Flame size={128} style={{ color: GOLD, filter: 'drop-shadow(0 0 40px rgba(198,168,92,0.75))' }} fill={GOLD} />
-          </motion.div>
+          <StreakFlame size={150} />
         </motion.div>
         <motion.p
           initial={{ opacity: 0, y: 8 }}
@@ -378,9 +338,14 @@ export default function DailyCheckin() {
             </div>
           </GlossyCard>
 
-          {/* Once all 5 are checked, the FlameBurst effect above takes over
-              and auto-submits — no manual button needed at that point. */}
-          {completionScore < 5 && (
+          {/* Keep the explicit log action visible for any non-empty check-in;
+              the full streak celebration begins only after it is pressed. */}
+          {alreadyDone ? (
+            <div className="flex items-center justify-center gap-2 py-4 rounded-2xl border-2 font-heading font-bold text-[15px]" style={{ background: `${GOLD}14`, color: GOLD, borderColor: GOLD, boxShadow: '0 0 18px rgba(198,168,92,0.25), inset 0 0 14px rgba(198,168,92,0.08)', textShadow: GOLD_GLOW }}>
+              <CheckCircle2 size={18} style={{ filter: GOLD_ICON_GLOW }} />
+              Today's check-in is complete
+            </div>
+          ) : (
             <button
               onClick={() => { triggerHaptic(); handleSubmit() }}
               disabled={completionScore === 0}
@@ -393,7 +358,6 @@ export default function DailyCheckin() {
           <div style={{ height: 'max(48px, calc(env(safe-area-inset-bottom, 0px) + 32px))' }} />
       </div>
 
-      <AnimatePresence>{celebrating && <FlameBurst key="flame-burst" />}</AnimatePresence>
     </MotionPage>
   )
 }

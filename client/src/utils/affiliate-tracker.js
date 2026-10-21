@@ -3,7 +3,7 @@
  * Tracks product clicks with UTM attribution and fires to the backend
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
+import { BACKEND_ORIGIN } from './backend'
 
 // ── Product catalogue ─────────────────────────────────────────────────────────
 // Replace URL values with your actual Amazon Associates links
@@ -77,7 +77,7 @@ export async function trackAndGo(productId, userId) {
   const utmUrl = `${product.url}&utm_source=ascendus&utm_medium=app&utm_campaign=product_rec&utm_content=${productId}`
 
   // Fire-and-forget — don't block the navigation
-  fetch(`${API_URL}/webhooks/track-click`, {
+  fetch(`${BACKEND_ORIGIN}/webhooks/track-click`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

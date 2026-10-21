@@ -12,36 +12,51 @@ const midpoint = (a, b) => valid(a) && valid(b)
 const available = entries => entries.filter(({ point }) => valid(point))
 const region = points => points.every(valid) ? points : null
 
-// Envelope of the detected upper-cheek surface points, including the outer
-// face boundary. Interior mesh points must not fold the outline inward.
-const cheekEnvelope = points => {
-  if (!points?.length || !points.every(valid)) return null
-  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y)
-  const cross = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-  const half = list => {
-    const hull = []
-    for (const p of list) {
-      while (hull.length > 1 && cross(hull.at(-2), hull.at(-1), p) <= 0) hull.pop()
-      hull.push(p)
-    }
-    return hull.slice(0, -1)
-  }
-  return [...half(sorted), ...half([...sorted].reverse())]
+// Anchor-based template, not hand-picked landmark indices: every previous
+// attempt at this shape guessed 3-4 raw MediaPipe points and hoped they'd
+// happen to form the right triangle — which is why each attempt came out
+// wrong in a different way (through the eye, pointing up instead of
+// sideways, collapsed into a sliver). This instead defines the wedge ONCE
+// as fixed offsets from the eye's own center, scaled by that eye's own
+// width, then fits it onto whichever face is detected — same technique AR
+// face filters use. Because it's anchored to the eye and scaled by eye
+// width rather than built from independently-guessed points, it lands in
+// the same correct relative position/size on any face automatically.
+function eyeAnchoredWedge(eyeInner, eyeOuter, side) {
+  if (!valid(eyeInner) || !valid(eyeOuter)) return null
+  const center = midpoint(eyeInner, eyeOuter)
+  const width = Math.hypot(eyeOuter.x - eyeInner.x, eyeOuter.y - eyeInner.y)
+  const dir = side === 'L' ? -1 : 1 // outward = toward the ear on that side
+  return [
+    { x: center.x + dir * 1.3 * width, y: center.y },               // apex, out at eye height
+    { x: center.x + dir * 0.1 * width, y: center.y - 0.9 * width }, // base, above the eye
+    { x: center.x + dir * 0.1 * width, y: center.y + 0.9 * width }, // base, below the eye
+  ]
 }
 
 export function frontFeatureAnchors(p) {
-  const pt = p || {}
-  const leftUpper = cheekEnvelope(pt.malarL)
-  const rightUpper = cheekEnvelope(pt.malarR)
-  // Preserve the requested stage order; missing landmarks are not invented or removed from the count.
-  return [
-    { id: 'chin', label: 'Chin Definition', point: pt.chin, regions: [] },
-    { id: 'cheekbones', label: 'Cheekbone Prominence', point: midpoint(pt.malarL?.[0], pt.malarL?.[1]), focus: midpoint(pt.cheekL, pt.cheekR), regions: [leftUpper, rightUpper], exact: true },
-    { id: 'jaw', label: 'Jaw Definition', point: pt.jawMidR, contour: pt.jawContour },
-    { id: 'cheeks', label: 'Cheek Leanness & Ogee Curve', point: pt.buccalL?.[2], regions: [cheekEnvelope(pt.buccalL), cheekEnvelope(pt.buccalR)], exact: true },
-    { id: 'submental', label: 'Submental Definition', point: pt.chin, contour: pt.chinContour },
-
-  ]
+  if (!p) return []
+  return available([
+    { id: 'chin-definition', label: 'CHIN DEFINITION', point: p.chin, badgeX: 90, badgeY: 74,
+      regions: [region([p.jawChinL, p.chin, p.jawChinR])] },
+    { id: 'cheekbone-prominence', label: 'CHEEKBONE PROMINENCE', point: p.cheekL, badgeX: 10, badgeY: 29,
+      regions: [
+        (() => { const w = eyeAnchoredWedge(p.eyeInnerL, p.eyeOuterL, 'L'); return w ? region(w) : null })(),
+        (() => { const w = eyeAnchoredWedge(p.eyeInnerR, p.eyeOuterR, 'R'); return w ? region(w) : null })(),
+      ] },
+    { id: 'jaw-definition', label: 'JAW DEFINITION', point: p.jawR, badgeX: 90, badgeY: 52,
+      contour: region([p.jawL, p.jawMidL, p.jawChinL, p.chin, p.jawChinR, p.jawMidR, p.jawR]) },
+    // Extended down through jawChin (not just jawMid) so the highlighted
+    // region actually spans the cheek-to-jaw transition the "ogee curve"
+    // name refers to, instead of stopping mid-cheek. Starts from eyeBottomL
+    // (below the eyelid) rather than eyeOuterL (the eye corner itself) for
+    // the same reason as cheekbone-prominence above — the eye corner as a
+    // polygon vertex drew the top edge straight across the eye.
+    { id: 'cheek-leanness', label: 'CHEEK LEANNESS & OGEE CURVE', point: p.cheekL, badgeX: 10, badgeY: 61,
+      regions: [region([p.eyeBottomL, p.cheekL, p.jawChinL, p.jawMidL]), region([p.eyeBottomR, p.cheekR, p.jawChinR, p.jawMidR])] },
+    { id: 'submental-definition', label: 'SUBMENTAL DEFINITION', point: p.chin, badgeX: 90, badgeY: 28,
+      contour: region([p.jawChinL, p.chin, p.jawChinR]) },
+  ])
 }
 
 export function profileFeatureAnchors(p) {

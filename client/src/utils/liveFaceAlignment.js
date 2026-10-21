@@ -35,7 +35,7 @@ export async function createLiveFaceAlignment(onFrame) {
 
 export function getAlignment(frame, profile) {
   if (!frame || frame.status === 'missing') return { label: profile ? 'Turn to the side' : 'Position your face', aligned: false }
-  if (frame.status === 'multiple') return { label: 'Only one face in frame', aligned: false }
+  if (frame.status === 'multiple') return { label: 'Multiple faces visible — you can still capture', aligned: false }
   if (frame.height < 0.3 || frame.width < 0.19) return { label: 'Move closer', aligned: false }
   if (frame.height > 0.86 || frame.width > 0.85) return { label: 'Move back', aligned: false }
   if (Math.abs(frame.centerX - 0.5) > 0.17 || Math.abs(frame.centerY - 0.5) > 0.2) return { label: profile ? 'Align your profile' : 'Center your face', aligned: false }
@@ -43,4 +43,10 @@ export function getAlignment(frame, profile) {
   if (profile && frame.yaw < 0.22) return { label: 'Turn to the side', aligned: false }
   if (!profile && frame.yaw > 0.18) return { label: 'Look straight ahead', aligned: false }
   return { label: 'Hold still', aligned: true }
+}
+
+export function shouldBlockPhotoCapture(stepNum, trackingAvailable, aligned) {
+  // Alignment remains guidance only. Never make the camera shutter a dead end
+  // when the tracker misreads a face or the user prefers another angle.
+  return false
 }

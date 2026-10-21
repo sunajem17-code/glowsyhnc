@@ -1,24 +1,34 @@
 import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
 import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
-import { isNative, purchasePro, purchaseDiscountedAnnual } from '../utils/iap'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { isNative, purchasePro } from '../utils/iap'
 import {
-  UserPlus, Share2, Check, Loader2, Users, ChevronRight, X,
+  UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import PromoModal from '../components/PromoModal'
-import { AnnualDiscountOfferModal } from '../components/OnboardingFinalSteps'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
+import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
+import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
+import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { getProgressSaveFlight } from '../utils/progressSaveAnimation'
+import { hasUnlockedScanUiAccess, isLocalDeveloperPreview, markScanResultsUnlocked } from '../utils/developerUnlock'
+import ScanWaitingText from '../components/ScanWaitingText'
+import ScanPhotoComparison from '../components/ScanPhotoComparison'
+import ShareCardModal from '../components/ShareCardModal'
+import { getProgressCardReturnTo } from '../utils/scanResultContext'
 
 const G    = GOLD
+const RESULT_VIEWS = ['results', 'photo', 'compare']
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -706,6 +716,19 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onPromo, onContinue, i
   }, [isPremium])
 
   const facePhoto = scan?.facePhotoUrl ?? null
+  const [photoReady, setPhotoReady] = useState(false)
+  useEffect(() => {
+    if (!facePhoto) { setPhotoReady(false); return undefined }
+    let active = true
+    const probe = new Image()
+    const ready = () => { if (active) setPhotoReady(true) }
+    probe.onload = ready
+    probe.onerror = () => { if (active) setPhotoReady(false) }
+    probe.src = facePhoto
+    if (probe.complete && probe.naturalWidth > 0) ready()
+    probe.decode?.().then(ready).catch(() => {})
+    return () => { active = false }
+  }, [facePhoto])
   const cards = [
     ...(isPremium ? [{ id: 'percentile', el: <CardPercentile scan={scan} /> }] : []),
     { id: 'score', el: <Card1Score scan={scan} isPremium={isPremium} /> },
@@ -1236,7 +1259,7 @@ function SocialProofTicker() {
             }}
           >
             <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{notif.flag}</span>
-            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'nowrap' }}>
+            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'normal' }}>
               <span style={{ color: 'rgba(198,168,92,0.92)', fontWeight: 600 }}>{notif.name}</span>
               {' from '}{notif.country}{' just unlocked their results'}
             </p>
@@ -1247,7 +1270,7 @@ function SocialProofTicker() {
   )
 }
 
-function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }) {
+function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
   const containerRef = useRef(null)
@@ -1256,10 +1279,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
 
   // Exit-intent discount offer state
   const [showDiscount, setShowDiscount]       = useState(false)
-  const [discountLoading, setDiscountLoading] = useState(false)
   const [discountError, setDiscountError]     = useState('')
-  const setIsPremium = useStore(s => s.setIsPremium)
-  const updateUser   = useStore(s => s.updateUser)
 
   // Pull real scan count from server — no hardcoded numbers
   useEffect(() => {
@@ -1288,6 +1308,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
   // X button → show discount first; decline → actually close the paywall.
   // Shown every time (no "already seen" gate) — same policy as StepScoresWaiting.
   function handleCloseAttempt() {
+    if (isPurchasing) return
     triggerHaptic()
     setDiscountError('')
     setShowDiscount(true)
@@ -1299,36 +1320,11 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
     onClose()   // actually exit the paywall
   }
 
-  async function handleClaimDiscount() {
-    triggerHaptic()
-    if (!isNative()) {
-      setDiscountError('This offer is only available in the app right now.')
-      return
-    }
-    setDiscountLoading(true)
-    setDiscountError('')
-    try {
-      const result = await purchaseDiscountedAnnual()
-      if (result?.success) {
-          useStore.getState().setUpgradeWelcomePending(true)
-        const rcUserId = result.customerInfo?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
-        setIsPremium(true)
-        updateUser?.({ isPremium: true })
-        setShowDiscount(false)
-        onClose()
-        return
-      }
-      if (result?.reason === 'not_configured') {
-        setDiscountError("This offer isn't set up yet. Please try again shortly.")
-      } else if (result?.reason !== 'cancelled') {
-        setDiscountError('Unable to complete purchase. Please try again.')
-      }
-    } catch {
-      setDiscountError('Unable to complete purchase. Please try again.')
-    } finally {
-      setDiscountLoading(false)
-    }
+  async function handleClaimDiscount(result) {
+    await api.payments.syncRc(result.customerInfo?.originalAppUserId)
+    useStore.getState().setUpgradeWelcomePending(true)
+    setShowDiscount(false)
+    onUnlock()
   }
 
   // Dynamic score gap — only shown if we have a real computed score
@@ -1382,12 +1378,6 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
         </p>
       </div>
 
-      {isCurrentAssessment(scan) ? (
-        <div className="mx-4 my-6 p-6 rounded-2xl bg-neutral-900 text-neutral-300">
-          <h2 className="text-xl font-bold text-white">Photographic appearance feedback</h2>
-          <p className="mt-3">View your subjective score range, supporting observations, confidence and photo limitations. No guaranteed improvements or tier increases.</p>
-        </div>
-      ) : (<>
       {/* Swipeable feature cards */}
       <div ref={containerRef} className="flex-shrink-0 relative overflow-hidden mx-4 my-2 rounded-3xl" style={{ background: '#141414', height: 240 }}>
         <motion.div
@@ -1416,8 +1406,6 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
         ))}
       </div>
 
-      </>)}
-
       {/* CTA */}
       <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 4 }}>
         <motion.button
@@ -1430,16 +1418,9 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
-        {error && (
-          <div role="alert" className="mt-3 text-center">
-            <p className="text-sm font-body" style={{ color: RED }}>{error}</p>
-            {/session expired|sign in|log in/i.test(error) && (
-              <button type="button" onClick={onSignIn} className="mt-2 text-sm underline" style={{ color: G }}>Sign in again</button>
-            )}
-          </div>
-        )}
-        <div className="mt-3 mb-2">
+        <div className="mt-3 mb-3">
           <SocialProofTicker />
+          <p className="text-center font-body text-[10px] mt-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Sample activity</p>
         </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
@@ -1449,14 +1430,7 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }
       </div>
 
       <AnimatePresence>
-        {showDiscount && (
-          <AnnualDiscountOfferModal
-            onClaim={handleClaimDiscount}
-            onDecline={handleDeclineDiscount}
-            loading={discountLoading}
-            error={discountError}
-          />
-        )}
+        {showDiscount && <FreeTrialOfferModal onClaim={handleClaimDiscount} onDecline={handleDeclineDiscount} loading={isPurchasing} error={discountError} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -1542,120 +1516,378 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-export function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, isPurchasing, error }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
-  const glowScore = scan?.glowScore ?? scan?.umaxScore ?? null
-  const fd = scan?.faceData ?? {}
-  const toBar = v => v != null ? Math.min(100, (v / 10) * 100) : 68
+  const savedScans = useStore(state => state.scans)
+  const [recoveredRatingValues, setRecoveredRatingValues] = useState(null)
+  const [isRecoveringRatings, setIsRecoveringRatings] = useState(false)
+  const [ratingsRecoveryError, setRatingsRecoveryError] = useState('')
+  const [activeView, setActiveView] = useState('results')
+  const [viewDirection, setViewDirection] = useState(1)
+  const [saveError, setSaveError] = useState('')
+  const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
+  const [showShareCard, setShowShareCard] = useState(false)
+  const [saveFlight, setSaveFlight] = useState(null)
+  const saveFlightIdRef = useRef(0)
+  const resultsCardRef = useRef(null)
+  const progressButtonRef = useRef(null)
+  const reduceMotion = useReducedMotion()
 
-  // Fixed locked display values — these are shown blurred, so they
-  // function as teaser numbers, not real scores.
-  const metrics = [
-    { label: 'Overall',      pct: 61 },
-    { label: 'Potential',    pct: 88 },
-    { label: 'Symmetry',     pct: 63 },
-    { label: 'Skin Quality', pct: 68 },
-    { label: 'Jawline',      pct: 57 },
-    { label: 'Cheekbones',   pct: 51 },
-  ]
+  function showView(view) {
+    if (view === activeView) return
+    setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
+    setActiveView(view)
+  }
+
+  function saveResult() {
+    setSaveError('')
+    try {
+      const progressSavedAt = new Date().toISOString()
+      useStore.setState(state => {
+        const latest = state.currentScan?.id === scan.id ? state.currentScan : scan
+        const saved = { ...latest, progressSavedAt: latest.progressSavedAt || progressSavedAt, resultsUnlocked: true }
+        const exists = state.scans.some(item => item.id === scan.id)
+        return {
+          currentScan: state.currentScan?.id === scan.id ? saved : state.currentScan,
+          scans: exists ? state.scans.map(item => item.id === scan.id ? saved : item) : [saved, ...state.scans].slice(0, 100),
+        }
+      })
+      return true
+    } catch {
+      setSaveError('Could not save your rating on this device. Please try again.')
+      return false
+    }
+  }
+
+  function saveToProgress() {
+    if (!saveResult()) return
+    triggerHaptic()
+    setProgressAdded(true)
+    const openProgress = () => navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
+    if (reduceMotion) {
+      openProgress()
+      return
+    }
+
+    const source = activeView === 'results'
+      ? resultsCardRef.current
+      : document.getElementById(`scan-${activeView}-panel`)
+    const flight = getProgressSaveFlight(
+      source?.getBoundingClientRect(),
+      progressButtonRef.current?.getBoundingClientRect(),
+    )
+    if (flight) setSaveFlight({ ...flight, id: ++saveFlightIdRef.current })
+    else openProgress()
+  }
+
+  useEffect(() => {
+    setRecoveredRatingValues(null)
+    setIsRecoveringRatings(false)
+    setRatingsRecoveryError('')
+    if (!unlocked || !scan || getRevealRatings(scan).every(({ value }) => value != null)) return undefined
+    let active = true
+    setIsRecoveringRatings(true)
+    recoverMissingRevealRatings(scan, api)
+      .then(({ values }) => {
+        if (!active) return
+        setRecoveredRatingValues(values)
+        if (getRevealRatings(scan).some((rating, index) => rating.value == null && values[index] == null)) {
+          setRatingsRecoveryError('The scoring service did not return every rating. Please run the scan again while connected.')
+        }
+        const patch = saved => {
+          if (saved?.id !== scan.id) return saved
+          const existingRatings = getRevealRatings(saved)
+          const aiScore = { ...saved.aiScore }
+          if (existingRatings[1].value == null && values[1] != null) aiScore.potentialScore = values[1]
+          const faceMetricKeys = [null, null, 'symmetry', 'skinQuality', 'jawline', 'cheekbones']
+          const faceMetrics = { ...aiScore.faceMetrics }
+          faceMetricKeys.forEach((key, index) => {
+            if (key && existingRatings[index].value == null && values[index] != null) {
+              faceMetrics[key] = { ...faceMetrics[key], score: values[index] }
+            }
+          })
+          if (Object.keys(faceMetrics).length) aiScore.faceMetrics = faceMetrics
+          return {
+            ...saved,
+            potentialScore: existingRatings[1].value == null ? values[1] ?? saved.potentialScore : saved.potentialScore,
+            aiScore,
+          }
+        }
+        useStore.setState(state => ({ currentScan: patch(state.currentScan), scans: state.scans.map(patch) }))
+      })
+      .catch(err => {
+        console.warn('[Reveal rating recovery failed]', err?.message)
+        if (active) setRatingsRecoveryError('Some ratings are missing from this saved scan and could not be recalculated. Please run the scan again while connected.')
+      })
+      .finally(() => { if (active) setIsRecoveringRatings(false) })
+    return () => { active = false }
+  }, [unlocked, scan?.id])
+
+  const recoveredScan = recoveredRatingValues
+    ? {
+        ...scan,
+        potentialScore: recoveredRatingValues[1] ?? scan?.potentialScore,
+        aiScore: {
+          ...scan?.aiScore,
+          potentialScore: scan?.aiScore?.potentialScore ?? recoveredRatingValues[1],
+          faceMetrics: {
+            ...scan?.aiScore?.faceMetrics,
+            ...Object.fromEntries(['symmetry', 'skinQuality', 'jawline', 'cheekbones']
+              .map((key, offset) => [key, recoveredRatingValues[offset + 2] == null || getRevealRatings(scan)[offset + 2].value != null
+                ? scan?.aiScore?.faceMetrics?.[key]
+                : { ...scan?.aiScore?.faceMetrics?.[key], score: recoveredRatingValues[offset + 2] }]))
+              .filter(([, metric]) => metric != null),
+          },
+        },
+      }
+    : scan
+  const metrics = getRevealRatings(recoveredScan)
+  const resultsHeading = unlocked ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <div className="flex flex-col items-center px-5 pb-10"
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
 
-        {/* Close button */}
-        <div className="w-full flex justify-end mb-3">
-          <button onClick={() => { triggerHaptic(); navigate('/scan') }} className="flex items-center justify-center" style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
+      {savedProgressCard && (
+        <div className="flex items-center w-full mb-3">
+          <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back" className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+            <ChevronLeft size={18} className="text-primary" />
           </button>
         </div>
+      )}
 
-        {/* Header */}
-        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Reveal your ratings
+      {/* Header */}
+        <div className="relative w-full">
+        <h1 className={`font-heading font-bold text-[32px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? getUnlockedResultsHeadingStyle(resultsHeading) : {}) }}>
+          {resultsHeading}
         </h1>
-        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full facial analysis with Ascendus Max
-        </p>
-
+        </div>
+        <div className="h-5 flex items-start justify-center">
+          {unlocked ? (
+            <span aria-hidden="true" />
+          ) : (
+            <p className="font-body text-[14px] text-center leading-5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              See your full facial analysis with Ascendus Max
+            </p>
+          )}
+        </div>
         {/* Face circle + card */}
-        <div className="relative w-full" style={{ marginTop: 102 }}>
+        <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+          drag={unlocked ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
+          onDragEnd={(_, info) => {
+            const index = RESULT_VIEWS.indexOf(activeView)
+            if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
+            else if (info.offset.x > 60 || info.velocity.x > 400) showView(RESULT_VIEWS[Math.max(index - 1, 0)])
+          }}
+          >
+          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
+          <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
-            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
+            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
               {facePhoto
-                ? <img src={facePhoto} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
+                ? <img src={facePhoto} alt="" loading="eager" decoding="async" className="w-full h-full object-cover" style={{ filter: 'brightness(1)' }} />
                 : null}
             </div>
           </div>
 
           {/* Metrics card */}
-          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+          <div ref={resultsCardRef} className="w-full rounded-3xl pt-14 pb-10 px-4" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
             <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
-              {metrics.map(({ label, pct }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <Lock size={13} style={{ color: G, flexShrink: 0 }} />
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
+              {metrics.map(({ label, value }, idx) => {
+                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun })
+                const metricTextStyles = getRevealMetricTextStyles()
+                return (
+                <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
+                    <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
+                    <motion.span
+                      aria-hidden="true"
+                      initial={ratingAnimation.lock.initial}
+                      animate={ratingAnimation.lock.animate}
+                      transition={ratingAnimation.lock.transition}
+                      style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    >
+                      <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
+                    </motion.span>
                   </div>
-                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
-                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
+                  {unlocked ? (
+                    <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                      {value == null ? isRecoveringRatings ? 'Scoring…' : 'Unavailable' : value.toFixed(1)}
+                    </motion.div>
+                  ) : (
+                    <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
+                    </div>
+                  )}
+                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
+                    <motion.div
+                      key={unlocked ? 'revealed' : 'locked'}
+                      initial={ratingAnimation.bar.initial}
+                      animate={ratingAnimation.bar.animate}
+                      transition={ratingAnimation.bar.transition}
+                      style={{ height: '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
+                    />
+                  </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
-        </div>
+          </div>
+          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
+            <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
+              {facePhoto ? <img src={facePhoto} draggable={false} alt="Your original front scan photo" className="w-full h-full object-contain" /> : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
+            </div>
+          </div>}
+          {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} />}
+          </div>}
+          </motion.div>
+        </motion.div>
 
         {/* CTAs */}
-        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
+        {unlocked && !savedProgressCard && <motion.button
+          ref={progressButtonRef}
+          whileTap={{ scale: 0.97 }}
+          onClick={saveToProgress}
+          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
+          style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
+        </motion.button>}
+        {unlocked && savedProgressCard && <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setShowShareCard(true)}
+          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
+          style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          Share Results
+        </motion.button>}
+        {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
+          {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
+            <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
+              onClick={() => showView(view)} onKeyDown={event => {
+                if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                  event.preventDefault()
+                  const direction = event.key === 'ArrowRight' ? 1 : -1
+                  const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
+                  showView(RESULT_VIEWS[index])
+                }
+              }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
+            </button>
+          ))}
+        </div>}
+        {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
+        {ratingsRecoveryError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{ratingsRecoveryError}</p>}
+        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
             disabled={isPurchasing}
-            className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+            className="w-full py-5 rounded-2xl font-body font-semibold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{ background: GRAD, color: '#0A0A0A', fontFamily: 'Inter, sans-serif', fontWeight: 600, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
             {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
           </motion.button>
 
-        </div>
+          {(import.meta.env.DEV || developerUnlockAvailable) && (
+            <button
+              onClick={onDeveloperUnlock}
+              disabled={developerUnlocking || isPurchasing}
+              className="w-full py-2 font-body text-[12px] text-center disabled:opacity-40"
+              style={{ color: 'rgba(198,168,92,0.7)' }}
+            >
+              {developerUnlocking ? 'Unlocking developer access…' : 'Developer unlock'}
+            </button>
+          )}
+
+        </div>}
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
-    </div>
+      <AnimatePresence>
+        {showShareCard && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50">
+            <ShareCardModal scan={recoveredScan} isPremium={unlocked} facePhotoUrl={facePhoto} onClose={() => setShowShareCard(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {saveFlight && typeof document !== 'undefined' && createPortal(
+        <motion.div
+          aria-hidden="true"
+          initial={{ ...saveFlight.from, borderRadius: 24, opacity: 1 }}
+          animate={{ ...saveFlight.to, borderRadius: 22, opacity: 1 }}
+          transition={{ duration: 0.72, ease: [0.22, 0.8, 0.2, 1] }}
+          onAnimationComplete={() => {
+            if (saveFlightIdRef.current !== saveFlight.id) return
+            setSaveFlight(null)
+            navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
+          }}
+          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(209,183,109,0.9)', boxShadow: '0 0 28px rgba(209,183,109,0.35)', pointerEvents: 'none' }}
+        >
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ delay: 0.3, duration: 0.18 }}
+            style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(180deg, transparent 38%, rgba(0,0,0,0.86) 100%)' }}
+          >
+            {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />}
+            <div style={{ position: 'relative', color: '#D1B76D', font: '800 12px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.16em' }}>ASCENDUS</div>
+            <div style={{ position: 'relative', color: '#fff', font: '800 42px "Plus Jakarta Sans", sans-serif' }}>{metrics[0]?.value?.toFixed(1) ?? '—'}</div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.45 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.43, duration: 0.2, ease: 'easeOut' }}
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1B76D' }}
+          >
+            <Check size={23} strokeWidth={3} />
+          </motion.div>
+        </motion.div>,
+        document.body,
+      )}
+    </motion.div>
   )
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-function LegacyScanUnlockGate() {
+function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
-  const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const location = useLocation()
+  const { currentScan, scans, pendingFacePhoto, isPremium, developerPreviewUnlocked, setIsPremium, setDeveloperPreviewUnlocked, updateUser, setShowUnlockSlideshow, setGuestSession } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
-  const [showPaywall, setShowPaywall]       = useState(searchParams.get('paywall') === '1')
+  const [showPaywall, setShowPaywall]       = useState(directPaywall || searchParams.get('paywall') === '1')
   const [showPromo, setShowPromo]           = useState(false)
   const [justUnlocked, setJustUnlocked]     = useState(false)
+  const [revealRun, setRevealRun] = useState(0)
   const justUnlockedRef = useRef(false)
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
+  const [developerUnlockAvailable, setDeveloperUnlockAvailable] = useState(false)
+  const [developerUnlocking, setDeveloperUnlocking] = useState(false)
+  const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
+  const completedDemoScan = completeDemoRevealRatings(currentScan)
+  const displayedScan = pendingScan ? null : completedDemoScan
+  // A saved history row must only ever show its own photo. Falling back to the
+  // pending upload here made old cards inherit the newest scan's image.
+  const revealScan = completedDemoScan
+    ? { ...completedDemoScan, facePhotoUrl: completedDemoScan.facePhotoUrl || null }
+    : pendingFacePhoto
+      ? { facePhotoUrl: pendingFacePhoto }
+      : null
   // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
   // for why isPurchasing alone can't prevent a true double-tap.
   const purchaseLockRef = useRef(false)
-
-  useEffect(() => {
-    if (isPremium && !justUnlockedRef.current) navigate('/results', { replace: true })
-  }, [isPremium])
-
-  useEffect(() => {
-    if (!currentScan && searchParams.get('paywall') !== '1') navigate('/scan', { replace: true })
-  }, [currentScan])
 
   useEffect(() => {
     if (!currentScan || isPremium) return
@@ -1664,29 +1896,38 @@ function LegacyScanUnlockGate() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (isPremium) return
+    api.developerAccess.status()
+      .then(({ enabled }) => setDeveloperUnlockAvailable(Boolean(enabled)))
+      .catch(() => setDeveloperUnlockAvailable(false))
+  }, [isPremium])
+
   // When arriving from paywall=1 (e.g. daily check-in tap), show the paywall
   // even without a scan. Without this guard, the component returns null and the
   // paywall sheet—already set to open via useState—never renders.
-  const isPaywallRedirect = searchParams.get('paywall') === '1'
-  if (!currentScan && !isPaywallRedirect) return null
-
-  if (isPremium && !justUnlocked) return null
-
+  const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
+  const progressCardReturnTo = getProgressCardReturnTo(location.state)
+  const hasUnlockedAccess = hasUnlockedScanUiAccess(isPremium || justUnlocked, developerPreviewUnlocked, currentScan)
+  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: hasUnlockedAccess, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
       setIsPremium(true)
-      updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
       navigate('/results', { replace: true })
       return
     }
     justUnlockedRef.current = true
+    // Replay only the compact lock-to-score animation on the existing card.
+    setRevealRun(run => run + 1)
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
     setJustUnlocked(true)
-    setShowUnlockSlideshow(true)
+    setShowPaywall(false)
+    setShowUnlockSlideshow(false)
     setIsPremium(true)
     updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
+
 
   async function handleAscend() {
     if (purchaseLockRef.current) return
@@ -1701,7 +1942,7 @@ function LegacyScanUnlockGate() {
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
-          api.payments.syncRc(rcUserId).catch(() => {})
+          await api.payments.syncRc(rcUserId)
           handleUnlockSuccess()
           setIsPurchasing(false)
           purchaseLockRef.current = false
@@ -1734,32 +1975,74 @@ function LegacyScanUnlockGate() {
     }
   }
 
+  async function handleDeveloperUnlock() {
+    if (developerUnlocking) return
+    setDeveloperUnlocking(true)
+    setPurchaseError('')
+
+    // Local-only UI preview: reveal this scan without changing persisted Pro
+    // entitlement or contacting a backend that may not be running locally.
+    // The real server-authoritative unlock path below is unchanged elsewhere.
+    if (isLocalDeveloperPreview()) {
+      useStore.setState(state => markScanResultsUnlocked(state, currentScan?.id))
+      setDeveloperPreviewUnlocked(true)
+      setRevealRun(run => run + 1)
+      setJustUnlocked(true)
+      setShowPaywall(false)
+      setShowUnlockSlideshow(false)
+      setDeveloperUnlocking(false)
+      return
+    }
+
+    try {
+      try {
+        await api.developerAccess.unlock()
+      } catch (err) {
+        // A browser pointed at local API can still have a JWT issued by the
+        // deployed API. Refresh only that stale local session, then retry.
+        if (!import.meta.env.DEV || err?.status !== 401) throw err
+        const guest = await api.auth.guest()
+        setGuestSession(guest.userId, guest.token)
+        await api.developerAccess.unlock()
+      }
+      handleUnlockSuccess()
+    } catch (err) {
+      setPurchaseError(err?.message || 'Developer unlock failed')
+      setDeveloperUnlocking(false)
+    }
+  }
+
   return (
     <MotionPage
       baseClassName=""
       className="fixed inset-0 z-50 overflow-hidden dark"
-      style={{ background: BG, '--text-secondary': 'rgba(255,255,255,0.5)' }}
+      style={{ background: BG, ...((directPaywall || embeddedReveal) ? { zIndex: 10002 } : {}), '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
-      {(isPremium || justUnlocked) ? (
-        <SwipeableResultCards
-          scan={currentScan}
-          onAscend={handleAscend}
-          onInvite={() => setShowInvite(true)}
-          onPromo={() => setShowPromo(true)}
-          isPurchasing={isPurchasing}
-          error={purchaseError}
-          isPremium={isPremium}
-        />
-      ) : currentScan && !isPaywallRedirect ? (
+      {revealView === 'pending' ? (
+        <ScanWaitingText ready={!pendingScan && Boolean(currentScan)} onComplete={() => setWaitingFinished(true)} />
+      ) : revealView === 'empty' ? (
+        <div className="h-full flex flex-col items-center justify-center gap-5 px-6 text-white text-center">
+          <h1 className="text-2xl font-bold">No scan to reveal yet</h1>
+          <p>Take a scan to see your ratings here.</p>
+          <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
+        </div>
+      ) : hasUnlockedAccess ? (
+        <LockedRevealScreen scan={revealScan} unlocked savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
+      ) : (
         <LockedRevealScreen
-          scan={currentScan}
+          scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}
+          savedProgressCard={Boolean(progressCardReturnTo)}
+          onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })}
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
+          developerUnlockAvailable={developerUnlockAvailable}
+          onDeveloperUnlock={handleDeveloperUnlock}
+          developerUnlocking={developerUnlocking}
           isPurchasing={isPurchasing}
           error={purchaseError}
         />
-      ) : null}
+      )}
 
       {/* paywall=1 redirect: showPaywall already true from useState init */}
 
@@ -1768,13 +2051,12 @@ function LegacyScanUnlockGate() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showPaywall && !isPremium && (
+        {revealView === 'paywall' && (
           <ProPaywall
-            scan={currentScan}
-            onClose={() => searchParams.get('paywall') === '1' ? navigate(-1) : setShowPaywall(false)}
+            scan={pendingScan ? null : currentScan}
+            onClose={() => navigate('/', { replace: true })}
             onPurchase={handleAscend}
-            error={purchaseError}
-            onSignIn={() => { useStore.getState().logout(); navigate('/auth', { replace: true }) }}
+            onUnlock={handleUnlockSuccess}
             isPurchasing={isPurchasing}
           />
         )}
@@ -1804,9 +2086,9 @@ function LegacyScanUnlockGate() {
   )
 }
 
-export default function ScanUnlockGate() {
+export default function ScanUnlockGate(props) {
   const scan = useStore(s => s.currentScan)
   const [params] = useSearchParams()
-  if (isCurrentAssessment(scan) && params.get('paywall') !== '1') return <AppearanceAssessmentResults key={scan.id} scan={scan} />
-  return <LegacyScanUnlockGate />
+  if (isCurrentAssessment(scan) && !props?.pendingScan && !props?.directPaywall && params.get('paywall') !== '1') return <AppearanceAssessmentResults key={scan.id} scan={scan} />
+  return <LegacyScanUnlockGate {...props} />
 }

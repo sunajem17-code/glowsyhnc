@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { MALE_TIERS, FEMALE_TIERS } from '../utils/analysis'
 import html2canvas from 'html2canvas'
 import logoSrc from '../assets/ascendus-icon.png'
+import wordmarkSrc from '../assets/ascendus-wordmark.png'
 import { isNative } from '../utils/camera'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 
@@ -239,9 +240,11 @@ function ShareCard({ scan, facePhotoUrl, cardRef }) {
           crossOrigin="anonymous"
           style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', display: 'block' }}
         />
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.26em', color: '#d4af37' }}>
-          ASCENDUS
-        </div>
+        <img
+          src={wordmarkSrc}
+          alt="ASCENDUS"
+          style={{ width: 118, height: 23, objectFit: 'contain', display: 'block' }}
+        />
       </div>
 
       {/* Avatar */}

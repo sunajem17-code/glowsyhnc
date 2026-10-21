@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Dumbbell, Zap, Target, Activity, Lock, X, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -28,17 +28,22 @@ function ScoreReveal({ score, tier, onDone }) {
   const [display, setDisplay] = useState(0)
   const tierColor = TIER_COLORS[tier] ?? GOLD
 
-  useState(() => {
-    let cur = 0
-    const steps = 30
-    const inc = score / steps
+  useEffect(() => {
+    const started = performance.now()
+    const duration = 1900
+    let finishTimer
     const id = setInterval(() => {
-      cur += inc
-      if (cur >= score) { setDisplay(score); clearInterval(id); setTimeout(() => setPhase('tier'), 300) }
-      else setDisplay(Math.round(cur * 10) / 10)
-    }, 1200 / steps)
-    return () => clearInterval(id)
-  })
+      const progress = Math.min(1, (performance.now() - started) / duration)
+      const eased = 1 - (1 - progress) ** 3
+      setDisplay(Math.round(score * eased * 10) / 10)
+      if (progress >= 1) {
+        clearInterval(id)
+        setDisplay(score)
+        finishTimer = setTimeout(() => setPhase('tier'), 350)
+      }
+    }, 32)
+    return () => { clearInterval(id); clearTimeout(finishTimer) }
+  }, [score])
 
   return (
     <motion.div
@@ -71,7 +76,13 @@ function ScoreReveal({ score, tier, onDone }) {
             >
               {tier}
             </span>
-            <p className="mt-2 font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Tap to see full breakdown</p>
+          <motion.button
+            type="button"
+            onClick={event => { event.stopPropagation(); triggerHaptic(); onDone() }}
+            whileTap={{ scale: 0.97 }}
+            className="mt-5 rounded-2xl px-7 py-3.5 font-heading font-bold text-[14px]"
+            style={{ color: '#0A0A0A', background: GOLD_GRADIENT, boxShadow: `0 0 28px ${tierColor}44` }}
+          >See full scorecard</motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -239,12 +250,14 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
 
 export default function PhysiqueResults() {
   const navigate = useNavigate()
+  const location = useLocation()
   const currentScan = useStore(s => s.currentScan)
   const isPremium = useStore(s => s.isPremium)
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser = useStore(s => s.updateUser)
   const setShowUnlockSlideshow = useStore(s => s.setShowUnlockSlideshow)
   const [revealDone, setRevealDone] = useState(false)
+  const [storedPhoto, setStoredPhoto] = useState(null)
   const [tab, setTab] = useState('overview')
   const [showInvite, setShowInvite] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -253,26 +266,12 @@ export default function PhysiqueResults() {
   const [referralCount, setReferralCount] = useState(0)
   const purchaseLockRef = useRef(false)
 
-  if (!currentScan) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4">
-        <Dumbbell size={48} style={{ color: `${GOLD}55` }} />
-        <p className="text-primary font-heading font-bold text-xl">No scan yet</p>
-        <button onClick={() => navigate('/physique-scan')}
-          className="w-full max-w-xs py-4 rounded-2xl font-heading font-bold text-[15px]"
-          style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}>
-          Start Physique Scan
-        </button>
-      </div>
-    )
-  }
-
-  const aiScore = currentScan.aiScore ?? {}
+  const aiScore = currentScan?.aiScore ?? {}
   const physique = aiScore.physiqueResult ?? aiScore  // fallback: top-level fields
-  const score = currentScan.glowScore ?? physique.overall ?? 5.0
-  const tier  = currentScan.tier ?? (score >= 8 ? 'Elite' : score >= 6.5 ? 'Advanced' : score >= 5 ? 'Intermediate' : 'Beginner')
+  const score = currentScan?.glowScore ?? physique.overall ?? 5.0
+  const tier  = currentScan?.tier ?? (score >= 8 ? 'Elite' : score >= 6.5 ? 'Advanced' : score >= 5 ? 'Intermediate' : 'Beginner')
   const tierColor = TIER_COLORS[tier] ?? GOLD
-  const photo = currentScan.facePhotoUrl ?? null
+  const photo = currentScan?.facePhotoUrl ?? storedPhoto ?? null
 
   const strengths    = physique.physique_strengths    ?? aiScore.physique_strengths    ?? []
   const improvements = physique.physique_improvements ?? aiScore.physique_improvements ?? []
@@ -287,6 +286,34 @@ export default function PhysiqueResults() {
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    let active = true
+    if (!currentScan?.facePhotoUrl && currentScan?.id) {
+      import('../utils/scanPhotoDb.js').then(({ loadScanMedia }) =>
+        loadScanMedia(currentScan.id).then(media => { if (active) setStoredPhoto(media?.photo ?? null) })
+      ).catch(() => {})
+    }
+    return () => { active = false }
+  }, [currentScan?.id, currentScan?.facePhotoUrl])
+
+  useEffect(() => {
+    setRevealDone(false)
+  }, [currentScan?.id])
+
+  if (!currentScan) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4">
+        <Dumbbell size={48} style={{ color: `${GOLD}55` }} />
+        <p className="text-primary font-heading font-bold text-xl">No scan yet</p>
+        <button onClick={() => navigate('/physique-scan')}
+          className="w-full max-w-xs py-4 rounded-2xl font-heading font-bold text-[15px]"
+          style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}>
+          Start Physique Scan
+        </button>
+      </div>
+    )
+  }
 
   function handleUnlockSuccess() {
     purchaseLockRef.current = false
@@ -334,13 +361,18 @@ export default function PhysiqueResults() {
     setShowInvite(true)
   }
 
-  // Free users: skip score animation entirely, go straight to paywall
-  if (!isPremium && !revealDone) {
+  // Let every completed scan see the score reveal once, then keep the existing
+  // Pro gate around the detailed scorecard.
+  if (!revealDone) {
+    return <ScoreReveal score={score} tier={tier} onDone={() => { triggerHaptic(); setRevealDone(true) }} />
+  }
+
+  if (!isPremium) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0A0A0A' }}>
         <PhysiquePaywall
           photo={photo}
-          onClose={() => navigate('/scan')}
+          onClose={() => navigate(location.state?.returnTo || '/scan')}
           onAscend={handleAscend}
           onInvite={handleInvite}
           isPurchasing={isPurchasing}
@@ -360,16 +392,12 @@ export default function PhysiqueResults() {
     )
   }
 
-  if (!revealDone) {
-    return <ScoreReveal score={score} tier={tier} onDone={() => { triggerHaptic(); setRevealDone(true) }} />
-  }
-
   return (
     <div className="relative flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 12 }}>
         <button
-          onClick={() => { triggerHaptic(); navigate('/scan') }}
+          onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
           aria-label="Go back"
           className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
           style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}

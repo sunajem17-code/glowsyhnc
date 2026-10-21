@@ -197,3 +197,10 @@ test('PSL scoring prompt supplies all anchors and separates facial appearance fr
  for(const rule of ['0–8 scale','4.5 is above average','5 attractive','5.5 very attractive','6 the start of model tier','6.5 exceptional model tier','7 elite model tier','7.5+','not dating appeal','Do not use celebrity identity','not an empirically validated distribution','not a required population quota','Do not demand literal flawlessness','scoreExplanation'])assert.ok(seen[1].includes(rule),rule)
  for(const forbidden of ['9–10 band','0–10 scale. Do not','PSL 5 is equivalent to 84.15%'])assert.equal(seen[1].includes(forbidden),false)
 })
+
+test('Railway server-only build can resolve its canonical rating rubric',()=>{
+ const source=readFileSync(new URL('../server/src/lib/appearanceAssessment.js',import.meta.url),'utf8')
+ assert.equal(source.includes("require('../../../client/"),false)
+ const packagedRubric=require('../server/src/lib/assessmentRubric.json')
+ assert.equal(packagedRubric.version,A.VERSION);assert.equal(packagedRubric.scale.max,8)
+})

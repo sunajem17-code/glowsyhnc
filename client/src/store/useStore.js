@@ -1,7 +1,9 @@
+import { API_BASE } from '../utils/backend'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
 import { checkAchievements } from '../utils/achievements'
+import { isLocalDeveloperPreview } from '../utils/developerUnlock'
 
 const useStore = create(
   persist(
@@ -13,6 +15,26 @@ const useStore = create(
       token: null,
       isAuthenticated: false,
       isGuest: false,
+      isLocalProPreview: false,
+      isLocalProPreviewConfigured: false,
+      _premiumBeforeLocalPreview: false,
+      setLocalProPreview: (enabled) => set(state => {
+        if (enabled && !isLocalDeveloperPreview()) return state
+        if (enabled) {
+          return {
+            isLocalProPreview: true,
+            isLocalProPreviewConfigured: true,
+            _premiumBeforeLocalPreview: state.isLocalProPreview ? state._premiumBeforeLocalPreview : state.isPremium,
+            isPremium: true,
+          }
+        }
+        return {
+          isLocalProPreview: false,
+          isLocalProPreviewConfigured: true,
+          isPremium: state._premiumBeforeLocalPreview,
+          _premiumBeforeLocalPreview: false,
+        }
+      }),
 
       setAuth: (user, token) => set({
         user,
@@ -20,9 +42,10 @@ const useStore = create(
         upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: false,
+        developerPreviewUnlocked: false,
         // Hydrate from the user object immediately so paying users aren't briefly downgraded
         // while the async RevenueCat / server check completes.
-        isPremium:
+        isPremium: (get().isLocalProPreview && isLocalDeveloperPreview()) ||
           user?.subscriptionTier === 'premium' ||
           user?.subscription_tier === 'premium' ||
           user?.is_pro === true ||
@@ -34,7 +57,8 @@ const useStore = create(
         upgradeWelcomePending: false,
         isAuthenticated: true,
         isGuest: true,
-        isPremium: false,
+        developerPreviewUnlocked: false,
+        isPremium: get().isLocalProPreview && isLocalDeveloperPreview(),
       }),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
@@ -49,6 +73,7 @@ const useStore = create(
           upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
+          developerPreviewUnlocked: false,
           scans: [],
           currentPlan: null,
           currentScan: null,
@@ -56,6 +81,8 @@ const useStore = create(
           todayCheckin: null,
           streak: { current: 0, longest: 0, lastDate: null },
           isPremium: false,
+          isLocalProPreview: false,
+          _premiumBeforeLocalPreview: false,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
           hairProfile: null,
@@ -249,6 +276,9 @@ const useStore = create(
       // Premium
       isPremium: false,
       setIsPremium: (v) => set({ isPremium: v }),
+      // Session-only local preview access; intentionally excluded from persist.partialize.
+      developerPreviewUnlocked: false,
+      setDeveloperPreviewUnlocked: (v) => set({ developerPreviewUnlocked: v }),
 
       // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
       showUnlockSlideshow: false,
@@ -257,11 +287,11 @@ const useStore = create(
       // Refresh Pro status from server — call after payment, trial activation, or app foreground
       // Throttled: won't re-run if called within 60s of the last successful refresh.
       _lastProRefresh: 0,
-      refreshProStatus: async () => {
+      refreshProStatus: async ({ force = false } = {}) => {
         const { token, isAuthenticated, _lastProRefresh } = get()
         if (!isAuthenticated || !token || token === 'demo-token') return
         // Throttle: skip if we refreshed within the last 60 seconds
-        if (Date.now() - _lastProRefresh < 60_000) return
+        if (!force && Date.now() - _lastProRefresh < 60_000) return
         set({ _lastProRefresh: Date.now() })
         try {
           // 0. On iOS check RevenueCat entitlements first (source of truth for IAP).
@@ -278,18 +308,16 @@ const useStore = create(
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              set({ isPremium: isPro })
+              set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPro }))
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
-          const API = (import.meta?.env?.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app')
-          const base = `https://${API.replace(/^https?:\/\//, '')}/api`
           const headers = { Authorization: `Bearer ${token}` }
 
           // Run both fetches in parallel — cuts startup time in half
           const [statusRes, profileRes] = await Promise.all([
-            fetch(`${base}/payments/status`, { headers }),
-            fetch(`${base}/user/profile`,    { headers }),
+            fetch(`${API_BASE}/payments/status`, { headers }),
+            fetch(`${API_BASE}/user/profile`,    { headers }),
           ])
 
           // Same reasoning as the RevenueCat check above — /payments/status is
@@ -298,7 +326,7 @@ const useStore = create(
           // just as trustworthy as an explicit true and should actually apply.
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
-            set({ isPremium })
+            set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPremium }))
           }
 
           // /user/profile is different — it's a general profile hydration
@@ -315,6 +343,7 @@ const useStore = create(
             set(state => ({
               user: { ...state.user, ...fresh },
               isPremium:
+                (state.isLocalProPreview && isLocalDeveloperPreview()) ||
                 fresh?.subscriptionTier === 'premium' ||
                 fresh?.subscription_tier === 'premium' ||
                 fresh?.is_pro === true ||
@@ -381,6 +410,28 @@ const useStore = create(
     }),
     {
       name: 'ascendus-storage',
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...persistedState }
+        // First local-dev launch gets the requested preview automatically;
+        // after that, the Settings toggle's saved choice is respected.
+        if (isLocalDeveloperPreview() && !merged.isLocalProPreviewConfigured) {
+          merged.isLocalProPreview = true
+          merged._premiumBeforeLocalPreview = Boolean(merged.isPremium)
+          merged.isPremium = true
+        }
+        // Never let a development preview carry over as premium access in a
+        // production build that happens to reuse this local storage.
+        if (!isLocalDeveloperPreview() && merged.isLocalProPreview) {
+          merged.isLocalProPreview = false
+          merged.isPremium = merged._premiumBeforeLocalPreview ?? Boolean(
+            merged.user?.subscriptionTier === 'premium' ||
+            merged.user?.subscription_tier === 'premium' ||
+            merged.user?.is_pro === true
+          )
+          merged._premiumBeforeLocalPreview = false
+        }
+        return merged
+      },
       // Normalize any glowScore stored in the old 0-100 scale back to 0-10
       onRehydrateStorage: () => (state) => {
         if (!state) return
@@ -417,6 +468,9 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
+        isLocalProPreview: isLocalDeveloperPreview() && state.isLocalProPreview,
+        isLocalProPreviewConfigured: isLocalDeveloperPreview() && state.isLocalProPreviewConfigured,
+        _premiumBeforeLocalPreview: isLocalDeveloperPreview() ? state._premiumBeforeLocalPreview : false,
         upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,

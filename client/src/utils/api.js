@@ -1,9 +1,7 @@
 import useStore from '../store/useStore'
+import { getRequestTimeoutMs } from './requestTimeout'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://glowsyhnc-production-e16b.up.railway.app'
-// In local development, use Vite's same-origin proxy. Browsers otherwise
-// block requests from 127.0.0.1 when the deployed API allows localhost only.
-const BASE = import.meta.env.DEV ? '/api' : `${/^https?:\/\//.test(API_URL) ? API_URL : `https://${API_URL}`}/api`
+import { API_BASE as BASE } from './backend'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -44,9 +42,8 @@ async function request(path, options = {}) {
     ...options.headers,
   }
 
-  // AI scoring can take 20–40s — give it 130s. All other calls get 15s.
-  const isAiCall = path.startsWith('/ai/') || path.startsWith('/tindermaxx/') || path.startsWith('/hair/')
-  const timeoutMs = isAiCall ? 130_000 : 15_000
+  // Generated AI and coach responses can take longer than ordinary API calls.
+  const timeoutMs = getRequestTimeoutMs(path)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -67,6 +64,11 @@ async function request(path, options = {}) {
   }
   clearTimeout(timeoutId)
   if (!res.ok) {
+    if (res.status === 404 && path.startsWith('/developer-access/')) {
+      const error = new Error('Developer unlock is not deployed or enabled on this server.')
+      error.status = 404
+      throw error
+    }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
     // 502/504 are proxy/gateway errors that return HTML — bail early.
@@ -105,7 +107,7 @@ async function request(path, options = {}) {
     // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
     const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status     = res.status
-    err.errorCode  = errBody.errorCode || errBody.error  // machine-readable code, e.g. 'rate_limited', 'claude_rate_limited'
+    err.errorCode = errBody.errorCode || errBody.code || errBody.error
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan
     throw err
@@ -205,6 +207,10 @@ export const api = {
   },
   promo: {
     redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
+  },
+  developerAccess: {
+    status: () => request('/developer-access/status'),
+    unlock: () => request('/developer-access/unlock', { method: 'POST' }),
   },
   potential: {
     analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),
