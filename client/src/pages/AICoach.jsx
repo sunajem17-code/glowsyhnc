@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Lock, ChevronRight, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { UPGRADE_WELCOME } from '../utils/coachWelcome'
+import { buildLocalCoachPreviewReply } from '../utils/coachPreview'
+import { getCoachAccessMode } from '../utils/coachAccess'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -141,9 +144,10 @@ const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
-  const { scans, isPremium, userProfile } = useStore()
-  const freeCoachMessages = useStore(s => s.freeCoachMessages)
-  const incrementFreeCoachMessages = useStore(s => s.incrementFreeCoachMessages)
+  const { scans, isPremium: actualIsPremium, isLocalProPreview: localPreviewEnabled, userProfile, freeCoachMessages, incrementFreeCoachMessages } = useStore()
+  const isPremium = usePremiumUiAccess()
+  const coachAccessMode = getCoachAccessMode({ isPremium: actualIsPremium, localPreviewEnabled })
+  const isLocalProPreview = coachAccessMode === 'local-preview'
   const freeMessagesLeft = Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages || 0))
   const freeCoachLocked = !isPremium && freeMessagesLeft === 0
   const latestScan = scans[0]
@@ -162,6 +166,10 @@ export default function AICoach() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  useEffect(() => {
+    if (isLocalProPreview) setError('')
+  }, [isLocalProPreview])
+
   // Initial greeting on mount
   useEffect(() => {
     if (messages.length > 0 || !latestScan || !isPremium) return
@@ -179,7 +187,7 @@ export default function AICoach() {
     if (!latestScan) { navigate('/scan'); return }
 
     // Not premium → open paywall immediately
-    if (!isPremium) { navigate('/unlock?paywall=1'); return }
+    if (coachAccessMode === 'paywall') { navigate('/unlock?paywall=1'); return }
 
     setInput('')
     setError('')
@@ -192,6 +200,21 @@ export default function AICoach() {
     setMessages(nextMessages)
     setNewMsgIdx(nextMessages.length - 1)
     setLoading(true)
+
+    if (isLocalProPreview) {
+      // Simulate a coach reply locally so preview mode never asks the paid API
+      // for access and never changes the account's subscription entitlement.
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      const previewReply = buildLocalCoachPreviewReply(msgText, scanContext)
+      setMessages(prev => {
+        const updated = [...prev, { role: 'assistant', content: previewReply }]
+        setNewMsgIdx(updated.length - 1)
+        return updated
+      })
+      setLoading(false)
+      inputRef.current?.focus()
+      return
+    }
 
     try {
       const data = await api.coach.message({
@@ -243,13 +266,15 @@ export default function AICoach() {
                 className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
                 style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
               >
-                {isPremium ? 'PRO' : 'FREE'}
+                {isLocalProPreview ? 'PRO PREVIEW' : isPremium ? 'PRO' : 'FREE'}
               </span>
             </div>
             <p className="font-body text-[11px] text-secondary">
               {!latestScan
                 ? 'Scan Your Face To Unlock'
-                : isPremium
+                : isLocalProPreview
+                  ? 'Local preview · sample replies'
+                  : isPremium
                   ? 'Your pal. Your coach. In your corner.'
                   : 'Pro required — tap to upgrade'}
             </p>

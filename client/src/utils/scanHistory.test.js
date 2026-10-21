@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getComparisonScans, getHistoryScoreColor, mergeScanHistory, normalizeHistoryScan } from './scanHistory.js'
+import { getComparisonScans, getComparisonSliderPosition, getHistoryScoreColor, mergeScanHistory, normalizeHistoryScan, resolveComparisonScan } from './scanHistory.js'
 import { getRevealRatings } from './revealRatings.js'
 
 test('comparison excludes the current scan and its server alias, and keeps other completed scans', () => {
@@ -12,6 +12,18 @@ test('comparison excludes the current scan and its server alias, and keeps other
   ])
   assert.deepEqual(candidates.map(scan => scan.id), ['other'])
   assert.equal(candidates[0].facePhotoUrl, 'data:image/jpeg;base64,other')
+})
+
+test('comparison stays on the Photo B prompt until a saved scan is selected', () => {
+  const candidates = [{ id: 'saved-one' }, { id: 'saved-two' }]
+  assert.equal(resolveComparisonScan(candidates, ''), null)
+  assert.equal(resolveComparisonScan(candidates, 'saved-two')?.id, 'saved-two')
+})
+
+test('comparison slider maps a drag to a clamped position within its photo frame', () => {
+  assert.equal(getComparisonSliderPosition(150, 100, 200), 25)
+  assert.equal(getComparisonSliderPosition(50, 100, 200), 0)
+  assert.equal(getComparisonSliderPosition(350, 100, 200), 100)
 })
 
 test('history includes device-saved scans when the legacy server history is empty', () => {
@@ -41,13 +53,8 @@ test('legacy results normalize safely and incomplete captures stay out of histor
   assert.equal(mergeScanHistory([], [{ id: 'unfinished' }], null).length, 0)
 })
 
-test('history score colors move from red through yellow to green with score', () => {
-  assert.equal(getHistoryScoreColor(0), '#EF4444')
-  assert.equal(getHistoryScoreColor(5), '#FACC15')
-  assert.equal(getHistoryScoreColor(10), '#22C55E')
-  assert.notEqual(getHistoryScoreColor(5.5), getHistoryScoreColor(6.5))
-  assert.equal(getHistoryScoreColor(12), '#22C55E')
-  assert.equal(getHistoryScoreColor(-2), '#EF4444')
+test('history tier and score use the same lime as a 7.1 overall rating', () => {
+  assert.equal(getHistoryScoreColor(7.1), 'rgb(157, 230, 52)')
   assert.equal(getHistoryScoreColor(null), 'rgba(255,255,255,0.4)')
 })
 

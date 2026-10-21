@@ -2,24 +2,20 @@ import { isCurrentAssessment } from '../utils/assessment'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { Camera, Lock, TrendingUp, ChevronRight, ChevronLeft } from 'lucide-react'
+import { CartesianGrid, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { Camera, TrendingUp, ChevronRight, ChevronLeft } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 import ScanHistoryRow from '../components/ScanHistoryRow'
 import { mergeScanHistory } from '../utils/scanHistory'
-import { hasPremiumUiAccess } from '../utils/developerUnlock'
-import { getProgressScore, isPhysiqueProgressScan } from '../utils/progressHistory'
+import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
+import { formatProgressTrendLabels, getProgressTrendSeries, isPhysiqueProgressScan } from '../utils/progressHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-
-function fmt(dateStr) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+import { getScanHistoryViewState } from '../utils/scanHistoryPresentation'
 
 // ── Custom recharts tooltip ───────────────────────────────────────────────────
 function ChartTooltip({ active, payload }) {
@@ -30,49 +26,17 @@ function ChartTooltip({ active, payload }) {
       background: '#1a1a1a', border: '1px solid rgba(198,168,92,0.3)',
       borderRadius: 10, padding: '8px 12px', fontSize: 12,
     }}>
-      <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{d.label}</p>
+      <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{d.shortLabel} · {d.fullLabel}</p>
       <p style={{ color: GOLD, fontWeight: 700, fontSize: 16 }}>{d.score.toFixed(1)}</p>
     </div>
   )
 }
 
-// ── Pro gate (full-page) ──────────────────────────────────────────────────────
-function ProGate({ onUpgrade }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 px-8 text-center gap-6">
-      <div style={{
-        width: 72, height: 72, borderRadius: 24,
-        background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Lock size={28} style={{ color: GOLD }} />
-      </div>
-      <div>
-        <h2 className="font-heading font-bold text-[22px] text-primary mb-2" style={{ letterSpacing: '-0.02em' }}>
-          Scan History is Pro
-        </h2>
-        <p className="font-body text-[14px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Upgrade to see every past scan, track your score over time, and spot exactly what's improving.
-        </p>
-      </div>
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => { triggerHaptic(); onUpgrade() }}
-        className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-        style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
-      >
-        Unlock Pro
-      </motion.button>
-    </div>
-  )
-}
-
 // ── Trend chart ───────────────────────────────────────────────────────────────
-function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall' }) {
-  const data = [...scans]
-    .reverse()
-    .map(s => ({ label: fmt(s.analyzedAt || s.scan_date || s.created_at), score: getProgressScore(s, mode, metric) }))
-    .filter(point => point.score != null)
+export function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall' }) {
+  const series = getProgressTrendSeries(scans, mode, metric)
+  const dateLabels = formatProgressTrendLabels(series)
+  const data = series.map((point, index) => ({ ...dateLabels[index], score: point.score }))
 
   if (data.length < 2) return null
 
@@ -82,42 +46,47 @@ function TrendChart({ scans, mode = 'face', metric = 'overall', label = 'Overall
   return (
     <div style={{
       background: '#141414', border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 20, padding: '18px 12px 14px', marginBottom: 20,
+      borderRadius: 20, padding: '18px 14px 14px', marginBottom: 20,
     }}>
-      <div className="flex items-center gap-2 mb-4 px-2">
+      <div className="flex items-center justify-center gap-2 mb-4 px-2">
         <TrendingUp size={15} style={{ color: GOLD }} />
         <p className="font-heading font-bold text-[11px] tracking-[0.14em]" style={{ color: GOLD }}>
           {label.toUpperCase()} OVER TIME
         </p>
       </div>
-      <ResponsiveContainer width="100%" height={140}>
-        <LineChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+      <div className="w-full flex justify-center">
+      <ResponsiveContainer width="100%" height={188}>
+        <LineChart data={data} margin={{ left: 8, right: 14, top: 8, bottom: 2 }}>
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 5" />
           <XAxis
-            dataKey="label"
-            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+            dataKey="shortLabel"
+            tick={{ fill: 'rgba(255,255,255,0.68)', fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
+            tickMargin={8}
+            padding={{ left: 8, right: 8 }}
           />
           <YAxis
             domain={[min, max]}
             tickFormatter={value => Number(value).toFixed(1)}
-            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+            tick={{ fill: 'rgba(255,255,255,0.68)', fontSize: 12, fontWeight: 600 }}
             axisLine={false}
             tickLine={false}
-            width={22}
+            width={38}
           />
           <Tooltip content={<ChartTooltip />} />
           <Line
             type="monotone"
             dataKey="score"
             stroke={GOLD}
-            strokeWidth={2}
-            dot={{ fill: GOLD, strokeWidth: 0, r: 3 }}
-            activeDot={{ fill: GOLD, r: 5, strokeWidth: 0 }}
+            strokeWidth={2.5}
+            dot={{ fill: GOLD, stroke: '#141414', strokeWidth: 2, r: 4 }}
+            activeDot={{ fill: GOLD, r: 6, strokeWidth: 0 }}
           />
         </LineChart>
       </ResponsiveContainer>
+      </div>
     </div>
   )
 }
@@ -127,7 +96,7 @@ export default function ScanHistory() {
   const navigate = useNavigate()
   const isPremium = useStore(s => s.isPremium)
   const developerPreviewUnlocked = useStore(s => s.developerPreviewUnlocked)
-  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
+  const canAccessProUi = hasLocalPremiumUiAccess(isPremium, developerPreviewUnlocked)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const localScans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)
@@ -189,21 +158,20 @@ export default function ScanHistory() {
         </h1>
       </div>
 
-      <ScanHistoryContent scans={scans} loading={loading} error={error} isPremium={canAccessProUi} onViewScan={viewScan} onUpgrade={() => navigate('/premium')} />
+      <ScanHistoryContent scans={scans} loading={loading} error={error} onViewScan={viewScan} />
     </MotionPage>
   )
 }
 
-export function ScanHistoryContent({ scans, loading, error, isPremium, onViewScan, onUpgrade, embedded = false, chartMode = 'face', chartMetric = 'overall', chartLabel = 'Overall', emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
+export function ScanHistoryContent({ scans, loading, error, onViewScan, embedded = false, emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
+  const viewState = getScanHistoryViewState({ scanCount: scans.length, loading, error })
   return (<>
       {/* Body */}
-      {!isPremium ? (
-        <ProGate onUpgrade={onUpgrade} />
-      ) : loading && scans.length === 0 ? (
+      {viewState === 'loading' ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading…</p>
         </div>
-      ) : error && scans.length === 0 ? (
+      ) : viewState === 'error' ? (
         <div className="flex-1 flex items-center justify-center px-8 text-center">
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{error}</p>
         </div>
@@ -218,10 +186,10 @@ export function ScanHistoryContent({ scans, loading, error, isPremium, onViewSca
         <div className={embedded ? "pb-4" : "flex-1 overflow-y-auto px-5 pb-8"}>
           {!embedded && loading && <p role="status" className="text-xs text-secondary mb-3">Refreshing history…</p>}
           {!embedded && error && <p role="status" className="text-xs text-secondary mb-3">Showing scans saved on this device. Server history couldn’t refresh.</p>}
-          <TrendChart scans={scans.filter(scan => !isCurrentAssessment(scan))} mode={chartMode} metric={chartMetric} label={chartLabel} />
-          <p className="font-heading font-bold text-[11px] tracking-[0.14em] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          {!embedded && <TrendChart scans={scans.filter(scan => !isCurrentAssessment(scan))} />}
+          {!embedded && <p className="font-heading font-bold text-[11px] tracking-[0.14em] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
             {scans.length} SCAN{scans.length !== 1 ? 'S' : ''}
-          </p>
+          </p>}
           {scans.map((scan, i) => (
             <ScanHistoryRow key={scan.id} scan={scan} index={i} onTap={onViewScan} />
           ))}

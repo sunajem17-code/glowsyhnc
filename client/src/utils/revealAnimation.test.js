@@ -90,6 +90,17 @@ test('unlocked scores sharpen as the lock fades and before the bar fills', () =>
   assert.ok(animation.bar.transition.width.delay >= animation.lock.transition.duration)
 })
 
+test('saved Progress cards skip the lock reveal but fill the colored score bars', () => {
+  const animation = getRevealRatingAnimation(7.2, { unlocked: true, savedProgressCard: true })
+  assert.equal(animation.lock.initial, false)
+  assert.equal(animation.number.initial, false)
+  assert.deepEqual(animation.bar.initial, { width: '0%', opacity: 0.65, boxShadow: 'none' })
+  assert.equal(animation.lock.transition.duration, 0)
+  assert.equal(animation.bar.transition.width.delay, 0)
+  assert.equal(animation.bar.transition.width.duration, 0.72)
+  assert.deepEqual(animation.bar.animate, { width: '72%', opacity: 1, boxShadow: 'none' })
+})
+
 test('missing ratings do not animate a fake score into the bar', () => {
   const animation = getRevealRatingAnimation(null, { unlocked: true })
   assert.deepEqual(animation.bar.animate, { width: '0%', opacity: 0.8, boxShadow: 'none' })

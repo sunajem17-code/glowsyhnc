@@ -1,18 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Camera } from 'lucide-react'
-import { getComparisonScans } from '../utils/scanHistory'
+import { useEffect, useRef, useState } from 'react'
+import { Camera, MoveHorizontal, X } from 'lucide-react'
+import { getComparisonScans, getComparisonSliderPosition, resolveComparisonScan } from '../utils/scanHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
 import { BACKEND_ORIGIN } from '../utils/backend'
 import { GOLD } from '../utils/theme'
+import ScanHistoryRow from './ScanHistoryRow'
 
 function photoUrl(value) {
   if (!value) return null
   return /^(https?:|data:|blob:)/.test(value) ? value : `${BACKEND_ORIGIN}${value}`
-}
-
-function scanDate(scan) {
-  const date = scan?.analyzedAt || scan?.scanDate || scan?.scan_date
-  return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Saved scan'
 }
 
 function useScanPhoto(scan) {
@@ -58,88 +54,95 @@ function SliderPhoto({ scan, label, clip = 'inset(0)', fallback }) {
 
 export default function ScanPhotoComparison({ scan, savedScans }) {
   const candidates = getComparisonScans(scan, savedScans)
-  const [selectedScanId, setSelectedScanId] = useState(candidates[0]?.id || '')
-  const comparisonScan = candidates.find(candidate => candidate.id === selectedScanId) || candidates[0] || null
+  const [selectedScanId, setSelectedScanId] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const comparisonScan = resolveComparisonScan(candidates, selectedScanId)
   const [position, setPosition] = useState(50)
-  const [sliderFocused, setSliderFocused] = useState(false)
-  const hasBothScans = Boolean(scan && comparisonScan)
+  const comparisonRef = useRef(null)
+  const draggingRef = useRef(false)
+
+  function updateSliderPosition(clientX) {
+    const bounds = comparisonRef.current?.getBoundingClientRect()
+    if (!bounds?.width) return
+    setPosition(getComparisonSliderPosition(clientX, bounds.left, bounds.width))
+  }
+
+  function startSliderDrag(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    draggingRef.current = true
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    updateSliderPosition(event.clientX)
+  }
+
+  function moveSlider(event) {
+    if (!draggingRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    updateSliderPosition(event.clientX)
+  }
+
+  function stopSliderDrag(event) {
+    draggingRef.current = false
+    event.stopPropagation()
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
 
   useEffect(() => {
-    if (comparisonScan?.id && comparisonScan.id !== selectedScanId) setSelectedScanId(comparisonScan.id)
-  }, [comparisonScan?.id, selectedScanId])
+    setSelectedScanId('')
+    setPickerOpen(false)
+  }, [scan?.id])
   useEffect(() => setPosition(50), [scan?.id, comparisonScan?.id])
 
   return (
-    <section aria-label="Before and after scan comparison">
-      <h2 className="font-heading font-bold text-xl text-white mb-1">Compare progress</h2>
-      <p className="font-body text-sm mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>
-        Your current scan stays in place. Choose another scan, then drag to compare.
-      </p>
-
-      {comparisonScan ? (
-        <p className="font-body text-[11px] text-center mb-2" style={{ color: 'rgba(255,255,255,0.55)' }}>
-          This scan · {scanDate(scan)}
-        </p>
-      ) : (
-        <p role="status" className="font-body text-xs mb-3 text-center" style={{ color: 'rgba(255,255,255,0.6)' }}>
-          Complete another scan to compare your progress.
-        </p>
-      )}
-
-      {candidates.length > 0 && (
-        <label className="block font-heading font-bold text-xs mb-2" style={{ color: GOLD }}>
-          Compare with
-          <select
-            aria-label="Choose a scan to compare with this scan"
-            value={comparisonScan?.id || ''}
-            onChange={event => setSelectedScanId(event.target.value)}
-            onPointerDown={event => event.stopPropagation()}
-            className="mt-2 block w-full rounded-xl px-3 py-3 font-body text-sm"
-            style={{ color: '#fff', background: '#1b1b1b', border: '1px solid rgba(198,168,92,0.35)' }}
-          >
-            {candidates.map((candidate, index) => (
-              <option key={candidate.id} value={candidate.id}>
-                {scanDate(candidate)} · Scan {candidates.length - index}{candidate.glowScore != null ? ` · ${Number(candidate.glowScore).toFixed(1)}` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
+    <section aria-label="Before and after scan comparison" className="relative">
       <div
+        ref={comparisonRef}
         className="relative w-full overflow-hidden rounded-2xl select-none"
-        style={{ height: 'min(54vh, 520px)', minHeight: 260, background: '#141414', border: '1px solid rgba(255,255,255,0.1)', touchAction: 'pan-y' }}
+        style={{ height: 'min(68vh, 720px)', minHeight: 300, background: '#080808', border: '1px solid rgba(255,255,255,0.1)', touchAction: 'pan-y' }}
       >
-        {comparisonScan ? <>
-          <SliderPhoto scan={comparisonScan} label="Previous" fallback="No photo saved for the previous scan" />
-          <SliderPhoto scan={scan} label="Latest" clip={`inset(0 0 0 ${position}%)`} fallback="No photo saved for this scan" />
-          <div aria-hidden="true" className="absolute top-0 bottom-0 w-0.5 pointer-events-none" style={{ left: `${position}%`, background: '#fff', boxShadow: '0 0 12px rgba(0,0,0,0.6)' }}>
-            <span className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: GOLD, border: '2px solid white', color: '#101010', fontSize: 18, fontWeight: 700 }}>↔</span>
-          </div>
-          <span className="absolute bottom-3 left-3 rounded-lg px-2 py-1 text-[10px] font-bold" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>COMPARISON</span>
-          <span className="absolute bottom-3 right-3 rounded-lg px-2 py-1 text-[10px] font-bold" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>THIS SCAN</span>
-          {sliderFocused && <span aria-hidden="true" className="absolute inset-0 z-20 rounded-2xl pointer-events-none" style={{ outline: `2px solid ${GOLD}`, outlineOffset: -3 }} />}
-          <input
-            aria-label="Drag to compare selected scan with this scan"
-            type="range"
-            min="0"
-            max="100"
-            value={position}
-            onChange={event => setPosition(Number(event.target.value))}
-            onFocus={() => setSliderFocused(true)}
-            onBlur={() => setSliderFocused(false)}
-            onPointerDown={event => event.stopPropagation()}
-            onTouchStart={event => event.stopPropagation()}
-            className="absolute inset-0 z-10 h-full w-full cursor-ew-resize opacity-0"
-            style={{ touchAction: 'pan-y' }}
-          />
-        </> : <SliderPhoto scan={scan} label="Latest" fallback="No photo saved for this scan" />}
+        <SliderPhoto scan={scan} label="Photo A" fallback="No photo saved for this scan" />
+        {comparisonScan ? (
+          <>
+            <SliderPhoto scan={comparisonScan} label="Photo B" clip={`inset(0 0 0 ${position}%)`} fallback="No photo saved for Photo B" />
+            <button type="button" aria-label="Change Photo B from saved Progress scans" onClick={() => setPickerOpen(true)} onPointerDown={event => event.stopPropagation()} className="absolute inset-0 z-10" style={{ clipPath: `inset(0 0 0 ${position}%)`, background: 'transparent' }} />
+          </>
+        ) : (
+          <button type="button" aria-label="Select Photo B from saved Progress scans" aria-expanded={pickerOpen} onClick={() => setPickerOpen(true)} onPointerDown={event => event.stopPropagation()} className="absolute inset-0 z-10" style={{ clipPath: `inset(0 0 0 ${position}%)`, background: '#000' }}>
+            <span className="absolute inset-y-0 right-0 flex w-1/2 flex-col items-center justify-center gap-3 px-4 text-center" style={{ color: '#fff' }}>
+              <Camera size={30} style={{ color: GOLD, filter: 'drop-shadow(0 0 8px rgba(198,168,92,0.38))' }} />
+              <span className="font-heading text-lg font-bold">PHOTO B</span>
+              <span className="font-body text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Tap to choose a saved scan</span>
+            </span>
+          </button>
+        )}
+        <div aria-hidden="true" className="absolute top-0 bottom-0 z-20 w-0.5 pointer-events-none" style={{ left: `${position}%`, background: '#fff', boxShadow: '0 0 12px rgba(0,0,0,0.6)' }} />
+        <button
+          type="button"
+          aria-label="Drag the comparison slider"
+          onPointerDown={startSliderDrag}
+          onPointerMove={moveSlider}
+          onPointerUp={stopSliderDrag}
+          onPointerCancel={stopSliderDrag}
+          className="absolute top-1/2 z-30 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full"
+          style={{ left: `${position}%`, background: GOLD, border: '2px solid white', color: '#fff', cursor: 'ew-resize' }}
+        >
+          <MoveHorizontal size={20} strokeWidth={2.5} />
+        </button>
       </div>
-      {!hasBothScans && scan && (
-        <p className="font-body text-[11px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Your current scan will appear here once a previous scan is available.
-        </p>
-      )}
+      {!candidates.length && scan && <p role="status" className="mt-3 text-center font-body text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>No other saved scans in Progress yet.</p>}
+      {pickerOpen && <div className="fixed inset-0 z-[100] flex flex-col bg-black" role="dialog" aria-modal="true" aria-labelledby="scan-picker-title">
+        <header className="flex shrink-0 items-center justify-between px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+            <div>
+              <h2 id="scan-picker-title" className="font-heading text-xl font-bold text-white">Choose Photo B</h2>
+              <p className="mt-1 font-body text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>Select a saved scan from Progress</p>
+            </div>
+            <button type="button" aria-label="Close scan picker" onClick={() => setPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: '#222', color: '#fff' }}><X size={18} /></button>
+        </header>
+        <div aria-label="Saved Progress scans" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" style={{ touchAction: 'pan-y' }}>
+          {candidates.map((candidate, index) => <ScanHistoryRow key={candidate.id} scan={candidate} index={index} showChevron={false} onTap={() => { setSelectedScanId(candidate.id); setPickerOpen(false); setPosition(50) }} />)}
+        </div>
+      </div>}
     </section>
   )
 }

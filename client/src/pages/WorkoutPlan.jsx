@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight, Beef, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
@@ -375,7 +376,8 @@ export default function WorkoutPlan() {
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const scans           = useStore(s => s.scans)
   const gender         = useStore(s => s.gender) ?? currentScan?.gender ?? 'male'
-  const isPremium      = useStore(s => s.isPremium)
+  const isPremium      = usePremiumUiAccess()
+  const actualIsPremium = useStore(s => s.isPremium)
   const userProfile    = useStore(s => s.userProfile)
   const setUserProfile = useStore(s => s.setUserProfile)
 
@@ -492,7 +494,7 @@ export default function WorkoutPlan() {
     setIsFallback(false)
 
     // Non-premium users get the fallback plan instantly
-    if (!isPremium) {
+    if (!actualIsPremium) {
       setPlan(buildFallback(physiqueScores, gender))
       setIsFallback(false)
       setLoading(false)
@@ -522,7 +524,7 @@ export default function WorkoutPlan() {
     } finally {
       setLoading(false)
     }
-  }, [physiqueScores, gender, isPremium, inferredLevel])
+  }, [physiqueScores, gender, actualIsPremium, inferredLevel])
 
   useEffect(() => {
     loadPlan()
@@ -569,7 +571,7 @@ export default function WorkoutPlan() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="font-heading font-bold text-[10px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>
-                {isPremium ? 'AI-Generated Plan' : 'Sample Plan'}
+                {actualIsPremium && !isFallback ? 'AI-Generated Plan' : 'Sample Plan'}
               </p>
               <h1 className="font-heading font-bold text-[20px] text-primary leading-tight">{splitLabel}</h1>
             </div>

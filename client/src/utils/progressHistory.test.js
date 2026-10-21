@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from './progressHistory.js'
+import { formatProgressTrendLabels, getProgressScore, getProgressTrendSeries, isPhysiqueProgressScan, mergeProgressHistory } from './progressHistory.js'
 
 const scan = { id: 'scan-1', scanDate: '2026-10-17T12:00:00Z', progressSavedAt: '2026-10-17T12:01:00Z', aiScore: { overallScore: 6.1, potentialScore: 7.5 } }
 test('device-saved rating appears in Progress when cloud history is empty', () => {
@@ -40,4 +40,23 @@ test('face progress series reads scores from the saved AI result without fabrica
   assert.equal(getProgressScore(face, 'face', 'potential'), 8.1)
   assert.equal(getProgressScore(face, 'face', 'symmetry'), 7.4)
   assert.equal(getProgressScore(face, 'face', 'skin'), null)
+})
+
+test('score trend spans the earliest and latest scans in chronological order', () => {
+  const newest = { id: 'newest', created_at: '2026-10-20T12:00:00Z', overall_score: 8.1 }
+  const oldest = { id: 'oldest', created_at: '2026-10-10T12:00:00Z', overall_score: 6.2 }
+  const middle = { id: 'middle', created_at: '2026-10-15T12:00:00Z', overall_score: 7.1 }
+  const series = getProgressTrendSeries([newest, oldest, middle], 'face', 'overall')
+  assert.deepEqual(series.map(point => point.scanId), ['oldest', 'middle', 'newest'])
+  assert.deepEqual(series.map(point => point.score), [6.2, 7.1, 8.1])
+})
+
+test('trend axis uses chronological scan numbers and retains dates for the tooltip', () => {
+  const labels = formatProgressTrendLabels([
+    { timestamp: '2026-10-19T12:00:00Z' },
+    { timestamp: '2026-10-19T18:00:00Z' },
+    { timestamp: '2026-10-20T12:00:00Z' },
+  ])
+  assert.deepEqual(labels.map(item => item.shortLabel), ['1', '2', '3'])
+  assert.deepEqual(labels.map(item => item.fullLabel), ['10-19-2026', '10-19-2026', '10-20-2026'])
 })

@@ -33,6 +33,33 @@ export function getProgressScore(scan, mode, metric) {
   return value != null && Number.isFinite(score) ? score : null
 }
 
+export function getProgressTrendSeries(scans, mode, metric) {
+  return [...scans]
+    .map(scan => ({
+      scanId: scan.id,
+      timestamp: scan.analyzedAt || scan.scanDate || scan.scan_date || scan.created_at,
+      score: getProgressScore(scan, mode, metric),
+    }))
+    .filter(point => point.score != null && Number.isFinite(Date.parse(point.timestamp)))
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+}
+
+export function formatProgressTrendLabels(series) {
+  const dateParts = series.map(point => {
+    const date = new Date(point.timestamp)
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const year = String(date.getFullYear())
+    return {
+      fullDate: `${month}-${day}-${year}`,
+    }
+  })
+  return dateParts.map(({ fullDate }, index) => ({
+    shortLabel: String(index + 1),
+    fullLabel: fullDate,
+  }))
+}
+
 export function mergeProgressHistory(remoteScans, localScans, currentScan) {
   const rows = [...remoteScans]
   for (const local of localScans) {

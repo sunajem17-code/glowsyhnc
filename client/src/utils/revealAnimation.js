@@ -46,27 +46,29 @@ export function getResultsNavigationDotButtonStyle() {
   return { width: 25, height: 44 }
 }
 
-export function getRevealRatingAnimation(value, { unlocked, reduceMotion = false, metricKey = '', revealRun = 0 }) {
+export function getRevealRatingAnimation(value, { unlocked, reduceMotion = false, metricKey = '', revealRun = 0, savedProgressCard = false }) {
   const canRevealScore = unlocked && typeof value === 'number' && Number.isFinite(value)
-  const lockDuration = reduceMotion ? 0 : 0.3
-  const barDelay = canRevealScore && !reduceMotion ? 0.34 : 0
+  const animateReveal = canRevealScore && !reduceMotion && !savedProgressCard
+  const animateBar = canRevealScore && !reduceMotion
+  const lockDuration = animateReveal ? 0.3 : 0
+  const barDelay = animateBar && !savedProgressCard ? 0.34 : 0
 
   return {
     // Changing this key remounts each metric when access changes, allowing
     // Framer Motion's initial state to run even though the screen stays put.
     key: `${metricKey}-${unlocked ? `unlocked-${revealRun}` : 'locked'}`,
     lock: {
-      initial: unlocked && !reduceMotion ? { opacity: 1 } : false,
+      initial: unlocked && !reduceMotion && !savedProgressCard ? { opacity: 1 } : false,
       animate: { opacity: unlocked ? 0 : 1 },
       transition: { duration: lockDuration, ease: 'easeOut' },
     },
     number: {
-      initial: canRevealScore && !reduceMotion ? { filter: 'blur(8px)', opacity: 0.55 } : false,
+      initial: animateReveal ? { filter: 'blur(8px)', opacity: 0.55 } : false,
       animate: { filter: 'blur(0px)', opacity: 1 },
       transition: { delay: 0, duration: reduceMotion ? 0 : lockDuration, ease: 'easeOut' },
     },
     bar: {
-      initial: canRevealScore && !reduceMotion ? { width: '0%', opacity: 0.65, boxShadow: 'none' } : false,
+      initial: animateBar ? { width: '0%', opacity: 0.65, boxShadow: 'none' } : false,
       animate: {
         width: canRevealScore ? `${value * 10}%` : unlocked ? '0%' : '100%',
         opacity: canRevealScore ? 1 : unlocked ? 0.8 : 1,

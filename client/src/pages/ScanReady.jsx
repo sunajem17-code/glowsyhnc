@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 
 const MESSAGES = [
   'You didn\'t choose your genetics…',
@@ -22,7 +23,7 @@ const MSG_BREAKS = [0, 700, 1800]
 
 export default function ScanReady() {
   const navigate    = useNavigate()
-  const isPremium   = useStore(s => s.isPremium)
+  const isPremium   = usePremiumUiAccess()
   const currentScan = useStore(s => s.currentScan)
   const destination = isPremium ? '/results' : '/unlock'
 

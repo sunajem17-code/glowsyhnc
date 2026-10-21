@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, ChevronLeft, ChevronRight, Zap, ClipboardList, Target, Dumbbell, Sparkles, Salad, Scissors, Ruler, Shirt, Gift, Trophy } from 'lucide-react'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import ProLock from '../components/ProLock'
@@ -206,7 +207,8 @@ function WeekSelector({ selectedWeek, onSelect, tasksByWeek, isPremium }) {
 
 export default function ActionPlan() {
   const navigate = useNavigate()
-  const { currentPlan, toggleTask, isPremium, assignedPhase } = useStore()
+  const { currentPlan, toggleTask, assignedPhase } = useStore()
+  const isPremium = usePremiumUiAccess()
   const [selectedWeek, setSelectedWeek] = useState(currentPlan?.weekNumber ?? 1)
   const [activeTab, setActiveTab] = useState('All')
 

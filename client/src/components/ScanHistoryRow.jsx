@@ -19,7 +19,7 @@ function fmt(dateStr) {
 }
 
 // ── Single scan row ───────────────────────────────────────────────────────────
-export default function ScanHistoryRow({ scan, onTap, index }) {
+export default function ScanHistoryRow({ scan, onTap, index, showChevron = true }) {
   const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
   const scorePresentation = assessment ? assessmentPresentation(assessment) : null
   const [storedPhoto, setStoredPhoto] = useState(null)
@@ -90,7 +90,7 @@ export default function ScanHistoryRow({ scan, onTap, index }) {
             {score.toFixed(1)}
           </p>
         )}
-        <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.25)' }} />
+        {showChevron && <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.25)' }} />}
       </div>
     </motion.button>
   )

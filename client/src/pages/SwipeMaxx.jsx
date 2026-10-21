@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, X, Sparkles, Trophy, ChevronLeft, Lock, Loader2, Star, AlertCircle } from 'lucide-react'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { api } from '../utils/api'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import PageHeader from '../components/PageHeader'
@@ -34,7 +35,8 @@ function RankBadge({ rank }) {
 
 export default function SwipeMaxx() {
   const navigate  = useNavigate()
-  const { isPremium, user, gender } = useStore()
+  const { user, gender } = useStore()
+  const isPremium = usePremiumUiAccess()
 
   const [photos, setPhotos]     = useState([]) // { url, base64, mediaType }
   const [loading, setLoading]   = useState(false)

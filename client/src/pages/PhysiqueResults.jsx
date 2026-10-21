@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Dumbbell, Zap, Target, Activity, Lock, X, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { purchasePro, isNative } from '../utils/iap'
@@ -252,7 +253,7 @@ export default function PhysiqueResults() {
   const navigate = useNavigate()
   const location = useLocation()
   const currentScan = useStore(s => s.currentScan)
-  const isPremium = useStore(s => s.isPremium)
+  const isPremium = usePremiumUiAccess()
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser = useStore(s => s.updateUser)
   const setShowUnlockSlideshow = useStore(s => s.setShowUnlockSlideshow)
@@ -285,7 +286,7 @@ export default function PhysiqueResults() {
     api.referral.count()
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
       .catch(() => {})
-  }, [])
+  }, [isPremium])
 
   useEffect(() => {
     let active = true

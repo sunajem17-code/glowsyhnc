@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import GlowScoreRing from '../components/GlowScoreRing'
 import ShareCardModal from '../components/ShareCardModal'
 import DevRankCard from '../components/DevRankCard'
@@ -314,7 +315,8 @@ function ProText({ text, onUpgrade }) {
 // ─── Main Results page ────────────────────────────────────────────────────────
 function LegacyResults() {
   const navigate = useNavigate()
-  const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, user } = useStore()
+  const { currentScan, isPremium: actualIsPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, user } = useStore()
+  const isPremium = usePremiumUiAccess()
 
   const [activeTab,        setActiveTab]        = useState('overview')
   const [showShareCard,    setShowShareCard]     = useState(false)
@@ -362,7 +364,7 @@ function LegacyResults() {
 
   // Products fetch — must be above the early return to satisfy Rules of Hooks
   useEffect(() => {
-    if (!currentScan || activeTab !== 'products' || productsFetched || !isPremium) return
+    if (!currentScan || activeTab !== 'products' || productsFetched || !actualIsPremium) return
     const { faceData: fd, aiScore: ai, pillars: sp, gender: g } = currentScan
     const observationToIssue = { visible_acne: 'acne', visible_scarring: 'scarring', visible_oiliness: 'oiliness', visible_dark_circles: 'dark_circles', visible_dullness: 'dullness' }
     const issues = (ai?.visualObservations ?? []).map(observation => observationToIssue[observation.id]).filter(Boolean)
@@ -377,7 +379,7 @@ function LegacyResults() {
       .catch(() => { setProducts([]); setProductsFetched(true) })
       .finally(() => setProductsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, productsFetched, isPremium, currentScan])
+  }, [activeTab, productsFetched, actualIsPremium, currentScan])
 
   if (!currentScan) {
     return (

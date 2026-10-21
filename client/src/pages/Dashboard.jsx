@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, Scissors, X, Gift, Clock, ArrowLeftRight, Sparkles } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import useStore from '../store/useStore'
+import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import GlowScoreRing from '../components/GlowScoreRing'
 import UMaxScoreBadge from '../components/UMaxScoreBadge'
 import MotionPage from '../components/MotionPage'
@@ -33,7 +34,7 @@ export default function Dashboard() {
   const currentPlan   = useStore(s => s.currentPlan)
   const streak        = useStore(s => s.streak)
   const todayCheckin  = useStore(s => s.todayCheckin)
-  const isPremium     = useStore(s => s.isPremium)
+  const isPremium     = usePremiumUiAccess()
   const referralCount = useStore(s => s.referralCount)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 3

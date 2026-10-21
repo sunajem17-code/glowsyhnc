@@ -1,31 +1,35 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronRight, ChevronDown, LockKeyhole } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from '../utils/progressHistory'
-import { ScanHistoryContent } from './ScanHistory'
+import { ScanHistoryContent, TrendChart } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
-import { hasPremiumUiAccess } from '../utils/developerUnlock'
+import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
 import StreakFlame from '../components/StreakFlame'
 import { loadScanMedia } from '../utils/scanPhotoDb'
+import { getProgressStatPresentation } from '../utils/scanHistoryPresentation'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
   const location = useLocation()
+  const reduceMotion = useReducedMotion()
   const { scans, currentScan, streak, isPremium, developerPreviewUnlocked, token, refreshProStatus } = useStore()
-  const canAccessProUi = hasPremiumUiAccess(isPremium, developerPreviewUnlocked)
+  const canAccessProUi = hasLocalPremiumUiAccess(isPremium, developerPreviewUnlocked)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const [historySnapshot, setHistory] = useState({ token, scans: [] })
   const remoteHistory = historySnapshot.token === token ? historySnapshot.scans : []
   const history = mergeProgressHistory(remoteHistory, scans, currentScan)
   const [progressMode, setProgressMode] = useState('face')
   const [progressMetric, setProgressMetric] = useState('overall')
+  const [improvementExpanded, setImprovementExpanded] = useState(false)
+  const [graphExpanded, setGraphExpanded] = useState(false)
   const faceHistory = history.filter(scan => !isPhysiqueProgressScan(scan) && getProgressScore(scan, 'face', 'overall') != null)
   const physiqueHistory = history.filter(scan => isPhysiqueProgressScan(scan) && getProgressScore(scan, 'physique', 'overall') != null)
   const activeHistory = progressMode === 'physique' ? physiqueHistory : faceHistory
@@ -126,29 +130,14 @@ export default function ScanTimeline() {
 
 
   return (
-    <MotionPage className="px-4">
+    <MotionPage className="px-4 progress-timeline">
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <button
-          onClick={() => { triggerHaptic(); navigate(-1) }}
-          aria-label="Go back"
-          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
-        >
-          <ChevronLeft size={18} className="text-primary" />
-        </button>
-        <div className="flex-1">
-          <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>
-            Progress
-          </h1>
-          <p className="font-body text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>Track your glow-up journey</p>
-        </div>
-      </div>
-
-      {/* Overview stats */}
-      <div className="mb-4">
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl" style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.08)' }} role="tablist" aria-label="Progress type">
+      <div className="flex items-center justify-between gap-3 mb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+        <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>
+          Progress
+        </h1>
+        <motion.div layout className="relative flex rounded-full p-1 flex-shrink-0" style={{ background: '#000', border: '1px solid rgba(255,255,255,0.1)' }} role="tablist" aria-label="Progress type">
           {[
             { key: 'face', label: 'Face' },
             { key: 'physique', label: 'Physique' },
@@ -161,57 +150,56 @@ export default function ScanTimeline() {
                 role="tab"
                 aria-selected={selected}
                 onClick={() => { setProgressMode(key); setProgressMetric('overall'); triggerHaptic() }}
-                className="py-2.5 rounded-xl font-heading font-semibold text-sm transition-colors"
-                style={{ color: selected ? '#0A0A0A' : 'rgba(255,255,255,0.58)', background: selected ? GOLD : 'transparent' }}
+                className="relative px-3 py-1.5 rounded-full font-heading font-semibold text-[11px] transition-colors duration-200"
+                style={{ color: selected ? '#fff' : 'rgba(255,255,255,0.58)' }}
               >
-                {label}
+                {selected && <motion.span layoutId="progress-mode-indicator" className="absolute inset-0 rounded-full" style={{ background: '#242424', zIndex: 0 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }} />}
+                <span className="relative z-[1]">{label}</span>
               </button>
             )
           })}
-        </div>
-        <div className="flex gap-2 overflow-x-auto mt-3 pb-1" role="group" aria-label="Score graph metric">
-          {metricOptions.map(({ key, label }) => {
-            const selected = progressMetric === key
-            return (
-              <button key={key} type="button" onClick={() => setProgressMetric(key)}
-                aria-pressed={selected}
-                className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-body transition-colors"
-                style={{ color: selected ? GOLD : 'rgba(255,255,255,0.55)', border: `1px solid ${selected ? 'rgba(198,168,92,0.55)' : 'rgba(255,255,255,0.12)'}`, background: selected ? 'rgba(198,168,92,0.1)' : 'transparent' }}>
-                {label}
-              </button>
-            )
-          })}
-        </div>
+        </motion.div>
       </div>
+
+      {/* Overview stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: `${progressMode === 'face' ? 'Face' : 'Physique'} Scans`, value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} /> },
+          { label: `${progressMode === 'face' ? 'Face' : 'Physique'} Scans`, value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} />, lockable: true },
           { label: 'Best Score',     value: bestScore != null ? bestScore.toFixed(1) : 'N/A', icon: <Trophy size={20} style={{ color: GOLD }} /> },
-        ].map(({ label, value, icon }) => (
-          <div key={label} className="card text-center py-3">
-            <div className="flex justify-center mb-0.5">{icon}</div>
-            <p className="font-mono font-bold text-lg text-primary">{value}</p>
-            <p className="text-[10px] text-secondary font-body">{label}</p>
-          </div>
-        ))}
+        ].map(({ label, value, icon, lockable }) => {
+          const stat = lockable ? getProgressStatPresentation(value, canAccessProUi) : { locked: false, value }
+          return (
+            <div key={label} className="card text-center py-3">
+              <div className="flex justify-center mb-0.5">{icon}</div>
+              {stat.locked
+                ? <LockKeyhole size={19} className="mx-auto my-[3px] text-secondary" aria-label="Locked" />
+                : <p className="font-mono font-bold text-lg text-primary">{stat.value}</p>}
+              <p className="text-[10px] text-secondary font-body">{label}</p>
+            </div>
+          )
+        })}
         <button
           type="button"
-          onClick={() => { triggerHaptic(); navigate('/streak') }}
-          aria-label={`Open current streak details, ${streak.current} days`}
+          onClick={() => { triggerHaptic(); navigate(canAccessProUi ? '/streak' : '/premium') }}
+          aria-label={canAccessProUi ? `Open current streak details, ${streak.current} days` : 'Current streak locked'}
           className="card relative text-center py-3 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           style={{ outlineColor: GOLD }}
         >
           <ChevronRight size={14} className="absolute right-2 top-2 text-secondary" aria-hidden="true" />
-          <div ref={streakIconRef} className="flex justify-center mb-0.5 w-6 h-6">
+          <div className="relative flex items-center justify-center mb-0.5 w-full h-6">
             <Flame
+              ref={streakIconRef}
               size={20}
               className={streakCompletedToday && !streakFlameFlight ? 'fire-icon' : ''}
-              style={streakCompletedToday && !streakFlameFlight
-                ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 8px rgba(198,168,92,0.8))' }
-                : { color: 'rgba(255,255,255,0.32)' }}
+              style={canAccessProUi && streakCompletedToday && !streakFlameFlight
+                ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 4px rgba(198,168,92,0.42))' }
+                : { color: canAccessProUi ? 'rgba(255,255,255,0.32)' : GOLD }}
             />
+            {!canAccessProUi && <LockKeyhole size={10} className="absolute text-primary" style={{ left: 'calc(50% + 3px)', top: 10 }} aria-hidden="true" />}
           </div>
-          <p className="font-mono font-bold text-lg text-primary">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
+          {canAccessProUi
+            ? <p className="font-mono font-bold text-lg text-primary">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
+            : <LockKeyhole size={19} className="mx-auto my-[3px] text-secondary" aria-hidden="true" />}
           <p className="text-[10px] text-secondary font-body">Current Streak</p>
         </button>
       </div>
@@ -229,17 +217,32 @@ export default function ScanTimeline() {
       )}
 
       {activeHistory.length >= 2 && canAccessProUi && (
+        <div>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
-                  { label: 'First Score',   value: Number(firstScan.overall_score).toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
-                  { label: 'Current Score', value: Number(latestScan.overall_score).toFixed(1), icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} /> },
+                  { label: 'First Score',   value: getProgressScore(firstScan, progressMode, 'overall').toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
+                  { label: 'Current Score', value: getProgressScore(latestScan, progressMode, 'overall').toFixed(1), icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} /> },
                   {
                     label: 'Improvement',
                     value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
                     icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: GOLD }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
                     colorStyle: improvementNum >= 0 ? { color: GOLD } : { color: '#E07A5F' },
                   },
-                ].map(({ label, value, icon, colorStyle }) => (
+                ].map(({ label, value, icon, colorStyle }) => label === 'Improvement' ? (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-expanded={improvementExpanded}
+                    aria-label={`${improvementExpanded ? 'Hide' : 'Show'} improvement details`}
+                    onClick={() => { setImprovementExpanded(value => !value); triggerHaptic() }}
+                    className="card relative text-center py-3 active:scale-[0.98] transition-transform"
+                  >
+                    <ChevronDown size={14} className={`absolute right-2 top-2 text-secondary transition-transform duration-200 ${improvementExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    <div className="flex justify-center mb-0.5">{icon}</div>
+                    <p className="font-mono font-bold text-lg text-primary" style={colorStyle}>{value}</p>
+                    <p className="text-[10px] text-secondary font-body">Improvement</p>
+                  </button>
+                ) : (
                   <div key={label} className="card text-center py-3">
                     <div className="flex justify-center mb-0.5">{icon}</div>
                     <p className="font-mono font-bold text-lg text-primary" style={colorStyle}>{value}</p>
@@ -247,17 +250,74 @@ export default function ScanTimeline() {
                   </div>
                 ))}
               </div>
-
+              <AnimatePresence initial={false}>
+                {improvementExpanded && (
+                  <motion.div
+                    initial={reduceMotion ? false : { opacity: 0, height: 0, y: -6 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, height: 0, y: -6 }}
+                    className="card mb-4 overflow-hidden px-4 py-3"
+                  >
+                    <p className="font-body text-sm text-primary">
+                      {improvementNum > 0 ? 'Up' : improvementNum < 0 ? 'Down' : 'No change'}{' '}
+                      {Math.abs(improvementNum).toFixed(1)} points from your first scan to your latest.
+                    </p>
+                    <p className="font-body text-xs text-secondary mt-1">
+                      {getProgressScore(firstScan, progressMode, 'overall').toFixed(1)} → {getProgressScore(latestScan, progressMode, 'overall').toFixed(1)} overall
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+        </div>
       )}
+
+      <div className="card mb-4 overflow-hidden">
+        <button
+          type="button"
+          aria-label={`Score trends, ${metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} metric selected`}
+          aria-expanded={graphExpanded}
+          onClick={() => { setGraphExpanded(value => !value); triggerHaptic() }}
+          className="relative w-full flex items-center justify-center gap-3 px-4 py-3 text-center"
+        >
+          <span className="flex items-center justify-center gap-2 font-heading font-semibold text-sm text-primary">
+            <TrendingUp size={16} style={{ color: GOLD }} />
+            Score trends
+          </span>
+          <span className="absolute right-4 flex items-center text-secondary" aria-hidden="true">
+            <ChevronDown size={15} className={`transition-transform duration-200 ${graphExpanded ? 'rotate-180' : ''}`} />
+          </span>
+        </button>
+        <AnimatePresence initial={false}>
+          {graphExpanded && (
+            <motion.div initial={reduceMotion ? false : { height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={reduceMotion ? undefined : { height: 0, opacity: 0 }} className="overflow-hidden">
+              <div className="px-3 pb-3">
+                <div className="flex gap-2 overflow-x-auto pb-3" role="group" aria-label="Score graph metric">
+                  {metricOptions.map(({ key, label }) => {
+                    const selected = progressMetric === key
+                    return (
+                      <button key={key} type="button" onClick={() => setProgressMetric(key)} aria-pressed={selected}
+                        className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-body transition-colors"
+                        style={{ color: selected ? GOLD : 'rgba(255,255,255,0.55)', border: `1px solid ${selected ? 'rgba(198,168,92,0.55)' : 'rgba(255,255,255,0.12)'}`, background: selected ? 'rgba(198,168,92,0.1)' : 'transparent' }}>
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {activeHistory.length >= 2
+                  ? <TrendChart scans={activeHistory} mode={progressMode} metric={progressMetric} label={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} />
+                  : <p className="font-body text-xs text-secondary text-center py-5">Save another scan to see your trend.</p>}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <section aria-label="Scan History" className="mt-2">
         <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
         <ScanHistoryContent
           embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading}
           error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
-          isPremium={canAccessProUi} onViewScan={viewHistoryScan} onUpgrade={() => navigate('/premium')}
-          chartMode={progressMode} chartMetric={progressMetric}
-          chartLabel={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'}
+          onViewScan={viewHistoryScan}
           emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
         />
       </section>

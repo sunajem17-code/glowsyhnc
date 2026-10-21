@@ -6,7 +6,7 @@ import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } fr
 import { createPortal } from 'react-dom'
 import { isNative, purchasePro } from '../utils/iap'
 import {
-  UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
+  UserPlus, Share2, Check, Download, Loader2, Users, ChevronRight, ChevronLeft, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -20,11 +20,13 @@ import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 import { getProgressSaveFlight } from '../utils/progressSaveAnimation'
-import { hasUnlockedScanUiAccess, isLocalDeveloperPreview, markScanResultsUnlocked } from '../utils/developerUnlock'
+import { hasLocalUnlockedScanUiAccess, isLocalDeveloperPreview, markScanResultsUnlocked } from '../utils/developerUnlock'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
-import ShareCardModal from '../components/ShareCardModal'
+import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
+import { cropPhotoToSquare } from '../utils/shareCardPhoto'
 import { getProgressCardReturnTo } from '../utils/scanResultContext'
 
 const G    = GOLD
@@ -1527,12 +1529,28 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const [viewDirection, setViewDirection] = useState(1)
   const [saveError, setSaveError] = useState('')
   const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
-  const [showShareCard, setShowShareCard] = useState(false)
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+  const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [saveFlight, setSaveFlight] = useState(null)
   const saveFlightIdRef = useRef(0)
   const resultsCardRef = useRef(null)
   const progressButtonRef = useRef(null)
+  const downloadCardRef = useRef(null)
   const reduceMotion = useReducedMotion()
+
+  useEffect(() => {
+    if (!facePhoto) {
+      setDownloadPhoto({ source: facePhoto, status: 'ready', url: null })
+      return undefined
+    }
+    let active = true
+    setDownloadPhoto({ source: facePhoto, status: 'processing', url: null })
+    cropPhotoToSquare(facePhoto)
+      .then(url => { if (active) setDownloadPhoto({ source: facePhoto, status: 'ready', url }) })
+      .catch(() => { if (active) setDownloadPhoto({ source: facePhoto, status: 'failed', url: null }) })
+    return () => { active = false }
+  }, [facePhoto])
 
   function showView(view) {
     if (view === activeView) return
@@ -1579,6 +1597,25 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
     )
     if (flight) setSaveFlight({ ...flight, id: ++saveFlightIdRef.current })
     else openProgress()
+  }
+
+  async function downloadResultsCard() {
+    if (isDownloadingCard || isPreparingDownloadPhoto) return
+    if (downloadPhoto.status === 'failed') {
+      setDownloadError('Could not prepare the photo. Please try again.')
+      return
+    }
+    setIsDownloadingCard(true)
+    setDownloadError('')
+    try {
+      const image = await createShareCardImage(downloadCardRef.current)
+      await saveShareCardImage(image)
+    } catch (downloadFailure) {
+      console.error('[Results card download]', downloadFailure)
+      setDownloadError('Could not create the results card. Please try again.')
+    } finally {
+      setIsDownloadingCard(false)
+    }
   }
 
   useEffect(() => {
@@ -1644,19 +1681,23 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
     : scan
   const metrics = getRevealRatings(recoveredScan)
   const resultsHeading = unlocked ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
+  const isPreparingDownloadPhoto = downloadPhoto.source !== facePhoto || downloadPhoto.status === 'processing'
+  const preparedDownloadPhoto = downloadPhoto.source === facePhoto && downloadPhoto.status === 'ready'
+    ? downloadPhoto.url
+    : null
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+      <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
+      {unlocked && (
+        <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
+          className="fixed left-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+          <ChevronLeft size={18} className="text-primary" />
+        </button>
+      )}
       <div className="flex flex-col items-center px-5 pb-10"
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-
-      {savedProgressCard && (
-        <div className="flex items-center w-full mb-3">
-          <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back" className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-            <ChevronLeft size={18} className="text-primary" />
-          </button>
-        </div>
-      )}
 
       {/* Header */}
         <div className="relative w-full">
@@ -1675,7 +1716,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </div>
         {/* Face circle + card */}
         <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
-          drag={unlocked ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
+          drag={unlocked && activeView !== 'compare' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
           onDragEnd={(_, info) => {
             const index = RESULT_VIEWS.indexOf(activeView)
             if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
@@ -1694,14 +1735,14 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           </div>
 
           {/* Metrics card */}
-          <div ref={resultsCardRef} className="w-full rounded-3xl pt-14 pb-10 px-4" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-            <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
+          <div ref={resultsCardRef} className="w-full rounded-3xl" style={{ background: '#141414', position: 'relative', zIndex: 1, padding: `${REVEAL_RATINGS_LAYOUT.panelPaddingTop}px ${REVEAL_RATINGS_LAYOUT.panelPaddingHorizontal}px ${REVEAL_RATINGS_LAYOUT.panelPaddingBottom}px` }}>
+            <div className="grid grid-cols-2" style={{ columnGap: REVEAL_RATINGS_LAYOUT.columnGap, rowGap: 0 }}>
               {metrics.map(({ label, value }, idx) => {
-                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun })
+                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun, savedProgressCard })
                 const metricTextStyles = getRevealMetricTextStyles()
                 return (
-                <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
+                <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: REVEAL_RATINGS_LAYOUT.labelMarginBottom, height: REVEAL_RATINGS_LAYOUT.labelHeight }}>
                     <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
                     <motion.span
                       aria-hidden="true"
@@ -1714,15 +1755,15 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
                     </motion.span>
                   </div>
                   {unlocked ? (
-                    <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom, fontVariantNumeric: 'tabular-nums', height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
                       {value == null ? isRecoveringRatings ? 'Scoring…' : 'Unavailable' : value.toFixed(1)}
                     </motion.div>
                   ) : (
-                    <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                    <div aria-label={`${label}: Locked`} style={{ height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom }}>
                       <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
                     </div>
                   )}
-                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
+                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
                     <motion.div
                       key={unlocked ? 'revealed' : 'locked'}
                       initial={ratingAnimation.bar.initial}
@@ -1758,14 +1799,17 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         >
           {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
         </motion.button>}
-        {unlocked && savedProgressCard && <motion.button
+        {unlocked && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => setShowShareCard(true)}
-          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
+          onClick={downloadResultsCard}
+          disabled={isDownloadingCard || isPreparingDownloadPhoto}
+          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          Share Results
+          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}
+          {isDownloadingCard ? 'Preparing download…' : 'Download'}
         </motion.button>}
+        {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
         {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
           {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
@@ -1810,13 +1854,6 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
-      <AnimatePresence>
-        {showShareCard && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50">
-            <ShareCardModal scan={recoveredScan} isPremium={unlocked} facePhotoUrl={facePhoto} onClose={() => setShowShareCard(false)} />
-          </motion.div>
-        )}
-      </AnimatePresence>
       {saveFlight && typeof document !== 'undefined' && createPortal(
         <motion.div
           aria-hidden="true"
@@ -1908,7 +1945,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const hasUnlockedAccess = hasUnlockedScanUiAccess(isPremium || justUnlocked, developerPreviewUnlocked, currentScan)
+  const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, developerPreviewUnlocked, currentScan)
   const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: hasUnlockedAccess, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
