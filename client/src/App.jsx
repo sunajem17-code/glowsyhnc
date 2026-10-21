@@ -218,6 +218,7 @@ export default function App() {
               {/* Full-screen reveal must not wait for the outgoing scan outlet's
                   nested exit animation or inherit its transformed viewport. */}
               <Route path="/unlock" element={<ProtectedRoute><ScanUnlockGate /></ProtectedRoute>} />
+              <Route path="/physique-results" element={<ProtectedRoute><PhysiqueResults /></ProtectedRoute>} />
               <Route path="/results" element={<Navigate to="/unlock" replace />} />
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
@@ -245,7 +246,6 @@ export default function App() {
                 <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="physique-scan" element={<PhysiqueScan />} />
-                <Route path="physique-results" element={<PhysiqueResults />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />
               </Route>

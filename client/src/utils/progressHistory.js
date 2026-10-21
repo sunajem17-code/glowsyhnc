@@ -18,8 +18,8 @@ const PHYSIQUE_METRICS = {
 }
 
 export function isPhysiqueProgressScan(scan) {
-  if (scan?.scanType === 'physique') return true
-  const score = scan?.physiqueScore
+  if ((scan?.scanType ?? scan?.scan_type) === 'physique') return true
+  const score = scan?.physiqueScore ?? scan?.aiScore?.physiqueScore ?? scan?.aiScore?.physiqueResult
   const hasFaceScore = [scan?.glowScore, scan?.glow_score, scan?.overall_score, scan?.aiScore?.overallScore]
     .some(value => value != null && Number.isFinite(Number(value)))
   return !!score && !hasFaceScore
@@ -28,6 +28,7 @@ export function isPhysiqueProgressScan(scan) {
 export function getProgressScore(scan, mode, metric) {
   const value = mode === 'physique'
     ? PHYSIQUE_METRICS[metric]?.(scan?.physiqueScore ?? scan?.aiScore?.physiqueScore)
+      ?? (metric === 'overall' ? scan?.glowScore ?? scan?.glow_score ?? scan?.overall_score ?? scan?.umaxScore : null)
     : FACE_METRICS[metric]?.(scan)
   const score = Number(value)
   return value != null && Number.isFinite(score) ? score : null

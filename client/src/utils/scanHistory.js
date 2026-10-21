@@ -1,5 +1,6 @@
 import { isCurrentAssessment } from './assessment.js'
 import { getRatingColor } from './revealRatings.js'
+import { isPhysiqueProgressScan } from './progressHistory.js'
 function parseField(value, fallback) {
   if (typeof value !== 'string') return value ?? fallback
   try { return JSON.parse(value) ?? fallback } catch { return fallback }
@@ -42,8 +43,11 @@ export function mergeScanHistory(remoteScans, localScans, currentScan) {
 
 export function getComparisonScans(currentScan, savedScans) {
   const currentIds = new Set([currentScan?.id, currentScan?.serverScanId].filter(Boolean))
+  const currentIsPhysique = isPhysiqueProgressScan(currentScan)
   return mergeScanHistory([], savedScans, null).filter(scan =>
-    !currentIds.has(scan.id) && !(scan.serverScanId && currentIds.has(scan.serverScanId)),
+    !currentIds.has(scan.id)
+    && !(scan.serverScanId && currentIds.has(scan.serverScanId))
+    && isPhysiqueProgressScan(scan) === currentIsPhysique,
   )
 }
 

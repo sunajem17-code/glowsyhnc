@@ -1,121 +1,93 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Dumbbell, Zap, Target, Activity, Lock, X, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { ChevronLeft, Dumbbell, Lock, X, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
+import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigationDotButtonStyle, getUnlockedResultsHeadingStyle } from '../utils/revealAnimation'
+import { getRatingColor } from '../utils/revealRatings'
+import ScanPhotoComparison from '../components/ScanPhotoComparison'
 
-const TIER_COLORS = {
-  'Elite':        '#FFD700',
-  'Advanced':     '#34C759',
-  'Intermediate': '#C6A85C',
-  'Beginner':     '#E07A5F',
-}
-
-const BODY_PILLARS = [
-  { key: 'frame',               label: 'Frame',         detail: 'Bone structure · Shoulder width · Natural build' },
-  { key: 'leanness',            label: 'Leanness',      detail: 'Muscle separation · Body fat · Definition' },
-  { key: 'proportions',         label: 'Proportions',   detail: 'Shoulder-to-waist ratio · Limb balance' },
-  { key: 'posture',             label: 'Posture',        detail: 'Alignment · Shoulder carriage · Spine' },
-  { key: 'overall_presentation',label: 'Presentation',  detail: 'Overall visual impact · Stage readiness' },
+const RESULT_VIEWS = ['results', 'photo', 'compare']
+const PHYSIQUE_METRICS = [
+  { key: 'frame', label: 'Frame' },
+  { key: 'leanness', label: 'Leanness' },
+  { key: 'proportions', label: 'Proportions' },
+  { key: 'posture', label: 'Posture' },
+  { key: 'overall_presentation', label: 'Presentation' },
 ]
 
-function ScoreReveal({ score, tier, onDone }) {
-  const [phase, setPhase] = useState('count')
-  const [display, setDisplay] = useState(0)
-  const tierColor = TIER_COLORS[tier] ?? GOLD
-
-  useEffect(() => {
-    const started = performance.now()
-    const duration = 1900
-    let finishTimer
-    const id = setInterval(() => {
-      const progress = Math.min(1, (performance.now() - started) / duration)
-      const eased = 1 - (1 - progress) ** 3
-      setDisplay(Math.round(score * eased * 10) / 10)
-      if (progress >= 1) {
-        clearInterval(id)
-        setDisplay(score)
-        finishTimer = setTimeout(() => setPhase('tier'), 350)
-      }
-    }, 32)
-    return () => { clearInterval(id); clearTimeout(finishTimer) }
-  }, [score])
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-      style={{ background: '#000' }}
-      onClick={phase === 'tier' ? onDone : undefined}
-    >
-      <motion.div
-        className="absolute inset-0"
-        style={{ background: `radial-gradient(circle at 50% 45%, ${tierColor}22 0%, transparent 65%)` }}
-      />
-      <motion.p
-        className="font-heading font-bold"
-        style={{ fontSize: 96, letterSpacing: '-0.04em', lineHeight: 1, color: '#fff', textShadow: `0 0 60px ${tierColor}88` }}
-        animate={{ scale: phase === 'tier' ? [1, 1.04, 1] : 1 }}
-        transition={{ duration: 0.4 }}
-      >
-        {typeof display === 'number' ? display.toFixed(1) : display}
-      </motion.p>
-      <p className="font-body text-[13px] mt-3" style={{ color: 'rgba(255,255,255,0.45)' }}>PHYSIQUE SCORE</p>
-      <AnimatePresence>
-        {phase === 'tier' && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="mt-6 flex flex-col items-center gap-2"
-          >
-            <span
-              className="font-heading font-bold text-[15px] px-5 py-2 rounded-full"
-              style={{ background: `${tierColor}18`, border: `1.5px solid ${tierColor}55`, color: tierColor, boxShadow: `0 0 30px ${tierColor}33` }}
-            >
-              {tier}
-            </span>
-          <motion.button
-            type="button"
-            onClick={event => { event.stopPropagation(); triggerHaptic(); onDone() }}
-            whileTap={{ scale: 0.97 }}
-            className="mt-5 rounded-2xl px-7 py-3.5 font-heading font-bold text-[14px]"
-            style={{ color: '#0A0A0A', background: GOLD_GRADIENT, boxShadow: `0 0 28px ${tierColor}44` }}
-          >See full scorecard</motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  )
+function getPhysiqueMetricScore(scan, key) {
+  const aliases = key === 'overall_presentation' ? [key, 'overallPresentation', 'presentation'] : [key]
+  const sources = [scan?.physiqueScore, scan?.aiScore?.physiqueScore, scan?.aiScore?.physiqueResult, scan?.aiScore]
+  for (const source of sources) {
+    for (const alias of aliases) {
+      const raw = source?.[alias]
+      const value = Number(raw && typeof raw === 'object' ? raw.score : raw)
+      if (raw != null && Number.isFinite(value) && value >= 0 && value <= 10) return value
+    }
+  }
+  return 5
 }
 
-function ScoreBar({ score }) {
-  const pct = Math.max(0, ((score - 1) / 9) * 100)
-  const color = score >= 7 ? '#34C759' : score >= 5 ? '#C6A85C' : '#E07A5F'
+function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
+  const reduceMotion = useReducedMotion()
+  const metricTextStyles = getRevealMetricTextStyles()
   return (
-    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-      <motion.div className="h-full rounded-full" style={{ background: color }}
-        initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-        transition={{ duration: 1, ease: 'easeOut' }} />
+    <div className="relative w-full">
+      <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
+        <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
+          {photo ? <img src={photo} alt="" loading="eager" decoding="async" className="w-full h-full object-cover" /> : null}
+        </div>
+      </div>
+      <div className="w-full rounded-3xl pt-14 pb-10 px-4" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
+        <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
+          {PHYSIQUE_METRICS.map(({ key, label }, idx) => {
+            const validValue = getPhysiqueMetricScore(scan, key)
+            const animation = getRevealRatingAnimation(validValue, { unlocked, reduceMotion, metricKey: label, revealRun })
+            return (
+              <div key={key} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
+                  <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
+                  <motion.span aria-hidden="true" initial={animation.lock.initial} animate={animation.lock.animate} transition={animation.lock.transition}
+                    style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
+                  </motion.span>
+                </div>
+                {unlocked ? (
+                  <motion.div aria-label={`${label}: ${validValue == null ? 'Not scored' : `${validValue.toFixed(1)} out of 10`}`}
+                    initial={animation.number.initial} animate={animation.number.animate} transition={animation.number.transition}
+                    style={{ ...metricTextStyles.value, fontSize: validValue == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    {validValue == null ? 'Unavailable' : validValue.toFixed(1)}
+                  </motion.div>
+                ) : (
+                  <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ width: 72, height: 26, borderRadius: 99, background: '#fff', filter: 'blur(8px)', opacity: 0.9 }} />
+                  </div>
+                )}
+                <div role={unlocked && validValue != null ? 'progressbar' : undefined} aria-label={`${label} score`}
+                  aria-valuemin={unlocked && validValue != null ? 0 : undefined} aria-valuemax={unlocked && validValue != null ? 10 : undefined}
+                  aria-valuenow={unlocked && validValue != null ? validValue : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
+                  <motion.div key={unlocked ? 'revealed' : 'locked'} initial={animation.bar.initial} animate={animation.bar.animate} transition={animation.bar.transition}
+                    style={{ height: '100%', borderRadius: 99, color: unlocked && validValue != null ? getRatingColor(validValue) : '#444', background: 'currentColor' }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
 
-const PHYSIQUE_METRICS = [
-  { label: 'Overall',     pct: 61 },
-  { label: 'Potential',   pct: 88 },
-  { label: 'Frame',       pct: 63 },
-  { label: 'Leanness',    pct: 68 },
-  { label: 'Proportions', pct: 57 },
-  { label: 'Posture',     pct: 51 },
-]
-
 const REQUIRED = 3
 
 // Clone of LockedRevealScreen from ScanUnlockGate — physique text only
-function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, error }) {
+function PhysiquePaywall({ photo, scan, onClose, onAscend, onInvite, isPurchasing, error }) {
   const navigate = useNavigate()
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
@@ -135,36 +107,10 @@ function PhysiquePaywall({ photo, onClose, onAscend, onInvite, isPurchasing, err
           Reveal your physique
         </h1>
         <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full physique analysis with Ascendus Max
+          See your full physique ratings with Ascendus Max
         </p>
 
-        {/* Photo circle + card */}
-        <div className="relative w-full" style={{ marginTop: 102 }}>
-          {/* Circle — absolutely positioned */}
-          <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
-            <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#111', overflow: 'hidden' }}>
-              {photo
-                ? <img src={photo} alt="" className="w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />
-                : null}
-            </div>
-          </div>
-
-          {/* Metrics card */}
-          <div className="w-full rounded-3xl pt-14 pb-10 px-6" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-            <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
-              {PHYSIQUE_METRICS.map(({ label }, idx) => (
-                <div key={label} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <Lock size={13} style={{ color: GOLD, flexShrink: 0 }} />
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>{label}</p>
-                  </div>
-                  <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', marginBottom: 12, opacity: 0.9 }} />
-                  <div style={{ height: 7, borderRadius: 99, background: 'linear-gradient(90deg, #B8973E 0%, #C6A85C 50%, #D4B96A 100%)' }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />
 
         {/* CTAs */}
         <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
@@ -252,33 +198,27 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
 export default function PhysiqueResults() {
   const navigate = useNavigate()
   const location = useLocation()
+  const reduceMotion = useReducedMotion()
   const currentScan = useStore(s => s.currentScan)
+  const savedScans = useStore(s => s.scans)
   const isPremium = usePremiumUiAccess()
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser = useStore(s => s.updateUser)
   const setShowUnlockSlideshow = useStore(s => s.setShowUnlockSlideshow)
-  const [revealDone, setRevealDone] = useState(false)
   const [storedPhoto, setStoredPhoto] = useState(null)
-  const [tab, setTab] = useState('overview')
+  const [activeView, setActiveView] = useState('results')
+  const [viewDirection, setViewDirection] = useState(1)
   const [showInvite, setShowInvite] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
+  const [shareStatus, setShareStatus] = useState('')
+  const [sharingResults, setSharingResults] = useState(false)
   const purchaseLockRef = useRef(false)
 
   const aiScore = currentScan?.aiScore ?? {}
-  const physique = aiScore.physiqueResult ?? aiScore  // fallback: top-level fields
-  const score = currentScan?.glowScore ?? physique.overall ?? 5.0
-  const tier  = currentScan?.tier ?? (score >= 8 ? 'Elite' : score >= 6.5 ? 'Advanced' : score >= 5 ? 'Intermediate' : 'Beginner')
-  const tierColor = TIER_COLORS[tier] ?? GOLD
   const photo = currentScan?.facePhotoUrl ?? storedPhoto ?? null
-
-  const strengths    = physique.physique_strengths    ?? aiScore.physique_strengths    ?? []
-  const improvements = physique.physique_improvements ?? aiScore.physique_improvements ?? []
-  const notes        = physique.physique_notes        ?? aiScore.physique_notes        ?? null
-
-  const TABS = ['overview', 'breakdown', 'improve']
 
   // Fetch referral info upfront so invite sheet is ready instantly
   useEffect(() => {
@@ -286,7 +226,7 @@ export default function PhysiqueResults() {
     api.referral.count()
       .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code || null) })
       .catch(() => {})
-  }, [isPremium])
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -299,8 +239,37 @@ export default function PhysiqueResults() {
   }, [currentScan?.id, currentScan?.facePhotoUrl])
 
   useEffect(() => {
-    setRevealDone(false)
+    setActiveView('results')
   }, [currentScan?.id])
+
+  function showView(view) {
+    if (view === activeView) return
+    setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
+    setActiveView(view)
+  }
+
+  async function handleShareResults() {
+    const scores = PHYSIQUE_METRICS
+      .map(({ key, label }) => `${label}: ${getPhysiqueMetricScore(currentScan, key).toFixed(1)}/10`)
+      .join('\n')
+    const shareData = { title: 'My Physique Results', text: `My Ascendus physique results:\n${scores}` }
+    setSharingResults(true)
+    setShareStatus('')
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareData.text)
+        setShareStatus('Results copied')
+      } else {
+        setShareStatus('Sharing is unavailable on this device')
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') setShareStatus('Could not share results')
+    } finally {
+      setSharingResults(false)
+    }
+  }
 
   if (!currentScan) {
     return (
@@ -362,17 +331,12 @@ export default function PhysiqueResults() {
     setShowInvite(true)
   }
 
-  // Let every completed scan see the score reveal once, then keep the existing
-  // Pro gate around the detailed scorecard.
-  if (!revealDone) {
-    return <ScoreReveal score={score} tier={tier} onDone={() => { triggerHaptic(); setRevealDone(true) }} />
-  }
-
   if (!isPremium) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0A0A0A' }}>
         <PhysiquePaywall
           photo={photo}
+          scan={currentScan}
           onClose={() => navigate(location.state?.returnTo || '/scan')}
           onAscend={handleAscend}
           onInvite={handleInvite}
@@ -394,158 +358,96 @@ export default function PhysiqueResults() {
   }
 
   return (
-    <div className="relative flex flex-col h-full" style={{ background: 'var(--bg)' }}>
-      {/* Header */}
-      <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 12 }}>
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+      <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button
           onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
           aria-label="Go back"
-          className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+          className="absolute left-4 top-3 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform z-10"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
         >
           <ChevronLeft size={18} className="text-primary" />
         </button>
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>PHYSIQUE SCAN</p>
-        <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>Your Results</h1>
-      </div>
-
-      {/* Score hero */}
-      <div className="flex-shrink-0 mx-5 mb-3 rounded-3xl overflow-hidden relative"
-        style={{ background: '#0a0a0a', border: `1px solid ${tierColor}33` }}>
-        {photo && (
-          <img src={photo} alt="" className="w-full object-cover" style={{ maxHeight: 220, objectPosition: 'center top', filter: 'brightness(0.45) saturate(0.8)' }} />
-        )}
-        {!photo && <div style={{ height: 120 }} />}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="font-heading font-bold" style={{ fontSize: 72, lineHeight: 1, color: '#fff', textShadow: `0 0 40px ${tierColor}88`, letterSpacing: '-0.04em' }}>{score.toFixed(1)}</p>
-          <span className="font-heading font-bold text-[13px] px-4 py-1.5 rounded-full mt-2"
-            style={{ background: `${tierColor}22`, border: `1px solid ${tierColor}55`, color: tierColor }}>
-            {tier}
-          </span>
+        <div className="relative w-full">
+          <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...getUnlockedResultsHeadingStyle('Your Results') }}>
+            Your Results
+          </h1>
         </div>
+        <div className="h-5 flex items-start justify-center"><span aria-hidden="true" /></div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex-shrink-0 flex gap-1 mx-5 mb-3 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => { triggerHaptic(); setTab(t) }}
-            className="flex-1 py-2 rounded-xl font-heading font-bold text-[13px] capitalize transition-all"
-            style={{
-              background: tab === t ? 'rgba(198,168,92,0.15)' : 'transparent',
-              color: tab === t ? GOLD : 'rgba(255,255,255,0.35)',
-              border: tab === t ? `1px solid ${GOLD}44` : '1px solid transparent',
-            }}>
-            {t}
-          </button>
-        ))}
-      </div>
-
-
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-5 pb-6">
-        <AnimatePresence mode="wait">
-          {tab === 'overview' && (
-            <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              {/* Notes */}
-              {notes && (
-                <div className="mb-4 px-4 py-3 rounded-2xl" style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.2)' }}>
-                  <p className="font-body text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>{notes}</p>
-                </div>
-              )}
-
-              {/* 5 pillars grid */}
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>5 Body Pillars</p>
-              <div className="grid grid-cols-2 gap-2.5 mb-4">
-                {BODY_PILLARS.map(({ key, label, detail }) => {
-                  const val = physique[key] ?? aiScore[key] ?? 5.0
-                  const color = val >= 7 ? '#34C759' : val >= 5 ? '#C6A85C' : '#E07A5F'
-                  return (
-                    <div key={key} className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-[12px] font-heading font-bold text-primary">{label}</p>
-                        <span className="text-sm font-mono font-bold" style={{ color }}>{val.toFixed(1)}</span>
-                      </div>
-                      <p className="text-[9px] text-secondary font-body mb-2 leading-tight">{detail}</p>
-                      <ScoreBar score={val} />
-                    </div>
-                  )
-                })}
+      <motion.div
+        className="relative w-full px-2"
+        style={{
+          marginTop: activeView === 'results' ? 150 : 0,
+          flex: activeView === 'photo' ? '1 1 auto' : '0 0 auto',
+          display: activeView === 'photo' ? 'flex' : undefined,
+          alignItems: activeView === 'photo' ? 'center' : undefined,
+          transformOrigin: '50% 50%',
+          touchAction: 'pan-y',
+        }}
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.15}
+        onDragEnd={(_, info) => {
+          const index = RESULT_VIEWS.indexOf(activeView)
+          if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
+          else if (info.offset.x > 60 || info.velocity.x > 400) showView(RESULT_VIEWS[Math.max(index - 1, 0)])
+        }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {activeView === 'results' && (
+            <motion.div key="results" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+              <PhysiqueScorecard photo={photo} scan={currentScan} unlocked />
+            </motion.div>
+          )}
+          {activeView === 'photo' && (
+            <motion.div key="photo" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+              <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
+                {photo
+                  ? <img src={photo} draggable={false} alt="Your original physique scan photo" className="w-full h-full object-contain" />
+                  : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
               </div>
             </motion.div>
           )}
-
-          {tab === 'breakdown' && (
-            <motion.div key="breakdown" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <p className="text-[10px] font-heading font-bold uppercase tracking-wide mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>Detailed Scores</p>
-              {BODY_PILLARS.map(({ key, label, detail }) => {
-                const val = physique[key] ?? aiScore[key] ?? 5.0
-                const color = val >= 7 ? '#34C759' : val >= 5 ? '#C6A85C' : '#E07A5F'
-                const pct = Math.max(0, ((val - 1) / 9) * 100)
-                return (
-                  <div key={key} className="mb-3 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-heading font-bold text-[14px] text-primary">{label}</p>
-                        <p className="text-[10px] text-secondary font-body">{detail}</p>
-                      </div>
-                      <span className="font-heading font-bold text-[22px]" style={{ color }}>{val.toFixed(1)}</span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                      <motion.div className="h-full rounded-full" style={{ background: color }}
-                        initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                        transition={{ duration: 1.2, ease: 'easeOut' }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </motion.div>
-          )}
-
-          {tab === 'improve' && (
-            <motion.div key="improve" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              {strengths.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-[10px] font-heading font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: '#34C759' }}>
-                    <Zap size={10} /> Strengths
-                  </p>
-                  {strengths.map((s, i) => (
-                    <div key={i} className="mb-2 flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(52,199,89,0.06)', border: '1px solid rgba(52,199,89,0.15)' }}>
-                      <span style={{ color: '#34C759', fontSize: 14, flexShrink: 0 }}>✓</span>
-                      <p className="font-body text-[12px] text-primary leading-snug">{s}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {improvements.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-[10px] font-heading font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: GOLD }}>
-                    <Target size={10} /> Areas to Improve
-                  </p>
-                  {improvements.map((imp, i) => (
-                    <div key={i} className="mb-2 flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.2)' }}>
-                      <span style={{ color: GOLD, fontSize: 14, flexShrink: 0 }}>→</span>
-                      <p className="font-body text-[12px] text-primary leading-snug">{imp}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-2">
-                <p className="text-[10px] font-heading font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  <Activity size={10} /> Next Step
-                </p>
-                <button
-                  onClick={() => { triggerHaptic(); navigate('/workout-plan') }}
-                  className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-                >
-                  View Workout Plan
-                </button>
-              </div>
+          {activeView === 'compare' && (
+            <motion.div key="compare" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+              <ScanPhotoComparison scan={currentScan} savedScans={savedScans} />
             </motion.div>
           )}
         </AnimatePresence>
+      </motion.div>
+
+      {activeView === 'results' && (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleShareResults}
+          disabled={sharingResults}
+          className="w-[calc(100%-1rem)] mx-auto mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 disabled:opacity-70"
+          style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+        >
+          {sharingResults ? 'Sharing…' : shareStatus || 'Share Results'}
+        </motion.button>
+      )}
+
+      <div role="tablist" aria-label="Results view" className="flex justify-center mt-2 mb-6 flex-shrink-0">
+        {[
+          ['results', 'Show results'],
+          ['photo', 'Show physique photo'],
+          ['compare', 'Show photo comparison'],
+        ].map(([view, label]) => (
+          <button key={view} role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}
+            onClick={() => { triggerHaptic(); showView(view) }} onKeyDown={event => {
+              if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                event.preventDefault()
+                const direction = event.key === 'ArrowRight' ? 1 : -1
+                const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
+                showView(RESULT_VIEWS[index])
+              }
+            }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? GOLD : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
+          </button>
+        ))}
       </div>
     </div>
   )
