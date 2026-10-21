@@ -1,3 +1,4 @@
+import { isCurrentAssessment, assessmentScale } from '../utils/assessment'
 import { useState, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const showReferralBanner = !isPremium && !bannerDismissed && (referralCount ?? 0) < 3
 
   const latestScan = scans[0]
+  const assessment = isCurrentAssessment(latestScan) ? latestScan.aiScore.assessment : null
   const rawGlowScore = latestScan?.glowScore ?? 0
   const glowScore = rawGlowScore > 10 ? Math.round(rawGlowScore) / 10 : rawGlowScore
   const skin = latestScan?.faceData?.skinClarity ?? 0
@@ -158,7 +160,7 @@ export default function Dashboard() {
             }}
           />
           <div className="flex items-center gap-5 relative z-10">
-            <GlowScoreRing score={glowScore} size="large" animated />
+            {assessment ? <div className="text-center text-amber-200"><p className="text-2xl font-bold">{assessment.scoreRange ? `${assessment.scoreRange.min}–${assessment.scoreRange.max}` : 'Withheld'}</p><p className="text-xs mt-1">{assessment.scoreRange ? `${assessmentScale(assessment.rubricVersion).unit} range / ${assessmentScale(assessment.rubricVersion).max}` : 'No numerical score'}</p></div> : <GlowScoreRing score={glowScore} size="large" animated />}
             <div className="flex-1">
               {latestScan ? (
                 <>
@@ -169,9 +171,9 @@ export default function Dashboard() {
                     Last scan · {new Date(latestScan.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </p>
                   <p className="font-heading font-semibold text-sm text-white">
-                    {glowScore >= 7 ? 'You\'re on fire.' : glowScore >= 5 ? 'Progress is real.' : 'Every journey starts here.'}
+                    {assessment ? 'View your photographic appearance feedback.' : glowScore >= 7 ? 'You\'re on fire.' : glowScore >= 5 ? 'Progress is real.' : 'Every journey starts here.'}
                   </p>
-                  {scans.length >= 2 && (
+                  {!assessment && scans.length >= 2 && (
                     <p className="text-[12px] mt-1 font-body" style={{ color: 'rgba(255,255,255,0.55)' }}>
                       {(() => {
                         const prev = normalizeScore(scans[1]?.glowScore ?? glowScore)

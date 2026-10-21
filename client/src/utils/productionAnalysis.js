@@ -1,3 +1,4 @@
+import { ASSESSMENT_VERSION } from './assessment.js'
 import { analyzeLandmarkEvidence, buildProfileEvidence } from './evidenceAnalysis.js'
 
 function imageDimensions(source) {
@@ -46,7 +47,7 @@ export async function buildProductionEvidence({ frontImage, frontLandmarks, qual
 }
 
 export async function requestProductionAnalysis({
-  apiClient, faceImage, sideImage = null, gender = 'male', previousScore = null,
+  apiClient, faceImage, sideImage = null, gender = null, knownMinor = false, presentationGoals = '',
   sideProfileGeometry = null, evidence, timeoutMs = 120_000,
 }) {
   if (evidence?.status !== 'measured') {
@@ -60,12 +61,17 @@ export async function requestProductionAnalysis({
     ...(sideImage ? { sideImage } : {}),
     ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
     analysisEvidence: portableEvidence(evidence),
-    gender,
-    ...(previousScore != null ? { previousScore } : {}),
+    assessmentProfile: gender,
+    knownMinor,
+    presentationGoals,
+
   }
   const scoreCall = apiClient.ai.score(payload)
-  const timeoutCall = new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs))
-  const result = await Promise.race([scoreCall, timeoutCall])
+  let timer
+  const timeoutCall = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs) })
+  let result
+  try { result = await Promise.race([scoreCall, timeoutCall]) } finally { clearTimeout(timer) }
+  if (result?.assessment?.rubricVersion !== ASSESSMENT_VERSION) throw new Error('The assessment server uses an older rubric. No new assessment was saved. Update the server and try again.')
   return {
     ...result,
     analysisEvidence: {
@@ -74,8 +80,8 @@ export async function requestProductionAnalysis({
       categories: { ...evidence.categories, observed: result.visualObservations ?? [] },
     },
     scoreClassification: result.scoreClassification ?? {
-      overall: 'legacy_subjective_visual_assessment',
-      objectiveReplacementStatus: 'not_validated',
+      overall: 'subjective_appearance_range',
+      empiricalCalibration: 'not_validated',
     },
   }
 }

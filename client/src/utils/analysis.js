@@ -1,3 +1,4 @@
+// Legacy rubric only: historical assessments retain these original labels. New assessments use assessmentRubric.json.
 /**
  * Ascendus Analysis Engine v2
  * Full PSL metric suite + UMax Score tier system

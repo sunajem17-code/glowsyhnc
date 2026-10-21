@@ -1,3 +1,5 @@
+import { assessmentScan } from '../utils/assessment'
+import AssessmentOptions from '../components/AssessmentOptions'
 import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,10 +9,7 @@ import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, Check, CheckCircle2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Star, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
-import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
-import { generatePlanTasks } from '../utils/content'
-import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/side-profile-guide.png'
@@ -1797,7 +1796,7 @@ export default function Scan() {
     const presentation = presentationGate()
     presentationRef.current = presentation
     const skipSide = skipSideOverride
-    const g        = gender ?? 'male'
+    const g        = useStore.getState().userProfile?.assessmentProfile ?? useStore.getState().gender ?? null
     setGender(g)
     if (import.meta.env.DEV) {
       console.log('[ASCENDUS SCAN] Profile captured')
@@ -1874,42 +1873,10 @@ export default function Scan() {
       let aiResult
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
       if (token === 'demo-token') {
-        // Demo users: return mock results instead of hitting the backend
-        await new Promise(r => setTimeout(r, 2500))
-        // Round first, then derive tier from the SAME rounded value used for
-        // overallScore — computing tier from the unrounded score can land it
-        // on the wrong side of a threshold vs. the rounded score shown elsewhere.
-        const demoScore = Math.round((6.8 + (Math.random() - 0.5) * 0.6) * 10) / 10
-        const demoTier  = getTier(demoScore, g)
-        aiResult = {
-          overallScore:    demoScore,
-          faceScore:       Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
-          faceOnlyScore:   Math.round((demoScore + (Math.random() - 0.5) * 0.4) * 10) / 10,
-          groomingScore:   Math.round((6.5 + Math.random()) * 10) / 10,
-          tier:            demoTier.label,
-          hasSideProfile:  !!sideB64,
-          faceSubScores: {
-            symmetry:          Math.round((6.5 + Math.random()) * 10) / 10,
-            jawlineDefinition: Math.round((6.2 + Math.random()) * 10) / 10,
-            skinClarity:       Math.round((7.0 + Math.random() * 0.8) * 10) / 10,
-            facialProportions: Math.round((6.8 + Math.random() * 0.6) * 10) / 10,
-            eyeArea:           Math.round((6.5 + Math.random()) * 10) / 10,
-            facialHarmony:     Math.round((7.0 + Math.random() * 0.5) * 10) / 10,
-          },
-          pillars: {
-            harmony:    Math.round((6.8 + Math.random()) * 10) / 10,
-            angularity: Math.round((6.5 + Math.random()) * 10) / 10,
-            features:   Math.round((7.0 + Math.random() * 0.8) * 10) / 10,
-            dimorphism: Math.round((6.3 + Math.random()) * 10) / 10,
-          },
-          facialStructure:  'Oval',
-          hairType:         null,
-          insights: ['Demo mode. Sign up for a real account to get AI-powered analysis'],
-        }
+        throw new Error('Demo mode does not generate appearance scores. Sign in for an assessment.')
       } else {
         try {
           setScanInFlight(true)
-          const lastGlowScore = scans?.[0]?.glowScore ?? null
           aiResult = await requestProductionAnalysis({
             apiClient: api,
             faceImage: faceB64,
@@ -1917,7 +1884,8 @@ export default function Scan() {
             sideProfileGeometry,
             evidence: analysisEvidence,
             gender: g,
-            previousScore: lastGlowScore,
+            presentationGoals: useStore.getState().userProfile?.presentationGoals || '',
+            knownMinor: useStore.getState().userProfile?.knownMinor === true || (Number.isFinite(useStore.getState().userProfile?.age) && useStore.getState().userProfile.age < 18),
           })
           if (presentationRef.current !== presentation) return
           setAnalysisResult(aiResult)
@@ -1938,153 +1906,14 @@ export default function Scan() {
       setAnalysisStep(3)
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis response received')
 
-      const scanRecord = {
-        id:             `scan-${Date.now()}`,
-        scanDate:       new Date().toISOString(),
-        analyzedAt:     new Date().toISOString(),
-        facePhotoUrl:   faceB64,
-        sidePhotoUrl:   sideB64 ?? null,
-        hasSideProfile: aiResult.hasSideProfile ?? false,
-        gender:         g,
-        umaxScore:      aiResult.overallScore,
-        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
-        tier:           aiResult.tier,
-        aiScore:        aiResult,
-        analysisEvidence: aiResult.analysisEvidence,
-        faceData: {
-          aestheticScore:    aiResult.faceScore,
-          pillars:           null,
-          symmetry:          aiResult.faceSubScores?.symmetry          ?? null,
-          jawlineDefinition: aiResult.faceSubScores?.jawlineDefinition ?? null,
-          skinClarity:       aiResult.faceSubScores?.skinClarity       ?? null,
-          facialProportions: aiResult.faceSubScores?.facialProportions ?? null,
-          eyeArea:           aiResult.faceSubScores?.eyeArea           ?? null,
-          facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
-        },
-        pillars:          aiResult.pillars         ?? null,
-        extendedMetrics:  aiResult.extendedMetrics ?? null,
-        // 'pending' when the core call split extended metrics into their own
-        // follow-up request (see below); absent/undefined for demo/ARKit
-        // scans, which never produce extended metrics at all.
-        extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
-        // Real, on-device Vision-framework geometry (side-profile landmarks)
-        // — present only when detection actually succeeded with adequate
-        // confidence. Same "measure, don't guess" principle as faceMetrics
-        // above. (Body geometry/physique scoring intentionally no longer
-        // happens here — see the Training Plan flow's own body-photo step.)
-        sideProfileGeometry:  sideProfileGeometry ?? undefined,
-      }
-
-      const assignedPh = assignPhase(aiResult.faceScore, userProfile?.goal)
-      const tasks = generatePlanTasks(scanRecord.faceData, scanRecord.pillars, assignedPh, g)
-      setCurrentPlan({ id: `plan-${Date.now()}`, scanId: scanRecord.id, tasks, createdAt: new Date().toISOString(), weekNumber: 1 })
-      if (faceB64) setPendingFacePhoto(faceB64)
-      addScan(scanRecord)
-      setCurrentScan(scanRecord)
-      setAssignedPhase(assignedPh)
-      recordProScan()
-
-      // Mark calibration complete after first successful scan — subsequent
-      // scans will use the fast local MediaPipe path instead of the AI API.
-      // Also release the original capture blob URL (privacy: no longer needed).
-      import('../utils/scanQuality.js').then(({ markCalibrated, releaseValidationImage }) => {
-        markCalibrated()
-        releaseValidationImage(facePhoto) // facePhoto may be blob: URL from camera/upload
-      }).catch(() => {})
-
-      // Fire-and-forget: run MediaPipe client-side to extract named landmarks
-      // and explorer metrics for FaceMetricsExplorer on the Progress screen.
-      // Non-blocking — scan completion is not gated on this.
-      if (faceB64) {
-        import('../utils/faceLandmarks.js')
-          .then(({ getLandmarks, toExplorerLandmarks2D, computeExplorerMetrics }) =>
-            getLandmarks(faceB64).then(lm => {
-              const named2D   = toExplorerLandmarks2D(lm)
-              const explorerM = computeExplorerMetrics(lm, g)
-              if (explorerM) {
-                setLastFaceScanCapture(faceB64, named2D, explorerM)
-                import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
-                  saveScanMedia(scanRecord.id, { photo: faceB64, landmarks2D: named2D, faceMetrics: explorerM })
-                ).catch(() => {})
-              }
-            })
-          )
-          .catch(err => console.warn('[FaceExplorer] Landmark detection:', err.message))
-      }
-
-      // Extended metrics (30-metric breakdown) fill in a few seconds after
-      // the core result — split out server-side purely for latency (core
-      // call ~18s vs ~35s combined). Fire the follow-up now, non-blocking;
-      // CategoryCard reads scan.extendedMetrics/.extendedMetricsStatus
-      // directly from the store, so this patch alone is enough to update it
-      // wherever it's rendered (ScanUnlockGate, StepScoresWaiting) once it lands.
-      if (faceB64 && scanRecord.extendedMetricsStatus === 'pending') {
-        api.ai.scoreExtendedMetrics({ faceImage: faceB64, gender: g })
-          .then(({ extendedMetrics }) => {
-            patchScanExtendedMetrics(scanRecord.id, extendedMetrics, 'ready')
-          })
-          .catch(err => {
-            console.warn('[Scan] Extended metrics follow-up failed (non-fatal):', err?.message)
-            patchScanExtendedMetrics(scanRecord.id, null, 'failed')
-          })
-      }
-
-      // Persist to Supabase (non-blocking). Upload the real scan photo to
-      // Supabase Storage first (private 'scan-images' bucket, already wired
-      // up server-side but never actually called until now) so the scan
-      // row's face_image_url is a real storage path, not empty — this is
-      // what powers Scan History thumbnails / Before-After on the Progress
-      // page across app restarts, instead of relying on localStorage (which
-      // deliberately strips photo data URLs to avoid a quota crash).
-      // For a Live-Face-Scan-only capture (no separate static photo taken),
-      // faceB64 is null but the AR capture's own photo is still available
-      // via lastFaceScanImage — fall back to that so ARKit-only scans still
-      // get a real thumbnail.
-      ;(async () => {
-        let faceImageUrl = null
-        const photoForUpload = faceB64
-        if (photoForUpload) {
-          try {
-            const commaIdx = photoForUpload.indexOf(',')
-            const header = commaIdx >= 0 ? photoForUpload.slice(0, commaIdx) : ''
-            const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
-            const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
-            const uploadResult = await api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' })
-            faceImageUrl = uploadResult?.path || null
-          } catch (err) {
-            console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
-          }
-        }
-
-        api.supabase.saveScan({
-          overallScore:     aiResult.overallScore,
-          tier:             aiResult.tier,
-          faceScore:        aiResult.faceScore,
-          groomingScore:    aiResult.groomingScore,
-          harmony:          aiResult.pillars?.harmony,
-          angularity:       aiResult.pillars?.angularity,
-          features:         aiResult.pillars?.features,
-          dimorphism:       aiResult.pillars?.dimorphism,
-          potentialScore:   Math.min(10, (aiResult.overallScore ?? 5) + 1.4),
-          hairTypeDetected: aiResult.hairType,
-          faceShape:        aiResult.facialStructure,
-          faceImageUrl,
-          gender:           g,
-          assignedPhase:    assignedPh?.toLowerCase(),
-          tasks,
-        }).catch(() => {})
-      })()
-
-      setLastScanDate(new Date().toISOString())
+      const structuredScan = assessmentScan(aiResult, { id: `scan-${Date.now()}`, scanDate: new Date().toISOString(), facePhotoUrl: faceB64, sidePhotoUrl: sideB64 })
+      addScan(structuredScan)
+      setCurrentScan(structuredScan)
+      setLastScanDate(structuredScan.scanDate)
       incrementScanCount()
-      // The real score may arrive before the user's measured landmarks and
-      // visual callouts have appeared. Wait for that sequence, bounded in
-      // case a device cannot run the landmark model.
+      recordProScan()
       setAnalysisStep(4)
-      // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
-      scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
-
-      navigate(isPremium ? '/results' : '/unlock', { replace: true, state: { scanCelebration: true } })
+      navigate(isPremium ? '/results' : '/unlock', { replace: true })
     } catch (err) {
       if (presentationRef.current !== presentation) return
       presentation.finish(false)
@@ -2210,6 +2039,7 @@ export default function Scan() {
         )
       )}
 
+      {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && <AssessmentOptions />}
       {/* Content */}
       <div className={`flex-1 ${isAnalyzing ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         <AnimatePresence mode="wait">

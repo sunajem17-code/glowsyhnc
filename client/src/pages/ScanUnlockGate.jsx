@@ -1,3 +1,5 @@
+import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
+import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
@@ -1245,7 +1247,7 @@ function SocialProofTicker() {
   )
 }
 
-function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
+function ProPaywall({ scan, onClose, onPurchase, isPurchasing, error, onSignIn }) {
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
   const containerRef = useRef(null)
@@ -1380,6 +1382,12 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
         </p>
       </div>
 
+      {isCurrentAssessment(scan) ? (
+        <div className="mx-4 my-6 p-6 rounded-2xl bg-neutral-900 text-neutral-300">
+          <h2 className="text-xl font-bold text-white">Photographic appearance feedback</h2>
+          <p className="mt-3">View your subjective score range, supporting observations, confidence and photo limitations. No guaranteed improvements or tier increases.</p>
+        </div>
+      ) : (<>
       {/* Swipeable feature cards */}
       <div ref={containerRef} className="flex-shrink-0 relative overflow-hidden mx-4 my-2 rounded-3xl" style={{ background: '#141414', height: 240 }}>
         <motion.div
@@ -1408,6 +1416,8 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
         ))}
       </div>
 
+      </>)}
+
       {/* CTA */}
       <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 4 }}>
         <motion.button
@@ -1420,6 +1430,14 @@ function ProPaywall({ scan, onClose, onPurchase, isPurchasing }) {
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
+        {error && (
+          <div role="alert" className="mt-3 text-center">
+            <p className="text-sm font-body" style={{ color: RED }}>{error}</p>
+            {/session expired|sign in|log in/i.test(error) && (
+              <button type="button" onClick={onSignIn} className="mt-2 text-sm underline" style={{ color: G }}>Sign in again</button>
+            )}
+          </div>
+        )}
         <div className="mt-3 mb-2">
           <SocialProofTicker />
         </div>
@@ -1613,7 +1631,7 @@ export function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onC
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export default function ScanUnlockGate() {
+function LegacyScanUnlockGate() {
   const navigate = useNavigate()
   const { currentScan, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
   const [searchParams] = useSearchParams()
@@ -1655,6 +1673,12 @@ export default function ScanUnlockGate() {
   if (isPremium && !justUnlocked) return null
 
   function handleUnlockSuccess() {
+    if (isCurrentAssessment(currentScan)) {
+      setIsPremium(true)
+      updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
+      navigate('/results', { replace: true })
+      return
+    }
     justUnlockedRef.current = true
     try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
@@ -1749,6 +1773,8 @@ export default function ScanUnlockGate() {
             scan={currentScan}
             onClose={() => searchParams.get('paywall') === '1' ? navigate(-1) : setShowPaywall(false)}
             onPurchase={handleAscend}
+            error={purchaseError}
+            onSignIn={() => { useStore.getState().logout(); navigate('/auth', { replace: true }) }}
             isPurchasing={isPurchasing}
           />
         )}
@@ -1776,4 +1802,11 @@ export default function ScanUnlockGate() {
       </AnimatePresence>
     </MotionPage>
   )
+}
+
+export default function ScanUnlockGate() {
+  const scan = useStore(s => s.currentScan)
+  const [params] = useSearchParams()
+  if (isCurrentAssessment(scan) && params.get('paywall') !== '1') return <AppearanceAssessmentResults key={scan.id} scan={scan} />
+  return <LegacyScanUnlockGate />
 }

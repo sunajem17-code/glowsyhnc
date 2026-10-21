@@ -1,3 +1,5 @@
+import { assessmentScan } from '../utils/assessment'
+import AssessmentOptions from '../components/AssessmentOptions'
 import './onboardingMotion.css'
 import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
 import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
@@ -2447,7 +2449,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           sideImage: sideB64,
           sideProfileGeometry,
           evidence: analysisEvidence,
-          gender: gender || 'male',
+          gender: useStore.getState().userProfile?.assessmentProfile ?? useStore.getState().gender ?? gender ?? null,
+          presentationGoals: useStore.getState().userProfile?.presentationGoals || '',
+          knownMinor: useStore.getState().userProfile?.knownMinor === true || (Number.isFinite(useStore.getState().userProfile?.age) && useStore.getState().userProfile.age < 18),
         })
       } finally {
         setScanInFlight(false)
@@ -2459,36 +2463,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
 
-      const scanRecord = {
-        id:             `scan-${Date.now()}`,
-        scanDate:       new Date().toISOString(),
-        analyzedAt:     new Date().toISOString(),
-        facePhotoUrl:   faceB64,
-        sidePhotoUrl:   sideB64,
-        hasSideProfile: !!sideB64,
-        gender:         gender || 'male',
-        umaxScore:      aiResult.overallScore,
-        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
-        tier:           aiResult.tier,
-        aiScore:        aiResult,
-        analysisEvidence: aiResult.analysisEvidence,
-        faceData: {
-          aestheticScore:    aiResult.faceScore,
-          pillars:           null,
-          symmetry:          aiResult.faceSubScores?.symmetry          ?? null,
-          jawlineDefinition: aiResult.faceSubScores?.jawlineDefinition ?? null,
-          skinClarity:       aiResult.faceSubScores?.skinClarity       ?? null,
-          facialProportions: aiResult.faceSubScores?.facialProportions ?? null,
-          eyeArea:           aiResult.faceSubScores?.eyeArea           ?? null,
-          facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
-        },
-        pillars:          aiResult.pillars          ?? null,
-        extendedMetrics:  aiResult.extendedMetrics  ?? null,
-        extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
-      }
-
+      const structuredScan = assessmentScan(aiResult, { id: `scan-${Date.now()}`, scanDate: new Date().toISOString(), facePhotoUrl: faceB64, sidePhotoUrl: sideB64 })
       if (!await presentation.promise || presentationRef.current !== presentation) return
-      onDone(scanRecord)
+      onDone(structuredScan)
     } catch (err) {
       if (presentationRef.current !== presentation) return
       presentation.finish(false)
@@ -2610,7 +2587,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           if (!sidePhoto) sideTriggerRef.current?.()
           else runAnalysisWithData(facePhoto, sidePhoto)
         }}
-        extra={null}
+        extra={<AssessmentOptions />}
       />
     )
   }
@@ -3099,6 +3076,14 @@ export default function PremiumOnboarding() {
   // REMOVED: handleScanDone — moved to paywall flow
   // eslint-disable-next-line no-unused-vars
   function handleScanDone(scanRecord) {
+    if (scanRecord.aiScore?.assessment) {
+      addScan(scanRecord)
+      setCurrentScan(scanRecord)
+      setLastScanDate(scanRecord.scanDate)
+      incrementScanCount()
+      goNext()
+      return
+    }
     try {
       const g = formData.gender || 'male'
       const phase = assignPhase(scanRecord.faceData?.aestheticScore, formData.goal)

@@ -1,3 +1,5 @@
+import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
+import { isCurrentAssessment } from '../utils/assessment'
 import { SCAN_FEATURES } from '../utils/scanPresentation'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -310,7 +312,7 @@ function ProText({ text, onUpgrade }) {
 }
 
 // ─── Main Results page ────────────────────────────────────────────────────────
-export default function Results() {
+function LegacyResults() {
   const navigate = useNavigate()
   const { currentScan, isPremium, pendingFacePhoto, assignedPhase, hairType, setHairType, user } = useStore()
 
@@ -1261,4 +1263,10 @@ export default function Results() {
 
     </>
   )
+}
+
+export default function Results() {
+  const scan = useStore(s => s.currentScan)
+  if (isCurrentAssessment(scan)) return <AppearanceAssessmentResults key={scan.id} scan={scan} />
+  return <LegacyResults />
 }

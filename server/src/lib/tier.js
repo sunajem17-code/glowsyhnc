@@ -1,3 +1,4 @@
+// Legacy rubric only: historical assessments retain these original labels. New assessments use assessmentRubric.json.
 /**
  * Single source of truth for tier-label assignment on the server.
  * Must be called with the FINAL score actually shown to the user

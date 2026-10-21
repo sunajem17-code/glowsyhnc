@@ -1,5 +1,6 @@
 /**
- * Regression test for the scoring pipeline.
+ * Historical rubric regression tests only. The copied formula below is retired.
+ * New assessments are tested in tests/appearanceAssessment.test.mjs.
  *
  * Run before shipping any scoring logic change:
  *   node server/src/test-scoring.js

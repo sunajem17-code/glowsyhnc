@@ -1,0 +1,135 @@
+{
+  "version": "appearance-psl-v2",
+  "name": "PSL-style facial assessment",
+  "scale": {
+    "min": 0,
+    "max": 8,
+    "unit": "PSL",
+    "averageAnchor": 4,
+    "modelTierAnchor": 6,
+    "eliteAnchor": 7
+  },
+  "bands": [
+    {
+      "id": "psl_under_2",
+      "min": 0,
+      "max": 2,
+      "labels": {
+        "male": "Marked facial imbalance",
+        "female": "Marked facial imbalance",
+        "unspecified": "Marked facial imbalance"
+      },
+      "criteria": "Describe visible overall imbalance without inferring diagnoses, disability, or universal unattractiveness."
+    },
+    {
+      "id": "psl_2",
+      "min": 2,
+      "max": 3,
+      "labels": {
+        "male": "Below-average facial harmony",
+        "female": "Below-average facial harmony",
+        "unspecified": "Below-average facial harmony"
+      },
+      "criteria": "Multiple visible feature relationships limit overall harmony within this subjective rubric."
+    },
+    {
+      "id": "psl_3",
+      "min": 3,
+      "max": 3.5,
+      "labels": {
+        "male": "Below average",
+        "female": "Below average",
+        "unspecified": "Below average"
+      },
+      "criteria": "Noticeable imbalances in facial proportions or feature relationships; explain the visible observations."
+    },
+    {
+      "id": "psl_4",
+      "min": 3.5,
+      "max": 4.5,
+      "labels": {
+        "male": "Average",
+        "female": "Average",
+        "unspecified": "Average"
+      },
+      "criteria": "The average reference is 4. Broadly balanced, ordinary facial relationships without pronounced overall strengths or limitations."
+    },
+    {
+      "id": "psl_4_5",
+      "min": 4.5,
+      "max": 5,
+      "labels": {
+        "male": "Above average",
+        "female": "Above average",
+        "unspecified": "Above average"
+      },
+      "criteria": "Good overall balance and facial harmony; striking features are not necessary."
+    },
+    {
+      "id": "psl_5",
+      "min": 5,
+      "max": 5.5,
+      "labels": {
+        "male": "Attractive",
+        "female": "Attractive",
+        "unspecified": "Attractive"
+      },
+      "criteria": "Good facial harmony and cohesive features, with some visible limitations or less exceptional relationships."
+    },
+    {
+      "id": "psl_5_5",
+      "min": 5.5,
+      "max": 6,
+      "labels": {
+        "male": "Very attractive",
+        "female": "Very attractive",
+        "unspecified": "Very attractive"
+      },
+      "criteria": "Strong overall harmony and multiple well-integrated features that support an assessment above the attractive anchor."
+    },
+    {
+      "id": "psl_6",
+      "min": 6,
+      "max": 6.5,
+      "labels": {
+        "male": "Model tier",
+        "female": "Model tier",
+        "unspecified": "Model tier"
+      },
+      "criteria": "Very strong facial harmony and cohesive structure; minor limitations may remain without dominating the whole face."
+    },
+    {
+      "id": "psl_6_5",
+      "min": 6.5,
+      "max": 7,
+      "labels": {
+        "male": "Exceptional model tier",
+        "female": "Exceptional model tier",
+        "unspecified": "Exceptional model tier"
+      },
+      "criteria": "Consistently strong visible feature relationships and exceptional overall harmony; do not require literal flawlessness."
+    },
+    {
+      "id": "psl_7",
+      "min": 7,
+      "max": 7.5,
+      "labels": {
+        "male": "Elite model tier",
+        "female": "Elite model tier",
+        "unspecified": "Elite model tier"
+      },
+      "criteria": "Exceptional whole-face harmony, balance and visible symmetry with distinctive, well-integrated features across assessable regions."
+    },
+    {
+      "id": "psl_7_5",
+      "min": 7.5,
+      "max": 8,
+      "labels": {
+        "male": "Near-ideal reference / True Adam",
+        "female": "Near-ideal reference / True Eve",
+        "unspecified": "Near-ideal reference"
+      },
+      "criteria": "The highest reference band demands unusually compelling visible evidence across the whole face. Eight is a theoretical reference endpoint, not a claim of human perfection."
+    }
+  ]
+}

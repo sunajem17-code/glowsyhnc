@@ -1,3 +1,4 @@
+import { isCurrentAssessment, assessmentScale } from '../utils/assessment'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -135,6 +136,7 @@ function TrendChart({ scans }) {
 
 // ── Single scan row ───────────────────────────────────────────────────────────
 function ScanRow({ scan, onTap, index }) {
+  const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
   const thumb = thumbnail(scan.facePhotoUrl || scan.face_photo_url)
   const date = fmt(scan.analyzedAt || scan.scan_date)
   const score = scan.glowScore != null
@@ -173,6 +175,8 @@ function ScanRow({ scan, onTap, index }) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="font-heading font-semibold text-[15px] text-primary leading-tight">{date}</p>
+        {assessment && <p className="text-xs mt-1" style={{ color: GOLD }}>Subjective appearance feedback · saved on this device</p>}
+        {!assessment && <p className="text-xs mt-1 opacity-50">Original legacy rubric</p>}
         {scan.tier && (
           <span
             className="font-heading font-bold text-[10px] tracking-wide mt-0.5 inline-block"
@@ -185,7 +189,8 @@ function ScanRow({ scan, onTap, index }) {
 
       {/* Score */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {score != null && (
+        {assessment && <p className="text-lg font-bold" style={{ color: GOLD }}>{assessment.scoreRange ? `${assessment.scoreRange.min}–${assessment.scoreRange.max} / ${assessmentScale(assessment.rubricVersion).max} ${assessmentScale(assessment.rubricVersion).unit}` : 'Withheld'}</p>}
+        {!assessment && score != null && (
           <p
             className="font-heading font-bold text-[22px]"
             style={{ color: scoreColor(score), letterSpacing: '-0.02em' }}
@@ -204,7 +209,7 @@ export default function ScanHistory() {
   const navigate = useNavigate()
   const isPremium = useStore(s => s.isPremium)
   const setCurrentScan = useStore(s => s.setCurrentScan)
-  const [scans, setScans] = useState([])
+  const [scans, setScans] = useState(() => useStore.getState().scans.filter(isCurrentAssessment))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -226,9 +231,9 @@ export default function ScanHistory() {
           scan_date:     s.scan_date,
           tier:          s.faceData?.tier ?? null,
         }))
-        setScans(list)
+        setScans([...useStore.getState().scans.filter(isCurrentAssessment), ...list].sort((a, b) => new Date(b.analyzedAt || b.scan_date) - new Date(a.analyzedAt || a.scan_date)))
       })
-      .catch(err => setError(err.message || 'Failed to load history'))
+      .catch(err => { if (!useStore.getState().scans.some(isCurrentAssessment)) setError(err.message || 'Failed to load history') })
       .finally(() => setLoading(false))
   }, [isPremium])
 

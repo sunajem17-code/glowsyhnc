@@ -1,3 +1,5 @@
+import AppearanceComparison from '../components/AppearanceComparison'
+import { isCurrentAssessment } from '../utils/assessment'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -551,7 +553,7 @@ function ShareModal({ beforeScan, afterScan, beforePhoto, afterPhoto, onClose })
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function Compare() {
+function LegacyCompare() {
   const navigate = useNavigate()
   const { scans } = useStore()
   const [showShare, setShowShare] = useState(false)
@@ -773,4 +775,10 @@ export default function Compare() {
       </AnimatePresence>
     </MotionPage>
   )
+}
+
+export default function Compare() {
+  const scans = useStore(s => s.scans)
+  if (scans.some(isCurrentAssessment)) return <AppearanceComparison scans={scans} />
+  return <LegacyCompare />
 }
