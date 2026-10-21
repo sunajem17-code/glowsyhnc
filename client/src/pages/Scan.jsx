@@ -1,5 +1,4 @@
 import { assessmentScan } from '../utils/assessment'
-import AssessmentOptions from '../components/AssessmentOptions'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { preserveCapture } from '../utils/capturePhoto'
 import { createPortal } from 'react-dom'
@@ -521,7 +520,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   {ready && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                       {stepNum !== 2 && (
-                        <div style={{ width: '70%', height: '67%', border: `1.5px solid ${GOLD}`, borderRadius: '48% 48% 42% 42%', boxShadow: `0 0 16px ${GOLD}55` }} />
+                        <FaceSymmetryGuide aligned />
                       )}
                       <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: GOLD, fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
                         {stepNum === 2 ? 'Align your side profile' : 'Position your face in the oval'}
@@ -540,7 +539,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
               {showLive && ready && (
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   {stepNum !== 2 && (
-                    <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
+                    <FaceSymmetryGuide aligned={alignment.aligned} />
                   )}
                   <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: alignment.aligned ? GOLD : '#fff', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
                     {trackingAvailable ? alignment.label : (stepNum === 2 ? 'Align your side profile' : 'Position your face')}
@@ -616,6 +615,26 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
           </>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+function FaceSymmetryGuide({ aligned = false }) {
+  const guideColor = aligned ? GOLD : 'rgba(255,255,255,0.72)'
+  return (
+    <div
+      aria-hidden="true"
+      className="relative"
+      style={{
+        width: '70%', height: '67%',
+        border: `1.5px solid ${guideColor}`,
+        borderRadius: '48% 48% 42% 42%',
+        boxShadow: aligned ? `0 0 16px ${GOLD}55` : 'none',
+        transition: 'border-color .3s, box-shadow .3s',
+      }}
+    >
+      <span style={{ position: 'absolute', left: '50%', top: '10%', bottom: '10%', width: 1, transform: 'translateX(-50%)', background: `linear-gradient(to bottom, transparent, ${guideColor} 16%, ${guideColor} 84%, transparent)` }} />
+      <span style={{ position: 'absolute', left: '43%', top: '40%', width: '14%', height: 1, background: guideColor, opacity: 0.8 }} />
     </div>
   )
 }
@@ -2234,27 +2253,24 @@ export default function Scan() {
 
       let aiResult
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
-      const localScorePreview = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AI_SCORE_FALLBACK === 'true'
-      if (token === 'demo-token' || localScorePreview) {
-        throw new Error('Demo mode does not generate appearance scores. Sign in for an assessment.')
-      } else {
-        try {
-          setScanInFlight(true)
-          aiResult = await requestProductionAnalysis({
-            apiClient: api,
-            faceImage: faceB64,
-            sideImage: sideB64,
-            sideProfileGeometry,
-            evidence: analysisEvidence,
-            gender: g,
-            presentationGoals: useStore.getState().userProfile?.presentationGoals || '',
-            knownMinor: useStore.getState().userProfile?.knownMinor === true || (Number.isFinite(useStore.getState().userProfile?.age) && useStore.getState().userProfile.age < 18),
-          })
-          setAnalysisResult(aiResult)
-
-        } finally {
-          setScanInFlight(false)
-        }
+      try {
+        // Demo sessions are rate-limited guests on the server; let them use
+        // the same validated assessment path instead of fabricating scores
+        // locally or stopping with an error.
+        setScanInFlight(true)
+        aiResult = await requestProductionAnalysis({
+          apiClient: api,
+          faceImage: faceB64,
+          sideImage: sideB64,
+          sideProfileGeometry,
+          evidence: analysisEvidence,
+          gender: g,
+          presentationGoals: useStore.getState().userProfile?.presentationGoals || '',
+          knownMinor: useStore.getState().userProfile?.knownMinor === true || (Number.isFinite(useStore.getState().userProfile?.age) && useStore.getState().userProfile.age < 18),
+        })
+        setAnalysisResult(aiResult)
+      } finally {
+        setScanInFlight(false)
       }
 
       if (!aiResult.analysisEvidence) aiResult.analysisEvidence = analysisEvidence
@@ -2447,9 +2463,14 @@ export default function Scan() {
         )
       )}
 
-      {step === 2 && !previewPhoto && !cameraOpen && <AssessmentOptions />}
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className="flex-1 min-h-0 overflow-hidden"
+        // The capture route no longer renders the app-wide bottom nav. Keep
+        // the guide's old vertical center, which was calculated in the space
+        // above that 72px nav, without moving the fixed Begin Scan action.
+        style={step === 1 && !cameraOpen && !previewPhoto ? { paddingBottom: 72 } : undefined}
+      >
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
@@ -2491,6 +2512,22 @@ export default function Scan() {
                   />
                 </div>
               )}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={async () => {
+                  triggerHaptic()
+                  if (isNative()) {
+                    try {
+                      await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
+                    } catch {}
+                  }
+                  setCameraOpen(true)
+                }}
+                className="w-full flex-shrink-0 mt-[30px] py-4 rounded-2xl font-heading font-bold text-[15px]"
+                style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+              >
+                Begin Scan
+              </motion.button>
             </motion.div>
           )}
           {(step === 1 || step === 2) && previewPhoto && (
@@ -2734,29 +2771,11 @@ export default function Scan() {
         </div>
       )}
 
-      {/* CTAs — pinned at bottom, same position/size on every step */}
+      {/* Optional library upload stays in the footer; Begin Scan sits directly
+          beneath the guide photo so the action is visually tied to the image. */}
       <input ref={libraryUploadRef} type="file" accept="image/*" onChange={selectLibraryPhoto} className="hidden" />
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {(step === 1 || step === 2) && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={async () => {
-                triggerHaptic()
-                if (isNative()) {
-                  try {
-                    // Triggers the iOS "Allow camera access" system dialog if not yet granted
-                    await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
-                  } catch {}
-                }
-                setCameraOpen(true)
-              }}
-              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-            >
-              Begin Scan
-            </motion.button>
-          )}
           {((step === 1 && frontTitleTaps >= 3) || (step === 2 && sideTitleTaps >= 3)) && (
             <button
               type="button"
