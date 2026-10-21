@@ -1,5 +1,5 @@
 {
-  "version": "appearance-psl-v2",
+  "version": "appearance-psl-v3",
   "name": "PSL-style facial assessment",
   "scale": {
     "min": 0,
@@ -19,7 +19,8 @@
         "female": "Marked facial imbalance",
         "unspecified": "Marked facial imbalance"
       },
-      "criteria": "Describe visible overall imbalance without inferring diagnoses, disability, or universal unattractiveness."
+      "criteria": "Describe visible overall imbalance without inferring diagnoses, disability, or universal unattractiveness.",
+      "referenceExamples": []
     },
     {
       "id": "psl_2",
@@ -30,7 +31,8 @@
         "female": "Below-average facial harmony",
         "unspecified": "Below-average facial harmony"
       },
-      "criteria": "Multiple visible feature relationships limit overall harmony within this subjective rubric."
+      "criteria": "Multiple visible feature relationships limit overall harmony within this subjective rubric.",
+      "referenceExamples": []
     },
     {
       "id": "psl_3",
@@ -41,7 +43,12 @@
         "female": "Below average",
         "unspecified": "Below average"
       },
-      "criteria": "Noticeable imbalances in facial proportions or feature relationships; explain the visible observations."
+      "criteria": "Noticeable imbalances in facial proportions or feature relationships; explain the visible observations.",
+      "referenceExamples": [
+        "Michael Cera",
+        "Steve Buscemi",
+        "Casey Neistat"
+      ]
     },
     {
       "id": "psl_4",
@@ -52,7 +59,12 @@
         "female": "Average",
         "unspecified": "Average"
       },
-      "criteria": "The average reference is 4. Broadly balanced, ordinary facial relationships without pronounced overall strengths or limitations."
+      "criteria": "The average reference is 4. Broadly balanced, ordinary facial relationships without pronounced overall strengths or limitations.",
+      "referenceExamples": [
+        "Omar Epps",
+        "Shia LaBeouf",
+        "Beck Bennett"
+      ]
     },
     {
       "id": "psl_4_5",
@@ -63,7 +75,12 @@
         "female": "Above average",
         "unspecified": "Above average"
       },
-      "criteria": "Good overall balance and facial harmony; striking features are not necessary."
+      "criteria": "Good overall balance and facial harmony; striking features are not necessary.",
+      "referenceExamples": [
+        "Derek Luke",
+        "Tom Holland",
+        "Daniel Wu"
+      ]
     },
     {
       "id": "psl_5",
@@ -74,7 +91,12 @@
         "female": "Attractive",
         "unspecified": "Attractive"
       },
-      "criteria": "Good facial harmony and cohesive features, with some visible limitations or less exceptional relationships."
+      "criteria": "Good facial harmony and cohesive features, with some visible limitations or less exceptional relationships.",
+      "referenceExamples": [
+        "Grant Gustin",
+        "Zaquan Champ",
+        "Timoth\u00e9e Chalamet"
+      ]
     },
     {
       "id": "psl_5_5",
@@ -85,7 +107,12 @@
         "female": "Very attractive",
         "unspecified": "Very attractive"
       },
-      "criteria": "Strong overall harmony and multiple well-integrated features that support an assessment above the attractive anchor."
+      "criteria": "Strong overall harmony and multiple well-integrated features that support an assessment above the attractive anchor.",
+      "referenceExamples": [
+        "Cristiano Ronaldo",
+        "Chris Evans",
+        "Keith Powers"
+      ]
     },
     {
       "id": "psl_6",
@@ -96,7 +123,12 @@
         "female": "Model tier",
         "unspecified": "Model tier"
       },
-      "criteria": "Very strong facial harmony and cohesive structure; minor limitations may remain without dominating the whole face."
+      "criteria": "Very strong facial harmony and cohesive structure; minor limitations may remain without dominating the whole face.",
+      "referenceExamples": [
+        "Johnny Depp",
+        "Charles Melton",
+        "Colton Haynes"
+      ]
     },
     {
       "id": "psl_6_5",
@@ -107,7 +139,12 @@
         "female": "Exceptional model tier",
         "unspecified": "Exceptional model tier"
       },
-      "criteria": "Consistently strong visible feature relationships and exceptional overall harmony; do not require literal flawlessness."
+      "criteria": "Consistently strong visible feature relationships and exceptional overall harmony; do not require literal flawlessness.",
+      "referenceExamples": [
+        "Zayn Malik",
+        "Chris Hemsworth",
+        "Henry Cavill"
+      ]
     },
     {
       "id": "psl_7",
@@ -118,7 +155,12 @@
         "female": "Elite model tier",
         "unspecified": "Elite model tier"
       },
-      "criteria": "Exceptional whole-face harmony, balance and visible symmetry with distinctive, well-integrated features across assessable regions."
+      "criteria": "Exceptional whole-face harmony, balance and visible symmetry with distinctive, well-integrated features across assessable regions.",
+      "referenceExamples": [
+        "Tom Cruise",
+        "Ian Somerhalder",
+        "Matt Bomer"
+      ]
     },
     {
       "id": "psl_7_5",
@@ -129,7 +171,197 @@
         "female": "Near-ideal reference / True Eve",
         "unspecified": "Near-ideal reference"
       },
-      "criteria": "The highest reference band demands unusually compelling visible evidence across the whole face. Eight is a theoretical reference endpoint, not a claim of human perfection."
+      "criteria": "The highest reference band demands unusually compelling visible evidence across the whole face. Eight is a theoretical reference endpoint, not a claim of human perfection.",
+      "referenceExamples": [
+        "David Gandy",
+        "Sean O\u2019Pry"
+      ]
     }
-  ]
+  ],
+  "presentation": {
+    "version": "umax-display-v1",
+    "unit": "UMAX",
+    "max": 10,
+    "bands": [
+      {
+        "id": "sub3",
+        "min": 0,
+        "max": 3.75,
+        "labels": {
+          "male": "Sub-3",
+          "female": "Sub-3",
+          "unspecified": "Below average"
+        }
+      },
+      {
+        "id": "ltn",
+        "min": 3.75,
+        "max": 4.375,
+        "labels": {
+          "male": "LTN \u2014 Low-Tier Normie",
+          "female": "LTB \u2014 Low-Tier Beauty",
+          "unspecified": "Below average"
+        }
+      },
+      {
+        "id": "mtn",
+        "min": 4.375,
+        "max": 6.875,
+        "labels": {
+          "male": "MTN \u2014 Mid-Tier Normie",
+          "female": "MTB \u2014 Mid-Tier Beauty",
+          "unspecified": "Average to above average"
+        }
+      },
+      {
+        "id": "htn",
+        "min": 6.875,
+        "max": 7.5,
+        "labels": {
+          "male": "HTN \u2014 High-Tier Normie",
+          "female": "HTB \u2014 High-Tier Beauty",
+          "unspecified": "Very attractive"
+        }
+      },
+      {
+        "id": "chadlite",
+        "min": 7.5,
+        "max": 8.125,
+        "labels": {
+          "male": "Chadlite",
+          "female": "Stacylite",
+          "unspecified": "Model tier"
+        }
+      },
+      {
+        "id": "chad",
+        "min": 8.125,
+        "max": 8.75,
+        "labels": {
+          "male": "Chad",
+          "female": "Stacy",
+          "unspecified": "Exceptional model tier"
+        }
+      },
+      {
+        "id": "slayer",
+        "min": 8.75,
+        "max": 9.375,
+        "labels": {
+          "male": "Slayer / PSL god",
+          "female": "Slayer / PSL goddess",
+          "unspecified": "Elite model tier"
+        }
+      },
+      {
+        "id": "true",
+        "min": 9.375,
+        "max": 10,
+        "labels": {
+          "male": "True Adam",
+          "female": "True Eve",
+          "unspecified": "Near-ideal reference"
+        }
+      }
+    ]
+  },
+  "referencePolicy": {
+    "source": "User-supplied PSL guide",
+    "status": "Subjective community examples; not verified reference-image ratings",
+    "scope": "The supplied named examples are male; their role is to explain anchor levels, not impose male feature shapes on every subject. No female reference-image set was supplied.",
+    "imageCalibration": "No reference photographs supplied. Never claim a visual match or direct photo comparison from these names."
+  },
+  "featureRules": {
+    "facialHarmony": "Evaluate how feature relationships work together across the whole face. An isolated striking trait cannot establish exceptional overall harmony.",
+    "facialBalance": "Describe visible vertical and horizontal relationships without enforcing exact golden ratios or fabricating measurements.",
+    "visibleSymmetry": "Consider noticeable differences in a neutral view. Account for pose, lens distortion and expression; ordinary asymmetry is not a defect by itself.",
+    "eyeArea": "Assess visible spacing, shape, eyelids and brow relationship. Do not require hunter eyes or infer orbital bone support from shadows.",
+    "lowerFace": "Assess visible jaw contour and chin proportions. Discuss projection only from a usable side view; do not infer bite or jaw diagnoses.",
+    "midfaceCheeks": "Assess visible cheek contours and midface relationships, separating lighting and soft tissue from unsupported skeletal claims.",
+    "noseLips": "Assess how nose and lip proportions fit the surrounding face. No universal ideal shape, size or ethnicity template.",
+    "skinPresentation": "Assess visible clarity and texture only. Do not estimate collagen, health, age, body fat or grooming effort. Skin alone cannot establish a high structural rating.",
+    "distinctiveQualities": "Describe distinctive features in context; uniqueness is neither automatically a bonus nor a penalty, and averageness is not mandatory."
+  },
+  "evidenceRules": {
+    "version": "feature-evidence-v1",
+    "levels": [
+      "limitation",
+      "ordinary",
+      "good",
+      "strong",
+      "exceptional",
+      "unassessable"
+    ],
+    "regions": [
+      "eyeArea",
+      "lowerFace",
+      "midfaceCheeks",
+      "noseLips"
+    ],
+    "gates": [
+      {
+        "min": 4.5,
+        "harmony": "good",
+        "balance": "ordinary",
+        "symmetry": "ordinary",
+        "goodRegions": 2,
+        "strongRegions": 0,
+        "exceptionalRegions": 0
+      },
+      {
+        "min": 5,
+        "harmony": "good",
+        "balance": "ordinary",
+        "symmetry": "ordinary",
+        "goodRegions": 3,
+        "strongRegions": 0,
+        "exceptionalRegions": 0
+      },
+      {
+        "min": 5.5,
+        "harmony": "strong",
+        "balance": "good",
+        "symmetry": "ordinary",
+        "goodRegions": 3,
+        "strongRegions": 2,
+        "exceptionalRegions": 0
+      },
+      {
+        "min": 6,
+        "harmony": "strong",
+        "balance": "strong",
+        "symmetry": "ordinary",
+        "goodRegions": 4,
+        "strongRegions": 3,
+        "exceptionalRegions": 0
+      },
+      {
+        "min": 6.5,
+        "harmony": "exceptional",
+        "balance": "strong",
+        "symmetry": "good",
+        "goodRegions": 4,
+        "strongRegions": 4,
+        "exceptionalRegions": 1
+      },
+      {
+        "min": 7,
+        "harmony": "exceptional",
+        "balance": "strong",
+        "symmetry": "strong",
+        "goodRegions": 4,
+        "strongRegions": 4,
+        "exceptionalRegions": 2
+      },
+      {
+        "min": 7.5,
+        "harmony": "exceptional",
+        "balance": "exceptional",
+        "symmetry": "strong",
+        "goodRegions": 4,
+        "strongRegions": 4,
+        "exceptionalRegions": 4
+      }
+    ]
+  }
 }

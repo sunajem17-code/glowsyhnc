@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
-import { ASSESSMENT_VERSION, assessmentRange, assessmentScan, assessmentTier, assessmentScale, isCurrentAssessment } from '../client/src/utils/assessment.js'
+import { ASSESSMENT_VERSION, assessmentRange, assessmentScan, assessmentTier, assessmentScale, assessmentPresentation, isCurrentAssessment } from '../client/src/utils/assessment.js'
 import { requestProductionAnalysis } from '../client/src/utils/productionAnalysis.js'
 const require = createRequire(import.meta.url)
 const A = require('../server/src/lib/appearanceAssessment')
@@ -13,7 +13,7 @@ function quality(status = 'assessable') {
 }
 function raw(overrides = {}) {
  return { confidence: 'moderate', scoreExplanation: 'Visible harmony supports the attractive anchor, with uncertainty extending to the model-tier boundary.', scoreRange: { min: 5.2, max: 6.1 },
-   dimensions: Object.fromEntries(A.DIMENSIONS.map(k => [k, { status: 'broadly_average', observation: 'Visible proportions are balanced in this front view.' }])),
+   dimensions: Object.fromEntries(A.DIMENSIONS.map(k => [k, { status: 'relative_strength', evidenceLevel: 'strong', observation: 'Visible proportions are balanced in this front view.' }])),
    strengths: [], limitations: [], suggestions: ['Consider a low-maintenance haircut.'], unassessableDetails: ['Bite alignment cannot be assessed.'], ...overrides }
 }
 const context = { imageSuitability: quality(), assessmentProfile: 'male', knownMinor: false }
@@ -203,4 +203,103 @@ test('Railway server-only build can resolve its canonical rating rubric',()=>{
  assert.equal(source.includes("require('../../../client/"),false)
  const packagedRubric=require('../server/src/lib/assessmentRubric.json')
  assert.equal(packagedRubric.version,A.VERSION);assert.equal(packagedRubric.scale.max,8)
+})
+
+test('server-derived UMAX reaches ten, keeps PSL unchanged, and ignores injected public scores',()=>{
+ const result=A.validate(raw({dimensions: Object.fromEntries(A.DIMENSIONS.map(k=>[k,{status:'relative_strength',evidenceLevel:'exceptional',observation:'Exceptional visible feature relationships support the top reference anchor.'}])),scoreRange:{min:7.5,max:8},umax:{range:{min:99,max:100}}}),context)
+ assert.deepEqual(result.scoreRange,{min:7.5,max:8});assert.deepEqual(result.umax.range,{min:9.375,max:10})
+ assert.equal(result.umax.max,10);assert.equal(result.umax.tiers.max.label,'True Adam')
+ assert.equal(A.validate(raw({confidence:'low',umax:{range:{min:9,max:10}}}),context).umax,null)
+ assert.equal(A.withheld(quality('insufficient'),null,'insufficient_image').umax,null)
+})
+test('UMAX tiers keep average MTN and reserve HTN for the very-attractive anchor',()=>{
+ for(const profile of ['male','female',null]){
+  for(const psl of [0,3,3.5,4,4.5,5,5.499,5.5,5.999,6,6.5,7,7.5,8]){
+   const server=A.umaxPresentation({min:psl,max:psl},profile)
+   const client=assessmentPresentation({rubricVersion:A.VERSION,scoreRange:{min:psl,max:psl},assessmentProfile:profile})
+   assert.deepEqual(client.range,server.range);assert.deepEqual(client.tiers,server.tiers)
+   assert.equal(client.secondary.max,8);assert.equal(client.max,10)
+  }
+ }
+ for(const psl of [3.5,4,4.5,5,5.499])assert.equal(A.umaxPresentation({min:psl,max:psl},'male').tiers.min.id,'mtn')
+ assert.equal(A.umaxPresentation({min:5.5,max:5.9},'male').tiers.min.id,'htn')
+ assert.equal(A.umaxPresentation({min:6,max:6.4},'male').tiers.min.id,'chadlite')
+ assert.equal(A.umaxPresentation({min:6.5,max:6.9},'female').tiers.min.label,'Stacy')
+ assert.deepEqual(A.umaxPresentation({min:4,max:4},'male').range,{min:5,max:5})
+ assert.equal(A.umaxPresentation(null),null);assert.equal(assessmentPresentation({scoreRange:null}),null)
+ assert.throws(()=>A.umaxPresentation({min:8,max:8.1}))
+})
+
+function featureFixture(levels = {}) {
+ return Object.fromEntries(A.DIMENSIONS.map(key => {
+  const evidenceLevel=levels[key] || 'ordinary'
+  return [key,{evidenceLevel,status:evidenceLevel==='unassessable'?'unassessable':'broadly_average',observation:`Specific visible ${key} evidence supports the ${evidenceLevel} level.`}]
+ }))
+}
+test('feature gates accept supported anchors and reject unsupported upper endpoints without capping',()=>{
+ const cases=[
+  [5,{facialHarmony:'good',eyeArea:'good',lowerFace:'good',midfaceCheeks:'good'}],
+  [5.5,{facialHarmony:'strong',facialBalance:'good',eyeArea:'strong',lowerFace:'strong',midfaceCheeks:'good'}],
+  [6,{facialHarmony:'strong',facialBalance:'strong',eyeArea:'strong',lowerFace:'strong',midfaceCheeks:'strong',noseLips:'good'}],
+  [6.5,{facialHarmony:'exceptional',facialBalance:'strong',visibleSymmetry:'good',eyeArea:'exceptional',lowerFace:'strong',midfaceCheeks:'strong',noseLips:'strong'}],
+  [7,{facialHarmony:'exceptional',facialBalance:'strong',visibleSymmetry:'strong',eyeArea:'exceptional',lowerFace:'exceptional',midfaceCheeks:'strong',noseLips:'strong'}],
+  [7.5,{facialHarmony:'exceptional',facialBalance:'exceptional',visibleSymmetry:'strong',eyeArea:'exceptional',lowerFace:'exceptional',midfaceCheeks:'exceptional',noseLips:'exceptional'}]
+ ]
+ for(const [max,levels] of cases){
+  const input=raw({scoreRange:{min:max-0.1,max},dimensions:featureFixture(levels)})
+  const result=A.validate(input,context)
+  assert.equal(result.ratingEvidence.supportedGate,max)
+  assert.equal(result.scoreRange.max,max)
+  const invalid=structuredClone(input);invalid.dimensions.eyeArea.evidenceLevel='ordinary'
+  assert.throws(()=>A.validate(invalid,context),/exceeds documented feature evidence/)
+ }
+})
+test('skin or one striking feature cannot substitute for evidence across independent regions',()=>{
+ const dimensions=featureFixture({facialHarmony:'exceptional',facialBalance:'exceptional',visibleSymmetry:'exceptional',eyeArea:'exceptional',skinPresentation:'exceptional',distinctiveQualities:'exceptional'})
+ assert.throws(()=>A.validate(raw({scoreRange:{min:6,max:6.5},dimensions}),context),/documented feature evidence/)
+})
+test('missing feature evidence withholds a score instead of treating invisibility as unattractiveness',()=>{
+ const dimensions=featureFixture({eyeArea:'unassessable',midfaceCheeks:'unassessable',noseLips:'unassessable'})
+ const result=A.validate(raw({scoreRange:{min:4,max:4.5},dimensions}),context)
+ assert.equal(result.scoreRange,null);assert.equal(result.umax,null);assert.equal(result.ratingEvidence,null)
+ assert.equal(result.withheldReason,'insufficient_feature_evidence')
+ for(const invalidLevel of [undefined,'perfect',7]){
+  const invalid=featureFixture();invalid.eyeArea.evidenceLevel=invalidLevel
+  assert.throws(()=>A.validate(raw({dimensions:invalid}),context),A.AssessmentError)
+ }
+})
+test('reference evidence comes from canonical guide examples, never model-injected celebrity matches',()=>{
+ const input=raw({scoreRange:{min:5.5,max:5.9},ratingEvidence:{examples:['Made up person']},celebrityMatch:'Henry Cavill'})
+ const result=A.validate(input,context)
+ assert.deepEqual(result.ratingEvidence.anchors.min.examples,['Cristiano Ronaldo','Chris Evans','Keith Powers'])
+ assert.equal('celebrityMatch' in result,false)
+ assert.match(result.ratingEvidence.imageCalibration,/No reference photographs/)
+ assert.match(result.ratingEvidence.referenceStatus,/not verified/)
+})
+test('named guide anchors and region rules reach the score prompt but not minor feedback (mocked)',async()=>{
+ const adult=[],minor=[]
+ for(const [knownMinor,seen] of [[false,adult],[true,minor]]){
+  await A.runAssessment({faceImage:'photo',knownMinor,callModel:async(prompt)=>{
+   seen.push(prompt);return JSON.stringify(seen.length===1?quality():seen.length===2?raw():feedback())
+  }})
+ }
+ for(const anchor of ['Tom Holland','Chris Evans','Johnny Depp','Henry Cavill','Matt Bomer','David Gandy'])assert.ok(adult[1].includes(anchor),anchor)
+ for(const rule of ['For any endpoint >= PSL 6','Never raise evidence grades','skin and distinctive qualities','No reference photographs supplied','not scientifically validated weights'])assert.ok(adult[1].includes(rule),rule)
+ assert.equal(minor[1].includes('Henry Cavill'),false)
+})
+test('PSL v2 saved results remain readable without retroactive feature grades or gate validation',()=>{
+ const a={rubricVersion:'appearance-psl-v2',scoreRange:{min:6,max:6.4},assessmentProfile:'male'}
+ assert.equal(isCurrentAssessment({aiScore:{assessment:a}}),true)
+ assert.equal(assessmentScale(a.rubricVersion).max,8)
+ assert.equal(assessmentPresentation(a).unit,'UMAX')
+ assert.equal('ratingEvidence' in a,false)
+})
+
+test('ordinary features do not justify an unsupported below-average or above-average rating',()=>{
+ const ordinary=featureFixture()
+ assert.throws(()=>A.validate(raw({scoreRange:{min:2.9,max:3.2},dimensions:ordinary}),context),/lacks documented limitations/)
+ assert.throws(()=>A.validate(raw({scoreRange:{min:4.5,max:4.9},dimensions:ordinary}),context),/documented feature evidence/)
+ assert.deepEqual(A.validate(raw({scoreRange:{min:3.8,max:4.2},dimensions:ordinary}),context).scoreRange,{min:3.8,max:4.2})
+ const limited=featureFixture({eyeArea:'limitation',lowerFace:'limitation'})
+ assert.equal(A.validate(raw({scoreRange:{min:3,max:3.3},dimensions:limited}),context).scoreRange.max,3.3)
 })

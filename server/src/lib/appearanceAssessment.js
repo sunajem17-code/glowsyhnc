@@ -29,6 +29,42 @@ function tiers(value, selectedProfile) {
   const valid = range(value)
   return { min: tier(valid.min, selectedProfile), max: tier(valid.max, selectedProfile) }
 }
+// Public UMAX is a transparent rescaling of the validated PSL range, never a model/client score.
+function umaxPresentation(value, selectedProfile) {
+  if (value === null) return null
+  const valid = range(value), settings = rubric.presentation
+  const converted = { min: valid.min * settings.max / SCALE.max, max: valid.max * settings.max / SCALE.max }
+  const classify = number => {
+    const band = settings.bands.find(b => number >= b.min && (number < b.max || number === settings.max && b.max === settings.max))
+    return { id: band.id, label: band.labels[profile(selectedProfile)] }
+  }
+  return { version: settings.version, unit: settings.unit, max: settings.max, range: converted,
+    tiers: { min: classify(converted.min), max: classify(converted.max) } }
+}
+const LEVELS = ['limitation', 'ordinary', 'good', 'strong', 'exceptional']
+function evidenceForRange(value, dimensions) {
+  if (value === null) return null
+  const rank = key => LEVELS.indexOf(dimensions[key].evidenceLevel)
+  const regions = rubric.evidenceRules.regions.map(rank)
+  const passes = gate => rank('facialHarmony') >= LEVELS.indexOf(gate.harmony)
+    && rank('facialBalance') >= LEVELS.indexOf(gate.balance)
+    && rank('visibleSymmetry') >= LEVELS.indexOf(gate.symmetry)
+    && regions.filter(n => n >= LEVELS.indexOf('good')).length >= gate.goodRegions
+    && regions.filter(n => n >= LEVELS.indexOf('strong')).length >= gate.strongRegions
+    && regions.filter(n => n >= LEVELS.indexOf('exceptional')).length >= gate.exceptionalRegions
+  if (value.max < 3.5 && rank('facialHarmony') !== 0 && regions.filter(n => n === 0).length < 2) fail('Below-average rating lacks documented limitations')
+  const applicable = rubric.evidenceRules.gates.filter(gate => value.max >= gate.min)
+  if (applicable.some(gate => !passes(gate))) fail('Rating exceeds documented feature evidence; reassess the observations or withhold, never invent supporting features')
+  const band = number => rubric.bands.find(b => number >= b.min && (number < b.max || number === SCALE.max && b.max === SCALE.max))
+  const reference = number => {
+    const b = band(number)
+    return { id: b.id, label: b.labels.unspecified, examples: b.referenceExamples, criteria: b.criteria }
+  }
+  return { version: rubric.evidenceRules.version, source: rubric.referencePolicy.source,
+    referenceStatus: rubric.referencePolicy.status, imageCalibration: rubric.referencePolicy.imageCalibration,
+    anchors: { min: reference(value.min), max: reference(value.max) },
+    supportedGate: applicable.at(-1)?.min ?? null }
+}
 function text(value, name) {
   if (typeof value !== 'string' || !value.trim() || value.length > 1200) fail(`Invalid ${name}`)
   return value.trim()
@@ -53,9 +89,9 @@ function suitability(raw) {
   return { status: raw.status, checks, limitations, guidance, profileUsable: raw.profileUsable }
 }
 function withheld(imageSuitability, selectedProfile, reason) {
-  return { rubricVersion: VERSION, scoreExplanation: null, assessmentProfile: profile(selectedProfile), imageSuitability,
+  return { rubricVersion: VERSION, scoreExplanation: null, umax: null, ratingEvidence: null, assessmentProfile: profile(selectedProfile), imageSuitability,
     confidence: 'low', scoreRange: null, tiers: null, withheldReason: reason,
-    dimensions: Object.fromEntries(DIMENSIONS.map(k => [k, { status: 'unassessable', observation: 'Not assessed from these photographs.' }])),
+    dimensions: Object.fromEntries(DIMENSIONS.map(k => [k, { status: 'unassessable', evidenceLevel: 'unassessable', observation: 'Not assessed from these photographs.' }])),
     strengths: [], limitations: [], suggestions: [], unassessableDetails: ['Numerical appearance assessment withheld.'] }
 }
 function validate(raw, context) {
@@ -66,7 +102,10 @@ function validate(raw, context) {
   const dimensions = Object.fromEntries(DIMENSIONS.map(key => {
     const item = raw.dimensions?.[key]
     if (!item || !STATUSES.includes(item.status)) fail(`Invalid dimension: ${key}`)
-    return [key, { status: item.status, observation: text(item.observation, key) }]
+    if (!rubric.evidenceRules.levels.includes(item.evidenceLevel)) fail(`Invalid feature evidence level: ${key}`)
+    if ((item.status === 'unassessable') !== (item.evidenceLevel === 'unassessable')) fail(`Contradictory feature visibility: ${key}`)
+    const status = item.evidenceLevel === 'unassessable' ? 'unassessable' : item.evidenceLevel === 'limitation' ? 'relative_limitation' : item.evidenceLevel === 'ordinary' ? 'broadly_average' : 'relative_strength'
+    return [key, { status, evidenceLevel: item.evidenceLevel, observation: text(item.observation, key) }]
   }))
   const result = { rubricVersion: VERSION, assessmentProfile: profile(context.assessmentProfile),
     imageSuitability: context.imageSuitability, confidence: raw.confidence, dimensions,
@@ -82,10 +121,17 @@ function validate(raw, context) {
     // Only neutral presentation suggestions are requested for known minors.
     return { ...withheld(context.imageSuitability, context.assessmentProfile, 'minor'), suggestions: result.suggestions }
   }
+  if (result.scoreRange && (rubric.evidenceRules.regions.filter(key => dimensions[key].evidenceLevel !== 'unassessable').length < 3 || dimensions.facialHarmony.evidenceLevel === 'unassessable')) {
+    result.scoreRange = null
+    result.confidence = 'low'
+    result.withheldReason = 'insufficient_feature_evidence'
+  }
   if (!result.scoreRange && !result.withheldReason) result.withheldReason = 'not_assessable'
   result.scoreExplanation = result.scoreRange ? text(raw.scoreExplanation, 'score explanation') : null
   if (result.scoreRange && Object.values(result.scoreRange).some(value => Math.abs(value * 10 - Math.round(value * 10)) > 1e-8)) fail('Unsupported score precision')
+  result.ratingEvidence = evidenceForRange(result.scoreRange, dimensions)
   result.tiers = tiers(result.scoreRange, result.assessmentProfile)
+  result.umax = umaxPresentation(result.scoreRange, result.assessmentProfile)
   return result
 }
 const PRESENTATION_KEYS = ['hairstyle', 'facialHair', 'grooming', 'clothingFit', 'posture', 'expression']
@@ -122,13 +168,22 @@ function assessmentPrompt(knownMinor) {
  return `${BASE_INSTRUCTIONS}
 ${knownMinor ? 'The subject is known to be under 18. Give only neutral grooming and presentation suggestions. Return scoreRange:null, confidence:"low", all dimensions unassessable; no attractiveness rankings, strengths or limitations.' : `Use the PSL-style 0–8 scale below, not the previous 0–10 scale. Four is the average reference; 4.5 is above average, 5 attractive, 5.5 very attractive, 6 the start of model tier, 6.5 exceptional model tier, 7 elite model tier and 7.5+ the near-ideal reference band. Eight is a theoretical endpoint; never describe a person as perfect or claim a rarity percentile. The 3.5–4.5 interval is the average reference band, not a required population quota. These anchors are subjective product conventions from the supplied guide, not an empirically validated distribution. Never convert a previous score by multiplying, subtracting, or preserving its old tier. Evaluate the photographs afresh.
 Keep the facial range independent of hairstyle, facial hair styling, clothing, expression, posture, wealth, occupation and social status. The skinPresentation dimension covers visible skin appearance only, not grooming rewards. First evaluate visible dimensions, THEN select the range. Examine facial harmony, balance, visible symmetry, feature relationships and distinctive qualities as integrated aspects of the whole face. Distinctive features can coexist with harmony; averageness is not a requirement. Describe masculine or feminine feature presentation only when relevant, without inferring gender or making conformity a scoring requirement. Do not double-count correlated observations, invent measurements, enforce golden ratios or ethnicity-specific ideals, assign arbitrary feature weights, or cap a rating because of one unconventional feature.
-Be direct and specific. Name visible strengths and limitations without forced praise, insults, or forum slurs. Support both higher and lower assessments with visible evidence. Do not automatically praise or reassure, reduce scores for "brutal honesty", force a population distribution, apply arbitrary penalties, or exclude high scores. Treat ordinary asymmetry proportionately. No profile-specific score adjustment. This is facial assessment, not dating appeal, SMV or a prediction of universal agreement. Do not use celebrity identity, fame or remembered celebrity ratings as scoring evidence.
+Be direct and specific. Name visible strengths and limitations without forced praise, insults, or forum slurs. Support both higher and lower assessments with visible evidence. Do not automatically praise or reassure, reduce scores for "brutal honesty", force a population distribution, apply arbitrary penalties, or exclude high scores. Treat ordinary asymmetry proportionately. No profile-specific score adjustment. This is facial assessment, not dating appeal, SMV or a prediction of universal agreement. Do not use celebrity identity, fame or remembered celebrity ratings as scoring evidence. Use only the supplied named groups as textual examples of the guide’s intended levels, not identity recognition, visual resemblance, an ethnicity target, or proof of a person’s real rating.
 Confidence describes photographic evidence, not attractiveness. Low confidence MUST yield scoreRange:null. Moderate/high confidence may use a range, never a precise point; widen uncertainty for limited images or withhold. Use endpoints with at most one decimal place. A range crossing anchors must have visible evidence supporting its upper end; uncertainty alone is not a reason for an exceptional upper endpoint. Model tier starts at 6; use that anchor only when whole-face evidence supports very strong harmony, not merely one striking feature, grooming or favorable lighting. Seven and above require exceptional integrated evidence across assessable regions. Do not demand literal flawlessness or invent rarity statistics. Separate current appearance from hypothetical improvements; never guarantee score/tier increases.
-Explain the range in scoreExplanation: connect the observations to the selected anchors and explain what supports or limits the next higher anchor, without inventing flaws. Withheld assessments must have scoreExplanation:null. No model tier labels. Do not assess profile characteristics unless quality.profileUsable is true.`}
+UMAX is displayed separately by application code on a 0–10 scale; do not output UMAX scores or tier names. The internal PSL score remains out of 8. In scoreExplanation, explicitly prefix any numeric rating with PSL to prevent confusion with the public UMAX display. Explain the range in scoreExplanation: connect the observations to the selected anchors and explain what supports or limits the next higher anchor, without inventing flaws. Withheld assessments must have scoreExplanation:null. No model tier labels. Do not assess profile characteristics unless quality.profileUsable is true.`}
+${knownMinor ? '' : `Feature assessment rules:
+${Object.entries(rubric.featureRules).map(([key, rule]) => `${key}: ${rule}`).join('\n')}
+For every dimension provide evidenceLevel: limitation, ordinary, good, strong, exceptional, or unassessable, and a concrete visible observation supporting that level. These are ordinal judgments, not anatomical measurements. Do not copy the overall grade into every region. Do not grade an unseen region or invent supporting evidence. An ordinary feature is not a flaw. Distinctive appearance and visible masculinity/femininity are descriptive, not mandatory bonuses.
+Apply the following product-defined evidence checks to the UPPER endpoint of the PSL range. They are consistency rules, not scientifically validated weights. Do not average feature grades, subtract a point per flaw, or double-count harmony/balance/symmetry as independent anatomical regions. The independent regions are ${rubric.evidenceRules.regions.join(', ')}; skin and distinctive qualities are described but cannot satisfy the structural region counts.
+${rubric.evidenceRules.gates.map(g => `For any endpoint >= PSL ${g.min}: harmony >= ${g.harmony}; balance >= ${g.balance}; visible symmetry >= ${g.symmetry}; at least ${g.goodRegions} independent regions good or better, ${g.strongRegions} strong or better, and ${g.exceptionalRegions} exceptional.`).join('\n')}
+A range entirely below PSL 3.5 must document a limitation in overall harmony or limitations in at least two independent regions; ordinary features alone do not justify a below-average assessment. These are necessary support checks, not automatic score awards. Choose the overall range from the holistic observations. Never lower a score solely because evidence is missing: withhold when the intended assessment cannot be supported. Never raise evidence grades just to pass a gate.
+Named examples supplied by the user’s guide, not verified visual references:
+${rubric.bands.filter(b => b.referenceExamples.length).map(b => `${b.id === 'psl_4' ? 'PSL 4' : 'PSL ' + b.min}: ${b.referenceExamples.join(', ')} — ${b.criteria}`).join('\n')}
+${rubric.referencePolicy.scope} ${rubric.referencePolicy.imageCalibration} Do not claim resemblance, reference-photo similarity, or population percentiles. Do not require the subject to resemble any individual reference person.`}
 Apply these canonical bands and criteria:
 ${rubric.bands.map(b => `${b.min}–${b.max === SCALE.max ? 'through ' : 'below '}${b.max}: ${b.labels.unspecified}. ${b.criteria}`).join('\n')}
 Return exactly this shape, with each named dimension present:
-{"confidence":"low|moderate|high","scoreExplanation":"evidence linked to rating anchors, or null when withheld","scoreRange":null or {"min":number,"max":number},"dimensions":{${DIMENSIONS.map(k => `"${k}":{"status":"relative_strength|broadly_average|relative_limitation|unassessable","observation":"specific visible evidence or reason unassessable"}`).join(',')}},"strengths":[],"limitations":[],"suggestions":[],"unassessableDetails":[]}
+{"confidence":"low|moderate|high","scoreExplanation":"evidence linked to rating anchors, or null when withheld","scoreRange":null or {"min":number,"max":number},"dimensions":{${DIMENSIONS.map(k => `"${k}":{"status":"relative_strength|broadly_average|relative_limitation|unassessable","evidenceLevel":"limitation|ordinary|good|strong|exceptional|unassessable","observation":"specific visible evidence or reason unassessable"}`).join(',')}},"strengths":[],"limitations":[],"suggestions":[],"unassessableDetails":[]}
 Each of strengths, limitations, suggestions has zero to three items, never mandatory praise. Suggestions should be practical grooming, clothing, hair styling or photographic presentation. Unassessable details must identify what photographs cannot establish.`
 }
 function parse(raw) {
@@ -160,4 +215,4 @@ async function runAssessment({ callModel, faceImage, sideImage, assessmentProfil
 
  return result
 }
-module.exports = { PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, validate, withheld, parse, runAssessment }
+module.exports = { evidenceForRange, umaxPresentation, PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, validate, withheld, parse, runAssessment }

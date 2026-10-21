@@ -20,11 +20,11 @@ const module = new Module('assessment-ui-fixture',import.meta)
 module._compile(compiled.outputFiles[0].text,'assessment-ui-fixture.cjs')
 const {render,compare}=module.exports
 const quality={status:'limited',profileUsable:false,checks:Object.fromEntries(A.CHECKS.map(k=>[k,{status:'limited',observation:'Light obscures some visible detail.'}])),limitations:['Uneven lighting.'],guidance:['Retake in daylight.']}
-const raw={confidence:'moderate',scoreExplanation:'The visible feature relationships support this anchor range.',scoreRange:{min:4.9,max:5.3},dimensions:Object.fromEntries(A.DIMENSIONS.map(k=>[k,{status:'broadly_average',observation:'Visible observations support this assessment.'}])),strengths:[],limitations:[],suggestions:['Choose an optional haircut that suits your style.'],unassessableDetails:['No usable side profile.']}
+const raw={confidence:'moderate',scoreExplanation:'The visible feature relationships support this anchor range.',scoreRange:{min:4.9,max:5.6},dimensions:Object.fromEntries(A.DIMENSIONS.map(k=>[k,{status:'relative_strength',evidenceLevel:'strong',observation:'Visible observations support this assessment.'}])),strengths:[],limitations:[],suggestions:['Choose an optional haircut that suits your style.'],unassessableDetails:['No usable side profile.']}
 test('premium UI displays original endpoints, both tier labels, confidence and limitations',()=>{
  const a=A.validate(raw,{imageSuitability:quality,assessmentProfile:'female'})
  const html=render(a,true)
- for(const expected of ['4.9–5.3','Above average','Attractive','PSL range','out of 8','Why this range','moderate','Uneven lighting.','Facial harmony','No usable side profile.','not scientific measurements']) assert.ok(html.includes(expected),expected)
+ for(const expected of ['4.9–5.6','MTB — Mid-Tier Beauty','HTB — High-Tier Beauty','UMAX SCORE','/10','/8','Why this range','moderate','Uneven lighting.','Facial harmony','No usable side profile.','not scientific measurements']) assert.ok(html.includes(expected),expected)
  for(const forbidden of ['Top 1%','potential score','Guaranteed','6.4'])assert.equal(html.includes(forbidden),false)
 })
 test('withheld UI shows guidance with no numeric ranking or tier label',()=>{
@@ -41,7 +41,7 @@ test('known-minor UI is neutral and has no paywall for withheld feedback',()=>{
 })
 test('free UI keeps assessment details behind the existing upgrade path',()=>{
  const html=render(A.validate(raw,{imageSuitability:quality,assessmentProfile:null}),false)
- assert.ok(html.includes('View subscription options'));assert.equal(html.includes('4.9–5.3'),false)
+ assert.ok(html.includes('View subscription options'));assert.equal(html.includes('4.9–5.6'),false)
  assert.equal(html.includes('Visible observations support'),false)
 })
 
@@ -50,7 +50,7 @@ test('comparison keeps original rubrics, exact ranges and withheld states withou
  const recent={id:'recent',analyzedAt:'2026-10-19T12:00:00Z',aiScore:{assessment:a},glowScore:null}
  const historical={id:'old',analyzedAt:'2026-09-19T12:00:00Z',tier:'Adam Lite',glowScore:9.2}
  const mixed=compare([recent,historical])
- assert.ok(mixed.includes('not directly comparable'));assert.ok(mixed.includes('Adam Lite'));assert.ok(mixed.includes('4.9–5.3 / 8 PSL'))
+ assert.ok(mixed.includes('not directly comparable'));assert.ok(mixed.includes('Adam Lite'));assert.ok(mixed.includes('6.1–7 / 10 UMAX'))
  const withheld={...recent,id:'withheld',aiScore:{assessment:A.withheld({...quality,status:'insufficient'},null,'insufficient_image')}}
  const html=compare([withheld,recent]);assert.ok(html.includes('Score withheld'));assert.equal(html.includes('5 / 10'),false)
 })
@@ -59,7 +59,7 @@ test('presentation UI separates recommendations from facial observations and lab
  const a=A.validate(raw,{imageSuitability:quality,assessmentProfile:'female'})
  a.presentation={observations:{posture:{status:'unassessable',observation:'The photograph does not show enough of your body.'}},recommendations:[{action:'Try a side-swept fringe.',observation:'Hair covers the forehead.',rationale:'Frames the face differently.',priority:'medium',effort:'low',cost:'free',basis:'visible_evidence',limitations:'Style preference varies.'}]}
  const html=render(a,true)
- for(const label of ['Facial assessment','Presentation feedback','Unassessable','Practical next steps','Priority: medium','Cost: free','visible evidence','4.9–5.3'])assert.ok(html.includes(label),label)
+ for(const label of ['Facial assessment','Presentation feedback','Unassessable','Practical next steps','Priority: medium','Cost: free','visible evidence','4.9–5.6'])assert.ok(html.includes(label),label)
  const free=render(a,false);assert.equal(free.includes('Try a side-swept fringe.'),false)
 })
 
@@ -71,5 +71,21 @@ test('saved ten-point results remain readable without relabeling or comparison a
  assert.equal(html.includes('PSL scale: 4 average'),false)
  const mixed=compare([{id:'old',aiScore:{assessment:old}},{id:'new',aiScore:{assessment:current}}])
  assert.ok(mixed.includes('not directly comparable'));assert.ok(mixed.includes('9.1–9.5 / 10 Appearance'))
- assert.ok(mixed.includes('4.9–5.3 / 8 PSL'))
+ assert.ok(mixed.includes('6.1–7 / 10 UMAX'))
+})
+
+test('UMAX is the large primary ten-point score, with PSL explicitly labeled out of eight',()=>{
+ const a=A.validate({...raw,dimensions:Object.fromEntries(A.DIMENSIONS.map(k=>[k,{status:'relative_strength',evidenceLevel:'exceptional',observation:'Exceptional relationships are visible in this fixture.'}])),scoreRange:{min:7.5,max:8}},{imageSuitability:quality,assessmentProfile:'male'})
+ const html=render(a,true)
+ assert.ok(html.includes('UMAX SCORE'));assert.ok(html.includes('9.4–10'));assert.ok(html.includes('/10'))
+ assert.ok(html.includes('PSL: 7.5–8 /8'));assert.ok(html.includes('True Adam'))
+ assert.ok(html.indexOf('data-score="primary"') < html.indexOf('data-score="secondary"'))
+ assert.ok(html.includes('text-5xl sm:text-6xl'));assert.equal(html.includes('PSL range · out of 10'),false)
+})
+
+test('reference details show guide examples and feature evidence levels with no invented image match',()=>{
+ const a=A.validate({...raw,scoreRange:{min:5.5,max:5.9}},{imageSuitability:quality,assessmentProfile:'male'})
+ const html=render(a,true)
+ for(const text of ['Rating reference levels','Chris Evans','Keith Powers','strong','not verified reference-photo comparisons'])assert.ok(html.includes(text),text)
+ assert.equal(render(a,false).includes('Chris Evans'),false)
 })

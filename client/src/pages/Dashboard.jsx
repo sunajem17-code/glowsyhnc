@@ -1,4 +1,4 @@
-import { isCurrentAssessment, assessmentScale } from '../utils/assessment'
+import { isCurrentAssessment, assessmentPresentation, formatAssessmentRange } from '../utils/assessment'
 import { useState, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -40,6 +40,7 @@ export default function Dashboard() {
 
   const latestScan = scans[0]
   const assessment = isCurrentAssessment(latestScan) ? latestScan.aiScore.assessment : null
+  const scorePresentation = assessment ? assessmentPresentation(assessment) : null
   const rawGlowScore = latestScan?.glowScore ?? 0
   const glowScore = rawGlowScore > 10 ? Math.round(rawGlowScore) / 10 : rawGlowScore
   const skin = latestScan?.faceData?.skinClarity ?? 0
@@ -160,7 +161,7 @@ export default function Dashboard() {
             }}
           />
           <div className="flex items-center gap-5 relative z-10">
-            {assessment ? <div className="text-center text-amber-200"><p className="text-2xl font-bold">{assessment.scoreRange ? `${assessment.scoreRange.min}–${assessment.scoreRange.max}` : 'Withheld'}</p><p className="text-xs mt-1">{assessment.scoreRange ? `${assessmentScale(assessment.rubricVersion).unit} range / ${assessmentScale(assessment.rubricVersion).max}` : 'No numerical score'}</p></div> : <GlowScoreRing score={glowScore} size="large" animated />}
+            {assessment ? <div className="text-center text-amber-200"><p className="text-2xl font-bold">{assessment.scoreRange ? formatAssessmentRange(scorePresentation.range) : 'Withheld'}</p><p className="text-xs mt-1">{assessment.scoreRange ? `${scorePresentation.unit} / ${scorePresentation.max}` : 'No numerical score'}</p></div> : <GlowScoreRing score={glowScore} size="large" animated />}
             <div className="flex-1">
               {latestScan ? (
                 <>

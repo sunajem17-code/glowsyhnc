@@ -1,4 +1,4 @@
-import { isCurrentAssessment, assessmentScale } from '../utils/assessment'
+import { isCurrentAssessment, assessmentPresentation, formatAssessmentRange } from '../utils/assessment'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, ChevronRight } from 'lucide-react'
@@ -21,6 +21,7 @@ function fmt(dateStr) {
 // ── Single scan row ───────────────────────────────────────────────────────────
 export default function ScanHistoryRow({ scan, onTap, index }) {
   const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
+  const scorePresentation = assessment ? assessmentPresentation(assessment) : null
   const [storedPhoto, setStoredPhoto] = useState(null)
   const directPhoto = scan.facePhotoUrl || scan.face_photo_url || scan.face_image_url || scan.bodyPhotoUrl || scan.body_photo_url || scan.body_image_url
   useEffect(() => {
@@ -80,7 +81,7 @@ export default function ScanHistoryRow({ scan, onTap, index }) {
 
       {/* Score */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {assessment && <p className="text-lg font-bold" style={{ color: '#C6A85C' }}>{assessment.scoreRange ? `${assessment.scoreRange.min}–${assessment.scoreRange.max} / ${assessmentScale(assessment.rubricVersion).max} ${assessmentScale(assessment.rubricVersion).unit}` : 'Withheld'}</p>}
+        {assessment && <p className="text-lg font-bold" style={{ color: '#C6A85C' }}>{assessment.scoreRange ? `${formatAssessmentRange(scorePresentation.range)} / ${scorePresentation.max} ${scorePresentation.unit}` : 'Withheld'}</p>}
         {!assessment && score != null && (
           <p
             className="font-heading font-bold text-[22px]"

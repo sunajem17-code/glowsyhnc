@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
-import { isCurrentAssessment, assessmentRange, assessmentScale } from '../utils/assessment'
+import { isCurrentAssessment, assessmentPresentation, formatAssessmentRange } from '../utils/assessment'
 export default function AppearanceComparison({ scans }) {
   const navigate = useNavigate()
   const setCurrentScan = useStore(s => s.setCurrentScan)
@@ -13,11 +13,13 @@ export default function AppearanceComparison({ scans }) {
     <p className="mt-3 text-sm text-neutral-400">Use matching camera distance, eye-level head position, neutral expression, framing and even lighting without filters. Capture differences can change the result; these photographs have not been verified as matched.</p>
     <div className="grid gap-4 mt-6">{selected.map(scan => {
       const a = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
-      const t = a ? assessmentRange(a.scoreRange, a.assessmentProfile, a.rubricVersion) : null
+      const presentation = a ? assessmentPresentation(a) : null
+      const t = presentation?.tiers
       return <article key={scan.id} className="p-5 rounded-2xl border border-white/10 bg-neutral-900">
         <h2>{new Date(scan.analyzedAt || scan.scanDate).toLocaleDateString()}</h2>
         <p className="mt-2 text-xs text-neutral-400">{a ? a.rubricVersion : 'Original legacy rubric'}</p>
-        <p className="mt-3 text-2xl font-bold">{a ? a.scoreRange ? `${a.scoreRange.min}–${a.scoreRange.max} / ${assessmentScale(a.rubricVersion).max} ${assessmentScale(a.rubricVersion).unit}` : 'Score withheld' : scan.glowScore == null ? 'Score unavailable' : `${scan.glowScore} / 10`}</p>
+        <p className="mt-3 text-2xl font-bold">{a ? a.scoreRange ? `${formatAssessmentRange(presentation.range)} / ${presentation.max} ${presentation.unit}` : 'Score withheld' : scan.glowScore == null ? 'Score unavailable' : `${scan.glowScore} / 10`}</p>
+        {presentation?.secondary && <p className="mt-2 text-sm text-neutral-400">PSL: {formatAssessmentRange(presentation.secondary.range)} /{presentation.secondary.max}</p>}
         <p className="mt-2">{t ? t.min.label + (t.min.id === t.max.id ? '' : ` → ${t.max.label}`) : a ? '' : scan.tier}</p>
         {a && <p className="mt-2 text-sm text-neutral-400">Confidence: {a.confidence} · Image: {a.imageSuitability.status}</p>}
         <button onClick={() => { setCurrentScan(scan); navigate('/results') }} className="mt-4 underline text-amber-200">View original assessment</button>
