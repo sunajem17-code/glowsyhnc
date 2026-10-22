@@ -42,7 +42,7 @@ router.post('/post', authMiddleware, async (req, res) => {
   if (!allowed) return res.status(429).json({ error: 'Slow down — too many posts today.' })
 
   const { displayName, scoreBefore, scoreAfter, photoUrl, beforePhotoUrl, caption, postType } = req.body
-  const type = (postType === 'rate-me' ? 'rate-me' : 'glow-up')
+  const type = ['rate-me', 'question'].includes(postType) ? postType : 'glow-up'
   const id = uuid()
 
   try {
