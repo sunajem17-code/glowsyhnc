@@ -1531,6 +1531,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
   const [isDownloadingCard, setIsDownloadingCard] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  const [showScorecardShareMenu, setShowScorecardShareMenu] = useState(false)
   const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [saveFlight, setSaveFlight] = useState(null)
   const saveFlightIdRef = useRef(0)
@@ -1801,15 +1802,71 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={downloadResultsCard}
-          disabled={isDownloadingCard || isPreparingDownloadPhoto}
+          onClick={() => { triggerHaptic(); setShowScorecardShareMenu(true) }}
+          disabled={isDownloadingCard}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}
-          {isDownloadingCard ? 'Preparing download…' : 'Download'}
+          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Share2 size={19} />}
+          {isDownloadingCard ? 'Preparing scorecard…' : 'Share Scorecard'}
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
+        {showScorecardShareMenu && createPortal(
+            <>
+              <motion.button
+                type="button"
+                aria-label="Close scorecard sharing options"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                onClick={() => setShowScorecardShareMenu(false)}
+                className="fixed inset-0"
+                style={{ background: 'rgba(0,0,0,0.75)', zIndex: 10020 }}
+              />
+              <motion.div
+                initial={{ y: '100%' }} animate={{ y: 0 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+                className="fixed inset-x-0 bottom-0 rounded-t-2xl overflow-hidden"
+                style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 0, boxShadow: '0 -12px 48px rgba(0,0,0,0.4)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10021 }}
+              >
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                </div>
+                <div className="flex items-center justify-between px-5 pt-3 pb-4">
+                  <div>
+                    <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>YOUR RESULTS</p>
+                    <h2 className="font-heading font-bold text-xl text-primary">Share Scorecard</h2>
+                  </div>
+                  <button type="button" aria-label="Close" onClick={() => setShowScorecardShareMenu(false)} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#242424', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.65)' }}><X size={17} /></button>
+                </div>
+                <div className="px-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); downloadResultsCard() }}
+                    disabled={isPreparingDownloadPhoto || isDownloadingCard}
+                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left disabled:opacity-50"
+                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.2)', boxShadow: '0 0 16px rgba(198,168,92,0.08)' }}
+                  >
+                    <Download size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.35))' }} />
+                    <div>
+                      <p className="font-heading font-bold text-sm text-primary">Download scorecard</p>
+                      <p className="font-body text-xs text-secondary">Save your results as an image</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); navigate('/community', { state: { shareScanId: scan?.id, shareType: 'glow-up' } }) }}
+                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left"
+                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.32)', boxShadow: '0 0 18px rgba(198,168,92,0.12)' }}
+                  >
+                    <Users size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.4))' }} />
+                    <div>
+                      <p className="font-heading font-bold text-sm text-primary">Share to Community</p>
+                      <p className="font-body text-xs text-secondary">Create a post with this scan</p>
+                    </div>
+                  </button>
+                </div>
+              </motion.div>
+            </>, document.body,
+          )}
         {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
           {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}

@@ -1,16 +1,31 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Camera, Copy, Image, Check, Star, BarChart2, Flag, Settings } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Copy, Image, Check, Star, BarChart2, Flag, Settings, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
-import { pickPhoto, isNative } from '../utils/camera'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { isPhysiqueProgressScan } from '../utils/progressHistory'
+import { loadScanMedia } from '../utils/scanPhotoDb'
+import demoMaleScan from '../assets/face-metrics-demo-cropped.jpg'
+import demoFemaleScan from '../assets/face-metrics-demo-female.jpg'
+import demoMaleScanOverlay from '../assets/face-metrics-demo.jpg'
 
 const BORDER = 'rgba(255,255,255,0.07)'
+const GOLD_LINE_GLOW = '0 0 14px rgba(198,168,92,0.4), 0 0 28px rgba(198,168,92,0.18), inset 0 0 10px rgba(198,168,92,0.1)'
+
+const SAMPLE_COMMUNITY_POSTS = [
+  { id: 'sample-1', display_name: 'Jordan', post_type: 'glow-up', created_at: new Date(Date.now() - 18 * 60_000).toISOString(), score_before: 6.2, score_after: 7.4, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Six weeks of consistency is starting to show.', likes_count: 28, comments_count: 6, sample_comments: [{ id: 'sample-1-comment-1', display_name: 'Maya', content: 'The progress is really clear!', created_at: new Date(Date.now() - 10 * 60_000).toISOString() }, { id: 'sample-1-comment-2', display_name: 'Ethan', content: 'Consistency pays off. Nice work.', created_at: new Date(Date.now() - 5 * 60_000).toISOString() }] },
+  { id: 'sample-2', display_name: 'Maya', post_type: 'rate-me', created_at: new Date(Date.now() - 52 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.1, rating_count: 24, caption: 'Trying a new haircut. What do you think?', likes_count: 17, comments_count: 4, sample_comments: [{ id: 'sample-2-comment-1', display_name: 'Sofia', content: 'That style suits you!', created_at: new Date(Date.now() - 30 * 60_000).toISOString() }] },
+  { id: 'sample-3', display_name: 'Ethan', post_type: 'glow-up', created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(), score_before: 5.8, score_after: 6.6, before_photo_url: demoMaleScanOverlay, photo_url: demoMaleScan, caption: 'Better sleep and a simpler routine.', likes_count: 21, comments_count: 3, sample_comments: [{ id: 'sample-3-comment-1', display_name: 'Noah', content: 'What did you change in your routine?', created_at: new Date(Date.now() - 90 * 60_000).toISOString() }] },
+  { id: 'sample-4', display_name: 'Ava', post_type: 'rate-me', created_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 7.6, rating_count: 16, caption: 'New lighting setup for my scan. Any tips?', likes_count: 13, comments_count: 2, sample_comments: [{ id: 'sample-4-comment-1', display_name: 'Jordan', content: 'Natural window light usually works well.', created_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString() }] },
+  { id: 'sample-5', display_name: 'Noah', post_type: 'glow-up', created_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), score_before: 6.5, score_after: 7.0, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Keeping the routine simple and sticking with it.', likes_count: 35, comments_count: 8, sample_comments: [{ id: 'sample-5-comment-1', display_name: 'Ethan', content: 'Simple routines are easier to stay consistent with.', created_at: new Date(Date.now() - 6 * 60 * 60_000).toISOString() }] },
+  { id: 'sample-6', display_name: 'Sofia', post_type: 'rate-me', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.4, rating_count: 31, caption: 'Which style suits me better?', likes_count: 26, comments_count: 5, sample_comments: [{ id: 'sample-6-comment-1', display_name: 'Maya', content: 'I like this look best!', created_at: new Date(Date.now() - 9 * 60 * 60_000).toISOString() }] },
+].map(post => ({ ...post, user_liked: 0, is_mine: 0 }))
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -22,11 +37,22 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-const Avatar = memo(function Avatar({ name, size = 9 }) {
+function getFaceScanOverallScore(scan) {
+  const raw = scan?.aiScore?.overallScore ?? scan?.glowScore ?? scan?.glow_score ?? scan?.overall_score
+  const score = Number(raw)
+  return raw != null && Number.isFinite(score) ? score : null
+}
+
+const Avatar = memo(function Avatar({ name, size = 9, subtle = false }) {
   return (
     <div
       className={`w-${size} h-${size} rounded-full flex items-center justify-center flex-shrink-0 font-heading font-bold text-sm`}
-      style={{ background: 'rgba(198,168,92,0.15)', color: GOLD, border: '1px solid rgba(198,168,92,0.2)' }}
+      style={{
+        background: subtle ? 'rgba(198,168,92,0.12)' : 'rgba(198,168,92,0.15)',
+        color: GOLD,
+        border: `1px solid rgba(198,168,92,${subtle ? '0.16' : '0.2'})`,
+        boxShadow: subtle ? '0 0 5px rgba(198,168,92,0.12), inset 0 0 3px rgba(198,168,92,0.05)' : GOLD_LINE_GLOW,
+      }}
     >
       {(name?.[0] ?? '?').toUpperCase()}
     </div>
@@ -39,107 +65,61 @@ const CARD_VARIANTS = {
   animate: { opacity: 1, y: 0 },
 }
 
-// ── Photo picker ──────────────────────────────────────────────────────────────
-function fileToDataUrl(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader()
-    reader.onerror = rej
-    reader.onload = e => {
-      const img = new Image()
-      img.onerror = rej
-      img.onload = () => {
-        const MAX = 900
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-        const w = Math.round(img.width  * scale)
-        const h = Math.round(img.height * scale)
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-        res(canvas.toDataURL('image/jpeg', 0.72))
-      }
-      img.src = e.target.result
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
-function PhotoPicker({ label, value, onChange }) {
-  const inputRef = useRef()
-  const [pickErr, setPickErr] = useState('')
-
-  async function handlePick() {
-    setPickErr('')
-    if (isNative()) {
-      // On iOS/Android use Capacitor camera plugin — file input is unreliable in WKWebView
-      try {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) onChange(dataUrl)
-      } catch (err) {
-        const msg = (err?.message ?? '').toLowerCase()
-        const isCancelled = msg.includes('cancel') || msg.includes('user cancel')
-        if (!isCancelled) setPickErr('Could not open photos. Check app permissions in Settings.')
-      }
-    } else {
-      inputRef.current?.click()
-    }
-  }
+// Community posts can only use photos already saved with a face scan.
+function FaceScanPhotoPicker({ label, value, onChange, photos, disabled }) {
+  const [open, setOpen] = useState(false)
+  const selected = photos.find(photo => photo.id === value?.id)
 
   return (
-    <div className="flex-1">
+    <div className="flex-1 min-w-0">
       <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5"
         style={{ color: 'rgba(255,255,255,0.35)' }}>
         {label}
       </p>
       <button
         type="button"
-        onClick={() => { triggerHaptic(); handlePick() }}
-        className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center"
-        style={{
-          aspectRatio: '3/4',
-          background: value ? 'transparent' : '#1C1C1C',
-          border: `1.5px dashed ${value ? 'transparent' : 'rgba(255,255,255,0.12)'}`,
-        }}
+        disabled={disabled}
+        onClick={() => { triggerHaptic(); setOpen(value ? !open : true) }}
+        className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center disabled:opacity-50"
+        style={{ aspectRatio: '3/4', background: value ? 'transparent' : '#1C1C1C', border: `1.5px dashed ${value ? 'transparent' : 'rgba(255,255,255,0.12)'}` }}
       >
         {value ? (
           <>
-            <img src={value} alt={label} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 flex items-center justify-center"
-              style={{ background: 'rgba(0,0,0,0.35)' }}>
-              <Camera size={18} color="#fff" />
+            <img src={value.src} alt={`${label} face scan`} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+              style={{ background: 'rgba(0,0,0,0.38)' }}>
+              <Image size={18} color="#fff" />
+              <span className="font-body text-[10px] text-white">{selected?.date ?? 'Change scan'}</span>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center gap-1.5">
-            <Camera size={22} style={{ color: 'rgba(255,255,255,0.25)' }} />
-            <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>Tap to add</span>
+            <Image size={22} style={{ color: 'rgba(255,255,255,0.3)' }} />
+            <span className="font-body text-[11px] text-center px-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {disabled ? 'No face scans yet' : 'Choose a face scan'}
+            </span>
           </div>
         )}
       </button>
-      {pickErr && (
-        <p className="font-body text-[10px] mt-1 text-center leading-tight" style={{ color: '#EF4444' }}>
-          {pickErr}
-        </p>
+      {open && photos.length > 0 && (
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {photos.map(photo => (
+            <button key={photo.id} type="button" onClick={() => { onChange(photo); setOpen(false); triggerHaptic() }}
+              className="relative rounded-xl overflow-hidden aspect-[3/4]"
+              style={{ border: `1px solid ${photo.id === value?.id ? GOLD : 'rgba(255,255,255,0.12)'}`, boxShadow: photo.id === value?.id ? GOLD_LINE_GLOW : 'none' }}>
+              <img src={photo.src} alt={`Face scan from ${photo.date}`} className="w-full h-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 py-1 text-[9px] text-white text-center"
+                style={{ background: 'rgba(0,0,0,0.7)' }}>{photo.date}</span>
+            </button>
+          ))}
+        </div>
       )}
-      {/* Web fallback file input */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={async e => {
-          const file = e.target.files?.[0]
-          if (file) {
-            try { onChange(await fileToDataUrl(file)) } catch {}
-          }
-          e.target.value = ''
-        }}
-      />
     </div>
   )
 }
 
 // ── Comments sheet ────────────────────────────────────────────────────────────
-function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
+function CommentsSheet({ post, onCommentAdded, displayName, previewOnly = false, sectionRef }) {
   const [comments, setComments] = useState([])
   const [loading, setLoading]   = useState(true)
   const [text, setText]         = useState('')
@@ -147,15 +127,34 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
   const bottomRef = useRef()
 
   useEffect(() => {
+    if (previewOnly) {
+      setComments(post.sample_comments || [])
+      setLoading(false)
+      return undefined
+    }
     api.community.comments(post.id)
       .then(({ comments: c }) => setComments(c || []))
       .finally(() => setLoading(false))
-  }, [post.id])
+  }, [post.id, previewOnly, post.sample_comments])
 
   async function send() {
     if (!text.trim() || sending) return
     setSending(true)
     try {
+      if (previewOnly) {
+        const comment = {
+          id: `local-comment-${Date.now()}`,
+          display_name: displayName || 'You',
+          content: text.trim(),
+          created_at: new Date().toISOString(),
+          is_mine: true,
+        }
+        setComments(prev => [...prev, comment])
+        setText('')
+        onCommentAdded()
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+        return
+      }
       const { comment } = await api.community.addComment(post.id, { content: text.trim(), displayName })
       setComments(prev => [...prev, comment])
       setText('')
@@ -165,6 +164,10 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
   }
 
   async function deleteComment(id) {
+    if (previewOnly) {
+      setComments(prev => prev.filter(comment => comment.id !== id))
+      return
+    }
     try {
       await api.community.deleteComment(id)
       setComments(prev => prev.filter(c => c.id !== id))
@@ -172,30 +175,19 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
   }
 
   return (
-    <motion.div
-      initial={{ y: '100%' }}
-      animate={{ y: 0 }}
-      exit={{ y: '100%' }}
-      transition={SPRING_STANDARD}
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
-      style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '75vh' }}
-    >
-      <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
-        <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-      </div>
-      <div className="flex items-center justify-between px-4 pb-3 border-b flex-shrink-0" style={{ borderColor: BORDER }}>
-        <p className="font-heading font-bold text-sm text-primary">Comments</p>
-        <button onClick={() => { triggerHaptic(); onClose() }}><X size={18} style={{ color: 'rgba(255,255,255,0.4)' }} /></button>
+    <section ref={sectionRef} className="mt-4 rounded-2xl p-4" style={{ background: '#141414', border: `1px solid ${BORDER}`, scrollMarginTop: 16 }}>
+      <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: BORDER }}>
+        <p className="font-heading font-bold text-sm text-primary">Comments <span className="text-secondary font-body">({post.comments_count ?? comments.length})</span></p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="py-3 space-y-3">
         {loading ? (
-          <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
+          <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
         ) : comments.length === 0 ? (
-          <p className="text-center text-secondary font-body text-sm py-8">Be the first to comment</p>
+          <p className="text-secondary font-body text-sm py-3">Be the first to comment</p>
         ) : comments.map(c => (
           <div key={c.id} className="flex gap-2.5">
-            <Avatar name={c.display_name} size={8} />
+            <Avatar name={c.display_name} size={8} subtle />
             <div className="flex-1">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="font-heading font-bold text-[12px] text-primary">{c.display_name}</span>
@@ -213,9 +205,9 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="px-4 py-3 flex items-center gap-3 border-t flex-shrink-0"
-        style={{ borderColor: BORDER, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-        <Avatar name={displayName} size={8} />
+      <div className="pt-3 flex items-center gap-3 border-t"
+        style={{ borderColor: BORDER }}>
+        <Avatar name={displayName} size={8} subtle />
         <input
           value={text}
           onChange={e => setText(e.target.value)}
@@ -229,25 +221,57 @@ function CommentsSheet({ post, onClose, onCommentAdded, userId, displayName }) {
           <Send size={18} style={{ color: text.trim() ? GOLD : 'rgba(255,255,255,0.2)' }} />
         </button>
       </div>
-    </motion.div>
+    </section>
   )
 }
 
 // ── Share modal (Glow-Up or Rate Me) ─────────────────────────────────────────
 function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto }) {
-  const latestScan  = scanToShare ?? scans[0]
-  const prevScan    = scanToShare ? null : scans.find((_, i) => i > 0)
-  const scoreAfter  = latestScan?.aiScore?.overallScore ?? latestScan?.glowScore ?? null
-  const scoreBefore = prevScan?.glowScore   ?? null
+  const faceScans = [scanToShare, ...scans]
+    .filter(scan => scan && !isPhysiqueProgressScan(scan))
+    .filter((scan, index, all) => all.findIndex(item => item.id && item.id === scan.id) === index)
+    .sort((a, b) => (Date.parse(b.scanDate ?? b.analyzedAt ?? b.created_at) || 0) - (Date.parse(a.scanDate ?? a.analyzedAt ?? a.created_at) || 0))
+  const latestScan  = faceScans[0]
 
   const [postType,    setPostType]    = useState('glow-up')
   const [displayName, setDisplayName] = useState(user?.name?.split(' ')[0] ?? 'Anonymous')
   const [caption,     setCaption]     = useState('')
-  const [afterPhoto,  setAfterPhoto]  = useState(initialPhoto ?? latestScan?.facePhotoUrl ?? null)
+  const [afterPhoto,  setAfterPhoto]  = useState(null)
   const [beforePhoto, setBeforePhoto] = useState(null)
   const [ratePhoto,   setRatePhoto]   = useState(null)
+  const [faceScanPhotos, setFaceScanPhotos] = useState([])
+  const [loadingFacePhotos, setLoadingFacePhotos] = useState(true)
   const [posting,     setPosting]     = useState(false)
   const [err,         setErr]         = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoadingFacePhotos(true)
+    Promise.all(faceScans.map(async (scan, index) => {
+      let src = scan.facePhotoUrl ?? scan.face_photo_url ?? scan.face_image_url ?? null
+      if (!src && scan.id) {
+        const media = await loadScanMedia(scan.id)
+        src = media?.photo ?? null
+      }
+      if (!src) return null
+      const timestamp = scan.scanDate ?? scan.analyzedAt ?? scan.created_at
+      const parsedDate = timestamp ? new Date(timestamp) : null
+      const date = parsedDate && Number.isFinite(parsedDate.getTime())
+        ? parsedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Face scan'
+      return { id: scan.id ?? `face-scan-${index}`, src, date, score: getFaceScanOverallScore(scan) }
+    })).then(photos => {
+      if (!active) return
+      const available = photos.filter(Boolean)
+      setFaceScanPhotos(available)
+      setAfterPhoto(current => current || available.find(photo => photo.id === scanToShare?.id)
+        || available.find(photo => photo.src === initialPhoto) || available[0] || null)
+    }).finally(() => { if (active) setLoadingFacePhotos(false) })
+    return () => { active = false }
+  }, [scans, scanToShare?.id, initialPhoto])
+
+  const scoreBefore = beforePhoto?.score ?? null
+  const scoreAfter = afterPhoto?.score ?? null
 
   // Shrink modal when keyboard appears using visualViewport
   const [vvH, setVvH] = useState(window.visualViewport?.height ?? window.innerHeight)
@@ -270,15 +294,15 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
           displayName,
           scoreBefore: scoreBefore ?? scoreAfter,
           scoreAfter,
-          photoUrl:       afterPhoto  || null,
-          beforePhotoUrl: beforePhoto || null,
+          photoUrl:       afterPhoto?.src || null,
+          beforePhotoUrl: beforePhoto?.src || null,
           caption,
           postType: 'glow-up',
         })
       } else {
         await api.community.post({
           displayName,
-          photoUrl: ratePhoto,
+          photoUrl: ratePhoto?.src,
           caption,
           postType: 'rate-me',
         })
@@ -342,10 +366,25 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
 
           {postType === 'glow-up' ? (
             <>
+              {/* Before / After photos */}
+              <div>
+                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
+                  Before &amp; After Photos
+                </p>
+                <div className="flex gap-3">
+                  <FaceScanPhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
+                  <FaceScanPhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
+                </div>
+                {!loadingFacePhotos && !faceScanPhotos.length && (
+                  <p className="font-body text-[11px] mt-2 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Complete a face scan first to choose a photo.
+                  </p>
+                )}
+              </div>
               {/* Score preview */}
               {scoreAfter != null && (
                 <div className="flex items-center gap-3 p-3 rounded-2xl"
-                  style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)' }}>
+                  style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)', boxShadow: GOLD_LINE_GLOW }}>
                   <TrendingUp size={18} style={{ color: GOLD }} />
                   <div>
                     <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
@@ -357,35 +396,19 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
                   </div>
                 </div>
               )}
-              {/* Before / After photos */}
-              <div>
-                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
-                  Before &amp; After Photos
-                </p>
-                <div className="flex gap-3">
-                  <PhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} />
-                  <PhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  />
-                </div>
-                <p className="font-body text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.22)' }}>
-                  Optional: show your transformation
-                </p>
-              </div>
             </>
           ) : (
             <>
-              {/* Rate Me — single photo + context blurb */}
-              <div className="p-3 rounded-2xl flex items-start gap-3"
-                style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.18)' }}>
-                <Star size={16} style={{ color: GOLD, flexShrink: 0 }} />
-                <p className="font-body text-[12px] text-secondary leading-relaxed">
-                  Post your photo and get rated 1–10 by the community. Anonymous. Only your display name is shown.
-                </p>
-              </div>
               <div>
                 <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">Your Photo</p>
                 <div className="w-1/2 mx-auto">
-                  <PhotoPicker label="Photo" value={ratePhoto} onChange={setRatePhoto} />
+                  <FaceScanPhotoPicker label="Photo" value={ratePhoto} onChange={setRatePhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
                 </div>
+                {!loadingFacePhotos && !faceScanPhotos.length && (
+                  <p className="font-body text-[11px] mt-2 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Complete a face scan first to choose a photo.
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -652,7 +675,7 @@ function PostShareSheet({ post, onClose }) {
 }
 
 // ── Rate Me scoring UI ────────────────────────────────────────────────────────
-const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate }) {
+const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate, previewOnly = false }) {
   const isOwn = !!post.is_mine
   const [hoveredScore, setHoveredScore] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -702,7 +725,7 @@ const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate })
                   whileTap={{ scale: 0.9 }}
                   onPointerEnter={() => setHoveredScore(n)}
                   onPointerLeave={() => setHoveredScore(null)}
-                  onClick={() => { triggerHaptic(); handleScore(n) }}
+                  onClick={event => { event.stopPropagation(); triggerHaptic(); handleScore(n) }}
                   disabled={submitting}
                   className="aspect-square rounded-lg flex items-center justify-center font-heading font-bold text-[11px] transition-colors"
                   style={{
@@ -711,6 +734,7 @@ const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate })
                     color: filled ? (n >= 8 ? '#34C759' : n >= 5 ? GOLD : '#E07A5F') : 'rgba(255,255,255,0.35)',
                     outline: isRated ? `2px solid ${GOLD}` : 'none',
                     outlineOffset: 1,
+                    boxShadow: isRated || (filled && n >= 5 && n < 8) ? GOLD_LINE_GLOW : 'none',
                   }}
                 >
                   {n}
@@ -784,6 +808,7 @@ function ReportSheet({ postId, onClose }) {
                   style={{
                     background: selected === r.value ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${selected === r.value ? 'rgba(198,168,92,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                    boxShadow: selected === r.value ? GOLD_LINE_GLOW : 'none',
                   }}
                 >
                   <span className="font-body text-sm text-primary">{r.label}</span>
@@ -920,7 +945,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
   )
 }
 
-export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onDelete, onEdit, onRate }) {
+export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onEdit, onRate, previewOnly = false }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
   const [showMenu, setShowMenu]             = useState(false)
@@ -940,8 +965,15 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
       variants={CARD_VARIANTS}
       initial="initial"
       animate="animate"
+      onClick={onOpenPost ? () => onOpenPost(post) : undefined}
+      onKeyDown={onOpenPost ? event => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenPost(post) }
+      } : undefined}
+      tabIndex={onOpenPost ? 0 : undefined}
+      aria-label={onOpenPost ? `Open ${post.display_name}'s post` : undefined}
       className="rounded-2xl overflow-hidden mb-3"
-      style={{ background: '#141414', border: BORDER }}
+      style={{ background: '#141414', border: BORDER, cursor: onOpenPost ? 'pointer' : undefined }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
@@ -972,7 +1004,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
         {!!post.is_mine && (
           <div className="relative">
             <button
-              onClick={() => { triggerHaptic(); setShowMenu(v => !v) }}
+              onClick={event => { event.stopPropagation(); triggerHaptic(); setShowMenu(v => !v) }}
               className="p-1.5 rounded-lg"
               style={{ color: 'rgba(255,255,255,0.3)' }}
             >
@@ -1081,15 +1113,26 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
       {/* Actions */}
       <div className="flex items-center gap-1 px-3 py-3 border-t" style={{ borderColor: BORDER }}>
         <button
-          onClick={() => { triggerHaptic(); onLike(post.id) }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-          style={{ color: post.user_liked ? '#EF4444' : 'rgba(255,255,255,0.4)' }}
+          onClick={event => { event.stopPropagation(); triggerHaptic(); onLike(post.id) }}
+          className="community-like-button flex items-center gap-1.5 px-3 py-2 rounded-xl"
+          style={{ color: post.user_liked ? GOLD : 'rgba(255,255,255,0.4)' }}
+          aria-label={post.user_liked ? 'Unlike post' : 'Like post'}
         >
-          <Heart size={16} fill={post.user_liked ? '#EF4444' : 'none'} />
+          <motion.span
+            whileTap={{ scale: 0.78, rotate: post.user_liked ? -10 : 10 }}
+            animate={{
+              scale: post.user_liked ? [1, 1.28, 1] : 1,
+              filter: post.user_liked ? 'drop-shadow(0 0 6px rgba(198,168,92,0.65))' : 'drop-shadow(0 0 0px rgba(198,168,92,0))',
+            }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
+            className="inline-flex"
+          >
+            <Heart size={16} fill={post.user_liked ? GOLD : 'none'} />
+          </motion.span>
           <span className="font-body text-[12px]">{post.likes_count ?? 0}</span>
         </button>
         <button
-          onClick={() => { triggerHaptic(); onOpenComments(post) }}
+          onClick={event => { event.stopPropagation(); triggerHaptic(); onOpenComments(post) }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
           style={{ color: 'rgba(255,255,255,0.4)' }}
         >
@@ -1097,9 +1140,9 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           <span className="font-body text-[12px]">{post.comments_count ?? 0}</span>
         </button>
         <div className="flex items-center gap-1 ml-auto">
-          {!post.is_mine && (
+          {!post.is_mine && !previewOnly && (
             <button
-              onClick={() => { triggerHaptic(); setShowReport(true) }}
+              onClick={event => { event.stopPropagation(); triggerHaptic(); setShowReport(true) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
               style={{ color: 'rgba(255,255,255,0.2)' }}
               aria-label="Report post"
@@ -1109,7 +1152,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           )}
           {!isRateMe && (
             <button
-              onClick={() => { triggerHaptic(); setShowShareSheet(true) }}
+              onClick={event => { event.stopPropagation(); triggerHaptic(); setShowShareSheet(true) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
               style={{ color: 'rgba(255,255,255,0.4)' }}
             >
@@ -1145,10 +1188,34 @@ export default function Community() {
 
   const [posts, setPosts]           = useState([])
   const [loading, setLoading]       = useState(true)
+  const [previewFeed, setPreviewFeed] = useState(false)
   const [showShare, setShowShare]   = useState(Boolean(shareDraft))
   const [activePost, setActivePost] = useState(null)
+  const [showPostComments, setShowPostComments] = useState(false)
+  const commentsSectionRef = useRef(null)
 
   const displayName = user?.name?.split(' ')[0] ?? 'Anonymous'
+
+  const openPost = useCallback((post, withComments = false) => {
+    setActivePost(post)
+    setShowPostComments(withComments)
+  }, [])
+
+  const closePost = useCallback(() => {
+    setActivePost(null)
+    setShowPostComments(false)
+  }, [])
+
+  useEffect(() => {
+    if (!activePost || !showPostComments) return
+    const frame = requestAnimationFrame(() => commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    return () => cancelAnimationFrame(frame)
+  }, [activePost?.id, showPostComments])
+
+  function scrollToPostComments() {
+    setShowPostComments(true)
+    requestAnimationFrame(() => commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 
   useEffect(() => { loadFeed() }, [])
   useEffect(() => {
@@ -1159,18 +1226,48 @@ export default function Community() {
     setLoading(true)
     try {
       const { posts: p } = await api.community.feed()
-      setPosts(p || [])
-    } catch {} finally { setLoading(false) }
+      if (p?.length) {
+        setPosts(p)
+        setPreviewFeed(false)
+      } else if (import.meta.env.DEV) {
+        setPosts(SAMPLE_COMMUNITY_POSTS)
+        setPreviewFeed(true)
+      } else {
+        setPosts([])
+        setPreviewFeed(false)
+      }
+    } catch {
+      if (import.meta.env.DEV) {
+        setPosts(SAMPLE_COMMUNITY_POSTS)
+        setPreviewFeed(true)
+      } else {
+        setPosts([])
+        setPreviewFeed(false)
+      }
+    } finally { setLoading(false) }
   }
 
   const handleLike = useCallback(async (postId) => {
+    if (String(postId).startsWith('sample-')) {
+      const post = posts.find(item => item.id === postId)
+      if (!post) return
+      const liked = !post.user_liked
+      const likesCount = Math.max(0, (post.likes_count || 0) + (liked ? 1 : -1))
+      setPosts(prev => prev.map(post => {
+        if (post.id !== postId) return post
+        return { ...post, user_liked: liked ? 1 : 0, likes_count: likesCount }
+      }))
+      setActivePost(current => current?.id === postId ? { ...current, user_liked: liked ? 1 : 0, likes_count: likesCount } : current)
+      return
+    }
     try {
       const { liked, likes } = await api.community.like(postId)
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, user_liked: liked ? 1 : 0, likes_count: likes } : p
       ))
+      setActivePost(current => current?.id === postId ? { ...current, user_liked: liked ? 1 : 0, likes_count: likes } : current)
     } catch {}
-  }, [])
+  }, [posts])
 
   const [confirmDelete, setConfirmDelete] = useState(null) // postId pending confirm
 
@@ -1199,9 +1296,23 @@ export default function Community() {
     setPosts(prev => prev.map(p =>
       p.id === activePost?.id ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
     ))
+    setActivePost(prev => prev ? { ...prev, comments_count: (prev.comments_count || 0) + 1 } : prev)
   }, [activePost?.id])
 
   const handleRate = useCallback(async (postId, score) => {
+    if (String(postId).startsWith('sample-')) {
+      setPosts(prev => prev.map(post => {
+        if (post.id !== postId) return post
+        const count = post.rating_count || 0
+        const previous = post.user_rating
+        const nextCount = previous == null ? count + 1 : count
+        const nextAverage = previous == null
+          ? ((Number(post.avg_rating || 0) * count) + score) / Math.max(nextCount, 1)
+          : ((Number(post.avg_rating || 0) * count) - previous + score) / Math.max(count, 1)
+        return { ...post, avg_rating: nextAverage, rating_count: nextCount, user_rating: score }
+      }))
+      return
+    }
     try {
       const data = await api.community.rate(postId, score)
       setPosts(prev => prev.map(p =>
@@ -1213,7 +1324,7 @@ export default function Community() {
   }, [])
 
   return (
-    <MotionPage className="px-4 pb-8">
+    <MotionPage className="px-4 pb-8" style={activePost ? { overflow: 'hidden', touchAction: 'none' } : undefined}>
       <div className="flex items-center justify-between pb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div>
           <p className="text-[11px] text-secondary font-body uppercase tracking-widest mb-0.5">Community</p>
@@ -1226,7 +1337,7 @@ export default function Community() {
             whileTap={{ scale: 0.95 }}
             onClick={() => { triggerHaptic(); setShowShare(true) }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
-            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
+            style={{ background: 'rgba(198,168,92,0.14)', border: '1px solid rgba(198,168,92,0.4)', color: GOLD, boxShadow: GOLD_LINE_GLOW }}
           >
             <Plus size={14} /> Post
           </motion.button>
@@ -1249,11 +1360,12 @@ export default function Community() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-4 py-16 text-center"
+          className="flex flex-col items-center justify-center gap-4 py-12 text-center"
+          style={{ minHeight: 'calc(100vh - 160px)' }}
         >
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.15)' }}>
-            <Users size={28} style={{ color: 'rgba(198,168,92,0.5)' }} />
+            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)', boxShadow: GOLD_LINE_GLOW }}>
+            <Users size={28} style={{ color: GOLD, filter: 'drop-shadow(0 0 6px rgba(198,168,92,0.65))' }} />
           </div>
           <p className="font-heading font-bold text-base text-primary">Be the first to share</p>
           <p className="font-body text-sm text-secondary max-w-[220px]">
@@ -1262,26 +1374,36 @@ export default function Community() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => { triggerHaptic(); setShowShare(true) }}
-            className="px-6 py-3 rounded-2xl font-heading font-bold text-sm"
+            className="w-full max-w-[260px] px-6 py-3 rounded-2xl font-heading font-bold text-sm"
             style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
           >
             Share My Glow-Up
           </motion.button>
         </motion.div>
       ) : (
-        posts.map(post => (
+        <>
+        {previewFeed && (
+          <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.18)' }}>
+            <Image size={13} style={{ color: GOLD }} />
+            <p className="font-heading font-bold text-[10px] uppercase tracking-widest" style={{ color: GOLD }}>Sample feed · local preview</p>
+          </div>
+        )}
+        {posts.map(post => (
           <PostCard
             key={post.id}
             post={post}
             currentUserId={user?.id}
             displayName={displayName}
             onLike={handleLike}
-            onOpenComments={setActivePost}
+            onOpenComments={post => openPost(post, true)}
+            onOpenPost={post => openPost(post, false)}
             onDelete={handleDelete}
             onEdit={handleEdit}
             onRate={handleRate}
+            previewOnly={previewFeed}
           />
-        ))
+        ))}
+        </>
       )}
 
       <AnimatePresence>
@@ -1302,26 +1424,50 @@ export default function Community() {
             initialPhoto={shareDraft?.photo}
           />
         )}
-        {activePost && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40"
-              style={{ background: 'rgba(0,0,0,0.5)' }}
-              onClick={() => setActivePost(null)}
-            />
-            <CommentsSheet
-              post={activePost}
-              onClose={() => setActivePost(null)}
-              onCommentAdded={handleCommentAdded}
-              userId={user?.id}
-              displayName={displayName}
-            />
-          </>
-        )}
       </AnimatePresence>
+      {activePost && createPortal(
+            <motion.div
+              key={`post-detail-${activePost.id}`}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex flex-col"
+              style={{ background: '#0A0A0A', zIndex: 10050 }}
+            >
+              <div className="flex-shrink-0 flex items-center gap-3 px-4 border-b" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 12, borderColor: BORDER, background: '#0A0A0A' }}>
+                <button type="button" onClick={() => { triggerHaptic(); closePost() }} aria-label="Back to community feed" className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#1A1A1A', border: `1px solid ${BORDER}`, color: 'rgba(255,255,255,0.75)' }}>
+                  <ChevronLeft size={19} />
+                </button>
+                <div>
+                  <p className="font-heading font-bold text-[11px] uppercase tracking-widest" style={{ color: GOLD }}>Community</p>
+                  <p className="font-heading font-bold text-base text-primary">Post</p>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
+                <PostCard
+                  key={`post-card-detail-${activePost.id}`}
+                  post={activePost}
+                  currentUserId={user?.id}
+                  displayName={displayName}
+                  onLike={handleLike}
+                  onOpenComments={scrollToPostComments}
+                  onDelete={handleDelete}
+                  onEdit={handleEdit}
+                  onRate={handleRate}
+                  previewOnly={previewFeed}
+                />
+                <CommentsSheet
+                  key={`post-comments-${activePost.id}`}
+                  post={activePost}
+                  onCommentAdded={handleCommentAdded}
+                  displayName={displayName}
+                  previewOnly={previewFeed}
+                  sectionRef={commentsSectionRef}
+                />
+              </div>
+            </motion.div>
+        , document.body
+      )}
     </MotionPage>
   )
 }
