@@ -17,6 +17,7 @@ import demoMaleScanOverlay from '../assets/face-metrics-demo.jpg'
 
 const BORDER = 'rgba(255,255,255,0.07)'
 const GOLD_LINE_GLOW = '0 0 14px rgba(198,168,92,0.4), 0 0 28px rgba(198,168,92,0.18), inset 0 0 10px rgba(198,168,92,0.1)'
+const SAMPLE_LIKES_STORAGE_KEY = 'community.sample-liked-posts'
 
 const SAMPLE_COMMUNITY_POSTS = [
   { id: 'sample-1', display_name: 'Jordan', post_type: 'glow-up', created_at: new Date(Date.now() - 18 * 60_000).toISOString(), score_before: 6.2, score_after: 7.4, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Six weeks of consistency is starting to show.', likes_count: 28, comments_count: 6, sample_comments: [{ id: 'sample-1-comment-1', display_name: 'Maya', content: 'The progress is really clear!', created_at: new Date(Date.now() - 10 * 60_000).toISOString() }, { id: 'sample-1-comment-2', display_name: 'Ethan', content: 'Consistency pays off. Nice work.', created_at: new Date(Date.now() - 5 * 60_000).toISOString() }] },
@@ -26,6 +27,23 @@ const SAMPLE_COMMUNITY_POSTS = [
   { id: 'sample-5', display_name: 'Noah', post_type: 'glow-up', created_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), score_before: 6.5, score_after: 7.0, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Keeping the routine simple and sticking with it.', likes_count: 35, comments_count: 8, sample_comments: [{ id: 'sample-5-comment-1', display_name: 'Ethan', content: 'Simple routines are easier to stay consistent with.', created_at: new Date(Date.now() - 6 * 60 * 60_000).toISOString() }] },
   { id: 'sample-6', display_name: 'Sofia', post_type: 'rate-me', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.4, rating_count: 31, caption: 'Which style suits me better?', likes_count: 26, comments_count: 5, sample_comments: [{ id: 'sample-6-comment-1', display_name: 'Maya', content: 'I like this look best!', created_at: new Date(Date.now() - 9 * 60 * 60_000).toISOString() }] },
 ].map(post => ({ ...post, user_liked: 0, is_mine: 0 }))
+
+function getSampleLikedIds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAMPLE_LIKES_STORAGE_KEY) || '[]')
+    return new Set(Array.isArray(saved) ? saved.filter(id => typeof id === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function withSampleLikeState() {
+  const likedIds = getSampleLikedIds()
+  return SAMPLE_COMMUNITY_POSTS.map(post => {
+    const liked = likedIds.has(post.id)
+    return { ...post, user_liked: liked ? 1 : 0, likes_count: post.likes_count + (liked ? 1 : 0) }
+  })
+}
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -332,8 +350,8 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
         transition={SPRING_STANDARD}
         className="w-full rounded-t-2xl flex flex-col"
         style={{
-          background: '#1A1A1A',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: '#141414',
+          border: '1px solid rgba(255,255,255,0.07)',
           maxHeight: Math.min(vvH - 24, window.innerHeight * 0.92),
         }}
       >
@@ -345,7 +363,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
 
         {/* Post type selector */}
         <div className="px-5 pb-3 flex-shrink-0">
-          <div className="flex gap-2 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
+          <div className="flex gap-2 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.035)' }}>
             {[{ id: 'glow-up', icon: <TrendingUp size={13} />, label: 'Glow-Up' }, { id: 'rate-me', icon: <Star size={13} />, label: 'Rate Me' }].map(t => (
               <button
                 key={t.id}
@@ -423,7 +441,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
               onChange={e => setDisplayName(e.target.value.slice(0, 30))}
               placeholder="Anonymous"
               className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none"
-              style={{ background: '#242424', border: `1px solid ${BORDER}`, fontSize: 16 }}
+              style={{ background: '#1C1C1C', border: `1px solid ${BORDER}`, fontSize: 16 }}
             />
           </div>
 
@@ -443,7 +461,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
               placeholder={postType === 'rate-me' ? 'Add context (age, improvements made…)' : 'What worked for you?'}
               rows={3}
               className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none resize-none"
-              style={{ background: '#242424', border: `1px solid ${BORDER}`, fontSize: 16 }}
+              style={{ background: '#1C1C1C', border: `1px solid ${BORDER}`, fontSize: 16 }}
             />
           </div>
 
@@ -1230,7 +1248,7 @@ export default function Community() {
         setPosts(p)
         setPreviewFeed(false)
       } else if (import.meta.env.DEV) {
-        setPosts(SAMPLE_COMMUNITY_POSTS)
+        setPosts(withSampleLikeState())
         setPreviewFeed(true)
       } else {
         setPosts([])
@@ -1238,7 +1256,7 @@ export default function Community() {
       }
     } catch {
       if (import.meta.env.DEV) {
-        setPosts(SAMPLE_COMMUNITY_POSTS)
+        setPosts(withSampleLikeState())
         setPreviewFeed(true)
       } else {
         setPosts([])
@@ -1253,6 +1271,10 @@ export default function Community() {
       if (!post) return
       const liked = !post.user_liked
       const likesCount = Math.max(0, (post.likes_count || 0) + (liked ? 1 : -1))
+      const likedIds = getSampleLikedIds()
+      if (liked) likedIds.add(postId)
+      else likedIds.delete(postId)
+      try { localStorage.setItem(SAMPLE_LIKES_STORAGE_KEY, JSON.stringify([...likedIds])) } catch {}
       setPosts(prev => prev.map(post => {
         if (post.id !== postId) return post
         return { ...post, user_liked: liked ? 1 : 0, likes_count: likesCount }
