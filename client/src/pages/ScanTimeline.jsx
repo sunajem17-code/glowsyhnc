@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { TrendingUp, Trophy, Camera, Star, Flame, Sprout, TrendingDown, ChevronRight, ChevronDown, LockKeyhole } from 'lucide-react'
+import { TrendingUp, Trophy, Camera, Flame, ChevronRight, ChevronDown, LockKeyhole } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
@@ -11,24 +11,25 @@ import { triggerHaptic } from '../utils/haptics'
 import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from '../utils/progressHistory'
 import { ScanHistoryContent, TrendChart } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
-import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
 import StreakFlame from '../components/StreakFlame'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-import { getProgressStatPresentation } from '../utils/scanHistoryPresentation'
+import { getProgressStatPresentation, getProgressTrendPresentation, shouldShowProgressData } from '../utils/scanHistoryPresentation'
+import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
   const location = useLocation()
   const reduceMotion = useReducedMotion()
-  const { scans, currentScan, streak, isPremium, developerPreviewUnlocked, token, refreshProStatus } = useStore()
-  const canAccessProUi = hasLocalPremiumUiAccess(isPremium, developerPreviewUnlocked)
+  const { scans, currentScan, streak, isPremium, token, refreshProStatus } = useStore()
+  const canAccessProUi = hasLocalPremiumUiAccess(isPremium)
+  const showProgressData = shouldShowProgressData()
+  const progressTrend = getProgressTrendPresentation(canAccessProUi)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const [historySnapshot, setHistory] = useState({ token, scans: [] })
   const remoteHistory = historySnapshot.token === token ? historySnapshot.scans : []
   const history = mergeProgressHistory(remoteHistory, scans, currentScan)
   const [progressMode, setProgressMode] = useState('face')
   const [progressMetric, setProgressMetric] = useState('overall')
-  const [improvementExpanded, setImprovementExpanded] = useState(false)
   const [graphExpanded, setGraphExpanded] = useState(false)
   const faceHistory = history.filter(scan => !isPhysiqueProgressScan(scan) && getProgressScore(scan, 'face', 'overall') != null)
   const physiqueHistory = history.filter(scan => isPhysiqueProgressScan(scan) && getProgressScore(scan, 'physique', 'overall') != null)
@@ -97,6 +98,11 @@ export default function ScanTimeline() {
   useEffect(() => {
     let cancelled = false
     setHistoryError(false)
+    if (!showProgressData) {
+      setHistory({ token, scans: [] })
+      setLoading(false)
+      return () => { cancelled = true }
+    }
     if (isDemo) { setLoading(false); return }
     setLoading(true)
     api.supabase.getScans()
@@ -104,15 +110,10 @@ export default function ScanTimeline() {
       .catch(() => { if (!cancelled) setHistoryError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [token, isDemo])
+  }, [token, isDemo, showProgressData])
 
-  const firstScan      = activeHistory.length > 0 ? activeHistory[activeHistory.length - 1] : null
-  const latestScan     = activeHistory.length > 0 ? activeHistory[0] : null
   const activeScores = activeHistory.map(scan => getProgressScore(scan, progressMode, 'overall')).filter(Number.isFinite)
   const bestScore      = activeScores.length ? Math.max(...activeScores) : null
-  const improvement    = firstScan && latestScan
-    ? (getProgressScore(latestScan, progressMode, 'overall') - getProgressScore(firstScan, progressMode, 'overall')).toFixed(1) : null
-  const improvementNum = improvement !== null ? parseFloat(improvement) : null
 
   async function viewHistoryScan(entry) {
     const saved = currentScan?.id === entry.id ? currentScan
@@ -165,16 +166,16 @@ export default function ScanTimeline() {
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: `${progressMode === 'face' ? 'Face' : 'Physique'} Scans`, value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} />, lockable: true },
-          { label: 'Best Score',     value: bestScore != null ? bestScore.toFixed(1) : 'N/A', icon: <Trophy size={20} style={{ color: GOLD }} /> },
+          { label: 'Best Score',     value: bestScore != null ? bestScore.toFixed(1) : 'N/A', icon: <Trophy size={20} style={{ color: GOLD }} />, lockable: true },
         ].map(({ label, value, icon, lockable }) => {
           const stat = lockable ? getProgressStatPresentation(value, canAccessProUi) : { locked: false, value }
           return (
             <div key={label} className="card text-center py-3">
               <div className="flex justify-center mb-0.5">{icon}</div>
               {stat.locked
-                ? <LockKeyhole size={19} className="mx-auto my-[3px] text-secondary" aria-label="Locked" />
-                : <p className="font-mono font-bold text-lg text-primary">{stat.value}</p>}
-              <p className="text-[10px] text-secondary font-body">{label}</p>
+                ? <LockKeyhole size={19} className="mx-auto my-[3px]" style={{ color: GOLD }} aria-label="Locked" />
+                : <p className="font-mono font-bold text-lg text-white">{stat.value}</p>}
+              <p className="text-[10px] text-white font-body">{label}</p>
             </div>
           )
         })}
@@ -195,12 +196,11 @@ export default function ScanTimeline() {
                 ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 4px rgba(198,168,92,0.42))' }
                 : { color: canAccessProUi ? 'rgba(255,255,255,0.32)' : GOLD }}
             />
-            {!canAccessProUi && <LockKeyhole size={10} className="absolute text-primary" style={{ left: 'calc(50% + 3px)', top: 10 }} aria-hidden="true" />}
           </div>
           {canAccessProUi
-            ? <p className="font-mono font-bold text-lg text-primary">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
-            : <LockKeyhole size={19} className="mx-auto my-[3px] text-secondary" aria-hidden="true" />}
-          <p className="text-[10px] text-secondary font-body">Current Streak</p>
+            ? <p className="font-mono font-bold text-lg text-white">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
+            : <LockKeyhole size={19} className="mx-auto my-[3px]" style={{ color: GOLD }} aria-hidden="true" />}
+          <p className="text-[10px] text-white font-body">Current Streak</p>
         </button>
       </div>
 
@@ -216,62 +216,7 @@ export default function ScanTimeline() {
         </div>
       )}
 
-      {activeHistory.length >= 2 && canAccessProUi && (
-        <div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {[
-                  { label: 'First Score',   value: getProgressScore(firstScan, progressMode, 'overall').toFixed(1), icon: <Sprout size={20} style={{ color: '#34C759' }} /> },
-                  { label: 'Current Score', value: getProgressScore(latestScan, progressMode, 'overall').toFixed(1), icon: <Star size={20} style={{ color: GOLD, fill: GOLD }} /> },
-                  {
-                    label: 'Improvement',
-                    value: `${improvementNum >= 0 ? '+' : ''}${improvement}`,
-                    icon:  improvementNum >= 0 ? <TrendingUp size={20} style={{ color: GOLD }} /> : <TrendingDown size={20} style={{ color: '#E07A5F' }} />,
-                    colorStyle: improvementNum >= 0 ? { color: GOLD } : { color: '#E07A5F' },
-                  },
-                ].map(({ label, value, icon, colorStyle }) => label === 'Improvement' ? (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-expanded={improvementExpanded}
-                    aria-label={`${improvementExpanded ? 'Hide' : 'Show'} improvement details`}
-                    onClick={() => { setImprovementExpanded(value => !value); triggerHaptic() }}
-                    className="card relative text-center py-3 active:scale-[0.98] transition-transform"
-                  >
-                    <ChevronDown size={14} className={`absolute right-2 top-2 text-secondary transition-transform duration-200 ${improvementExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
-                    <div className="flex justify-center mb-0.5">{icon}</div>
-                    <p className="font-mono font-bold text-lg text-primary" style={colorStyle}>{value}</p>
-                    <p className="text-[10px] text-secondary font-body">Improvement</p>
-                  </button>
-                ) : (
-                  <div key={label} className="card text-center py-3">
-                    <div className="flex justify-center mb-0.5">{icon}</div>
-                    <p className="font-mono font-bold text-lg text-primary" style={colorStyle}>{value}</p>
-                    <p className="text-[10px] text-secondary font-body">{label}</p>
-                  </div>
-                ))}
-              </div>
-              <AnimatePresence initial={false}>
-                {improvementExpanded && (
-                  <motion.div
-                    initial={reduceMotion ? false : { opacity: 0, height: 0, y: -6 }}
-                    animate={{ opacity: 1, height: 'auto', y: 0 }}
-                    exit={reduceMotion ? undefined : { opacity: 0, height: 0, y: -6 }}
-                    className="card mb-4 overflow-hidden px-4 py-3"
-                  >
-                    <p className="font-body text-sm text-primary">
-                      {improvementNum > 0 ? 'Up' : improvementNum < 0 ? 'Down' : 'No change'}{' '}
-                      {Math.abs(improvementNum).toFixed(1)} points from your first scan to your latest.
-                    </p>
-                    <p className="font-body text-xs text-secondary mt-1">
-                      {getProgressScore(firstScan, progressMode, 'overall').toFixed(1)} → {getProgressScore(latestScan, progressMode, 'overall').toFixed(1)} overall
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-        </div>
-      )}
-
-      <div className="card mb-4 overflow-hidden">
+      {showProgressData && <div className="card mb-4 overflow-hidden">
         <button
           type="button"
           aria-label={`Score trends, ${metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} metric selected`}
@@ -283,7 +228,7 @@ export default function ScanTimeline() {
             <TrendingUp size={16} style={{ color: GOLD }} />
             Score trends
           </span>
-          <span className="absolute right-4 flex items-center text-secondary" aria-hidden="true">
+          <span className="absolute right-4 flex items-center gap-2 text-secondary" aria-hidden="true">
             <ChevronDown size={15} className={`transition-transform duration-200 ${graphExpanded ? 'rotate-180' : ''}`} />
           </span>
         </button>
@@ -304,23 +249,25 @@ export default function ScanTimeline() {
                   })}
                 </div>
                 {activeHistory.length >= 2
-                  ? <TrendChart scans={activeHistory} mode={progressMode} metric={progressMetric} label={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} />
+                  ? <TrendChart scans={activeHistory} mode={progressMode} metric={progressMetric} label={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} locked={progressTrend.locked} />
                   : <p className="font-body text-xs text-secondary text-center py-5">Save another scan to see your trend.</p>}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </div>}
 
-      <section aria-label="Scan History" className="mt-2">
-        <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
-        <ScanHistoryContent
-          embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading}
-          error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
-          onViewScan={viewHistoryScan}
-          emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
-        />
-      </section>
+      {showProgressData && (
+        <section aria-label="Scan History" className="mt-2">
+          <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
+          <ScanHistoryContent
+            embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading} canAccessProUi={canAccessProUi}
+            error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
+            onViewScan={viewHistoryScan}
+            emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
+          />
+        </section>
+      )}
 
       <div className="pb-8" />
       {flameFlight && createPortal(

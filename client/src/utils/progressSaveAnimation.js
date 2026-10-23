@@ -1,7 +1,7 @@
-const FLIGHT_SIZE = 44
+const ARCHIVE_CARD = { width: 92, height: 128 }
 
-export function getProgressSaveFlight(cardRect, buttonRect) {
-  if (!cardRect || !buttonRect || cardRect.width <= 0 || cardRect.height <= 0 || buttonRect.width <= 0 || buttonRect.height <= 0) {
+export function getProgressSaveFlight(cardRect, viewport) {
+  if (!cardRect || !viewport || cardRect.width <= 0 || cardRect.height <= 0 || viewport.width <= 0 || viewport.height <= 0) {
     return null
   }
 
@@ -13,10 +13,23 @@ export function getProgressSaveFlight(cardRect, buttonRect) {
       height: cardRect.height,
     },
     to: {
-      left: buttonRect.left + (buttonRect.width - FLIGHT_SIZE) / 2,
-      top: buttonRect.top + (buttonRect.height - FLIGHT_SIZE) / 2,
-      width: FLIGHT_SIZE,
-      height: FLIGHT_SIZE,
+      left: (viewport.width - ARCHIVE_CARD.width) / 2,
+      top: (viewport.height - ARCHIVE_CARD.height) / 2,
+      ...ARCHIVE_CARD,
     },
   }
+}
+
+export function getProgressSaveSequence(cardRect, viewport, reduceMotion = false) {
+  const flight = getProgressSaveFlight(cardRect, viewport)
+  if (flight && !reduceMotion) return { ...flight, phase: 'flight', holdMs: 950, animateCard: true }
+  if (!viewport || viewport.width <= 0 || viewport.height <= 0) return null
+
+  const archiveCard = {
+    left: (viewport.width - ARCHIVE_CARD.width) / 2,
+    top: (viewport.height - ARCHIVE_CARD.height) / 2,
+    ...ARCHIVE_CARD,
+  }
+  const confirmation = getProgressSaveFlight(archiveCard, viewport)
+  return confirmation ? { ...confirmation, phase: 'saved', holdMs: 1400, animateCard: false } : null
 }

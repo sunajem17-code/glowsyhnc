@@ -4,7 +4,7 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { isNative, getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
 import { trialRenewalText } from '../utils/scanTrial'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
@@ -71,7 +71,7 @@ export function StepRating({ onNext }) {
           className="font-body text-[14px] leading-relaxed mb-10"
           style={{ color: DIM, maxWidth: 280 }}
         >
-          A quick rating takes 5 seconds and helps thousands of guys discover their potential.
+          A quick rating takes 5 seconds and helps thousands of guys discover their potential
         </motion.p>
 
         {/* Interactive stars */}
@@ -259,7 +259,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
   useEffect(() => {
     let active = true
     getEligibleScanTrial().then(pkg => { if (active) setTrial(pkg) })
-      .catch(() => { if (active) setTrialError('Unable to check trial eligibility. Please try again later.') })
+      .catch(() => { if (active) setTrialError('Unable to check trial eligibility Please try again later') })
       .finally(() => { if (active) setChecking(false) })
     return () => { active = false }
   }, [])
@@ -274,10 +274,10 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         completedPurchase.current = result
         await onClaim(result)
       } else if (result?.reason !== 'cancelled') {
-        setTrialError('Your trial could not be activated. Please try again.')
+        setTrialError('Your trial could not be activated Please try again')
       }
     } catch (err) {
-      setTrialError(err?.message || 'Unable to start your trial. Please try again.')
+      setTrialError(err?.message || 'Unable to start your trial Please try again')
     } finally {
       purchaseLock.current = false
       setPurchasing(false)
@@ -332,7 +332,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           {trial ? '7 DAYS FREE · MONTHLY PLAN' : 'MONTHLY FREE TRIAL'}
         </p>
         <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking your trial eligibility…' : trial ? 'Your first 7 days are completely free' : 'This trial is not available for your account on this device.'}
+          {checking ? 'Checking your trial eligibility…' : trial ? 'Your first 7 days are completely free' : 'This trial is not available for your account on this device'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">

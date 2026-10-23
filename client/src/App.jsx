@@ -12,6 +12,7 @@ import Splash, { CinematicIntro } from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import PremiumSplash from './pages/PremiumSplash'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
+import { getStartupSplash } from './utils/splashFlow'
 
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
@@ -160,7 +161,9 @@ export default function App() {
   }
 
   // ── GATE 0: Cinematic intro — plays once per session for everyone ──
-  if (!cinematicDone) {
+  const startupSplash = getStartupSplash({ cinematicDone, splashDone })
+
+  if (startupSplash === 'cinematic') {
     return (
       <CinematicIntro onDone={() => {
         sessionStorage.setItem('asc_cinematic_shown', '1')
@@ -170,7 +173,7 @@ export default function App() {
   }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (!splashDone) {
+  if (startupSplash === 'welcome') {
     return <Splash onDone={handleSplashDone} />
   }
 

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { formatProgressTrendLabels, getProgressScore, getProgressTrendSeries, isPhysiqueProgressScan, mergeProgressHistory } from './progressHistory.js'
+import { formatProgressTrendLabels, getProgressScore, getProgressTrendAxisTicks, getProgressTrendChartSeries, getProgressTrendSeries, isPhysiqueProgressScan, mergeProgressHistory } from './progressHistory.js'
 
 const scan = { id: 'scan-1', scanDate: '2026-10-17T12:00:00Z', progressSavedAt: '2026-10-17T12:01:00Z', aiScore: { overallScore: 6.1, potentialScore: 7.5 } }
 test('device-saved rating appears in Progress when cloud history is empty', () => {
@@ -40,6 +40,32 @@ test('face progress series reads scores from the saved AI result without fabrica
   assert.equal(getProgressScore(face, 'face', 'potential'), 8.1)
   assert.equal(getProgressScore(face, 'face', 'symmetry'), 7.4)
   assert.equal(getProgressScore(face, 'face', 'skin'), null)
+})
+
+test('locked Potential chart keeps scan dates when saved scans do not contain Potential scores', () => {
+  const scans = [
+    { id: 'newest', created_at: '2026-10-20T12:00:00Z', overall_score: 8.1 },
+    { id: 'oldest', created_at: '2026-10-10T12:00:00Z', overall_score: 6.2 },
+  ]
+
+  assert.deepEqual(getProgressTrendChartSeries(scans, 'face', 'potential', true), [
+    { scanId: 'oldest', timestamp: '2026-10-10T12:00:00Z', score: null },
+    { scanId: 'newest', timestamp: '2026-10-20T12:00:00Z', score: null },
+  ])
+})
+
+test('unlocked Potential chart does not fabricate points when saved scans lack Potential scores', () => {
+  const scans = [
+    { id: 'newest', created_at: '2026-10-20T12:00:00Z', overall_score: 8.1 },
+    { id: 'oldest', created_at: '2026-10-10T12:00:00Z', overall_score: 6.2 },
+  ]
+
+  assert.deepEqual(getProgressTrendChartSeries(scans, 'face', 'potential', false), [])
+})
+
+test('locked trend ratings use evenly spaced values across the 0–10 scale', () => {
+  assert.deepEqual(getProgressTrendAxisTicks(true), [0, 2, 4, 6, 8, 10])
+  assert.equal(getProgressTrendAxisTicks(false), undefined)
 })
 
 test('score trend spans the earliest and latest scans in chronological order', () => {

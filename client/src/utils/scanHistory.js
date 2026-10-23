@@ -1,6 +1,5 @@
-import { isCurrentAssessment } from './assessment.js'
 import { getRatingColor } from './revealRatings.js'
-import { isPhysiqueProgressScan } from './progressHistory.js'
+
 function parseField(value, fallback) {
   if (typeof value !== 'string') return value ?? fallback
   try { return JSON.parse(value) ?? fallback } catch { return fallback }
@@ -33,7 +32,7 @@ export function mergeScanHistory(remoteScans, localScans, currentScan) {
   for (const scan of [currentScan, ...localScans, ...remoteScans]) {
     if (!scan?.id || seen.has(scan.id) || (scan.serverScanId && seen.has(scan.serverScanId))) continue
     const normalized = normalizeHistoryScan(scan)
-    if (!isCurrentAssessment(normalized) && (normalized.glowScore == null || !Number.isFinite(Number(normalized.glowScore)))) continue
+    if (normalized.glowScore == null || !Number.isFinite(Number(normalized.glowScore))) continue
     rows.push(normalized)
     seen.add(scan.id)
     if (scan.serverScanId) seen.add(scan.serverScanId)
@@ -43,11 +42,8 @@ export function mergeScanHistory(remoteScans, localScans, currentScan) {
 
 export function getComparisonScans(currentScan, savedScans) {
   const currentIds = new Set([currentScan?.id, currentScan?.serverScanId].filter(Boolean))
-  const currentIsPhysique = isPhysiqueProgressScan(currentScan)
   return mergeScanHistory([], savedScans, null).filter(scan =>
-    !currentIds.has(scan.id)
-    && !(scan.serverScanId && currentIds.has(scan.serverScanId))
-    && isPhysiqueProgressScan(scan) === currentIsPhysique,
+    !currentIds.has(scan.id) && !(scan.serverScanId && currentIds.has(scan.serverScanId)),
   )
 }
 

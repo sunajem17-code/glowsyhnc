@@ -18,8 +18,8 @@ const PHYSIQUE_METRICS = {
 }
 
 export function isPhysiqueProgressScan(scan) {
-  if ((scan?.scanType ?? scan?.scan_type) === 'physique') return true
-  const score = scan?.physiqueScore ?? scan?.aiScore?.physiqueScore ?? scan?.aiScore?.physiqueResult
+  if (scan?.scanType === 'physique') return true
+  const score = scan?.physiqueScore
   const hasFaceScore = [scan?.glowScore, scan?.glow_score, scan?.overall_score, scan?.aiScore?.overallScore]
     .some(value => value != null && Number.isFinite(Number(value)))
   return !!score && !hasFaceScore
@@ -28,7 +28,6 @@ export function isPhysiqueProgressScan(scan) {
 export function getProgressScore(scan, mode, metric) {
   const value = mode === 'physique'
     ? PHYSIQUE_METRICS[metric]?.(scan?.physiqueScore ?? scan?.aiScore?.physiqueScore)
-      ?? (metric === 'overall' ? scan?.glowScore ?? scan?.glow_score ?? scan?.overall_score ?? scan?.umaxScore : null)
     : FACE_METRICS[metric]?.(scan)
   const score = Number(value)
   return value != null && Number.isFinite(score) ? score : null
@@ -43,6 +42,28 @@ export function getProgressTrendSeries(scans, mode, metric) {
     }))
     .filter(point => point.score != null && Number.isFinite(Date.parse(point.timestamp)))
     .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+}
+
+// Locked charts still need scan dates to draw their frame when a metric such
+// as Potential has not been saved for every scan. Keep missing values null;
+// the chart may use these dates for labels, but must never invent scores.
+export function getProgressTrendChartSeries(scans, mode, metric, locked = false) {
+  const scoredSeries = getProgressTrendSeries(scans, mode, metric)
+  if (!locked) return scoredSeries
+
+  const scoresByScan = new Map(scoredSeries.map(point => [point.scanId, point.score]))
+  return [...scans]
+    .map(scan => ({
+      scanId: scan.id,
+      timestamp: scan.analyzedAt || scan.scanDate || scan.scan_date || scan.created_at,
+      score: scoresByScan.get(scan.id) ?? null,
+    }))
+    .filter(point => Number.isFinite(Date.parse(point.timestamp)))
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+}
+
+export function getProgressTrendAxisTicks(locked = false) {
+  return locked ? [0, 2, 4, 6, 8, 10] : undefined
 }
 
 export function formatProgressTrendLabels(series) {

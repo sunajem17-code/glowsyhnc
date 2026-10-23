@@ -57,15 +57,3 @@ test('history tier and score use the same lime as a 7.1 overall rating', () => {
   assert.equal(getHistoryScoreColor(7.1), 'rgb(157, 230, 52)')
   assert.equal(getHistoryScoreColor(null), 'rgba(255,255,255,0.4)')
 })
-
-test('PSL ranges and withheld assessments remain in history without a fabricated point score', () => {
-  const make = (id, scoreRange) => ({ id, scanDate: '2026-10-20T12:00:00Z', glowScore: null,
-    aiScore: { overallScore: null, assessment: { rubricVersion: 'appearance-psl-v2', scoreRange } } })
-  const assessed = make('psl', { min: 4.5, max: 5.2 })
-  const withheld = make('withheld', null)
-  const rows = mergeScanHistory([], [assessed, withheld], null)
-  assert.equal(rows.length, 2)
-  assert.equal(rows[0].glowScore, null)
-  assert.deepEqual(rows[0].aiScore.assessment.scoreRange, { min: 4.5, max: 5.2 })
-  assert.equal(rows[1].aiScore.assessment.scoreRange, null)
-})

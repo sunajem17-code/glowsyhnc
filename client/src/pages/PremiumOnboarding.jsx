@@ -1,9 +1,3 @@
-import { assessmentScan } from '../utils/assessment'
-import AssessmentOptions from '../components/AssessmentOptions'
-import './onboardingMotion.css'
-import { cacheLandmarkResult, frontLandmarkError } from '../utils/scanLandmarkCache'
-import { loadFaceMeshLibrary } from '../utils/faceLandmarks'
-import { presentationGate } from '../utils/scanPresentation'
 import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +7,10 @@ import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import hypergamyChart from '../assets/hypergamy-chart.png'
-import haloEffectImg from '../assets/halo-effect-new.png'
+import haloEffectImg from '../assets/halo-effect-gold.png'
+import marcovFitAvatar from '../assets/marcov-fit.jpg'
+import kyleJordanAvatar from '../assets/kyle-jordan.png'
+import samHakimiAvatar from '../assets/sam-hakimi.png'
 import { PhotoUploadStep, AnalyzingScreen, extractScanOverlayPoints, buildMeshPathD } from './Scan'
 import { ANALYSIS_STEPS } from '../utils/analysisSteps'
 import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
@@ -27,6 +24,7 @@ import { isNative } from '../utils/iap'
 import { Capacitor } from '@capacitor/core'
 import { getDeviceId } from '../utils/deviceId'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { ONBOARDING_GOLD } from '../utils/onboardingGold'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import ProcessingOverlay from '../components/ProcessingOverlay'
@@ -107,7 +105,7 @@ function ConsentMicroText() {
         style={{ color: 'rgba(255,255,255,0.45)' }}
         onClick={() => navigate('/privacy')}
       >Privacy Policy</span>
-      , and AI analysis.
+      , and AI analysis
     </p>
   )
 }
@@ -134,7 +132,7 @@ function BackBtn({ onBack }) {
   )
 }
 
-function GoldBtn({ label, onClick, disabled, loading }) {
+function GoldBtn({ label, onClick, disabled, loading, solid = false }) {
   function handleClick() {
     triggerHaptic()
     onClick?.()
@@ -144,7 +142,7 @@ function GoldBtn({ label, onClick, disabled, loading }) {
       onClick={handleClick}
       disabled={disabled || loading}
       className="btn-primary flex items-center justify-center gap-2"
-      style={{ background: GOLD_GRADIENT }}
+      style={{ background: solid ? ONBOARDING_GOLD : GOLD_GRADIENT }}
     >
       {loading && <Loader2 size={16} className="animate-spin" />}
       {label}
@@ -349,13 +347,13 @@ function StepIntro({ onNext }) {
           className="space-y-4"
         >
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-            Research on social perception shows people form judgments about attractiveness, confidence, and trustworthiness within seconds of seeing a face, often before a single word is spoken. That snap judgment shapes dating, social, and even professional outcomes.
+            Research on social perception shows people form judgments about attractiveness, confidence, and trustworthiness within seconds of seeing a face, often before a single word is spoken That snap judgment shapes dating, social, and even professional outcomes
           </p>
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-            The good news: most of what drives that impression (grooming, skin, fitness, posture, style) is genuinely improvable, not fixed.
+            The good news: most of what drives that impression (grooming, skin, fitness, posture, style) is genuinely improvable, not fixed
           </p>
           <p className="font-body text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-            Ascendus uses AI to show you exactly where you stand and what's actually worth working on, so you're not guessing.
+            Ascendus uses AI to show you exactly where you stand and what's actually worth working on, so you're not guessing
           </p>
         </motion.div>
       </div>
@@ -393,7 +391,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onDemo }) {
           className="font-heading font-bold text-[22px] mb-2"
           style={{ color: TEXT, letterSpacing: '-0.02em' }}
         >
-          Brutally honest. Built to improve you.
+          Brutally honest Built to improve you
         </motion.p>
 
         <motion.p
@@ -403,7 +401,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onDemo }) {
           className="font-body text-[15px] leading-relaxed mb-5"
           style={{ color: DIM }}
         >
-          Brutally accurate AI scoring<br />and a 12-week plan built for you.
+          Brutally accurate AI scoring<br />and a 12-week plan built for you
         </motion.p>
 
         {/* Urgency badge */}
@@ -512,9 +510,9 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
       <BackBtn onBack={onBack} />
       <div className="flex-1 flex flex-col justify-center">
         <h1 className="font-heading font-bold text-[28px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Welcome back.
+          Welcome back
         </h1>
-        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Sign in to continue your journey.</p>
+        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Sign in to continue your journey</p>
 
         <form onSubmit={handleSignIn} className="space-y-3">
           <div>
@@ -746,22 +744,22 @@ const CONSEQUENCES = [
   {
     icon:  '⚠️',
     color: '#EF4444',
-    text:  'A limited dating life — your pool narrows every year you let this slide.',
+    text:  'A limited dating life — your pool narrows every year you let this slide',
   },
   {
     icon:  '🔁',
     color: '#F97316',
-    text:  'The confidence spiral: rejection → insecurity → less effort → more rejection.',
+    text:  'The confidence spiral: rejection → insecurity → less effort → more rejection',
   },
   {
     icon:  '📉',
     color: '#EF4444',
-    text:  'Studies show appearance directly impacts perceived competence and hireability.',
+    text:  'Studies show appearance directly impacts perceived competence and hireability',
   },
   {
     icon:  '⏳',
     color: '#F97316',
-    text:  'Your peak window is now. The habits you build in your 20s define your 30s.',
+    text:  'Your peak window is now The habits you build in your 20s define your 30s',
   },
 ]
 
@@ -784,7 +782,7 @@ function StepConsequences({ onNext }) {
             What staying the same actually costs you
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-            Most people know something is off. Few do anything about it.
+            Most people know something is off Few do anything about it
           </p>
         </motion.div>
       </div>
@@ -829,7 +827,7 @@ function StepConsequences({ onNext }) {
           }}
         >
           <p style={{ fontSize: 13, color: '#C6A85C', fontWeight: 600, margin: 0, lineHeight: 1.45 }}>
-            Ascendus shows you exactly where you are — and the fastest path to where you want to be.
+            Ascendus shows you exactly where you are — and the fastest path to where you want to be
           </p>
         </motion.div>
       </div>
@@ -861,23 +859,26 @@ const TESTIMONIALS = [
   {
     handle:  '@samhakimii',
     rating:  5,
-    quote:   'My face looks so different after only 2 weeks. Almost have hollow cheeks now.',
+    quote:   'My face looks so different after only 2 weeks Almost have hollow cheeks now',
     initials:'SH',
     color:   '#C6A85C',
+    avatar:  samHakimiAvatar,
   },
   {
-    handle:  '@kylejordan_',
+    handle:  '@yusufali_',
     rating:  5,
-    quote:   'Went from a 6.1 to a 7.4 after my 12 week plan.',
+    quote:   'Went from a 6.1 to a 7.4 after my 12 week plan',
     initials:'KJ',
     color:   '#60A5FA',
+    avatar:  kyleJordanAvatar,
   },
   {
     handle:  '@marcov.fit',
     rating:  5,
-    quote:   'The only app that helps me take action instead of just pointing out flaws.',
+    quote:   'The only app that helps me take action instead of just pointing out flaws',
     initials:'MV',
-    color:   '#34C759',
+    color:   '#C6A85C',
+    avatar:  marcovFitAvatar,
   },
 ]
 
@@ -915,7 +916,7 @@ function StepTestimonials({ onNext }) {
             See why thousands are ascending
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 0 }}>
-            Real results from real people.
+            Real results from real people
           </p>
         </motion.div>
       </div>
@@ -941,13 +942,14 @@ function StepTestimonials({ onNext }) {
             {/* Avatar */}
             <div style={{
               width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
-              background: `${t.color}22`,
-              border:     `1.5px solid ${t.color}55`,
+              background: t.avatar ? 'transparent' : `${t.color}22`,
+              border:     t.avatar ? 'none' : `1.5px solid ${t.color}55`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
             }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: t.color, fontFamily: 'inherit' }}>
-                {t.initials}
-              </span>
+              {t.avatar
+                ? <img src={t.avatar} alt={`${t.handle} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }} />
+                : <span style={{ fontSize: 14, fontWeight: 700, color: t.color, fontFamily: 'inherit' }}>{t.initials}</span>}
             </div>
 
             {/* Body */}
@@ -1129,7 +1131,7 @@ function StepAuth({ onNext, onSkip }) {
           scopes: 'email name',
           nonce: Math.random().toString(36).substring(2, 15),
         }),
-        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out Please try again'), { name: 'AppleTimeout' })), 30_000)),
       ])
       const identityToken = appleResult?.response?.identityToken
       if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
@@ -1163,7 +1165,7 @@ function StepAuth({ onNext, onSkip }) {
         || err?.message?.toLowerCase().includes('cancel')
         || err?.message?.toLowerCase().includes('dismissed')
       if (!isCancelled) {
-        setError(err.message || 'Sign in failed. Please try again.')
+        setError(err.message || 'Sign in failed Please try again')
       }
     } finally {
       setLoading(null)
@@ -1172,7 +1174,7 @@ function StepAuth({ onNext, onSkip }) {
 
   function handleGoogle() {
     triggerHaptic()
-    setError('Google Sign In coming soon.')
+    setError('Google Sign In coming soon')
   }
 
   return (
@@ -1376,7 +1378,7 @@ function HaloEffectDiagram() {
       <rect x="244" y="183" width="52" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
       <text x="270" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="8.5" fontWeight="600">Average</text>
       <rect x="300" y="183" width="32" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
-      <text x="316" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="7.5" fontWeight="600">Forget.</text>
+      <text x="316" y="194" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontFamily="sans-serif" fontSize="7.5" fontWeight="600">Forget</text>
     </svg>
   )
 }
@@ -1387,32 +1389,97 @@ const HALO_LINES = [
   "Make every second count",
 ]
 
-function SmoothOnboardingText({ text, delay = 0 }) {
-  return <span aria-label={text}>
-    {text.split('\n').map((line, lineIndex) => <span key={lineIndex} style={{ display: 'block' }} aria-hidden="true">
-      {line.split(' ').map((word, wordIndex) => <span key={wordIndex} className="onboarding-word" style={{ animationDelay: `${delay + (lineIndex * 6 + wordIndex) * 0.055}s` }}>{word}{'\u00a0'}</span>)}
-    </span>)}
-  </span>
-}
-
 function HaloTypewriter({ start }) {
   const [lineIdx, setLineIdx] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const idx = useRef(0)
+
   useEffect(() => {
     if (!start) return
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
     setLineIdx(0)
-    triggerPageHaptic()
-    const timer = setTimeout(() => { setLineIdx(1); triggerPageHaptic() }, 3200)
-    return () => clearTimeout(timer)
   }, [start])
-  return start ? <SmoothOnboardingText key={lineIdx} text={HALO_LINES[lineIdx]} /> : null
+
+  useEffect(() => {
+    if (!start) return
+    triggerPageHaptic()
+  }, [start, lineIdx])
+
+  useEffect(() => {
+    if (!start) return
+    const text = HALO_LINES[lineIdx]
+    idx.current = 0
+    setDisplayed('')
+    setDone(false)
+    const id = setInterval(() => {
+      if (idx.current < text.length) {
+        setDisplayed(text.slice(0, idx.current + 1))
+        idx.current++
+      } else {
+        clearInterval(id)
+        if (lineIdx === 0) {
+          setTimeout(() => {
+            setDisplayed('')
+            setTimeout(() => setLineIdx(1), 300)
+          }, 1200)
+        } else {
+          setDone(true)
+        }
+      }
+    }, 28)
+    return () => clearInterval(id)
+  }, [start, lineIdx])
+
+  const cursor = start && !done ? (
+    <motion.span
+      animate={{ opacity: [1, 0] }}
+      transition={{ duration: 0.5, repeat: Infinity }}
+      style={{ color: ONBOARDING_GOLD, marginLeft: 1 }}
+    >|</motion.span>
+  ) : null
+  const displayLines = displayed.split('\n')
+  return (
+    <span style={{ whiteSpace: 'pre-line' }}>
+      {displayLines.map((line, i) => (
+        <span key={i}>
+          {line}
+          {i === displayLines.length - 1 ? cursor : '\n'}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 function HaloSubTypewriter({ start }) {
-  return start ? <SmoothOnboardingText text="What impression are you making?" delay={0.2} /> : null
+  const text = 'What impression are you making?'
+  const [displayed, setDisplayed] = useState('')
+  const idx = useRef(0)
+
+  useEffect(() => {
+    if (!start) return
+    // delay until main typewriter is roughly done (~2 lines × chars × 28ms + pauses ≈ 3.5s)
+    const delay = setTimeout(() => {
+      triggerPageHaptic()
+      idx.current = 0
+      setDisplayed('')
+      const id = setInterval(() => {
+        idx.current++
+        setDisplayed(text.slice(0, idx.current))
+        if (idx.current >= text.length) clearInterval(id)
+      }, 24)
+      return () => clearInterval(id)
+    }, 200)
+    return () => clearTimeout(delay)
+  }, [start])
+
+  return <span>{displayed}</span>
 }
 
 function StepHaloEffect({ onNext, onBack }) {
-  const G = '#C6A85C'
+  const G = ONBOARDING_GOLD
   const TEXT = '#FFFFFF'
   const [imgLoaded, setImgLoaded] = useState(false)
   useEffect(() => {
@@ -1450,7 +1517,7 @@ function StepHaloEffect({ onNext, onBack }) {
 
       {/* Bottom button */}
       <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <GoldBtn label="Next" onClick={onNext} />
+        <GoldBtn label="Next" onClick={onNext} solid />
       </div>
     </div>
   )
@@ -1467,10 +1534,10 @@ function StepHypergamy({ onNext, onBack }) {
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 260, overflowY: 'auto', padding: '0 24px 12px' }}>
         <BackBtn onBack={onBack} />
         <h1 className="font-heading font-bold text-[24px] leading-tight" style={{ color: TEXT, letterSpacing: '-0.02em', marginBottom: 8 }}>
-          Dating apps changed the rules.
+          Dating apps changed the rules
         </h1>
         <p className="font-body text-[14px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', marginBottom: 16 }}>
-          The top 20% get 80% of the attention — unless you optimize your structure.
+          The top 20% get 80% of the attention — unless you optimize your structure
         </p>
         <div style={{ borderRadius: 16, overflow: 'hidden', border: `1.5px solid ${G_BORDER}` }}>
           <img src={hypergamyChart} alt="Hypergamy data chart" style={{ display: 'block', width: '100%' }} />
@@ -1492,9 +1559,9 @@ function StepHypergamy({ onNext, onBack }) {
             Hypergamy
           </h2>
           <p className="font-body text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)', margin: 0 }}>
-            Modern dating apps changed the math completely. Women now have instant access to top tier profiles globally, meaning the average guy is no longer just competing locally. Right now 80% of attention goes to the top 20% of men, leaving the rest nearly invisible in a crowded digital marketplace.{' '}
-            <span style={{ color: 'rgba(255,255,255,0.88)' }}>The good news is it is not about luck. It is all about optimization.</span>{' '}
-            Once you figure out where you actually stand structurally, you can stop guessing, start maximizing your potential, and command the attention you deserve.
+            Modern dating apps changed the math completely Women now have instant access to top tier profiles globally, meaning the average guy is no longer just competing locally Right now 80% of attention goes to the top 20% of men, leaving the rest nearly invisible in a crowded digital marketplace{' '}
+            <span style={{ color: 'rgba(255,255,255,0.88)' }}>The good news is it is not about luck It is all about optimization</span>{' '}
+            Once you figure out where you actually stand structurally, you can stop guessing, start maximizing your potential, and command the attention you deserve
           </p>
           <GoldBtn label="Find out where you rank" onClick={onNext} />
         </div>
@@ -1550,16 +1617,33 @@ function StepWhyAppearance({ onNext, onBack }) {
 
 // ── STEP 6: Improvement Focus ─────────────────────────────────────────────────
 // ── STEP: Cinematic Closer ────────────────────────────────────────────────────
+function useTypewriter(text, speed = 38) {
+  const [displayed, setDisplayed] = useState('')
+  useEffect(() => {
+    setDisplayed('')
+    if (!text) return
+    let i = 0
+    const iv = setInterval(() => {
+      i++
+      setDisplayed(text.slice(0, i))
+      triggerHaptic()
+      if (i >= text.length) clearInterval(iv)
+    }, speed)
+    return () => clearInterval(iv)
+  }, [text, speed])
+  return displayed
+}
+
 function StepCinematic({ onNext }) {
   const lines = [
     { text: 'Looks shape how the world sees you', gold: false },
     { text: 'They can shape first impressions', gold: false },
     { text: "Now it's time to see where you stand", gold: false },
-    { text: 'Scan your face and...', gold: false },
-    { text: 'ASCEND WITH US', gold: true },
+    { text: 'Scan your face and find your starting point', gold: false },
   ]
   const [lineIdx, setLineIdx] = useState(0)
   const [leaving, setLeaving] = useState(false)
+  const displayed = useTypewriter(lines[lineIdx]?.text, 55)
 
   useEffect(() => {
     // Light tap as each new line starts — skip lineIdx 0 on mount (feels like a jolt on open)
@@ -1621,7 +1705,7 @@ function StepCinematic({ onNext }) {
               : '0 0 20px rgba(198,168,92,0.25)',
           }}
         >
-          <SmoothOnboardingText text={lines[lineIdx].text} />
+          {displayed}
         </motion.p>
       </AnimatePresence>
     </motion.div>
@@ -1686,7 +1770,7 @@ function StepAttractivenessImpact({ onNext, onBack }) {
   const bars = [
     { label: 'Dating',       pct: 80, gold: true },
     { label: 'Popularity',   pct: 65 },
-    { label: 'Career Oppt.', pct: 40 },
+    { label: 'Career Oppt', pct: 40 },
     { label: 'Income',       pct: 30 },
   ]
   const touchStartX = useRef(null)
@@ -2000,7 +2084,7 @@ function StepHeight({ data, onChange, onNext, onBack, units }) {
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How tall are you?
         </h1>
-        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Used to calculate your ideal body ratios.</p>
+        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Used to calculate your ideal body ratios</p>
 
         <Slider
           label="Height"
@@ -2046,7 +2130,7 @@ function StepWeight({ data, onChange, onNext, onBack, units }) {
         <h1 className="font-heading font-bold text-[28px] mb-2" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
           How much do you weigh?
         </h1>
-        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Used to calculate your BMI and training phase.</p>
+        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Used to calculate your BMI and training phase</p>
 
         <Slider
           label="Weight"
@@ -2095,7 +2179,7 @@ const BMI_TIERS = [
     color: '#3B82F6',
     bg: 'rgba(59,130,246,0.09)',
     border: 'rgba(59,130,246,0.28)',
-    impact: 'Being underweight means your face looks gaunt and your frame lacks presence. Building muscle mass will fill out your jaw, neck, and shoulders, directly raising your score.',
+    impact: 'Being underweight means your face looks gaunt and your frame lacks presence Building muscle mass will fill out your jaw, neck, and shoulders, directly raising your score',
   },
   {
     max: 25,
@@ -2106,7 +2190,7 @@ const BMI_TIERS = [
     color: '#C6A85C',
     bg: 'rgba(198,168,92,0.09)',
     border: 'rgba(198,168,92,0.28)',
-    impact: "You're in the ideal range to recomp. Lose fat and build muscle simultaneously. This is the most effective phase for improving your appearance rating.",
+    impact: "You're in the ideal range to recomp Lose fat and build muscle simultaneously This is the most effective phase for improving your appearance rating",
   },
   {
     max: 30,
@@ -2117,7 +2201,7 @@ const BMI_TIERS = [
     color: '#F59E0B',
     bg: 'rgba(245,158,11,0.09)',
     border: 'rgba(245,158,11,0.28)',
-    impact: 'Excess body fat is hiding your jawline, cheekbones, and V-taper. Reducing to a healthy range will visibly sharpen your face and improve your score significantly.',
+    impact: 'Excess body fat is hiding your jawline, cheekbones, and V-taper Reducing to a healthy range will visibly sharpen your face and improve your score significantly',
   },
   {
     max: Infinity,
@@ -2128,7 +2212,7 @@ const BMI_TIERS = [
     color: '#EF4444',
     bg: 'rgba(239,68,68,0.09)',
     border: 'rgba(239,68,68,0.28)',
-    impact: 'Body fat reduction is your highest-impact lever. Leaning out reveals facial bone structure, jawline, and neck definition, three of the highest-weight metrics in your rating.',
+    impact: 'Body fat reduction is your highest-impact lever Leaning out reveals facial bone structure, jawline, and neck definition, three of the highest-weight metrics in your rating',
   },
 ]
 
@@ -2262,8 +2346,6 @@ function PhotoStepScreen({ stepLabel, headline, photo, photoType, gender, trigge
 
 // ── STEP 7: Photo Capture + Analysis (face → side profile → analyze) ─────────
 function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
-  const presentationRef = useRef(null)
-  useEffect(() => () => { presentationRef.current?.finish(false); presentationRef.current = null }, [])
   const [phase, setPhase]               = useState('face') // 'face' | 'side' | 'analyzing' | 'retry_error'
   const [facePhoto, setFacePhoto]       = useState(null)
   const [sidePhoto, setSidePhoto]       = useState(null)
@@ -2282,8 +2364,13 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retrySideRef = useRef(null)
   const frontLandmarksRef = useRef(null)
+  const animationGateRef = useRef(null)
   const sideTriggerRef = useRef(null)
   const faceTriggerRef = useRef(null)
+  const finishAnimation = useCallback(() => {
+    animationGateRef.current?.()
+    animationGateRef.current = null
+  }, [])
 
   function ensureFrontLandmarks(url) {
     if (!url) return Promise.resolve(null)
@@ -2296,7 +2383,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setAnalysisLandmarks(lm)
         const points = extractScanOverlayPoints(lm)
         if (points) setAnalysisPoints(points)
-        loadFaceMeshLibrary().then(mod => {
+        import('@mediapipe/face_mesh').then(mod => {
           const FACEMESH_TESSELATION = mod.FACEMESH_TESSELATION || mod.default?.FACEMESH_TESSELATION || globalThis.FACEMESH_TESSELATION
           const path = buildMeshPathD(lm, FACEMESH_TESSELATION)
           if (path) setMeshPathD(path)
@@ -2305,9 +2392,10 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       })
       .catch(err => {
         console.warn('[PremiumOnboarding] Front landmark mapping unavailable:', err?.message)
-        return { points: null, error: err }
+        return null
       })
-    return cacheLandmarkResult(frontLandmarksRef, url, promise)
+    frontLandmarksRef.current = { url, promise }
+    return promise
   }
   // Countdown → auto-retry with the same photos
   useEffect(() => {
@@ -2323,7 +2411,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
 
   async function toBase64(url, maxPx = 1024) {
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Photo processing timed out. Please retake your photo')), 15_000)
+      setTimeout(() => reject(new Error('Photo processing timed out Please retake your photo')), 15_000)
     )
     const convert = (async () => {
       const res = await fetch(url)
@@ -2352,14 +2440,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     return Promise.race([convert, timeout])
   }
 
-  const analysisBusyRef = useRef(false)
   async function runAnalysisWithData(face, side) {
-    if (analysisBusyRef.current) return
-    analysisBusyRef.current = true
-    try {
-    presentationRef.current?.finish(false)
-    const presentation = presentationGate()
-    presentationRef.current = presentation
     setPhase('analyzing')
     setError('')
     setAnalysisStep(0)
@@ -2367,6 +2448,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     setSideAnalysisPoints(null)
     setSideAnalysisLandmarks(null)
     setSideDetectionPending(!!side)
+    const animationGate = new Promise(resolve => { animationGateRef.current = resolve })
 
     // Fire MediaPipe landmark detection in parallel with the AI call so
     // FacialAnalysisOverlay gets real per-user coordinates instead of null.
@@ -2379,9 +2461,6 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     const slowTimer  = setTimeout(() => setSlowAnalysis(true), 12000)
 
     try {
-      const landmarks = await frontLandmarksPromise
-      if (presentationRef.current !== presentation) return
-      if (!landmarks?.points) throw frontLandmarkError(landmarks)
       const faceB64 = await toBase64(face)
       setFacePhoto(faceB64) // upgrade blob URL → stable data URL so retries don't expire
       const sideB64 = side ? await toBase64(side) : null
@@ -2420,9 +2499,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       }
       setSlowAnalysis(false)
       const frontDetection = await frontLandmarksPromise
-      if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
+      if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again')
       const detectedSidePoints = sideB64 ? await sideLandmarksPromise : null
-      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again')
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null
@@ -2448,9 +2527,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           sideImage: sideB64,
           sideProfileGeometry,
           evidence: analysisEvidence,
-          gender: useStore.getState().userProfile?.assessmentProfile ?? useStore.getState().gender ?? gender ?? null,
-          presentationGoals: useStore.getState().userProfile?.presentationGoals || '',
-          knownMinor: useStore.getState().userProfile?.knownMinor === true || (Number.isFinite(useStore.getState().userProfile?.age) && useStore.getState().userProfile.age < 18),
+          gender: gender || 'male',
         })
       } finally {
         setScanInFlight(false)
@@ -2458,17 +2535,40 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
         setSlowAnalysis(false)
       }
 
-      if (presentationRef.current !== presentation) return
       setLiveAnalysisResult(aiResult)
       setAnalysisStep(3)
 
-      const structuredScan = assessmentScan(aiResult, { id: `scan-${Date.now()}`, scanDate: new Date().toISOString(), facePhotoUrl: faceB64, sidePhotoUrl: sideB64 })
-      if (!await presentation.promise || presentationRef.current !== presentation) return
-      onDone(structuredScan)
+      const scanRecord = {
+        id:             `scan-${Date.now()}`,
+        scanDate:       new Date().toISOString(),
+        analyzedAt:     new Date().toISOString(),
+        facePhotoUrl:   faceB64,
+        sidePhotoUrl:   sideB64,
+        hasSideProfile: !!sideB64,
+        gender:         gender || 'male',
+        umaxScore:      aiResult.overallScore,
+        glowScore:      Math.round(aiResult.overallScore * 10) / 10,
+        tier:           aiResult.tier,
+        aiScore:        aiResult,
+        analysisEvidence: aiResult.analysisEvidence,
+        faceData: {
+          aestheticScore:    aiResult.faceScore,
+          pillars:           null,
+          symmetry:          aiResult.faceSubScores?.symmetry          ?? null,
+          jawlineDefinition: aiResult.faceSubScores?.jawlineDefinition ?? null,
+          skinClarity:       aiResult.faceSubScores?.skinClarity       ?? null,
+          facialProportions: aiResult.faceSubScores?.facialProportions ?? null,
+          eyeArea:           aiResult.faceSubScores?.eyeArea           ?? null,
+          facialHarmony:     aiResult.faceSubScores?.facialHarmony     ?? null,
+        },
+        pillars:          aiResult.pillars          ?? null,
+        extendedMetrics:  aiResult.extendedMetrics  ?? null,
+        extendedMetricsStatus: aiResult.extendedMetricsStatus ?? null,
+      }
+
+      await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation Please retry the scan')), 30000))])
+      onDone(scanRecord)
     } catch (err) {
-      if (presentationRef.current !== presentation) return
-      presentation.finish(false)
-      clearTimeout(slowTimer)
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
       retrySideRef.current = side
       const code = err.errorCode || ''
@@ -2486,12 +2586,10 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       } else {
         setQuotaExhausted(false)
         setRateLimited(false)
-        setError(err.message || 'Something went wrong, please try again.')
-        if (err.code === 'front_landmarks_failed') { setFacePhoto(null); setPhase('face') }
-        else setPhase('retry_error')
+        setError(err.message || 'Something went wrong, please try again')
+        setPhase('retry_error')
       }
     }
-    } finally { analysisBusyRef.current = false }
   }
 
   if (phase === 'retry_error') {
@@ -2501,7 +2599,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           {quotaExhausted ? (
             <>
               <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Daily scan limit reached</p>
-              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day. Upgrade to Ascendus Max for unlimited scans.</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>Free accounts get 3 scans per day Upgrade to Ascendus Max for unlimited scans</p>
               <button
                 onClick={onDone}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
@@ -2525,7 +2623,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
               </div>
               <div className="text-center">
                 <p className="font-heading font-bold text-base" style={{ color: TEXT }}>High demand right now</p>
-                <p className="font-body text-[13px] mt-1" style={{ color: DIM }}>We're experiencing high demand right now. Please try again in 30 seconds.</p>
+                <p className="font-body text-[13px] mt-1" style={{ color: DIM }}>We're experiencing high demand right now Please try again in 30 seconds</p>
                 <p className="font-body text-[12px] mt-1" style={{ color: DIM }}>Auto-retrying in {retryCountdown}s…</p>
               </div>
               <button
@@ -2538,7 +2636,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           ) : (
             <>
               <p className="font-heading font-bold text-base text-center" style={{ color: TEXT }}>Something went wrong</p>
-              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>{error || 'Please try again.'}</p>
+              <p className="font-body text-[13px] text-center" style={{ color: DIM }}>{error || 'Please try again'}</p>
               <button
                 onClick={() => { setError(''); runAnalysisWithData(facePhoto, retrySideRef.current) }}
                 className="w-full py-3 rounded-2xl font-heading font-bold text-sm"
@@ -2564,7 +2662,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
   if (phase === 'analyzing') {
     return (
       <div className="flex flex-col h-full" style={{ background: BG }}>
-        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} meshPathD={meshPathD} onPresentationComplete={() => presentationRef.current?.finish()} />
+        <AnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} sidePhoto={sidePhoto} scanResult={liveAnalysisResult} points={analysisPoints} sidePoints={sideAnalysisPoints} rawLandmarks={analysisLandmarks} sideRawLandmarks={sideAnalysisLandmarks} meshPathD={meshPathD} sideDetectionPending={sideDetectionPending} onSequenceComplete={finishAnimation} />
       </div>
     )
   }
@@ -2573,7 +2671,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
     return (
       <PhotoStepScreen
         stepLabel="STEP 3 OF 3"
-        headline="Now, your side profile."
+        headline="Now, your side profile"
         photo={sidePhoto}
         photoType="side"
         gender={gender}
@@ -2586,7 +2684,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           if (!sidePhoto) sideTriggerRef.current?.()
           else runAnalysisWithData(facePhoto, sidePhoto)
         }}
-        extra={<AssessmentOptions />}
+        extra={null}
       />
     )
   }
@@ -2611,17 +2709,12 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
             const { validateScanQuality } = await import('../utils/scanQuality.js')
             const quality = await validateScanQuality(facePhoto)
             if (!quality.passed) {
-              setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo.')
+              setError(quality.issues?.[0]?.advice || 'Please retake a clearer front photo')
               return
             }
-            const mapping = await ensureFrontLandmarks(facePhoto)
-            if (!mapping?.points) {
-              setError(frontLandmarkError(mapping).message)
-              setFacePhoto(null)
-              return
-            }
+            ensureFrontLandmarks(facePhoto)
             setPhase('side'); setError('')
-          } catch { setError('Could not check the photo. Please try again.') }
+          } catch { setError('Could not check the photo Please try again') }
         }
       }}
       extra={<ConsentMicroText />}
@@ -2735,7 +2828,7 @@ function Slide2() {
       </div>
 
       <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
-        The difference isn't genetics.<br />It's information.
+        The difference isn't genetics<br />It's information
       </p>
     </div>
   )
@@ -2798,7 +2891,7 @@ function Slide3() {
       </div>
 
       <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
-        You just need to know where to start.
+        You just need to know where to start
       </p>
     </div>
   )
@@ -2829,7 +2922,7 @@ function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
       const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
         || err?.message?.toLowerCase().includes('cancel')
         || err?.message?.toLowerCase().includes('dismissed')
-      if (!isCancelled) setAuthError(err?.message || 'Sign in failed. Please try again.')
+      if (!isCancelled) setAuthError(err?.message || 'Sign in failed Please try again')
     } finally {
       setAuthLoading(null)
     }
@@ -2837,7 +2930,7 @@ function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
 
   function handleGoogle() {
     triggerHaptic()
-    setAuthError('Google Sign In coming soon.')
+    setAuthError('Google Sign In coming soon')
   }
 
   const SlideContent = SLIDE_COMPONENTS[slide]
@@ -3075,14 +3168,6 @@ export default function PremiumOnboarding() {
   // REMOVED: handleScanDone — moved to paywall flow
   // eslint-disable-next-line no-unused-vars
   function handleScanDone(scanRecord) {
-    if (scanRecord.aiScore?.assessment) {
-      addScan(scanRecord)
-      setCurrentScan(scanRecord)
-      setLastScanDate(scanRecord.scanDate)
-      incrementScanCount()
-      goNext()
-      return
-    }
     try {
       const g = formData.gender || 'male'
       const phase = assignPhase(scanRecord.faceData?.aestheticScore, formData.goal)
@@ -3182,7 +3267,7 @@ export default function PremiumOnboarding() {
 
   // Apple sign-in handler used from both IntroSlides and StepAuth
   async function handleAppleSignInFromSlide() {
-    if (!Capacitor.isNativePlatform()) throw new Error('Apple Sign In is only available on iOS.')
+    if (!Capacitor.isNativePlatform()) throw new Error('Apple Sign In is only available on iOS')
     const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
     const result = await Promise.race([
       SignInWithApple.authorize({
@@ -3190,7 +3275,7 @@ export default function PremiumOnboarding() {
         scopes: 'email name',
         nonce: Math.random().toString(36).substring(2, 15),
       }),
-      new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out. Please try again.'), { name: 'AppleTimeout' })), 30_000)),
+      new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out Please try again'), { name: 'AppleTimeout' })), 30_000)),
     ])
     const token = result?.response?.identityToken
     if (!token) throw new Error('Apple Sign In did not return a valid token')

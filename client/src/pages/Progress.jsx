@@ -7,6 +7,7 @@ import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages, waitForMinimumCoachThinking } from '../utils/coachChat'
+import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
 
 const STARTER_PROMPTS = [
   "What's holding my score back the most?",
@@ -210,10 +211,10 @@ export default function Progress() {
                 boxShadow: '0 0 24px rgba(209,183,109,0.2)',
               }} />
             <img src="/adonis-coach-gold.png?v=transparent" alt="Adonis" className="relative w-full h-full object-contain"
-              style={{ transform: 'scale(1.19)' }} />
+              style={{ transform: `scale(${scaleCoachHeaderSize(1.19)})` }} />
           </div>
           <div className="translate-y-1">
-            <h1 className="font-heading font-bold text-[17px] leading-tight text-primary">Adonis</h1>
+            <h1 className="font-heading font-bold leading-tight text-primary" style={{ fontSize: `${scaleCoachHeaderSize(17)}px` }}>Adonis</h1>
           </div>
         </div>
       </div>
