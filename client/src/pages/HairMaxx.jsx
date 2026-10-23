@@ -17,6 +17,9 @@ import longLengthPortrait from '../assets/hair-length/long.png'
 import type1BuzzCutReference from '../assets/hair-examples/type1-medium-high-short.jpg'
 import type1CrewCutReference from '../assets/hair-examples/type1-all-density-short-crew-cut.jpg'
 import type1ModCutReference from '../assets/hair-examples/type1-all-density-short-mod-cut.jpg'
+import type1MiddlePartFlowReference from '../assets/hair-examples/type1-medium-short-middle-part-flow.png'
+import type1TexturedFringeReference from '../assets/hair-examples/type1-medium-short-textured-fringe.png'
+import type1MediumModCutReference from '../assets/hair-examples/type1-medium-short-mod-cut.png'
 
 const BG = '#080808'
 const PANEL = 'rgba(255,255,255,0.045)'
@@ -311,11 +314,15 @@ export default function HairMaxx() {
   }
 
   function resolveRecommendations(items, engine, hairProfile) {
+    const isType1ShortProfile = hairProfile.hairType === 'straight' && hairProfile.desiredLength === 'short'
+    const excludedType1ShortStyles = new Set(['straight_crew', 'side_swept_crop', 'compact_crop', 'short_taper'])
     const resolved = items.map((item, index) => {
       const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
       const hardCompatible = style && style.compatibleHairTypes.includes(hairProfile.hairType) &&
         style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness || 'medium')
-      return hardCompatible ? {
+      const excluded = item.hairstyleId === 'layered_wolf' ||
+        (isType1ShortProfile && excludedType1ShortStyles.has(item.hairstyleId))
+      return hardCompatible && !excluded ? {
         hairstyleId: item.hairstyleId, style, rank: item.rank ?? index + 1,
         compatibility: item.compatibility ?? Math.max(72, 97 - index * 4),
         reasons: item.matchReasons ?? item.reasons ?? [],
@@ -325,7 +332,6 @@ export default function HairMaxx() {
       } : null
     }).filter(Boolean)
 
-    const isType1ShortProfile = hairProfile.hairType === 'straight' && hairProfile.desiredLength === 'short'
     if (isType1ShortProfile) {
       resolved.unshift({
         hairstyleId: 'community-reference-type1-crew-cut',
@@ -386,37 +392,124 @@ export default function HairMaxx() {
         },
       })
 
-      if (['medium', 'high'].includes(hairProfile.density)) {
-        resolved.splice(2, 0, {
-          hairstyleId: 'community-reference-type1-buzz-cut',
-          rank: 1,
-          compatibility: 100,
-          reasons: ['Reference photo for a Type 1 short buzz cut.'],
-          relevantMeasurements: [],
-          compatibilityFactors: ['Type 1 hair', 'Short length', `${hairProfile.density} density`],
-          limitations: [],
-          engine: 'user_reference',
-          style: {
-            id: 'community-reference-type1-buzz-cut',
-            name: 'Buzz Cut',
-            appearance: 'Type 1 reference photo',
-            compatibleHairTypes: ['straight'],
-            compatibleDensity: ['medium', 'high'],
-            compatibleThickness: ['fine', 'medium', 'thick'],
-            length: 'short',
-            maintenance: 'low',
-            growth: 'Suitable for a shorter cut',
-            styling: 'Keep the short shape neat with a light styling product.',
-            barber: {
-              top: 'Keep the top short and evenly textured, following the buzz cut reference.',
-              sides: 'Keep the sides short and blended into the top.',
-              back: 'Keep the back short and clean.',
-              taper: 'Use a subtle, even taper around the edges.',
-            },
-            image: { src: type1BuzzCutReference, width: 941, height: 1672 },
+      resolved.splice(2, 0, {
+        hairstyleId: 'community-reference-type1-buzz-cut',
+        rank: 1,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 short buzz cut.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Short length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-buzz-cut',
+          name: 'Buzz Cut',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'short',
+          maintenance: 'low',
+          growth: 'Suitable for a shorter cut',
+          styling: 'Keep the short shape neat with a light styling product.',
+          barber: {
+            top: 'Keep the top short and evenly textured, following the buzz cut reference.',
+            sides: 'Keep the sides short and blended into the top.',
+            back: 'Keep the back short and clean.',
+            taper: 'Use a subtle, even taper around the edges.',
           },
-        })
-      }
+          image: { src: type1BuzzCutReference, width: 941, height: 1672 },
+        },
+      })
+    }
+    if (hairProfile.hairType === 'straight' && hairProfile.desiredLength === 'medium') {
+      resolved.unshift({
+        hairstyleId: 'community-reference-type1-middle-part-flow',
+        rank: 0,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 medium-length middle part flow.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Medium length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-middle-part-flow',
+          name: 'Middle Part Flow',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'medium',
+          maintenance: 'some',
+          growth: 'Suitable for medium-length styling',
+          styling: 'Part the hair near the center and let the longer layers flow naturally away from the face.',
+          barber: {
+            top: 'Keep medium length on top with a relaxed center part and natural movement.',
+            sides: 'Leave enough length at the sides to sweep back and blend into the top.',
+            back: 'Keep the back medium length with soft, flowing layers.',
+            taper: 'Use a subtle, natural blend without a sharp fade.',
+          },
+          image: { src: type1MiddlePartFlowReference, width: 941, height: 1672 },
+        },
+      })
+      resolved.splice(1, 0, {
+        hairstyleId: 'community-reference-type1-textured-fringe',
+        rank: 1,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 medium-length textured fringe.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Medium length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-textured-fringe',
+          name: 'Textured Fringe',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'medium',
+          maintenance: 'some',
+          growth: 'Suitable for a medium-length textured style',
+          styling: 'Wear the textured layers forward with a loose, natural fringe.',
+          barber: {
+            top: 'Keep medium length on top with choppy texture and a loose fringe over the forehead.',
+            sides: 'Leave soft length around the sides and blend it naturally into the top.',
+            back: 'Keep the back medium length with lightly textured layers.',
+            taper: 'Use a soft, natural blend rather than a sharp fade.',
+          },
+          image: { src: type1TexturedFringeReference, width: 941, height: 1671 },
+        },
+      })
+      resolved.splice(2, 0, {
+        hairstyleId: 'community-reference-type1-medium-mod-cut',
+        rank: 2,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 medium-length Mod Cut.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Medium length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-medium-mod-cut',
+          name: 'Mod Cut',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'medium',
+          maintenance: 'some',
+          growth: 'Suitable for medium-length styling',
+          styling: 'Wear the layered shape loose, with the fringe falling naturally across the forehead.',
+          barber: {
+            top: 'Keep medium length and add soft layers with a loose fringe across the forehead.',
+            sides: 'Leave enough length to frame the face and connect into the top layers.',
+            back: 'Keep medium length with a softly layered, slightly rounded shape.',
+            taper: 'Blend naturally around the sides and back without a sharp fade.',
+          },
+          image: { src: type1MediumModCutReference, width: 941, height: 1670 },
+        },
+      })
     }
     return resolved
   }
@@ -458,7 +551,11 @@ export default function HairMaxx() {
   function back() {
     if (barber) { setBarber(null); return }
     if (detail) { setDetail(null); return }
-    if (stage === 'intro') navigate(-1)
+    if (stage === 'intro') {
+      const historyIndex = window.history.state?.idx
+      if (Number.isInteger(historyIndex) && historyIndex > 0) navigate(-1)
+      else navigate('/extras', { replace: true })
+    }
     else if (stage === 'questions') question > 0 ? setQuestion(value => value - 1) : setStage('intro')
     else if (stage === 'saved') setStage('looks')
     else if (stage === 'looks') { setQuestion(questions.length - 1); setStage('questions') }
