@@ -54,36 +54,38 @@ router.post('/scans', auth, async (req, res) => {
     // req.userId is the Supabase UUID in production (same UUID used at registration)
     const sbUserId = req.userId
 
-    const {
-      overallScore, tier, faceScore, groomingScore,
-      harmony, angularity, features, dimorphism, potentialScore,
-      faceImageUrl,
-      hairstyleRec1, hairstyleRec2, hairstyleRec3,
-      hairTypeDetected, faceShape,
-      extendedMetrics,
-    } = req.body
+    const { faceImageUrl, hairstyleRec1, hairstyleRec2, hairstyleRec3 } = req.body
+    const { ownedResult, latestOwnedResult, ownedImagePath } = require('../lib/coachScanContext')
+    // Older clients omit scanId, so link only a recent server-generated result.
+    // Browser-supplied scores and premium/status fields are never authoritative.
+    const verified = req.body.scanId ? ownedResult(req.body.scanId, req.userId) : latestOwnedResult(req.userId)
+    if (!verified) return res.status(404).json({ error: 'Completed server analysis not found. Please retry your scan.' })
+    const image = ownedImagePath(faceImageUrl, req.userId) || ownedImagePath(verified.row.face_photo_url, req.userId) || null
+    if (image) require('../db').prepare('UPDATE scans SET face_photo_url = ? WHERE id = ? AND user_id = ?').run(image, verified.row.id, req.userId)
+    const result = verified.result
 
     // Insert scan
     const { data: scan, error: scanErr } = await sb
       .from('scans')
-      .insert({
-        user_id:                     sbUserId,
-        overall_score:               overallScore,
-        tier,
-        face_score:                  faceScore,
-        grooming_score:              groomingScore,
-        harmony,
-        angularity,
-        features,
-        dimorphism,
-        potential_score:             potentialScore,
-        face_image_url:              faceImageUrl  ?? null,
-        hairstyle_recommendation_1:  hairstyleRec1 ?? null,
-        hairstyle_recommendation_2:  hairstyleRec2 ?? null,
-        hairstyle_recommendation_3:  hairstyleRec3 ?? null,
-        hair_type_detected:          hairTypeDetected ?? null,
-        face_shape:                  faceShape     ?? null,
-        extended_metrics:            extendedMetrics ?? null,
+      .upsert({
+        id: verified.row.id,
+        user_id: sbUserId,
+        overall_score: result.overallScore,
+        tier: result.tier,
+        face_score: result.faceScore,
+        grooming_score: result.groomingScore,
+        harmony: result.pillars?.harmony ?? null,
+        angularity: result.pillars?.angularity ?? null,
+        features: result.pillars?.features ?? null,
+        dimorphism: result.pillars?.dimorphism ?? null,
+        potential_score: result.potentialScore,
+        face_image_url: image,
+        hairstyle_recommendation_1: hairstyleRec1 ?? null,
+        hairstyle_recommendation_2: hairstyleRec2 ?? null,
+        hairstyle_recommendation_3: hairstyleRec3 ?? null,
+        hair_type_detected: result.hairType ?? null,
+        face_shape: result.facialStructure ?? null,
+        extended_metrics: result.extendedMetrics ?? null,
       })
       .select('id')
       .single()
@@ -94,8 +96,8 @@ router.post('/scans', auth, async (req, res) => {
     await sb.from('progress').insert({
       user_id:       sbUserId,
       scan_id:       scan.id,
-      overall_score: overallScore,
-      face_score:    faceScore,
+      overall_score: result.overallScore,
+      face_score:    result.faceScore,
     })
 
     // Save plan tasks if provided

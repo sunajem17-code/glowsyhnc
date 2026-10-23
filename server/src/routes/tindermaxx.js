@@ -1,5 +1,6 @@
 const express   = require('express')
-const Anthropic  = require('@anthropic-ai/sdk')
+const { createAIClient, getAIKey } = require('../lib/aiProvider')
+const aiSchemas = require('../lib/aiSchemas')
 const { verifyToken, resolvePro } = require('../middleware/claudeGate')
 const { createLimiter } = require('../middleware/ratelimit')
 const { withRetry } = require('../utils/withRetry')
@@ -16,7 +17,7 @@ async function limitMiddleware(req, res, next) {
 }
 
 function getClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return createAIClient()
 }
 
 // POST /api/tindermaxx/rank
@@ -47,7 +48,8 @@ router.post('/rank', verifyToken, resolvePro, limitMiddleware, async (req, res) 
       },
     ]))
 
-    const message = await withRetry(() => client.messages.create({
+    const message = await withRetry(() => client.generate({
+      responseSchema: aiSchemas.ranking(photos.length), responseName: 'tindermaxx_ranking',
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       messages: [{

@@ -23,6 +23,7 @@ import { getDeviceId } from '../utils/deviceId'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
+import { normalizeOnboardingStep, nextOnboardingStep } from '../utils/onboardingProgress'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 
@@ -3111,7 +3112,12 @@ export default function PremiumOnboarding() {
   // Restore an in-progress draft so a refresh/backgrounding mid-quiz doesn't
   // silently discard answers already entered. Authenticated users clamp to
   // step ≥ 3 so they never see Welcome/SignUp again.
-  const draft = loadDraft()
+  const [draft] = useState(loadDraft)
+  useEffect(() => {
+    if (draft?.step != null && normalizeOnboardingStep(draft.step) !== draft.step) {
+      console.warn('[Onboarding] Recovered an invalid saved step; existing answers were preserved.')
+    }
+  }, [draft])
 
   // Intro slides play first for new users on every fresh app launch.
   const [introDone, setIntroDone] = useState(true)
@@ -3124,7 +3130,9 @@ export default function PremiumOnboarding() {
   // Gender (step 2) is the first screen on a fresh launch. Welcome/Intro are
   // still in the steps array but skipped by default — start at 2 for everyone.
   // Flow simplified: gender is now step 0. Always start at 0.
-  const [step, setStep] = useState(draft?.step ?? 0)
+  const [step, setStep] = useState(() => normalizeOnboardingStep(draft?.step))
+  const activeStepRef = useRef(step)
+  activeStepRef.current = step
   const [dir, setDir] = useState(1)
   const [signingIn, setSigningIn] = useState(false)
 
@@ -3149,13 +3157,19 @@ export default function PremiumOnboarding() {
   }
 
   function goNext() {
+    // An outgoing screen's delayed/duplicate callback must not advance a new screen.
+    if (activeStepRef.current !== step) return
+    const next = nextOnboardingStep(step)
+    activeStepRef.current = next
     setDir(1)
-    setStep(s => s + 1)
+    setStep(next)
   }
   function goBack() {
-    if (step <= 0) return
+    if (step <= 0 || activeStepRef.current !== step) return
+    const previous = nextOnboardingStep(step, -1)
+    activeStepRef.current = previous
     setDir(-1)
-    setStep(s => s - 1)
+    setStep(previous)
   }
 
   // REMOVED: handleScanDone — moved to paywall flow
@@ -3255,8 +3269,6 @@ export default function PremiumOnboarding() {
     setHasOnboarded()
   }
 
-  // Flow: 0=gender, 1=referral, 2=auth, 3=notifications
-  const TOTAL_STEPS = 9
 
   // Apple sign-in handler used from both IntroSlides and StepAuth
   async function handleAppleSignInFromSlide() {

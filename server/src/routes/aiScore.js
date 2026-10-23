@@ -1,5 +1,8 @@
 const express = require('express')
-const Anthropic = require('@anthropic-ai/sdk')
+const { createAIClient, getAIKey, cacheNamespace } = require('../lib/aiProvider')
+const aiSchemas = require('../lib/aiSchemas')
+const coachScans = require('../lib/coachScanContext')
+const { EYE_GUIDANCE, GENERAL_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache } = require('../supabase')
@@ -28,7 +31,7 @@ function sampleB64(s) {
 
 function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
+    .update(cacheNamespace() + '||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -43,12 +46,13 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update(bodyB64 ?? 'skip')
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
-  h.update('||v3') // bump to bust Supabase cache — Rekognition path replaces Claude lookalike
+  h.update('||' + cacheNamespace())
+  h.update('||v4_eye_guidance') // bump to bust Supabase cache — Rekognition path replaces Claude lookalike
   return h.digest('hex') // 64-char hex string
 }
 
 function getClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return createAIClient()
 }
 
 // ── Concurrency queue ─────────────────────────────────────────────────────────
@@ -236,7 +240,8 @@ Include a "profile" object in your JSON response.` : ''
     "chin_projection": "<recessed|average|projected|prominent>"
   }` : ''
 
-  const response = await client.messages.create({
+  const response = await client.generate({
+    responseSchema: aiSchemas.core(hasSide), responseName: 'face_core',
     model: 'claude-sonnet-4-6',
     // extended_metrics (30 more {score, descriptor} pairs) moved to its own
     // call (getExtendedMetrics) — this budget only needs to cover the core
@@ -367,6 +372,12 @@ ${profileSection}${evidenceNote}
 VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
 KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
 
+${GENERAL_GUIDANCE}
+
+${EYE_GUIDANCE}
+
+For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
+
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
 
 Return ONLY this JSON — no markdown, nothing else:
@@ -432,13 +443,16 @@ async function getExtendedMetrics(faceBase64, faceMediaType, gender) {
   const client = getClient()
   const isFemale = gender === 'female'
 
-  const response = await client.messages.create({
+  const response = await client.generate({
+    responseSchema: aiSchemas.extended, responseName: 'face_extended',
     model: 'claude-sonnet-4-6',
     max_tokens: 1400,
     temperature: 0,
     system: `You are a facial structure analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 SCORE DISTRIBUTION — every score is 1.0–10.0, a bell curve across the general population: 5.0 = true average (most people), 3.0 = below average (common, not rare), 7.0 = above average (a real, achievable good score), 9.0 = genuinely exceptional (rare, top few percent). Use the full range — do not compress everyone into 6–8.
+
+${EYE_GUIDANCE}
 
 EXTENDED METRICS — a deeper, 30-metric breakdown across 5 categories. Each metric gets a score (1.0–10.0) and a one-line descriptor (max 10 words) of exactly what you observe. Keep descriptors neutral and observational — factual rather than evaluative or clinical. Describe the feature as it appears; avoid language that reads as a verdict or flaw ("drooping", "weak", "poor", "bad"). Scoring direction is consistent for every metric: 10.0 = the most aesthetically favorable outcome, 1.0 = the least (including the hair-loss and bloat metrics — e.g. norwood_stage: 10.0 = full undiminished hairline, 1.0 = advanced recession; bloat: 10.0 = no visible puffiness/water retention, 1.0 = heavy visible bloat).
 
@@ -625,7 +639,8 @@ async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', body
       }\nUse these as factual anchors for "proportions" and "posture" specifically — don't contradict them without a clear photographic reason (e.g. baggy clothing hiding true shoulder width). They don't determine leanness, frame, or overall_presentation, which stay purely visual.`
     : ''
 
-  const response = await client.messages.create({
+  const response = await client.generate({
+    responseSchema: aiSchemas.physique, responseName: 'physique',
     model: 'claude-sonnet-4-6',
     max_tokens: 600,
     temperature: 0,
@@ -763,11 +778,12 @@ function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null)
 // verifyToken accepts demo-token as a rate-limited guest (see claudeGate.js).
 // resolvePro sets req.isPro so scanLimit can skip the cap for Pro users.
 router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (req, res) => {
+  let completedScanId = null
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = getAIKey()
     if (!apiKey || apiKey.trim() === '') {
-      console.error(`[aiScore] POST /score — ANTHROPIC_API_KEY not configured — ${new Date().toISOString()}`)
-      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+      console.error(`[aiScore] POST /score — selected AI provider key not configured — ${new Date().toISOString()}`)
+      return res.status(500).json({ error: 'AI scoring unavailable — selected AI provider key not configured on server' })
     }
 
     const { faceImage, sideImage, bodyImage, gender = 'male', previousScore, bodyGeometry, sideProfileGeometry } = req.body
@@ -775,6 +791,8 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
+
+    completedScanId = coachScans.startScan(req.userId)
 
     // Detect actual media type BEFORE stripping the prefix
     const faceMediaType = getMediaType(faceImage)
@@ -791,12 +809,12 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     // ── L1: in-process memory cache ───────────────────────────────────────────
     // v2: suffix bumped to invalidate stale celebrity results from before the
     // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
-    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v3', sideBase64)
+    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v4_eye_guidance', sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       const cached = withPotentialScore(scoreCache.get(cacheKey))
       scoreCache.set(cacheKey, cached)
-      return res.json(cached)
+      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
@@ -809,7 +827,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
       const cached = withPotentialScore(sbCached)
       scoreCache.set(cacheKey, cached)
-      return res.json(cached)
+      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
@@ -1005,8 +1023,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       }
     }
 
-    res.json(result)
+    res.json(await coachScans.finishScan(completedScanId, req.userId, result))
   } catch (err) {
+    try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
     const status = err.status ?? err.statusCode ?? 0
     const msg    = err.message || ''
     const lower  = msg.toLowerCase()
@@ -1038,9 +1057,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
 // still makes one real Claude call.
 router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req, res) => {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = getAIKey()
     if (!apiKey || apiKey.trim() === '') {
-      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+      return res.status(500).json({ error: 'AI scoring unavailable — selected AI provider key not configured on server' })
     }
 
     const { bodyImage, gender = 'male', bodyGeometry, height, weight } = req.body
@@ -1091,9 +1110,9 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
 // /score/physique, since this is a single follow-up Claude call, not a scan.
 router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, async (req, res) => {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = getAIKey()
     if (!apiKey || apiKey.trim() === '') {
-      return res.status(500).json({ error: 'AI scoring unavailable — ANTHROPIC_API_KEY not configured on server' })
+      return res.status(500).json({ error: 'AI scoring unavailable — selected AI provider key not configured on server' })
     }
 
     const { faceImage, gender = 'male' } = req.body
@@ -1177,7 +1196,7 @@ router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, r
     return res.status(400).json({ error: 'physiqueScores object required' })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = getAIKey()
   if (!apiKey) return res.status(500).json({ error: 'AI unavailable', fallback: true })
 
   try {
@@ -1230,7 +1249,8 @@ Respond ONLY with valid JSON — no extra text:
 }`
 
     const raw = await withRetry(async () => {
-      const msg = await client.messages.create({
+      const msg = await client.generate({
+        responseSchema: aiSchemas.workout, responseName: 'workout_plan',
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2500,
         messages: [{ role: 'user', content: prompt }],
@@ -1264,8 +1284,8 @@ router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async
     return res.json({ valid: true, faceCount: 1, issues: [], localBypass: true })
   }
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-    console.error('[validate-scan] ANTHROPIC_API_KEY is not configured on the server')
+  if (!getAIKey()?.trim()) {
+    console.error('[validate-scan] selected AI provider key is not configured on the server')
     return res.status(503).json({
       error: 'The photo-checking service is unavailable. Your photo has not been rejected.',
       code: 'validation_not_configured',
@@ -1281,7 +1301,8 @@ router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async
 
   try {
     const client = getClient()
-    const response = await client.messages.create({
+    const response = await client.generate({
+      responseSchema: aiSchemas.validation, responseName: 'photo_validation',
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 256,
       messages: [{

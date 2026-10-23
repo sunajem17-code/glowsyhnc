@@ -17,6 +17,7 @@ const jwt = require('jsonwebtoken')
 const db  = require('../db')
 const { getSupabase, getUserById } = require('../supabase')
 const { createLimiter } = require('./ratelimit')
+const { hasLocalProPreview } = require('../utils/localProPreview')
 const { JWT_SECRET } = require('./auth') // single hardened source of truth
 
 // ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
@@ -97,7 +98,8 @@ async function scanLimit(req, res, next) {
 }
 
 // ── helper: resolve subscription tier ─────────────────────────────────────────
-async function getSubscriptionTier(userId) {
+async function getSubscriptionTier(userId, req) {
+  if (req && hasLocalProPreview(req)) return { tier: 'local_preview', isPro: true, trialExpires: null, source: 'local_preview' }
   // Try Supabase first (production primary store)
   const sbUser = await getUserById(userId)
   if (sbUser) {
@@ -131,7 +133,7 @@ async function requirePro(req, res, next) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   }
   try {
-    const { isPro } = await getSubscriptionTier(req.userId)
+    const { isPro, source } = await getSubscriptionTier(req.userId, req)
     if (isPro) {
       req.isPro = true
       return next()
@@ -147,8 +149,9 @@ async function requirePro(req, res, next) {
 async function resolvePro(req, res, next) {
   if (req.isDemo) { req.isPro = false; return next() }
   try {
-    const { isPro } = await getSubscriptionTier(req.userId)
+    const { isPro, source } = await getSubscriptionTier(req.userId, req)
     req.isPro = isPro
+    req.proSource = source || 'subscription'
   } catch (err) {
     console.error('[claudeGate] resolvePro error (non-fatal, defaulting to free):', err.message)
     req.isPro = false

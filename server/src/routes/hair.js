@@ -1,5 +1,5 @@
 const express = require('express')
-const Anthropic = require('@anthropic-ai/sdk')
+const { createAIClient, getAIKey } = require('../lib/aiProvider')
 const { verifyToken, claudeLimit } = require('../middleware/claudeGate')
 const { withRetry } = require('../utils/withRetry')
 
@@ -80,7 +80,7 @@ router.post('/recommend', verifyToken, claudeLimit, async (req, res) => {
     let candidates = eligibleStyles(profile)
     // Keep length and maintenance preferences even when fewer styles qualify.
     fallback = deterministicRecommendations(candidates, profile, measurements)
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = getAIKey()
     if (!apiKey) return res.json({ engine: 'deterministic_catalog_fallback_v1', scanId: profile.scanId, recommendations: fallback })
     const measurementMap = new Map(measurements.map(row => [row.id, row]))
     const candidateIds = new Set(candidates.map(style => style.id))
@@ -107,9 +107,9 @@ Rules:
 Schema:
 {"recommendations":[{"hairstyleId":"catalog_id","matchReasons":["short reason"],"relevantMeasurementIds":["measurement_id"],"compatibilityFactors":["hair feasibility factor"],"limitations":["limitation"]}]}`
 
-    const client = new Anthropic({ apiKey })
+    const client = createAIClient()
     const toolName = 'submit_hair_recommendations'
-    const message = await withRetry(() => client.messages.create({
+    const message = await withRetry(() => client.generate({
       model: 'claude-haiku-4-5', max_tokens: 4096, temperature: 0,
       messages: [{ role: 'user', content: prompt }],
       tools: [{

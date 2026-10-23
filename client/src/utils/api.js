@@ -175,6 +175,7 @@ export const api = {
     workoutPlan: (data) => request('/ai/workout-plan', { method: 'POST', body: JSON.stringify(data) }),
   },
   coach: {
+    context: () => request('/coach/context'),
     message: (data) => request('/coach/message', { method: 'POST', body: JSON.stringify(data) }),
   },
   hair: {

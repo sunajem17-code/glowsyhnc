@@ -4,14 +4,15 @@
 // Returns clean JSON — no images are sent to Claude.
 
 const express   = require('express')
-const Anthropic  = require('@anthropic-ai/sdk')
+const { createAIClient, getAIKey } = require('../lib/aiProvider')
+const aiSchemas = require('../lib/aiSchemas')
 const { verifyToken, requirePro, claudeLimit } = require('../middleware/claudeGate')
 const { MALE_TIERS: MALE_TIER_TABLE, FEMALE_TIERS: FEMALE_TIER_TABLE } = require('../lib/tier')
 
 const router = express.Router()
 
 function getClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return createAIClient()
 }
 
 // ── Utility: find the N lowest-scoring pillars ─────────────────────────────────
@@ -96,7 +97,8 @@ Rules:
     const model = 'claude-haiku-4-5'
     console.log('POTENTIAL: calling Claude with model:', model)
     console.log('POTENTIAL: prompt length:', prompt.length)
-    const message = await client.messages.create({
+    const message = await client.generate({
+      responseSchema: aiSchemas.potential, responseName: 'potential_feedback',
       model,
       max_tokens: 300,
       messages:   [{ role: 'user', content: prompt }],
@@ -144,9 +146,9 @@ Rules:
 router.post('/glow-up', verifyToken, requirePro, async (req, res) => {
   try {
     const openaiKey    = process.env.OPENAI_API_KEY
-    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    const analysisKey = getAIKey()
     if (!openaiKey)    return res.status(500).json({ error: 'OpenAI not configured' })
-    if (!anthropicKey) return res.status(500).json({ error: 'Anthropic not configured' })
+    if (!analysisKey) return res.status(500).json({ error: 'Selected AI provider is not configured' })
 
     const {
       faceImage,
@@ -192,7 +194,7 @@ Rules:
 - Output ONLY the prompt text, nothing else`
 
     console.log('[GlowUp] Step 1: Claude writing enhancement prompt...')
-    const claudeMsg = await anthropic.messages.create({
+    const claudeMsg = await anthropic.generate({
       model:      'claude-haiku-4-5',
       max_tokens: 200,
       messages: [{

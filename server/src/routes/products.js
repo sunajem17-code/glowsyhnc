@@ -1,7 +1,10 @@
 const express = require('express')
-const Anthropic = require('@anthropic-ai/sdk')
+const { createAIClient, getAIKey } = require('../lib/aiProvider')
+const aiSchemas = require('../lib/aiSchemas')
+const { EYE_GUIDANCE, GENERAL_GUIDANCE } = require('../lib/appearanceKnowledge')
+const { productWithLink, isAllowedCosmeticProduct } = require('../lib/affiliateRecommendations')
 const { authMiddleware } = require('../middleware/auth')
-const { verifyToken, resolvePro } = require('../middleware/claudeGate')
+const { verifyToken, resolvePro, claudeLimit } = require('../middleware/claudeGate')
 const db = require('../db')
 
 const router = express.Router()
@@ -16,7 +19,7 @@ const PRODUCTS = [
   { id: 'p5',  name: 'Differin Adapalene Gel 0.1%',             category: 'retinoid',   description: 'OTC retinoid clinically proven to clear acne and prevent new breakouts. Starts working at the follicle level.',                  searchQuery: 'Differin Adapalene Gel 0.1%',              tags: ['acne', 'texture', 'scarring'] },
   { id: 'p6',  name: 'La Roche-Posay Toleriane Double Repair',  category: 'moisturizer',description: 'Dual-action barrier repair with ceramides + niacinamide. Suitable for virtually every skin type including sensitive.',          searchQuery: 'La Roche-Posay Toleriane Double Repair',   tags: ['sensitive', 'dry', 'barrier', 'combination'] },
   { id: 'p7',  name: 'Timeless Vitamin C 20% Serum',            category: 'vitamin_c',  description: 'High-potency Vit C + E + Ferulic acid. Brightens tone, fades dark marks, and firms skin over 8–12 weeks.',                     searchQuery: 'Timeless Vitamin C 20% Serum',             tags: ['scarring', 'dullness', 'brightening', 'antiaging'] },
-  { id: 'p8',  name: 'CeraVe Eye Repair Cream',                 category: 'eye_cream',  description: 'Ceramide and hyaluronic acid formula for the under-eye area. Reduces puffiness and fades dark circles.',                       searchQuery: 'CeraVe Eye Repair Cream',                  tags: ['dark_circles', 'eyes'] },
+  { id: 'p8',  name: 'CeraVe Eye Repair Cream',                 category: 'eye_cream',  description: 'Eye-area moisturizer for dryness and surface hydration; does not change eye shape, orbital structure or replace lost volume.',                       searchQuery: 'CeraVe Eye Repair Cream',                  tags: ['dark_circles', 'eyes'] },
   { id: 'p9',  name: 'The Ordinary Retinol 0.5%',               category: 'retinol',    description: 'Entry-level retinoid for smoother texture and long-term collagen support. Build up from 2×/week.',                             searchQuery: 'The Ordinary Retinol 0.5%',                tags: ['antiaging', 'texture', 'scarring'] },
   { id: 'p10', name: 'Neutrogena Hydro Boost Water Gel',        category: 'moisturizer',description: 'Lightweight hyaluronic acid gel moisturizer. Delivers 8-hour hydration without clogging pores.',                              searchQuery: 'Neutrogena Hydro Boost Water Gel',         tags: ['dry', 'combination', 'hydration'] },
   { id: 'p11', name: 'American Crew Pomade',                    category: 'styling',    description: 'Medium hold, high shine pomade for defined, professional-looking styles. Water-soluble for easy wash-out.',                     searchQuery: 'American Crew Pomade',                     tags: ['grooming', 'hair_styling'] },
@@ -33,18 +36,21 @@ router.get('/recommended', authMiddleware, (req, res) => {
   let tags = ['daily']
   if (scan?.face_data) {
     try {
-      const faceData = JSON.parse(scan.face_data)
-      if (faceData.skinClarity < 6) tags.push('acne', 'oily')
-      if (faceData.eyeArea < 6)     tags.push('dark_circles', 'eyes')
-      if (faceData.facialHarmony < 7) tags.push('antiaging')
+      const saved = JSON.parse(scan.face_data)
+      const observations = saved.kind === 'server_analysis_v1' ? saved.result?.visualObservations || [] : []
+      if (observations.some(row => row.id === 'visible_acne')) tags.push('acne')
+      if (observations.some(row => row.id === 'visible_oiliness')) tags.push('oily')
+      // A low eye score alone does not establish dark circles or a product need.
+      if (observations.some(row => row.id === 'visible_dark_circles')) tags.push('eyes')
     } catch {}
   }
 
   const recommended = PRODUCTS
+    .filter(isAllowedCosmeticProduct)
     .filter(p => p.tags.some(t => tags.includes(t)))
     .slice(0, 6)
 
-  res.json({ products: recommended.length > 0 ? recommended : PRODUCTS.slice(0, 4) })
+  res.json({ products: (recommended.length > 0 ? recommended : PRODUCTS.slice(0, 4)).map(productWithLink) })
 })
 
 // ── AI-personalised recommendations ──────────────────────────────────────────
@@ -55,7 +61,7 @@ router.get('/recommended', authMiddleware, (req, res) => {
 // Calls Claude Haiku to generate 3–6 products tailored to the user's specific
 // weak areas. Falls back to the static database if the API is unavailable.
 // Uses verifyToken (accepts demo users) + resolvePro (sets req.isPro).
-router.post('/recommendations', verifyToken, resolvePro, async (req, res) => {
+router.post('/recommendations', verifyToken, resolvePro, claudeLimit, async (req, res) => {
   const {
     weaknesses   = [],
     skinIssues   = [],
@@ -78,10 +84,10 @@ router.post('/recommendations', verifyToken, resolvePro, async (req, res) => {
     : 'grooming unknown'
 
   // ── Try Haiku call ────────────────────────────────────────────────────────
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = getAIKey()
   if (apiKey) {
     try {
-      const client = new Anthropic({ apiKey })
+      const client = createAIClient()
 
       const prompt = `You are a product recommendation engine for a ${gender === 'female' ? "women's" : "men's"} appearance optimization app. Based on this user's AI scan results, recommend exactly 5 specific real products.
 
@@ -90,6 +96,12 @@ Skin issues detected: ${skinIssueList}
 Grooming quality: ${groomingTag}
 Low face pillars (under 6.5/10): ${lowPillars}
 Gender: ${gender}
+
+${GENERAL_GUIDANCE}
+
+${EYE_GUIDANCE}
+
+User-submitted weakness/issue text is self-reported context, not a diagnosis or a measured finding. Do not invent an eye condition from a low score. Do not recommend prescriptions, eye-area growth drugs, needling/injection devices, or products promising structural change. If no supported issue calls for a product, describe optional basic maintenance instead of a claimed defect or cure. The server adds the Amazon affiliate URLs; do not invent URLs or ASINs.
 
 Return ONLY a valid JSON array with exactly 5 objects, no markdown, no explanation:
 [
@@ -104,10 +116,11 @@ Rules:
 - Use ONLY real, purchasable products from known brands (CeraVe, The Ordinary, Paula's Choice, Neutrogena, Differin, EltaMD, La Roche-Posay, Cetaphil, Jack Black, American Crew, etc.)
 - Each product must directly address one of the user's detected weak areas
 - Cover a mix of: skincare first (if skin issues), then grooming/haircare
-- description must reference the detected issue it solves
+- description must state a realistic purpose and limitations, grounded in a supported concern or optional basic maintenance; never claim every dark circle or hollow has a cream solution
 - searchQuery must be specific enough to find the right product on Amazon`
 
-      const message = await client.messages.create({
+      const message = await client.generate({
+        responseSchema: aiSchemas.products, responseName: 'product_recommendations',
         model:      'claude-haiku-4-5',
         max_tokens: 900,
         messages:   [{ role: 'user', content: prompt }],
@@ -121,7 +134,7 @@ Rules:
         const products = JSON.parse(jsonMatch[0])
         if (Array.isArray(products) && products.length > 0) {
           console.log('[products] Haiku generated', products.length, 'recommendations')
-          return res.json({ products, source: 'ai' })
+          return res.json({ products: products.map(productWithLink), source: 'ai' })
         }
       }
       console.warn('[products] Haiku response could not be parsed as JSON array — falling back')
@@ -134,18 +147,17 @@ Rules:
   const allTags = [
     ...skinIssues,
     groomingScore != null && Number(groomingScore) < 6.5 ? 'grooming' : null,
-    pillars?.harmony   != null && Number(pillars.harmony)   < 6.5 ? 'antiaging'  : null,
-    pillars?.features  != null && Number(pillars.features)  < 6.5 ? 'texture'    : null,
     'daily',
   ].filter(Boolean)
 
   const fallback = PRODUCTS
+    .filter(isAllowedCosmeticProduct)
     .filter(p => p.tags.some(t => allTags.includes(t)))
     .slice(0, 5)
     .map(({ id, tags: _t, ...p }) => p)
 
   res.json({
-    products: fallback.length >= 2 ? fallback : PRODUCTS.slice(0, 5).map(({ id, tags: _t, ...p }) => p),
+    products: (fallback.length >= 2 ? fallback : ['p1', 'p6', 'p4', 'p11', 'p15'].map(id => PRODUCTS.find(product => product.id === id)).map(({ id, tags: _t, ...p }) => p)).map(productWithLink),
     source: 'fallback',
   })
 })

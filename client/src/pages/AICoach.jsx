@@ -17,22 +17,10 @@ const STARTER_PROMPTS = [
 ]
 
 const DEMO_TEASER = [
-  { role: 'assistant', content: "Your scan is loaded. Your biggest growth opportunity is jawline definition. Targeting this is your fastest path to 7+.", locked: false },
+  { role: 'assistant', content: "Adonis can explain your completed scan and help you choose practical next steps.", locked: false },
   { role: 'user', content: 'What should I do about it?', locked: false },
   { role: 'assistant', content: 'Unlock AI Coach to get your personalized jawline protocol and full improvement plan.', locked: true },
 ]
-
-function buildScanContext(latestScan, userProfile) {
-  if (!latestScan) return null
-  return {
-    glowScore: latestScan.glowScore,
-    faceScore: latestScan.faceScore,
-    presentationScore: latestScan.presentationScore,
-    faceData: latestScan.faceData,
-    presentationData: latestScan.presentationData,
-    userProfile,
-  }
-}
 
 function TypingIndicator() {
   return (
@@ -141,9 +129,16 @@ const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
-  const { scans, isPremium, userProfile } = useStore()
+  const { scans, isPremium, userProfile, user } = useStore()
+  // Preserve the existing premium-only chat entry behavior.
+  const freeCoachLocked = !isPremium
+  const freeMessagesLeft = 0
   const latestScan = scans[0]
-  const scanContext = buildScanContext(latestScan, userProfile)
+  const [serverScan, setServerScan] = useState(null)
+  const hasScan = !!latestScan || !!serverScan?.hasCompletedScan
+  const conversationRef = useRef(null)
+  const requestGenerationRef = useRef(0)
+  const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -153,6 +148,33 @@ export default function AICoach() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Server decides which completed scan belongs to this user. Local scan state
+  // is used only for availability/navigation, never as trusted model context.
+  useEffect(() => {
+    let active = true
+    requestGenerationRef.current += 1
+    setLoading(false)
+    setError('')
+    setMessagesOwner(user?.id ?? null)
+    setServerScan(null)
+    setMessages([])
+    conversationRef.current = null
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
+      if (saved?.conversationId && Array.isArray(saved.messages)) {
+        conversationRef.current = saved.conversationId
+        setMessages(saved.messages.slice(-12))
+      }
+    } catch { /* private browsing/storage unavailable */ }
+    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {})
+    return () => { active = false; requestGenerationRef.current += 1 }
+  }, [user?.id, latestScan?.id])
+
+  useEffect(() => {
+    if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
+    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+  }, [messages, user?.id, messagesOwner])
+
   // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -160,19 +182,19 @@ export default function AICoach() {
 
   // Initial greeting on mount
   useEffect(() => {
-    if (messages.length > 0 || !latestScan || !isPremium) return
+    if (messages.length > 0 || !hasScan || !isPremium) return
     const pending = useStore.getState().upgradeWelcomePending
     setMessages([{ role: 'assistant', content: pending ? UPGRADE_WELCOME : `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
     if (pending) useStore.getState().setUpgradeWelcomePending(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPremium, latestScan])
+  }, [isPremium, hasScan])
 
   async function sendMessage(text) {
     const msgText = (text || input).trim()
     if (!msgText || loading) return
 
     // No scan → redirect to scan
-    if (!latestScan) { navigate('/scan'); return }
+    if (!hasScan) { navigate('/scan'); return }
 
     // Not premium → open paywall immediately
     if (!isPremium) { navigate('/unlock?paywall=1'); return }
@@ -180,8 +202,7 @@ export default function AICoach() {
     setInput('')
     setError('')
 
-    // Increment free usage counter before sending
-    if (!isPremium) incrementFreeCoachMessages()
+    const generation = requestGenerationRef.current
 
     const userMsg = { role: 'user', content: msgText }
     const nextMessages = [...messages, userMsg]
@@ -191,9 +212,12 @@ export default function AICoach() {
 
     try {
       const data = await api.coach.message({
-        messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
-        scanContext,
+        messages: [{ role: 'user', content: msgText }],
+        conversationId: conversationRef.current,
+        preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
+      if (generation !== requestGenerationRef.current) return
+      conversationRef.current = data.conversationId
       const aiMsg = { role: 'assistant', content: data.message }
       setMessages(prev => {
         const updated = [...prev, aiMsg]
@@ -201,8 +225,10 @@ export default function AICoach() {
         return updated
       })
     } catch (err) {
+      if (generation !== requestGenerationRef.current) return
       setError(err.message || "Couldn’t connect just now. Please try again.")
     } finally {
+      if (generation !== requestGenerationRef.current) return
       setLoading(false)
       inputRef.current?.focus()
     }
@@ -243,7 +269,7 @@ export default function AICoach() {
               </span>
             </div>
             <p className="font-body text-[11px] text-secondary">
-              {!latestScan
+              {!hasScan
                 ? 'Scan Your Face To Unlock'
                 : isPremium
                   ? 'Your pal. Your coach. In your corner.'
@@ -255,9 +281,14 @@ export default function AICoach() {
           <button
             onClick={() => {
               triggerHaptic()
-              if (latestScan) {
+              requestGenerationRef.current += 1
+              setLoading(false)
+              setError('')
+              conversationRef.current = null
+              try { sessionStorage.removeItem(`adonis-chat:${user?.id}`) } catch {}
+              if (hasScan) {
                 const greeting = isPremium
-                  ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything. I'll tell you exactly what to work on.`
+                  ? 'Your completed scan is available. Ask me what it found or what to work on.'
                   : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
                 setMessages([{ role: 'assistant', content: greeting }])
               } else {
@@ -381,7 +412,7 @@ export default function AICoach() {
       </div>
 
       {/* Input bar — disabled state if no scan */}
-      {!latestScan ? (
+      {!hasScan ? (
         <div className="px-4 pb-8 pt-3 flex-shrink-0">
           <button
             onClick={() => { triggerHaptic(); navigate('/scan') }}

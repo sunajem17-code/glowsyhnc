@@ -14,17 +14,6 @@ const STARTER_PROMPTS = [
   'What should I fix first to attract more?',
 ]
 
-function buildScanContext(scan, userProfile) {
-  if (!scan) return null
-  return {
-    glowScore: scan.glowScore,
-    faceScore: scan.faceScore,
-    presentationScore: scan.presentationScore,
-    faceData: scan.faceData,
-    userProfile,
-  }
-}
-
 function TypingIndicator() {
   const reduceMotion = useReducedMotion()
   return (
@@ -128,9 +117,12 @@ function MessageBubble({ msg }) {
 }
 
 export default function Progress() {
-  const { scans, userProfile } = useStore()
+  const { scans, userProfile, user } = useStore()
   const latestScan = scans?.[0] ?? null
-  const scanContext = buildScanContext(latestScan, userProfile)
+  const [serverScan, setServerScan] = useState(null)
+  const conversationRef = useRef(null)
+  const requestGenerationRef = useRef(0)
+  const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
   const [showTypewriter, setShowTypewriter] = useState(true)
@@ -141,16 +133,43 @@ export default function Progress() {
   const inputRef = useRef(null)
 
   useEffect(() => {
+    let active = true
+    requestGenerationRef.current += 1
+    setLoading(false)
+    setMessagesOwner(user?.id ?? null)
+    setMessages([])
+    setServerScan(null)
+    conversationRef.current = null
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
+      if (saved?.conversationId && Array.isArray(saved.messages)) {
+        conversationRef.current = saved.conversationId
+        setMessages(saved.messages.slice(-12))
+      }
+    } catch {}
+    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {
+      if (active) setServerScan({ status: 'unavailable' })
+    })
+    return () => { active = false; requestGenerationRef.current += 1 }
+  }, [user?.id, latestScan?.id])
+
+  useEffect(() => {
+    if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
+    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+  }, [messages, user?.id, messagesOwner])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, showTypewriter])
 
   async function send(text) {
     const txt = (text || input).trim()
-    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan), loading })
+    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
     if (sendState === 'ignore') return
 
     setInput('')
     setChipsVisible(false)
+    const generation = requestGenerationRef.current
 
     if (sendState === 'needs-scan') {
       setShowTypewriter(false)
@@ -159,6 +178,7 @@ export default function Progress() {
       setLoading(true)
       const requestStartedAt = Date.now()
       await waitForMinimumCoachThinking(requestStartedAt)
+      if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, assistantMessage])
       setLoading(false)
       inputRef.current?.focus()
@@ -171,17 +191,22 @@ export default function Progress() {
     const requestStartedAt = Date.now()
     try {
       const data = await api.coach.message({
-        messages: next.map(m => ({ role: m.role, content: m.content })),
-        scanContext,
+        messages: [{ role: 'user', content: txt }],
+        conversationId: conversationRef.current,
+        preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
       await waitForMinimumCoachThinking(requestStartedAt)
+      if (generation !== requestGenerationRef.current) return
+      conversationRef.current = data.conversationId
       setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
     } catch (err) {
+      if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: err.message || 'Something went wrong. Try again.',
       }])
     } finally {
+      if (generation !== requestGenerationRef.current) return
       setLoading(false)
       inputRef.current?.focus()
     }

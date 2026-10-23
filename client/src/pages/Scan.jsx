@@ -13,9 +13,9 @@ import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/side-profile-guide.png'
-import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
+import sideProfileGuideFemale from '../assets/female-side-cutout.png'
 import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
-import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
+import faceGuidePhotoFemale from '../assets/female-front-cutout.png'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { CameraPreview } from '@capacitor-community/camera-preview'
@@ -2321,6 +2321,7 @@ export default function Scan() {
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
+        serverScanId:   aiResult.scanId ?? null,
         scanDate:       new Date().toISOString(),
         analyzedAt:     new Date().toISOString(),
         facePhotoUrl:   faceB64,
@@ -2441,13 +2442,14 @@ export default function Scan() {
             const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
             const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
             const uploadResult = await (earlyFaceUpload || api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' }))
-            faceImageUrl = uploadResult?.path || null
+            faceImageUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.path || null
           } catch (err) {
             console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
           }
         }
 
         api.supabase.saveScan({
+          scanId:           aiResult.scanId,
           overallScore:     aiResult.overallScore,
           tier:             aiResult.tier,
           faceScore:        aiResult.faceScore,
@@ -2637,34 +2639,36 @@ export default function Scan() {
           {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
             <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6" style={{ overflow: 'visible' }}>
               {step === 1 ? (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
                     alt="Guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
-                      transform: 'scale(1.05) translateY(16px)',
+                      transform: gender === 'female' ? 'scale(1.15)' : 'scale(1.05) translateY(16px)',
+                      objectFit: gender === 'female' ? 'contain' : undefined,
                       transformOrigin: 'center bottom',
                       objectPosition: 'center bottom',
                       position: 'relative',
                       zIndex: 5,
-                      mixBlendMode: 'lighten',
+                      mixBlendMode: gender === 'female' ? 'normal' : 'lighten',
                     }}
                   />
                 </div>
               ) : (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
                     alt="Guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
-                      transform: 'scale(1.1) translateY(34px)',
+                      transform: gender === 'female' ? 'scale(1.15)' : 'scale(1.1) translateY(34px)',
+                      objectFit: gender === 'female' ? 'contain' : undefined,
                       transformOrigin: 'center bottom',
                       objectPosition: 'center bottom',
                       position: 'relative',
                       zIndex: 5,
-                      mixBlendMode: 'lighten',
+                      mixBlendMode: gender === 'female' ? 'normal' : 'lighten',
                     }}
                   />
                 </div>
