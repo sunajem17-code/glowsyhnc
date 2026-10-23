@@ -1,4 +1,5 @@
 import { analyzeLandmarkEvidence, buildProfileEvidence } from './evidenceAnalysis.js'
+import { withDeadline } from './requestTimeout.js'
 
 function imageDimensions(source) {
   return new Promise((resolve, reject) => {
@@ -64,8 +65,7 @@ export async function requestProductionAnalysis({
     ...(previousScore != null ? { previousScore } : {}),
   }
   const scoreCall = apiClient.ai.score(payload)
-  const timeoutCall = new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs))
-  const result = await Promise.race([scoreCall, timeoutCall])
+  const result = await withDeadline(scoreCall, timeoutMs, 'Analysis timed out. Please try again')
   return {
     ...result,
     analysisEvidence: {

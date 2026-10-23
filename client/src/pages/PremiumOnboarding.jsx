@@ -2494,8 +2494,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       setSlowAnalysis(false)
       const frontDetection = await frontLandmarksPromise
       if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
-      const detectedSidePoints = sideB64 ? await sideLandmarksPromise : null
-      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      // Only native detection supplies measured profile geometry. Web mesh
+      // anchors are optional and must not block analysis of the actual photo.
+      if (sideB64 && Capacitor.isNativePlatform()) await sideLandmarksPromise
       const sideProfileGeometry = sideProfileGeometryResult?.detected
         ? { facialConvexityDegrees: sideProfileGeometryResult.facialConvexityDegrees ?? null }
         : null

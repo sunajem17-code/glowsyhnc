@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { withDeadline } from './requestTimeout.js'
 
 // Lazily registered — registerPlugin is a no-op on web and defers resolution
 // until the native layer is ready, so it's safe to call at module load time.
@@ -24,7 +25,11 @@ const PhotoGeometryPlugin = registerPlugin('PhotoGeometryPlugin')
 export async function analyzeSideProfile(imageDataUrl) {
   if (!imageDataUrl) return { supported: false }
   try {
-    const result = await PhotoGeometryPlugin.analyzeSideProfile({ imageData: imageDataUrl })
+    const result = await withDeadline(
+      PhotoGeometryPlugin.analyzeSideProfile({ imageData: imageDataUrl }),
+      10_000,
+      'Optional profile geometry timed out',
+    )
     return result
   } catch (err) {
     console.warn('[PhotoGeometry] analyzeSideProfile native call failed (non-fatal):', err?.message ?? err)

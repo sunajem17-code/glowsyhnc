@@ -146,6 +146,7 @@ function SideGuide({ size = 'normal', gender }) {
         display: 'block',
         margin: '0 auto',
         opacity: 0.4,
+        transform: gender === 'female' ? 'scaleX(-1)' : undefined,
         borderRadius: 16,
       }}
     />
@@ -749,7 +750,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
               </div>
             </>
           ) : (
-            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" style={{ transform: gender === 'female' && photoType === 'side' ? 'scaleX(-1)' : undefined }} />
           )}
         </div>
 
@@ -830,7 +831,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center top', transform: 'scale(1.2)', transformOrigin: 'center top' }}
+            style={{ objectFit: 'cover', objectPosition: 'center top', transform: gender === 'female' ? 'scale(1.2) scaleX(-1)' : 'scale(1.2)', transformOrigin: 'center top' }}
           />
         ) : stepNum === 1 ? (
           // object-fit: cover + object-position: bottom (not contain) — this
@@ -2207,11 +2208,10 @@ export default function Scan() {
       }
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
-      let sideLandmarksPromise = Promise.resolve(null)
       if (sideB64 && !isNative()) {
         // FaceMesh uses one shared instance: wait for the front photo before
         // asking it to inspect the side photo for visual callout anchors.
-        sideLandmarksPromise = frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+        frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
           .then(({ getLandmarks }) => getLandmarks(sideB64))
           .then(lm => {
             setSideAnalysisLandmarks(lm)
@@ -2242,8 +2242,9 @@ export default function Scan() {
         : null
       const frontDetection = await frontLandmarksPromise
       if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
-      const detectedSidePoints = sideB64 ? (isNative() ? nativeSidePoints : await sideLandmarksPromise) : null
-      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      // FaceMesh is a front-face model and may not map a true side profile.
+      // Profile anchors are optional decoration, not an analysis prerequisite.
+      // Send the actual side image to the AI; unavailable geometry stays null.
       const analysisEvidence = await buildProductionEvidence({
         frontImage: faceB64,
         frontLandmarks: frontDetection.landmarks,
@@ -2662,7 +2663,7 @@ export default function Scan() {
                     alt="Guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
-                      transform: gender === 'female' ? 'scale(1.15)' : 'scale(1.1) translateY(34px)',
+                      transform: gender === 'female' ? 'scale(1.15) scaleX(-1)' : 'scale(1.1) translateY(34px)',
                       objectFit: gender === 'female' ? 'contain' : undefined,
                       transformOrigin: 'center bottom',
                       objectPosition: 'center bottom',
@@ -2934,7 +2935,12 @@ export default function Scan() {
                 setCameraOpen(true)
               }}
               className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+              style={{
+                background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+                // Match the portrait width without clipping the button corners at the page edges.
+                width: gender === 'female' && step === 1 ? 'min(115%, calc(100% + 48px))' : undefined,
+                marginLeft: gender === 'female' && step === 1 ? 'max(-7.5%, -24px)' : undefined,
+              }}
             >
               Begin Scan
             </motion.button>
