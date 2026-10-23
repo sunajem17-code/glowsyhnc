@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { assessImageSuitability } = require('./appearanceAssessment')
+const { assessImageSuitability, validate, DIMENSIONS } = require('./appearanceAssessment')
 
 const validSuitability = JSON.stringify({
   status: 'assessable',
@@ -34,4 +34,30 @@ test('fails closed when both suitability responses have an invalid status', asyn
   )
 
   assert.equal(calls, 2)
+})
+
+test('keeps a validated score range when the model omits the optional written explanation', () => {
+  const raw = {
+    confidence: 'moderate',
+    scoreRange: { min: 3.8, max: 4.2 },
+    scoreExplanation: null,
+    dimensions: Object.fromEntries(DIMENSIONS.map(key => [key, {
+      status: 'broadly_average',
+      evidenceLevel: 'ordinary',
+      observation: 'Visible features appear broadly typical in this image.',
+    }])),
+    strengths: [],
+    limitations: [],
+    suggestions: [],
+    unassessableDetails: [],
+  }
+
+  const result = validate(raw, {
+    assessmentProfile: 'male',
+    imageSuitability: { status: 'assessable' },
+    knownMinor: false,
+  })
+
+  assert.deepEqual(result.scoreRange, { min: 3.8, max: 4.2 })
+  assert.match(result.scoreExplanation, /written explanation could not be generated/i)
 })

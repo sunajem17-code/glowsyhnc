@@ -127,7 +127,11 @@ function validate(raw, context) {
     result.withheldReason = 'insufficient_feature_evidence'
   }
   if (!result.scoreRange && !result.withheldReason) result.withheldReason = 'not_assessable'
-  result.scoreExplanation = result.scoreRange ? text(raw.scoreExplanation, 'score explanation') : null
+  result.scoreExplanation = result.scoreRange
+    ? (typeof raw.scoreExplanation === 'string' && raw.scoreExplanation.trim() && raw.scoreExplanation.length <= 1200
+      ? raw.scoreExplanation.trim()
+      : 'The score range is available, but its written explanation could not be generated for this scan.')
+    : null
   if (result.scoreRange && Object.values(result.scoreRange).some(value => Math.abs(value * 10 - Math.round(value * 10)) > 1e-8)) fail('Unsupported score precision')
   result.ratingEvidence = evidenceForRange(result.scoreRange, dimensions)
   result.tiers = tiers(result.scoreRange, result.assessmentProfile)
