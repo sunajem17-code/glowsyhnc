@@ -164,6 +164,16 @@ const QUALITY_PROMPT = `${BASE_INSTRUCTIONS}
 Check image suitability BEFORE attractiveness assessment. Do not score. Inspect lighting, head angle, obstruction, filters and camera distortion. Return:
 {"status":"assessable|limited|insufficient","checks":{"lighting":{"status":"clear|limited|unassessable","observation":"specific visible evidence"},"headAngle":{"status":"clear|limited|unassessable","observation":"evidence"},"obstruction":{"status":"clear|limited|unassessable","observation":"evidence"},"filters":{"status":"clear|limited|unassessable","observation":"evidence, acknowledge uncertainty"},"cameraDistortion":{"status":"clear|limited|unassessable","observation":"evidence"}},"limitations":[],"guidance":[],"profileUsable":false}
 Insufficient means no usable face or too much uncertainty for a responsible assessment; include specific limitations and up to three photo retake suggestions. Limited images must name limitations. Only mark profileUsable true for a usable actual side-profile image supplied separately. Never guess a profile from a front view.`
+async function assessImageSuitability({ callModel, faceImage, sideImage }) {
+ const input = { faceImage, sideImage }
+ try {
+   return suitability(parse(await callModel(QUALITY_PROMPT, input)))
+ } catch (error) {
+   if (!(error instanceof AssessmentError) || error.message !== 'Invalid image suitability') throw error
+   const retryPrompt = `${QUALITY_PROMPT}\nYour previous response did not match the required JSON schema. Return only one complete JSON object matching the schema above. The top-level status is required and must be exactly assessable, limited, or insufficient. Do not omit fields or add markdown.`
+   return suitability(parse(await callModel(retryPrompt, input)))
+ }
+}
 function assessmentPrompt(knownMinor) {
  return `${BASE_INSTRUCTIONS}
 ${knownMinor ? 'The subject is known to be under 18. Give only neutral grooming and presentation suggestions. Return scoreRange:null, confidence:"low", all dimensions unassessable; no attractiveness rankings, strengths or limitations.' : `Use the PSL-style 0–8 scale below, not the previous 0–10 scale. Four is the average reference; 4.5 is above average, 5 attractive, 5.5 very attractive, 6 the start of model tier, 6.5 exceptional model tier, 7 elite model tier and 7.5+ the near-ideal reference band. Eight is a theoretical endpoint; never describe a person as perfect or claim a rarity percentile. The 3.5–4.5 interval is the average reference band, not a required population quota. These anchors are subjective product conventions from the supplied guide, not an empirically validated distribution. Never convert a previous score by multiplying, subtracting, or preserving its old tier. Evaluate the photographs afresh.
@@ -191,7 +201,7 @@ function parse(raw) {
  try { return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')) } catch { fail('Malformed model JSON') }
 }
 async function runAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor = false, presentationGoals = '' }) {
- const imageSuitability = suitability(parse(await callModel(QUALITY_PROMPT, { faceImage, sideImage })))
+ const imageSuitability = await assessImageSuitability({ callModel, faceImage, sideImage })
  if (!sideImage) imageSuitability.profileUsable = false
  if (imageSuitability.status === 'insufficient') return withheld(imageSuitability, assessmentProfile, 'insufficient_image')
  const raw = parse(await callModel(assessmentPrompt(knownMinor), { faceImage, sideImage: imageSuitability.profileUsable ? sideImage : null, quality: imageSuitability }))
@@ -215,4 +225,4 @@ async function runAssessment({ callModel, faceImage, sideImage, assessmentProfil
 
  return result
 }
-module.exports = { evidenceForRange, umaxPresentation, PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, validate, withheld, parse, runAssessment }
+module.exports = { evidenceForRange, umaxPresentation, PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, assessImageSuitability, validate, withheld, parse, runAssessment }
