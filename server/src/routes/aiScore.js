@@ -2,6 +2,7 @@ const express = require('express')
 const Anthropic = require('@anthropic-ai/sdk')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const assessment = require('../lib/appearanceAssessment')
+const { assessmentFailureDetails } = require('../utils/assessmentFailure')
 
 
 const router = express.Router()
@@ -240,10 +241,13 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       hasSideProfile: result.imageSuitability.profileUsable, extendedMetricsStatus: 'unsupported_removed',
       scoreClassification: { overall: 'subjective_appearance_range', empiricalCalibration: 'not_validated' } })
   } catch (err) {
-    console.error('[appearance-assessment]', err.code || err.status || 'analysis_failed')
+    // AssessmentError messages are fixed validator reasons; never log images or model output.
+    const failure = assessmentFailureDetails(err)
+    console.error('[appearance-assessment]', JSON.stringify(failure))
     res.status(err.code === 'invalid_assessment' ? 502 : 503).json({
       error: 'The photographs could not be assessed reliably. No score was generated. Please try again with clear photographs.',
-      errorCode: err.code === 'invalid_assessment' ? 'invalid_assessment' : 'assessment_failed' })
+      errorCode: failure.errorCode,
+      ...(failure.reason ? { diagnosticReason: failure.reason } : {}) })
   } finally { releaseSlot() }
 })
 

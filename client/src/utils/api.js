@@ -2,6 +2,7 @@ import useStore from '../store/useStore'
 import { getRequestTimeoutMs } from './requestTimeout'
 
 import { API_BASE as BASE } from './backend'
+import { apiErrorMessage } from './apiError'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -71,9 +72,9 @@ async function request(path, options = {}) {
     }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
-    // 502/504 are proxy/gateway errors that return HTML — bail early.
-    // 503 from our own API returns JSON (rate-limit payload) — let it fall through.
-    if (contentType.includes('text/html') || res.status === 502 || res.status === 504) {
+    // Gateway HTML and 504s are unavailable; our assessment route uses JSON 502s
+    // for validation failures and includes a safe diagnostic reason.
+    if (contentType.includes('text/html') || res.status === 504) {
       console.error(`[api] gateway-level failure for ${options.method || 'GET'} ${path}: HTTP ${res.status}, content-type=${contentType}`)
       throw new Error('Server unavailable')
     }
@@ -105,9 +106,10 @@ async function request(path, options = {}) {
       throw new Error(friendlyError(errBody.error, 'Invalid email or password'))
     }
     // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
-    const err = new Error(friendlyError(errBody.error, `Something went wrong (${res.status})`))
+    const err = new Error(apiErrorMessage(errBody) || friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status     = res.status
     err.errorCode = errBody.errorCode || errBody.code || errBody.error
+    if (typeof errBody.diagnosticReason === 'string') err.diagnosticReason = errBody.diagnosticReason
     if (errBody.retryAfter) err.retryAfter = errBody.retryAfter
     if (errBody.plan)       err.plan       = errBody.plan
     throw err
