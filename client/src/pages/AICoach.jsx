@@ -1,3 +1,4 @@
+import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -52,22 +53,6 @@ function TypingIndicator() {
 }
 
 // Renders coach responses with bold headers and line breaks
-function formatMessage(content) {
-  const lines = content.split('\n')
-  return lines.map((line, i) => {
-    if (!line.trim()) return <div key={i} style={{ height: 6 }} />
-    // **bold** or __bold__
-    const parts = line.split(/(\*\*[^*]+\*\*|__[^_]+__)/g)
-    const rendered = parts.map((part, j) => {
-      if (/^\*\*[^*]+\*\*$/.test(part) || /^__[^_]+__$/.test(part)) {
-        const text = part.replace(/^\*\*|\*\*$|^__|__$/g, '')
-        return <span key={j} className="font-heading font-bold" style={{ color: 'rgba(255,255,255,0.95)' }}>{text}</span>
-      }
-      return <span key={j}>{part}</span>
-    })
-    return <div key={i} className="leading-snug mb-1.5">{rendered}</div>
-  })
-}
 
 function MessageBubble({ msg, isNew }) {
   const isUser = msg.role === 'user'
@@ -87,7 +72,7 @@ function MessageBubble({ msg, isNew }) {
         </div>
       )}
       <div
-        className={`px-4 py-3 rounded-2xl max-w-[78%] relative ${msg.locked ? 'select-none' : ''}`}
+        className={`px-4 py-3 rounded-2xl ${isUser ? 'max-w-[78%]' : 'max-w-[90%]'} min-w-0 relative ${msg.locked ? 'select-none' : ''}`}
         style={isUser ? {
           background: `linear-gradient(135deg, ${GOLD}22 0%, ${GOLD}14 100%)`,
           border: `1px solid ${GOLD}30`,
@@ -118,7 +103,7 @@ function MessageBubble({ msg, isNew }) {
             filter: msg.locked ? 'blur(3px)' : 'none',
           }}
         >
-          {isUser ? msg.content : formatMessage(msg.content)}
+          {isUser ? msg.content : <CoachMessage content={msg.content} reveal={msg.reveal === true} />}
         </div>
       </div>
     </motion.div>
@@ -163,7 +148,7 @@ export default function AICoach() {
       const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
       if (saved?.conversationId && Array.isArray(saved.messages)) {
         conversationRef.current = saved.conversationId
-        setMessages(saved.messages.slice(-12))
+        setMessages(saved.messages.slice(-12).map(message => ({ ...message, reveal: false })))
       }
     } catch { /* private browsing/storage unavailable */ }
     api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {})
@@ -177,7 +162,13 @@ export default function AICoach() {
 
   // Scroll to bottom on new message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesEndRef.current?.closest('[data-coach-scroll]')
+    if (container) {
+      container.scrollTop = container.scrollHeight
+      // Hidden app-shell ancestors must never scroll with a chat reply.
+      const shell = container.closest('main')
+      if (shell) shell.scrollTop = 0
+    }
   }, [messages, loading])
 
   // Initial greeting on mount
@@ -218,7 +209,7 @@ export default function AICoach() {
       })
       if (generation !== requestGenerationRef.current) return
       conversationRef.current = data.conversationId
-      const aiMsg = { role: 'assistant', content: data.message }
+      const aiMsg = { role: 'assistant', content: data.message, reveal: true }
       setMessages(prev => {
         const updated = [...prev, aiMsg]
         setNewMsgIdx(updated.length - 1)
@@ -304,7 +295,7 @@ export default function AICoach() {
       </motion.div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
+      <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
         {/* Citations / Medical Disclaimer */}
         <motion.div
           initial={{ opacity: 0, y: -4 }}

@@ -74,6 +74,7 @@ function normalize(row) {
     notAssessable: clean(result?.evidenceSummary?.notAssessable),
     measurementLimitations: clean(result?.evidenceSummary?.limitations),
     observations: clean(result?.visualObservations), faceMetrics: clean(result?.faceMetrics),
+    appearanceAnalysis: clean(result?.appearanceAnalysis),
     strengths: clean(result?.keyStrengths), improvements: clean(result?.keyWeaknesses),
     recommendation: clean(result?.topImprovement),
     hairType: clean(result?.hairType ?? row.hair_type_detected),

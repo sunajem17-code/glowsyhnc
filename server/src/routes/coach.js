@@ -6,7 +6,7 @@ const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
-const { loadContext, clean } = require('../lib/coachScanContext')
+const { loadContext, clean, ownedResult, normalize } = require('../lib/coachScanContext')
 const { answer } = require('../lib/coachIntelligence')
 
 router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) => {
@@ -15,6 +15,18 @@ router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) =>
     const context = await loadContext(req.userId)
     res.json({ access: req.proSource || 'subscription', isPro: req.isPro, status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
   } catch { res.status(503).json({ error: 'Saved scan context is temporarily unavailable. Please retry.' }) }
+})
+
+// On-demand enrichment of an owned completed scan; never delays capture/scoring.
+router.post('/appearance', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  if (req.isDemo) return res.status(403).json({ error: 'Sign in to analyze your saved scan.' })
+  if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return res.status(400).json({ error: 'A saved scan ID is required.' })
+  try {
+    const { getBreakdown } = require('../lib/appearanceBreakdown')
+    res.json({ analysis: await getBreakdown(req.userId, req.body.scanId) })
+  } catch (err) {
+    res.status([404, 422].includes(err.status) ? err.status : 503).json({ error: [404, 422].includes(err.status) ? err.message : 'Your appearance analysis could not be completed. Please retry. Your scan is safe.' })
+  }
 })
 
 // POST /api/coach/message
@@ -48,6 +60,14 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     // The last user message is new input; prior assistant turns come only from
     // this user's bounded server session, not client-forged conversation data.
     const context = await loadContext(req.userId)
+    if (typeof req.body.scanId === 'string') {
+      const selected = ownedResult(req.body.scanId, req.userId)
+      if (!selected) return res.status(404).json({ error: 'The selected scan is unavailable. Return to your results and retry.' })
+      const scan = normalize(selected.row)
+      context.previous = [context.latest, ...context.previous].filter(row => row && row.id !== scan.id).slice(0, 2)
+      context.latest = scan
+      context.status = 'completed'
+    }
     const preferences = {}
     for (const key of ['goal', 'goal_type', 'improvement_focus', 'hairType']) {
       if (typeof req.body.preferences?.[key] === 'string') preferences[key] = req.body.preferences[key].slice(0, 300)
