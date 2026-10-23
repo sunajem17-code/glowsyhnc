@@ -14,6 +14,9 @@ import { triggerHaptic } from '../utils/haptics'
 import shortLengthPortrait from '../assets/hair-length/short.png'
 import mediumLengthPortrait from '../assets/hair-length/medium.png'
 import longLengthPortrait from '../assets/hair-length/long.png'
+import type1BuzzCutReference from '../assets/hair-examples/type1-medium-high-short.jpg'
+import type1CrewCutReference from '../assets/hair-examples/type1-all-density-short-crew-cut.jpg'
+import type1ModCutReference from '../assets/hair-examples/type1-all-density-short-mod-cut.jpg'
 
 const BG = '#080808'
 const PANEL = 'rgba(255,255,255,0.045)'
@@ -170,10 +173,11 @@ function Matching({ profile, structure }) {
 function CatalogModelImage({ recommendation, className = '', compact = false }) {
   const [failed, setFailed] = useState(false)
   const src = recommendation.style.image.src
+  const isUserReference = recommendation.engine === 'user_reference'
   useEffect(() => setFailed(false), [src])
-  return <div className={`relative overflow-hidden ${className}`} style={{ aspectRatio: '4 / 5', background: 'radial-gradient(ellipse at 50% 45%, #25221b, #0c0c0c 80%)' }}>
+  return <div className={`relative overflow-hidden ${className}`} style={{ aspectRatio: '4 / 5', background: '#000' }}>
     {failed ? <div className="absolute inset-0 flex items-center justify-center text-white/60 text-sm">Photo unavailable</div>
-      : <img src={src} alt={`${recommendation.style.name} hairstyle reference`} draggable={false} onError={() => setFailed(true)} className="w-full h-full object-contain object-bottom" loading={compact ? 'lazy' : 'eager'} />}
+      : <img src={src} alt={`${recommendation.style.name} hairstyle reference`} draggable={false} onError={() => setFailed(true)} className={`w-full h-full ${isUserReference ? 'object-cover' : 'object-contain object-bottom'}`} style={isUserReference ? { objectPosition: 'center 72%' } : undefined} loading={compact ? 'lazy' : 'eager'} />}
   </div>
 }
 
@@ -222,11 +226,18 @@ function Looks({ recommendations, active, setActive }) {
       tabIndex={0} role="group" aria-roledescription="slide"
       aria-label={`${item.style.name}, ${active + 1} of ${recommendations.length}. Swipe or use arrow keys to change haircut.`}
       onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); go(1) } else if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1) } }}
-      className="rounded-[28px] overflow-hidden border border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C6A85C]"
-      style={{ background: '#111', touchAction: 'pan-y' }}>
-      <CatalogModelImage recommendation={item} className="w-full h-[62svh] max-h-[620px] min-h-[280px]" />
-      <h1 className="px-5 py-5 text-center font-heading font-bold text-[25px] leading-tight text-white">{item.style.name}</h1>
+      className="rounded-[30px] overflow-hidden border border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C6A85C]"
+      style={{ background: '#080808', touchAction: 'pan-y' }}>
+      <CatalogModelImage recommendation={item} className="w-full h-[67svh] max-h-[700px] min-h-[360px]" />
+      <h1 className="min-h-[82px] px-5 py-5 flex items-center justify-center text-center font-heading font-bold text-[25px] leading-tight text-white" style={{ background: '#080808' }}>{item.style.name}</h1>
     </motion.div>
+    {recommendations.length > 1 && <div className="flex items-center justify-center gap-4 pt-4" aria-label={`Hairstyle ${active + 1} of ${recommendations.length}`}>
+      <button type="button" onClick={() => go(-1)} aria-label="Previous hairstyle" className="w-9 h-9 rounded-full flex items-center justify-center text-white/75 active:scale-95 transition-transform" style={{ background: PANEL, border: '1px solid rgba(255,255,255,.12)' }}><ChevronLeft size={18} /></button>
+      <div className="flex items-center justify-center gap-2">
+        {recommendations.map((recommendation, index) => <button key={recommendation.hairstyleId} type="button" onClick={() => { triggerHaptic(); setActive(index) }} aria-label={`Show ${recommendation.style.name}`} aria-current={index === active ? 'true' : undefined} className="h-2.5 rounded-full transition-all" style={{ width: index === active ? 22 : 9, background: index === active ? GOLD : 'rgba(255,255,255,.25)' }} />)}
+      </div>
+      <button type="button" onClick={() => go(1)} aria-label="Next hairstyle" className="w-9 h-9 rounded-full flex items-center justify-center text-white/75 active:scale-95 transition-transform" style={{ background: PANEL, border: '1px solid rgba(255,255,255,.12)' }}><ChevronRight size={18} /></button>
+    </div>}
   </div>
 }
 
@@ -257,7 +268,7 @@ export default function HairMaxx() {
   const [sourceImage, setSourceImage] = useState(lastFaceScanImage || currentScan?.facePhotoUrl || null)
   const [stage, setStage] = useState('intro')
   const [question, setQuestion] = useState(0)
-  const [profile, setProfile] = useState(() => storedProfile?.scanId === scan?.id ? storedProfile : {
+  const [profile, setProfile] = useState(() => storedProfile && storedProfile.scanId === (scan?.id ?? null) ? storedProfile : {
     scanId: scan?.id ?? null, hairType: ['straight', 'wavy', 'curly', 'coily'].includes(storedHairType) ? storedHairType : null,
     density: null, strandThickness: 'medium', desiredLength: 'any', maintenancePreference: 'any',
   })
@@ -278,9 +289,10 @@ export default function HairMaxx() {
   ], [])
 
   function startQuestions() {
-    const reusable = storedProfile?.scanId === scan?.id && storedProfile?.catalogVersion === HAIR_CATALOG_VERSION && ['hairType', 'density', 'desiredLength'].every(key => storedProfile[key])
-    if (reusable) { beginMatching(storedProfile); return }
-    setQuestion(profile.hairType ? 1 : 0)
+    // Re-ask the full profile whenever HairMax is entered. The saved profile
+    // remains available for matching and recommendations, but must not skip
+    // the questionnaire after the user presses Continue.
+    setQuestion(0)
     setStage('questions')
   }
 
@@ -299,7 +311,7 @@ export default function HairMaxx() {
   }
 
   function resolveRecommendations(items, engine, hairProfile) {
-    return items.map((item, index) => {
+    const resolved = items.map((item, index) => {
       const style = HAIRSTYLE_CATALOG.find(value => value.id === item.hairstyleId)
       const hardCompatible = style && style.compatibleHairTypes.includes(hairProfile.hairType) &&
         style.compatibleDensity.includes(hairProfile.density) && style.compatibleThickness.includes(hairProfile.strandThickness || 'medium')
@@ -312,6 +324,101 @@ export default function HairMaxx() {
         engine: item.engine ?? engine,
       } : null
     }).filter(Boolean)
+
+    const isType1ShortProfile = hairProfile.hairType === 'straight' && hairProfile.desiredLength === 'short'
+    if (isType1ShortProfile) {
+      resolved.unshift({
+        hairstyleId: 'community-reference-type1-crew-cut',
+        rank: 0,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 short crew cut.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Short length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-crew-cut',
+          name: 'Crew Cut',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'short',
+          maintenance: 'low',
+          growth: 'Suitable for a shorter cut',
+          styling: 'Keep the top lightly textured and the sides neat.',
+          barber: {
+            top: 'Keep the top short with natural texture, following the crew cut reference.',
+            sides: 'Keep the sides close and evenly blended.',
+            back: 'Keep the back short and clean.',
+            taper: 'Use a subtle taper around the edges.',
+          },
+          image: { src: type1CrewCutReference, width: 941, height: 1672 },
+        },
+      })
+      resolved.splice(1, 0, {
+        hairstyleId: 'community-reference-type1-mod-cut',
+        rank: 1,
+        compatibility: 100,
+        reasons: ['Reference photo for a Type 1 short Mod Cut.'],
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 1 hair', 'Short length', `${hairProfile.density} density`],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: 'community-reference-type1-mod-cut',
+          name: 'Mod Cut',
+          appearance: 'Type 1 reference photo',
+          compatibleHairTypes: ['straight'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'short',
+          maintenance: 'some',
+          growth: 'Suitable for a shorter cut',
+          styling: 'Wear the textured fringe forward and keep the sides softly shaped.',
+          barber: {
+            top: 'Leave a textured top with a soft fringe across the forehead, matching the Mod Cut reference.',
+            sides: 'Keep some length around the sides with a soft, natural shape.',
+            back: 'Leave light length at the back to keep the rounded silhouette.',
+            taper: 'Avoid a sharp high fade; blend the sides naturally.',
+          },
+          image: { src: type1ModCutReference, width: 941, height: 1672 },
+        },
+      })
+
+      if (['medium', 'high'].includes(hairProfile.density)) {
+        resolved.splice(2, 0, {
+          hairstyleId: 'community-reference-type1-buzz-cut',
+          rank: 1,
+          compatibility: 100,
+          reasons: ['Reference photo for a Type 1 short buzz cut.'],
+          relevantMeasurements: [],
+          compatibilityFactors: ['Type 1 hair', 'Short length', `${hairProfile.density} density`],
+          limitations: [],
+          engine: 'user_reference',
+          style: {
+            id: 'community-reference-type1-buzz-cut',
+            name: 'Buzz Cut',
+            appearance: 'Type 1 reference photo',
+            compatibleHairTypes: ['straight'],
+            compatibleDensity: ['medium', 'high'],
+            compatibleThickness: ['fine', 'medium', 'thick'],
+            length: 'short',
+            maintenance: 'low',
+            growth: 'Suitable for a shorter cut',
+            styling: 'Keep the short shape neat with a light styling product.',
+            barber: {
+              top: 'Keep the top short and evenly textured, following the buzz cut reference.',
+              sides: 'Keep the sides short and blended into the top.',
+              back: 'Keep the back short and clean.',
+              taper: 'Use a subtle, even taper around the edges.',
+            },
+            image: { src: type1BuzzCutReference, width: 941, height: 1672 },
+          },
+        })
+      }
+    }
+    return resolved
   }
 
   async function beginMatching(nextProfile) {
@@ -333,10 +440,10 @@ export default function HairMaxx() {
     try {
       const response = await api.hair.recommend({ hairProfile: nextProfile, analysisEvidence: portableEvidence(structure.evidence) })
       ranked = resolveRecommendations(response.recommendations ?? [], response.engine, nextProfile)
-      if (!ranked.length) ranked = rankHairstyles(nextProfile, structure, 18)
+      if (!ranked.length) ranked = resolveRecommendations(rankHairstyles(nextProfile, structure, 18), 'deterministic_catalog_fallback_v1', nextProfile)
     } catch (error) {
       console.error('[HairMax] Grounded recommendation request failed:', error?.message)
-      ranked = rankHairstyles(nextProfile, structure, 8).map(item => ({ ...item, engine: 'deterministic_catalog_fallback_v1' }))
+      ranked = resolveRecommendations(rankHairstyles(nextProfile, structure, 8), 'deterministic_catalog_fallback_v1', nextProfile)
     }
     if (!ranked.length) { setRecommendations([]); setStage('recommend_error'); return }
     setRecommendationCache({
