@@ -2631,7 +2631,9 @@ export default function Scan() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait">
+        {/* Reset presence bookkeeping with the step: a retained exiting guide
+            must never outlive its matching heading or become the next guide. */}
+        <AnimatePresence key={`scan-step-${step}`} mode="wait">
           {step === 0 && (
             <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               <GenderSelector selected={gender} onSelect={setLocalGender} onAdvance={() => setStep(1)} />
@@ -2643,7 +2645,7 @@ export default function Scan() {
                 <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
-                    alt="Guide"
+                    alt="Front photo guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
                       transform: gender === 'female' ? 'scale(1.15)' : 'scale(1.05) translateY(16px)',
@@ -2660,7 +2662,7 @@ export default function Scan() {
                 <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
-                    alt="Guide"
+                    alt="Side profile photo guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
                       transform: gender === 'female' ? 'scale(1.15) scaleX(-1)' : 'scale(1.1) translateY(34px)',
