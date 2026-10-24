@@ -2651,7 +2651,7 @@ export default function Scan() {
           {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
             <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6" style={{ overflow: 'visible' }}>
               {step === 1 ? (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
                   <img
                     src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
                     alt="Front photo guide"
@@ -2668,7 +2668,7 @@ export default function Scan() {
                   />
                 </div>
               ) : (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
                   <img
                     src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
                     alt="Side profile photo guide"
@@ -2698,7 +2698,12 @@ export default function Scan() {
                     setCameraOpen(true)
                   }}
                   className="w-full flex-shrink-0 mt-[30px] py-4 rounded-2xl font-heading font-bold text-[15px]"
-                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)', width: gender === 'female' && step === 1 ? 'min(115%, calc(100% + 48px))' : undefined }}
+                  style={{
+                    background: GOLD_GRADIENT,
+                    color: '#0A0A0A',
+                    boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+                    width: gender === 'female' && step === 1 ? 'min(115%, calc(100% + 48px))' : undefined,
+                  }}
                 >
                   Begin Scan
                 </motion.button>
