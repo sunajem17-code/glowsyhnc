@@ -49,7 +49,8 @@ export async function buildProductionEvidence({ frontImage, frontLandmarks, qual
 
 export async function requestProductionAnalysis({
   apiClient, faceImage, sideImage = null, gender = 'male',
-  sideProfileGeometry = null, evidence, knownMinor = false, presentationGoals = '', timeoutMs = 120_000,
+  sideProfileGeometry = null, evidence, timeoutMs = 120_000,
+  knownMinor = false, presentationGoals = null,
 }) {
   if (evidence?.status !== 'measured') {
     const error = new Error(`Photo geometry could not be measured reliably: ${evidence?.reason ?? 'unknown_reason'}`)
@@ -63,9 +64,6 @@ export async function requestProductionAnalysis({
     ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
     analysisEvidence: portableEvidence(evidence),
     gender,
-    assessmentProfile: gender ?? null,
-    knownMinor,
-    ...(presentationGoals ? { presentationGoals } : {}),
   }
   const scoreCall = apiClient.ai.score(payload)
   const result = await withDeadline(scoreCall, timeoutMs, 'Analysis timed out. Please try again')

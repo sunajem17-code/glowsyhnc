@@ -2304,6 +2304,7 @@ export default function Scan() {
             evidence: analysisEvidence,
             gender: g,
             knownMinor: userProfile?.knownMinor === true || (typeof userProfile?.age === 'number' && userProfile.age < 18),
+            presentationGoals: userProfile?.presentationGoals || null,
             previousScore: lastGlowScore,
           })
           presentationFollowup = aiResult.presentationPromise ?? null

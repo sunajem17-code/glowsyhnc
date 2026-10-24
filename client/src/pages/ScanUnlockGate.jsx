@@ -28,7 +28,7 @@ import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
 import { cropPhotoToSquare } from '../utils/shareCardPhoto'
-import { getProgressCardReturnTo } from '../utils/scanResultContext'
+import { getProgressCardReturnTo, getSavedProgressResultPresentation } from '../utils/scanResultContext'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
@@ -1521,7 +1521,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const savedScans = useStore(state => state.scans)
@@ -1532,6 +1532,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const [viewDirection, setViewDirection] = useState(1)
   const [saveError, setSaveError] = useState('')
   const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
+  const blurResultCard = blurSavedProgressResults
   const [isDownloadingCard, setIsDownloadingCard] = useState(false)
   const [downloadError, setDownloadError] = useState('')
   const [showScorecardShareMenu, setShowScorecardShareMenu] = useState(false)
@@ -1742,7 +1743,8 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           <div ref={resultsCardRef} className="w-full rounded-3xl" style={{ background: '#141414', position: 'relative', zIndex: 1, padding: `${REVEAL_RATINGS_LAYOUT.panelPaddingTop}px ${REVEAL_RATINGS_LAYOUT.panelPaddingHorizontal}px ${REVEAL_RATINGS_LAYOUT.panelPaddingBottom}px` }}>
             <div className="grid grid-cols-2" style={{ columnGap: REVEAL_RATINGS_LAYOUT.columnGap, rowGap: 0 }}>
               {metrics.map(({ label, value }, idx) => {
-                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun, savedProgressCard })
+                const cardShowsUnlockedRatings = unlocked && !blurResultCard
+                const ratingAnimation = getRevealRatingAnimation(value, { unlocked: cardShowsUnlockedRatings, reduceMotion, metricKey: label, revealRun, savedProgressCard })
                 const metricTextStyles = getRevealMetricTextStyles()
                 return (
                 <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
@@ -1758,7 +1760,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
                       <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
                     </motion.span>
                   </div>
-                  {unlocked ? (
+                  {cardShowsUnlockedRatings ? (
                     <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom, fontVariantNumeric: 'tabular-nums', height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
                       {value == null ? isRecoveringRatings ? 'Scoring…' : 'Unavailable' : value.toFixed(1)}
                     </motion.div>
@@ -1767,13 +1769,13 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
                       <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
                     </div>
                   )}
-                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
+                  <div role={cardShowsUnlockedRatings && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={cardShowsUnlockedRatings && value != null ? 0 : undefined} aria-valuemax={cardShowsUnlockedRatings && value != null ? 10 : undefined} aria-valuenow={cardShowsUnlockedRatings && value != null ? value : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
                     <motion.div
-                      key={unlocked ? 'revealed' : 'locked'}
+                      key={cardShowsUnlockedRatings ? 'revealed' : 'locked'}
                       initial={ratingAnimation.bar.initial}
                       animate={ratingAnimation.bar.animate}
                       transition={ratingAnimation.bar.transition}
-                      style={{ height: '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
+                      style={{ height: '100%', borderRadius: 99, color: cardShowsUnlockedRatings && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
                     />
                   </div>
                 </div>
@@ -1786,7 +1788,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} />}
           </div>}
           {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} />}
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} />}
           </div>}
           </motion.div>
         </motion.div>
@@ -2004,7 +2006,8 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
   const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, currentScan)
-  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: hasUnlockedAccess, paywallRequested: isPaywallRedirect || showPaywall })
+  const savedProgressResultPresentation = getSavedProgressResultPresentation({ savedProgressCard: Boolean(progressCardReturnTo), isPremium, hasUnlockedAccess })
+  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
       setIsPremium(true)
@@ -2122,7 +2125,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
           <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
         </div>
       ) : hasUnlockedAccess ? (
-        <LockedRevealScreen scan={revealScan} unlocked savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
+        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
       ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}

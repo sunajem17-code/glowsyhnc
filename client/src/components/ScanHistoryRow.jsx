@@ -1,4 +1,3 @@
-import { isCurrentAssessment, assessmentPresentation, formatAssessmentRange } from '../utils/assessment'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, ChevronRight } from 'lucide-react'
@@ -6,8 +5,10 @@ import { triggerHaptic } from '../utils/haptics'
 import { BACKEND_ORIGIN } from '../utils/backend'
 import { getHistoryScoreColor } from '../utils/scanHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
+import { getScanHistoryRowPresentation } from '../utils/scanHistoryPresentation'
 import { getTier } from '../utils/analysis'
 import useStore from '../store/useStore'
+import { isCurrentAssessment, assessmentPresentation } from '../utils/assessment'
 
 function thumbnail(url) {
   if (!url) return null
@@ -21,7 +22,7 @@ function fmt(dateStr) {
 }
 
 // ── Single scan row ───────────────────────────────────────────────────────────
-export default function ScanHistoryRow({ scan, onTap, index, showChevron = true }) {
+export default function ScanHistoryRow({ scan, onTap, index, showChevron = true, canAccessProUi = true }) {
   const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
   const scorePresentation = assessment ? assessmentPresentation(assessment) : null
   const profileGender = useStore(state => state.gender || state.userProfile?.gender || state.user?.gender)
@@ -29,21 +30,21 @@ export default function ScanHistoryRow({ scan, onTap, index, showChevron = true 
   const directPhoto = scan.facePhotoUrl || scan.face_photo_url || scan.face_image_url || scan.bodyPhotoUrl || scan.body_photo_url || scan.body_image_url
   useEffect(() => {
     let active = true
-    const mediaScanId = scan.localMediaScanId || scan.id
-    if (!directPhoto && mediaScanId) {
-      loadScanMedia(mediaScanId).then(media => { if (active) setStoredPhoto(media?.photo ?? null) })
+    if (!directPhoto && scan.id) {
+      loadScanMedia(scan.id).then(media => { if (active) setStoredPhoto(media?.photo ?? null) })
     }
     return () => { active = false }
-  }, [scan.id, scan.localMediaScanId, directPhoto])
+  }, [scan.id, directPhoto])
   const thumb = thumbnail(directPhoto || storedPhoto)
   const date = fmt(scan.analyzedAt || scan.scan_date)
   const score = scan.glowScore != null
     ? (typeof scan.glowScore === 'number' ? scan.glowScore : parseFloat(scan.glowScore))
     : null
+  const ratingPresentation = getScanHistoryRowPresentation(canAccessProUi)
   const tierGender = scan.gender || profileGender
   const tier = scan.tier || (!assessment && score != null && ['male', 'female'].includes(tierGender)
     ? getTier(score, tierGender)?.label ?? null
-    : null)
+    : scorePresentation?.tierLabel ?? null)
 
   return (
     <motion.button
@@ -78,26 +79,26 @@ export default function ScanHistoryRow({ scan, onTap, index, showChevron = true 
       <div className="flex-1 min-w-0">
         <p className="font-heading font-semibold text-[15px] text-primary leading-tight">{date}</p>
         {tier && (
-          <span
-            className="font-heading font-bold text-[10px] tracking-wide mt-0.5 inline-block"
-            style={{ color: getHistoryScoreColor(score) }}
-          >
-            {tier}
+          <span className="mt-0.5 inline-flex h-[13px] items-center" aria-label={ratingPresentation.blurRating ? 'Rating hidden' : undefined}>
+            {ratingPresentation.blurRating
+              ? <span aria-hidden="true" style={{ width: 102, height: 9, borderRadius: 99, background: '#fff', filter: 'blur(5px)', opacity: 0.9 }} />
+              : <span className="font-heading font-bold text-[10px] tracking-wide inline-block" style={{ color: getHistoryScoreColor(score) }}>{tier.toUpperCase()}</span>}
           </span>
         )}
       </div>
 
       {/* Score */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {assessment && <p className="text-lg font-bold" style={{ color: '#C6A85C' }}>{assessment.scoreRange ? `${formatAssessmentRange(scorePresentation.range)} / ${scorePresentation.max} ${scorePresentation.unit}` : 'Withheld'}</p>}
-        {!assessment && score != null && (
+        {score != null && (ratingPresentation.blurRating
+          ? <span aria-label="Score hidden" style={{ width: 42, height: 23, borderRadius: 99, background: '#fff', filter: 'blur(6px)', opacity: 0.9 }} />
+          : (
           <p
             className="font-heading font-bold text-[22px]"
             style={{ color: getHistoryScoreColor(score), letterSpacing: '-0.02em' }}
           >
             {score.toFixed(1)}
           </p>
-        )}
+          ))}
         {showChevron && <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.25)' }} />}
       </div>
     </motion.button>
