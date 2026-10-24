@@ -2253,6 +2253,7 @@ export default function Scan() {
       setAnalysisStep(2)
 
       let aiResult
+      let presentationFollowup = null
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
       const localScorePreview = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AI_SCORE_FALLBACK === 'true'
       if (token === 'demo-token' || localScorePreview) {
@@ -2301,8 +2302,11 @@ export default function Scan() {
             sideProfileGeometry,
             evidence: analysisEvidence,
             gender: g,
+            knownMinor: userProfile?.knownMinor === true || (typeof userProfile?.age === 'number' && userProfile.age < 18),
             previousScore: lastGlowScore,
           })
+          presentationFollowup = aiResult.presentationPromise ?? null
+          delete aiResult.presentationPromise
           setAnalysisResult(aiResult)
 
         } finally {
@@ -2363,6 +2367,9 @@ export default function Scan() {
       if (faceB64) setPendingFacePhoto(faceB64)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
+      presentationFollowup?.then(feedback => {
+        if (feedback) useStore.getState().patchScanPresentation(scanRecord.id, feedback)
+      }).catch(() => {})
       if (faceB64) {
         import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
           saveScanMedia(scanRecord.id, { photo: faceB64 })

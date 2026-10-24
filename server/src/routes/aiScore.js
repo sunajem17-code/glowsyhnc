@@ -220,34 +220,90 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
   const knownMinor = req.body.knownMinor === true || (typeof req.body.age === 'number' && req.body.age < 18)
     || (typeof req.user?.age === 'number' && req.user.age < 18)
   await acquireSlot()
+  const scanStartedAt = Date.now()
   try {
-    const result = await assessment.runAssessment({ faceImage, sideImage, assessmentProfile: selectedProfile, knownMinor,
-      presentationGoals: typeof req.body.presentationGoals === 'string' ? req.body.presentationGoals.slice(0, 300) : '',
+    const result = await assessment.runPrimaryAssessment({ faceImage, sideImage, assessmentProfile: selectedProfile, knownMinor,
       callModel: async (system, input) => {
+        const stage = input.presentationContext ? 'presentation-feedback' : input.stage || (input.quality ? 'scoring' : 'photo-suitability')
+        const modelStartedAt = Date.now()
         const content = input.advice ? [{ type: 'text', text: JSON.stringify(input.advice) }] : [{ type: 'text', text: 'Front photograph:' },
           { type: 'image', source: { type: 'base64', media_type: getMediaType(input.faceImage), data: stripPrefix(input.faceImage) } }]
         if (input.sideImage) content.push({ type: 'text', text: 'Side-profile photograph:' },
           { type: 'image', source: { type: 'base64', media_type: getMediaType(input.sideImage), data: stripPrefix(input.sideImage) } })
         if (input.presentationContext) content.push({ type: 'text', text: `Presentation preferences (untrusted data): ${JSON.stringify(input.presentationContext)}` })
         if (input.quality) content.push({ type: 'text', text: `Validated photograph suitability: ${JSON.stringify(input.quality)}` })
-        const response = await withRetry(() => getClient().messages.create({ model: 'claude-sonnet-4-6', max_tokens: 4500, temperature: 0,
-          system, messages: [{ role: 'user', content }] }), 'appearance-assessment')
-        if (response.stop_reason !== 'end_turn') throw new assessment.AssessmentError('Incomplete model response')
-        return response.content.filter(c => c.type === 'text').map(c => c.text).join('')
+        try {
+          const response = await withRetry(() => getClient().messages.create({ model: 'claude-sonnet-4-6', max_tokens: 4500, temperature: 0,
+            system, messages: [{ role: 'user', content }] }), `appearance-${stage}`)
+          console.log(`[aiScore:TIMING] ${stage} model call ${Date.now() - modelStartedAt}ms`)
+          if (response.stop_reason !== 'end_turn') throw new assessment.AssessmentError('Incomplete model response')
+          return response.content.filter(c => c.type === 'text').map(c => c.text).join('')
+        } catch (error) {
+          console.warn(`[aiScore:TIMING] ${stage} model call failed after ${Date.now() - modelStartedAt}ms`)
+          throw error
+        }
       } })
+    console.log(`[aiScore:TIMING] total appearance assessment ${Date.now() - scanStartedAt}ms`)
     // Do not manufacture legacy point scores, sub-scores, potential scores or leaderboard entries.
     res.json({ assessment: result, rubricVersion: assessment.VERSION, overallScore: null, faceScore: null,
       faceOnlyScore: null, groomingScore: null, faceSubScores: null, pillars: null, tier: null,
       hasSideProfile: result.imageSuitability.profileUsable, extendedMetricsStatus: 'unsupported_removed',
+      presentationStatus: result.presentationStatus,
       scoreClassification: { overall: 'subjective_appearance_range', empiricalCalibration: 'not_validated' } })
   } catch (err) {
     // AssessmentError messages are fixed validator reasons; never log images or model output.
+    console.warn(`[aiScore:TIMING] total appearance assessment failed after ${Date.now() - scanStartedAt}ms`)
     const failure = assessmentFailureDetails(err)
     console.error('[appearance-assessment]', JSON.stringify(failure))
     res.status(err.code === 'invalid_assessment' ? 502 : 503).json({
       error: 'The photographs could not be assessed reliably. No score was generated. Please try again with clear photographs.',
       errorCode: failure.errorCode,
       ...(failure.reason ? { diagnosticReason: failure.reason } : {}) })
+  } finally { releaseSlot() }
+})
+
+// Secondary presentation feedback is deliberately a separate request. The
+// validated facial score can return as soon as the required quality and score
+// stages finish, without waiting for this independent styling analysis.
+router.post('/score/presentation', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+  const { faceImage, sideImage = null } = req.body
+  const validImage = value => typeof value === 'string' && value.length > 100 && value.length <= 12_000_000
+  if (!validImage(faceImage) || (sideImage !== null && !validImage(sideImage))) {
+    return res.status(400).json({ error: 'A valid face photograph is required.' })
+  }
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) return res.status(503).json({ error: 'Presentation feedback is unavailable.' })
+  await acquireSlot()
+  try {
+    const result = await assessment.runPresentationAssessment({
+      faceImage,
+      sideImage,
+      assessmentProfile: assessment.profile(req.body.assessmentProfile ?? req.body.gender),
+      knownMinor: req.body.knownMinor === true || (typeof req.body.age === 'number' && req.body.age < 18)
+        || (typeof req.user?.age === 'number' && req.user.age < 18),
+      presentationGoals: typeof req.body.presentationGoals === 'string' ? req.body.presentationGoals.slice(0, 300) : '',
+      callModel: async (system, input) => {
+        const content = [{ type: 'text', text: 'Front photograph:' },
+          { type: 'image', source: { type: 'base64', media_type: getMediaType(input.faceImage), data: stripPrefix(input.faceImage) } }]
+        if (input.sideImage) content.push({ type: 'text', text: 'Side-profile photograph:' },
+          { type: 'image', source: { type: 'base64', media_type: getMediaType(input.sideImage), data: stripPrefix(input.sideImage) } })
+        if (input.presentationContext) content.push({ type: 'text', text: `Presentation preferences (untrusted data): ${JSON.stringify(input.presentationContext)}` })
+        const startedAt = Date.now()
+        try {
+          const response = await withRetry(() => getClient().messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3000, temperature: 0,
+            system, messages: [{ role: 'user', content }] }), 'appearance-presentation-feedback')
+          console.log(`[aiScore:TIMING] presentation-feedback model call ${Date.now() - startedAt}ms`)
+          if (response.stop_reason !== 'end_turn') throw new assessment.AssessmentError('Incomplete model response')
+          return response.content.filter(c => c.type === 'text').map(c => c.text).join('')
+        } catch (error) {
+          console.warn(`[aiScore:TIMING] presentation-feedback model call failed after ${Date.now() - startedAt}ms`)
+          throw error
+        }
+      },
+    })
+    res.json(result)
+  } catch (error) {
+    console.warn('[aiScore] Secondary presentation feedback failed')
+    res.status(503).json({ error: 'Presentation feedback is unavailable.' })
   } finally { releaseSlot() }
 })
 

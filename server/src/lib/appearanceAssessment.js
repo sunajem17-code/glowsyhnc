@@ -4,6 +4,7 @@ const SCALE = rubric.scale
 const DIMENSIONS = ['facialHarmony', 'eyeArea', 'lowerFace', 'midfaceCheeks', 'noseLips', 'skinPresentation', 'facialBalance', 'visibleSymmetry', 'distinctiveQualities']
 const STATUSES = ['relative_strength', 'broadly_average', 'relative_limitation', 'unassessable']
 const CHECKS = ['lighting', 'headAngle', 'obstruction', 'filters', 'cameraDistortion']
+const EVIDENCE_GATE_ERROR = 'Rating exceeds documented feature evidence; reassess the observations or withhold, never invent supporting features'
 class AssessmentError extends Error {
   constructor(message) { super(message); this.code = 'invalid_assessment' }
 }
@@ -54,7 +55,7 @@ function evidenceForRange(value, dimensions) {
     && regions.filter(n => n >= LEVELS.indexOf('exceptional')).length >= gate.exceptionalRegions
   if (value.max < 3.5 && rank('facialHarmony') !== 0 && regions.filter(n => n === 0).length < 2) fail('Below-average rating lacks documented limitations')
   const applicable = rubric.evidenceRules.gates.filter(gate => value.max >= gate.min)
-  if (applicable.some(gate => !passes(gate))) fail('Rating exceeds documented feature evidence; reassess the observations or withhold, never invent supporting features')
+  if (applicable.some(gate => !passes(gate))) fail(EVIDENCE_GATE_ERROR)
   const band = number => rubric.bands.find(b => number >= b.min && (number < b.max || number === SCALE.max && b.max === SCALE.max))
   const reference = number => {
     const b = band(number)
@@ -187,7 +188,7 @@ Confidence describes photographic evidence, not attractiveness. Low confidence M
 UMAX is displayed separately by application code on a 0–10 scale; do not output UMAX scores or tier names. The internal PSL score remains out of 8. In scoreExplanation, explicitly prefix any numeric rating with PSL to prevent confusion with the public UMAX display. Explain the range in scoreExplanation: connect the observations to the selected anchors and explain what supports or limits the next higher anchor, without inventing flaws. Withheld assessments must have scoreExplanation:null. No model tier labels. Do not assess profile characteristics unless quality.profileUsable is true.`}
 ${knownMinor ? '' : `Feature assessment rules:
 ${Object.entries(rubric.featureRules).map(([key, rule]) => `${key}: ${rule}`).join('\n')}
-For every dimension provide evidenceLevel: limitation, ordinary, good, strong, exceptional, or unassessable, and a concrete visible observation supporting that level. These are ordinal judgments, not anatomical measurements. Do not copy the overall grade into every region. Do not grade an unseen region or invent supporting evidence. An ordinary feature is not a flaw. Distinctive appearance and visible masculinity/femininity are descriptive, not mandatory bonuses.
+For every dimension provide evidenceLevel: limitation, ordinary, good, strong, exceptional, or unassessable, and a concrete visible observation supporting that level. These are ordinal judgments, not anatomical measurements. Do not copy the overall grade into every region. Do not grade an unseen region or invent supporting evidence. An ordinary feature is not a flaw. Distinctive appearance and visible masculinity/femininity are descriptive, not mandatory bonuses. Keep each dimension observation to 18 words or fewer while retaining its visible evidence. Keep scoreExplanation to 80 words or fewer; concise wording must not omit the score anchors or uncertainty rationale. Strengths, limitations and suggestions are optional; include at most two short entries in each list. Do not emit chain-of-thought.
 Apply the following product-defined evidence checks to the UPPER endpoint of the PSL range. They are consistency rules, not scientifically validated weights. Do not average feature grades, subtract a point per flaw, or double-count harmony/balance/symmetry as independent anatomical regions. The independent regions are ${rubric.evidenceRules.regions.join(', ')}; skin and distinctive qualities are described but cannot satisfy the structural region counts.
 ${rubric.evidenceRules.gates.map(g => `For any endpoint >= PSL ${g.min}: harmony >= ${g.harmony}; balance >= ${g.balance}; visible symmetry >= ${g.symmetry}; at least ${g.goodRegions} independent regions good or better, ${g.strongRegions} strong or better, and ${g.exceptionalRegions} exceptional.`).join('\n')}
 A range entirely below PSL 3.5 must document a limitation in overall harmony or limitations in at least two independent regions; ordinary features alone do not justify a below-average assessment. These are necessary support checks, not automatic score awards. Choose the overall range from the holistic observations. Never lower a score solely because evidence is missing: withhold when the intended assessment cannot be supported. Never raise evidence grades just to pass a gate.
@@ -204,29 +205,56 @@ function parse(raw) {
  if (typeof raw !== 'string') fail('Missing model text')
  try { return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')) } catch { fail('Malformed model JSON') }
 }
-async function runAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor = false, presentationGoals = '' }) {
+async function runPrimaryAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor = false }) {
  const imageSuitability = await assessImageSuitability({ callModel, faceImage, sideImage })
  if (!sideImage) imageSuitability.profileUsable = false
  if (imageSuitability.status === 'insufficient') return withheld(imageSuitability, assessmentProfile, 'insufficient_image')
- const raw = parse(await callModel(assessmentPrompt(knownMinor), { faceImage, sideImage: imageSuitability.profileUsable ? sideImage : null, quality: imageSuitability }))
- const result = validate(raw, { imageSuitability, assessmentProfile, knownMinor })
- // Presentation is isolated AFTER facial scoring; profile, goals and advice cannot change the range.
- result.feedbackVersion = 'presentation-v2'
- result.suggestions = []
+ const input = { faceImage, sideImage: imageSuitability.profileUsable ? sideImage : null, quality: imageSuitability, stage: 'scoring' }
+ const basePrompt = assessmentPrompt(knownMinor)
+ let result
  try {
-   const feedback = parse(await callModel(PRESENTATION_PROMPT, {
-     faceImage, sideImage: imageSuitability.profileUsable ? sideImage : null,
-     presentationContext: { assessmentProfile: profile(assessmentProfile), presentationGoals, knownMinor }
-   }))
-   result.presentation = presentationFeedback(feedback)
-   result.suggestions = result.presentation.recommendations.map(item => item.action)
- } catch {
-   result.presentation = { observations: Object.fromEntries(PRESENTATION_KEYS.map(key => [key, {
-     status: 'unassessable', observation: 'Presentation feedback is unavailable.'
-   }])), recommendations: [], unavailable: true }
-   result.unassessableDetails.push('Personalized styling suggestions are unavailable; the assessment range is unchanged.')
+   result = validate(parse(await callModel(basePrompt, input)), { imageSuitability, assessmentProfile, knownMinor })
+ } catch (error) {
+   if (!(error instanceof AssessmentError) || error.message !== EVIDENCE_GATE_ERROR) throw error
+   const retryPrompt = `${basePrompt}\n\nYour previous response exceeded an evidence gate. Reassess the same photographs and feature observations. Do not raise evidence grades to force a rating through. Reduce the upper endpoint only when the observations support a lower range; otherwise return scoreRange:null with confidence:"low" and explain that numerical scoring is withheld. Do not change observations to fit a target score.`
+   try {
+     result = validate(parse(await callModel(retryPrompt, input)), { imageSuitability, assessmentProfile, knownMinor })
+   } catch (retryError) {
+     if (!(retryError instanceof AssessmentError) || retryError.message !== EVIDENCE_GATE_ERROR) throw retryError
+     return withheld(imageSuitability, assessmentProfile, 'insufficient_feature_evidence')
+   }
  }
-
+ result.presentationStatus = 'pending'
+ result.suggestions = []
  return result
 }
-module.exports = { evidenceForRange, umaxPresentation, PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, assessImageSuitability, validate, withheld, parse, runAssessment }
+async function runPresentationAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor = false, presentationGoals = '' }) {
+ try {
+   const feedback = parse(await callModel(PRESENTATION_PROMPT, {
+     faceImage, sideImage,
+     presentationContext: { assessmentProfile: profile(assessmentProfile), presentationGoals, knownMinor }
+   }))
+   const presentation = presentationFeedback(feedback)
+   return { presentation, suggestions: presentation.recommendations.map(item => item.action) }
+ } catch {
+   return {
+     presentation: { observations: Object.fromEntries(PRESENTATION_KEYS.map(key => [key, {
+       status: 'unassessable', observation: 'Presentation feedback is unavailable.'
+     }])), recommendations: [], unavailable: true },
+     suggestions: [], unavailableDetail: 'Personalized styling suggestions are unavailable; the assessment range is unchanged.'
+   }
+ }
+}
+async function runAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor = false, presentationGoals = '' }) {
+ const result = await runPrimaryAssessment({ callModel, faceImage, sideImage, assessmentProfile, knownMinor })
+ if (result.withheldReason) return result
+ const feedback = await runPresentationAssessment({ callModel, faceImage,
+   sideImage: result.imageSuitability.profileUsable ? sideImage : null, assessmentProfile, knownMinor, presentationGoals })
+ result.feedbackVersion = 'presentation-v2'
+ result.suggestions = feedback.suggestions
+ result.presentation = feedback.presentation
+ result.presentationStatus = feedback.presentation.unavailable ? 'unavailable' : 'ready'
+ if (feedback.unavailableDetail) result.unassessableDetails.push(feedback.unavailableDetail)
+ return result
+}
+module.exports = { evidenceForRange, umaxPresentation, PRESENTATION_KEYS, presentationFeedback, VERSION, SCALE, DIMENSIONS, CHECKS, AssessmentError, profile, range, tier, tiers, suitability, assessImageSuitability, validate, withheld, parse, runPrimaryAssessment, runPresentationAssessment, runAssessment }

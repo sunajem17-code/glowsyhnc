@@ -2519,6 +2519,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
       if (guestReadyRef?.current) await guestReadyRef.current
 
       let aiResult
+      let presentationFollowup = null
       try {
         setScanInFlight(true)
         aiResult = await requestProductionAnalysis({
@@ -2529,6 +2530,8 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
           evidence: analysisEvidence,
           gender: gender || 'male',
         })
+        presentationFollowup = aiResult.presentationPromise ?? null
+        delete aiResult.presentationPromise
       } finally {
         setScanInFlight(false)
         clearTimeout(slowTimer)
@@ -2568,6 +2571,9 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
 
       await Promise.race([animationGate, new Promise((_, reject) => setTimeout(() => reject(new Error('Could not track the face for the analysis animation Please retry the scan')), 30000))])
       onDone(scanRecord)
+      presentationFollowup?.then(feedback => {
+        if (feedback) useStore.getState().patchScanPresentation(scanRecord.id, feedback)
+      }).catch(() => {})
     } catch (err) {
       console.error('[SCAN DONE] runAnalysisWithData caught error:', err?.message, err?.status, err?.errorCode)
       retrySideRef.current = side

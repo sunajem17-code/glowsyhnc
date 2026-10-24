@@ -108,6 +108,71 @@ test('profile and styling goals reach advice only, scoring input is invariant (m
  assert.match(calls[0][1].prompt,/Model tier starts at 6/)
  assert.match(calls[0][1].prompt,/not a required population quota/)
 })
+test('primary score completes independently of the presentation follow-up', async () => {
+ let presentationCalled = false
+ const result = await A.runPrimaryAssessment({faceImage:'front',callModel:async(prompt,input)=>{
+   if(prompt.includes('Provide separate presentation observations'))presentationCalled=true
+   if(input.quality)return JSON.stringify(raw())
+   return JSON.stringify(quality())
+ }})
+ assert.equal(result.scoreRange.min,5.2)
+ assert.equal(result.presentationStatus,'pending')
+ assert.equal(presentationCalled,false)
+})
+test('primary assessment returns a validated score without calling secondary presentation analysis', async () => {
+ let calls = 0
+ const result = await A.runPrimaryAssessment({faceImage:'front',callModel:async()=>{
+   calls++
+   return JSON.stringify(calls===1?quality():raw())
+ }})
+ assert.equal(calls,2)
+ assert.deepEqual(result.scoreRange,raw().scoreRange)
+ assert.equal(result.presentation,undefined)
+ assert.deepEqual(result.suggestions,[])
+})
+test('a score that fails the evidence gate is reassessed once without lowering evidence standards', async () => {
+ let scoringCalls = 0
+ let correctivePrompt = ''
+ const unsupported = raw({ scoreRange: { min: 7, max: 7.5 }, dimensions: Object.fromEntries(A.DIMENSIONS.map(k => [k, {
+   status: 'broadly_average', evidenceLevel: 'ordinary', observation: 'The visible region appears broadly ordinary.'
+ }])) })
+ const result = await A.runPrimaryAssessment({ faceImage: 'front', callModel: async (prompt, input) => {
+   if (prompt.includes('Check image suitability')) return JSON.stringify(quality())
+   scoringCalls++
+   if (scoringCalls === 1) return JSON.stringify(unsupported)
+   correctivePrompt = prompt
+   assert.equal(input.faceImage, 'front')
+   return JSON.stringify(raw({ scoreRange: { min: 4.5, max: 5.2 } }))
+ } })
+ assert.equal(scoringCalls, 2)
+ assert.match(correctivePrompt, /Do not raise evidence grades/)
+ assert.match(correctivePrompt, /withhold/)
+ assert.deepEqual(result.scoreRange, { min: 4.5, max: 5.2 })
+})
+test('repeated evidence-gate mismatch safely withholds instead of failing the scan or inventing a score', async () => {
+ let scoringCalls = 0
+ const unsupported = raw({ scoreRange: { min: 7, max: 7.5 }, dimensions: Object.fromEntries(A.DIMENSIONS.map(k => [k, {
+   status: 'broadly_average', evidenceLevel: 'ordinary', observation: 'The visible region appears broadly ordinary.'
+ }])) })
+ const result = await A.runPrimaryAssessment({ faceImage: 'front', callModel: async prompt => {
+   if (prompt.includes('Check image suitability')) return JSON.stringify(quality())
+   scoringCalls++
+   return JSON.stringify(unsupported)
+ } })
+ assert.equal(scoringCalls, 2)
+ assert.equal(result.scoreRange, null)
+ assert.equal(result.umax, null)
+ assert.equal(result.withheldReason, 'insufficient_feature_evidence')
+})
+test('presentation feedback can be requested as an independent follow-up', async () => {
+ const result = await A.runPresentationAssessment({faceImage:'front',assessmentProfile:'male',callModel:async(prompt,input)=>{
+   assert.match(prompt,/Provide separate presentation observations/)
+   assert.equal(input.faceImage,'front')
+   return JSON.stringify(feedback())
+ }})
+ assert.deepEqual(result.presentation,A.presentationFeedback(feedback()))
+ assert.deepEqual(result.suggestions,['Try sweeping the fringe to one side.'])
+})
 test('advice failure cannot change or fabricate score',async()=>{
  let count=0
  const result=await A.runAssessment({faceImage:'front',assessmentProfile:'female',callModel:async()=>{
@@ -137,11 +202,39 @@ test('capture requests explicit profile/minor flag, ignores previous score, reje
  await assert.rejects(requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({overallScore:8})}}}),/older rubric/)
  await assert.rejects(requestProductionAnalysis({...base,evidence:{status:'additional_image_required'},apiClient:{ai:{score:()=>assert.fail()}}}),/could not be measured/)
 })
+test('primary response returns before presentation follow-up resolves',async()=>{
+ let finishPresentation
+ const a={...A.validate(raw(),context),presentationStatus:'pending'}
+ const apiClient={ai:{
+  score:async()=>({assessment:a}),
+  scorePresentation:()=>new Promise(resolve=>{finishPresentation=resolve}),
+ }}
+ const result=await requestProductionAnalysis({apiClient,faceImage:'photo',evidence:{status:'measured'}})
+ assert.equal(result.assessment.scoreRange.min,5.2)
+ assert.equal(typeof result.presentationPromise?.then,'function')
+ let settled=false
+ result.presentationPromise.then(()=>{settled=true})
+ await Promise.resolve()
+ assert.equal(settled,false)
+ finishPresentation({presentation:feedback(),suggestions:['Try sweeping the fringe to one side.']})
+ assert.deepEqual(await result.presentationPromise,{presentation:feedback(),suggestions:['Try sweeping the fringe to one side.']})
+})
+test('completed server responses do not repeat secondary analysis during rollout',async()=>{
+ let secondaryCalls=0
+ const a={...A.validate(raw(),context),presentation:feedback(),presentationStatus:'ready'}
+ const result=await requestProductionAnalysis({faceImage:'photo',evidence:{status:'measured'},apiClient:{ai:{
+  score:async()=>({assessment:a}),
+  scorePresentation:async()=>{secondaryCalls++;return {presentation:feedback()}},
+ }}})
+ assert.equal(secondaryCalls,0)
+ assert.equal(result.presentationPromise,undefined)
+ assert.deepEqual(result.assessment.presentation,a.presentation)
+})
 test('new route does not use anchoring, historical cache, score defaults or leaderboard writes',()=>{
  const source=readFileSync(new URL('../server/src/routes/aiScore.js',import.meta.url),'utf8')
  const route=source.slice(source.indexOf("router.post('/score',"),source.indexOf('// ── POST /api/ai/score/physique'))
  for(const old of ['previousScore','getScanCache','calculateFinalScore','updateLeaderboard','Math.max','fallback = 5']) assert.equal(route.includes(old),false,old)
- assert.match(route,/assessment.runAssessment/)
+ assert.match(route,/assessment.runPrimaryAssessment/)
 })
 
 function feedback() {
@@ -194,7 +287,7 @@ test('new scored assessments require anchor explanations and reject false precis
 test('PSL scoring prompt supplies all anchors and separates facial appearance from appeal (mocked)',async()=>{
  const seen=[]
  await A.runAssessment({faceImage:'front',callModel:async(prompt)=>{seen.push(prompt);return JSON.stringify(seen.length===1?quality():seen.length===2?raw():feedback())}})
- for(const rule of ['0–8 scale','4.5 is above average','5 attractive','5.5 very attractive','6 the start of model tier','6.5 exceptional model tier','7 elite model tier','7.5+','not dating appeal','Do not use celebrity identity','not an empirically validated distribution','not a required population quota','Do not demand literal flawlessness','scoreExplanation'])assert.ok(seen[1].includes(rule),rule)
+ for(const rule of ['0–8 scale','4.5 is above average','5 attractive','5.5 very attractive','6 the start of model tier','6.5 exceptional model tier','7 elite model tier','7.5+','not dating appeal','Do not use celebrity identity','not an empirically validated distribution','not a required population quota','Do not demand literal flawlessness','scoreExplanation','18 words or fewer','80 words or fewer'])assert.ok(seen[1].includes(rule),rule)
  for(const forbidden of ['9–10 band','0–10 scale. Do not','PSL 5 is equivalent to 84.15%'])assert.equal(seen[1].includes(forbidden),false)
 })
 

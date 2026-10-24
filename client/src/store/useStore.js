@@ -127,6 +127,26 @@ const useStore = create(
           : state.currentScan,
         scans: state.scans.map(s => s.id === scanId ? { ...s, extendedMetrics, extendedMetricsStatus: status } : s),
       })),
+      patchScanPresentation: (scanId, feedback) => set(state => {
+        const apply = scan => scan?.id === scanId ? {
+          ...scan,
+          aiScore: {
+            ...scan.aiScore,
+            suggestions: feedback.suggestions ?? [],
+            assessment: {
+              ...scan.aiScore?.assessment,
+              feedbackVersion: 'presentation-v2',
+              presentationStatus: feedback.presentation?.unavailable ? 'unavailable' : 'ready',
+              suggestions: feedback.suggestions ?? [],
+              presentation: feedback.presentation,
+              ...(feedback.unavailableDetail ? { unassessableDetails: [
+                ...(scan.aiScore?.assessment?.unassessableDetails ?? []), feedback.unavailableDetail,
+              ] } : {}),
+            },
+          },
+        } : scan
+        return { currentScan: apply(state.currentScan), scans: state.scans.map(apply) }
+      }),
 
       // Live Face Scan photo + 2D landmark positions, for the "tap a stat, see
       // it pointed out on your face" UI. Deliberately session-only — NOT in

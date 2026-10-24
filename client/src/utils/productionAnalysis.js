@@ -1,4 +1,5 @@
 import { analyzeLandmarkEvidence, buildProfileEvidence } from './evidenceAnalysis.js'
+import { ASSESSMENT_VERSION } from './assessment.js'
 
 function imageDimensions(source) {
   return new Promise((resolve, reject) => {
@@ -46,8 +47,8 @@ export async function buildProductionEvidence({ frontImage, frontLandmarks, qual
 }
 
 export async function requestProductionAnalysis({
-  apiClient, faceImage, sideImage = null, gender = 'male', previousScore = null,
-  sideProfileGeometry = null, evidence, timeoutMs = 120_000,
+  apiClient, faceImage, sideImage = null, gender = 'male',
+  sideProfileGeometry = null, evidence, knownMinor = false, presentationGoals = '', timeoutMs = 120_000,
 }) {
   if (evidence?.status !== 'measured') {
     const error = new Error(`Photo geometry could not be measured reliably: ${evidence?.reason ?? 'unknown_reason'}`)
@@ -61,13 +62,40 @@ export async function requestProductionAnalysis({
     ...(sideProfileGeometry ? { sideProfileGeometry } : {}),
     analysisEvidence: portableEvidence(evidence),
     gender,
-    ...(previousScore != null ? { previousScore } : {}),
+    assessmentProfile: gender ?? null,
+    knownMinor,
+    ...(presentationGoals ? { presentationGoals } : {}),
   }
   const scoreCall = apiClient.ai.score(payload)
-  const timeoutCall = new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs))
-  const result = await Promise.race([scoreCall, timeoutCall])
+  let timeoutId
+  const timeoutCall = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs)
+  })
+  let result
+  try {
+    result = await Promise.race([scoreCall, timeoutCall])
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  if (result.assessment?.rubricVersion !== ASSESSMENT_VERSION) {
+    throw new Error('The scoring server returned an older rubric. Please update the server and try again.')
+  }
+  const presentationPromise = result.assessment?.presentationStatus === 'pending' && typeof apiClient.ai.scorePresentation === 'function'
+    ? apiClient.ai.scorePresentation({
+      faceImage,
+      ...(sideImage && result.assessment?.imageSuitability?.profileUsable ? { sideImage } : {}),
+      gender,
+      knownMinor,
+      ...(presentationGoals ? { presentationGoals } : {}),
+    }).catch(() => ({
+      presentation: { observations: {}, recommendations: [], unavailable: true },
+      suggestions: [],
+      unavailableDetail: 'Presentation feedback is unavailable; the assessment range is unchanged.',
+    }))
+    : null
   return {
     ...result,
+    ...(presentationPromise ? { presentationPromise } : {}),
     analysisEvidence: {
       ...evidence,
       observations: result.visualObservations ?? [],
