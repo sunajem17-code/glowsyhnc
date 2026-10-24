@@ -1,3 +1,5 @@
+import { GOLD } from './theme.js'
+
 export function getStartupSplash({ cinematicDone, splashDone }) {
   if (!cinematicDone) return 'cinematic'
   if (!splashDone) return 'welcome'
@@ -13,7 +15,7 @@ export function getSplashCopy() {
     cinematicBrandText: null,
     cinematicSubtitle: null,
     welcomeTitle: 'ASCENDUS',
-    welcomeTitleColor: '#FFFFFF',
+    welcomeTitleColor: GOLD,
     welcomeSubtitle: 'Your journey starts here',
     welcomeSubtitleDelay: 2500,
   }

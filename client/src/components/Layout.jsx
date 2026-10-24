@@ -1,6 +1,6 @@
 import AchievementToast from './AchievementToast'
 import ScanCelebration from './ScanCelebration'
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { useLocation, useNavigationType, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav, { TAB_ROOT_PATHS } from './BottomNav'
@@ -25,16 +25,16 @@ function buildPageVariants(isPop, isTabSwitch) {
   if (isTabSwitch) {
     return {
       initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0, transition: { duration: 0.15, ease: EASE_STANDARD } },
+      animate: { opacity: 1, zIndex: 1 },
+      exit: { opacity: 0, zIndex: 0, transition: { duration: 0.15, ease: EASE_STANDARD } },
     }
   }
   return {
     initial: isPop ? { opacity: 0, x: -32 } : { opacity: 0, y: 12 },
-    animate: { opacity: 1, x: 0, y: 0 },
+    animate: { opacity: 1, x: 0, y: 0, zIndex: 1 },
     exit: (custom) => custom
-      ? { x: custom.width, transition: { ...SPRING_STANDARD, velocity: custom.velocity } }
-      : { opacity: 0, y: -8, transition: { duration: 0.22, ease: EASE_STANDARD } },
+      ? { x: custom.width, zIndex: 0, transition: { ...SPRING_STANDARD, velocity: custom.velocity } }
+      : { opacity: 0, y: -8, zIndex: 0, transition: { duration: 0.22, ease: EASE_STANDARD } },
   }
 }
 
@@ -68,7 +68,14 @@ export default function Layout() {
   // history behind it — not on a tab root (nowhere in-app to "go back" to)
   // and not on the very first location of the session (nothing behind it).
   const swipeEnabled = !TAB_ROOT_PATHS.includes(location.pathname) && location.key !== 'default'
-  const { x, swipeExit, resetAfterExit, edgeHandlers } = useSwipeBack({ enabled: swipeEnabled })
+  const { x, resetAfterExit, edgeHandlers } = useSwipeBack({ enabled: swipeEnabled })
+
+  // Route changes immediately discard the previous page. This prevents nested
+  // looping animations from keeping an outgoing screen mounted over the new
+  // route, and resets any swipe offset before the destination paints.
+  useLayoutEffect(() => {
+    resetAfterExit()
+  }, [location.pathname, resetAfterExit])
 
   const isTabSwitch = TAB_ROOT_PATHS.includes(location.pathname)
   const pageVariants = location.pathname === '/unlock'
@@ -103,23 +110,17 @@ export default function Layout() {
             pointerEvents: swipeEnabled ? 'auto' : 'none',
           }}
         />
-        {/* The results card has already animated away during this handoff.
-            Reset the boundary so nested scan exits cannot hold Progress blank. */}
-        <AnimatePresence key={location.pathname === '/timeline' && location.state?.savedScanId ? `saved-${location.state.savedScanId}` : 'pages'} mode="wait" initial={false} onExitComplete={resetAfterExit}>
-          <motion.div
-            key={location.pathname}
-            custom={swipeExit}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.22, ease: EASE_STANDARD }}
-            style={{ x }}
-            className="h-full"
-          >
-            {outlet}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={location.pathname}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          transition={{ duration: 0.22, ease: EASE_STANDARD }}
+          style={{ x, position: 'absolute', inset: 0, width: '100%' }}
+          className="h-full"
+        >
+          {outlet}
+        </motion.div>
       </main>
       {!['/scan/capture', '/unlock'].includes(location.pathname) && <BottomNav />}
     </div>

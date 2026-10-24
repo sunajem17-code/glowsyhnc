@@ -1557,7 +1557,7 @@ function PhysiqueAnalyzingScreen({ currentStep, slow, photo, morphing = false, s
               className="absolute pointer-events-none"
               initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0 }}
               transition={{ duration: 0.5 }}
-              style={{ top: '12%', left: '15%', right: '15%', height: 2, background: `${LANDMARK_GOLD}88` }}
+              style={{ top: '35%', left: '15%', right: '15%', height: 2, background: `${LANDMARK_GOLD}88` }}
             >
               <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
               <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
@@ -1567,7 +1567,7 @@ function PhysiqueAnalyzingScreen({ currentStep, slow, photo, morphing = false, s
               className="absolute pointer-events-none"
               initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0 }}
               transition={{ duration: 0.5 }}
-              style={{ top: '45%', left: '28%', right: '28%', height: 2, background: `${LANDMARK_GOLD}88` }}
+              style={{ top: '62%', left: '28%', right: '28%', height: 2, background: `${LANDMARK_GOLD}88` }}
             >
               <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
               <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
@@ -1576,21 +1576,21 @@ function PhysiqueAnalyzingScreen({ currentStep, slow, photo, morphing = false, s
             <motion.div
               initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0, x: stepIndex >= 1 ? 0 : -8 }}
               transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '8%', left: '4%', textAlign: 'left' }}
+              style={{ position: 'absolute', top: '32%', left: '4%', textAlign: 'left' }}
             >
               <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>SHOULDERS</p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0, x: stepIndex >= 2 ? 0 : -8 }}
               transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '42%', left: '4%', textAlign: 'left' }}
+              style={{ position: 'absolute', top: '59%', left: '4%', textAlign: 'left' }}
             >
               <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>WAIST</p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: 8 }} animate={{ opacity: stepIndex >= 3 ? 1 : 0, x: stepIndex >= 3 ? 0 : 8 }}
               transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '20%', right: '4%', textAlign: 'right' }}
+              style={{ position: 'absolute', top: '45%', right: '4%', textAlign: 'right' }}
             >
               <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>V-TAPER</p>
             </motion.div>

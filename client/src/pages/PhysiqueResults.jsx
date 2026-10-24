@@ -14,15 +14,23 @@ import ScanPhotoComparison from '../components/ScanPhotoComparison'
 
 const RESULT_VIEWS = ['results', 'photo', 'compare']
 const PHYSIQUE_METRICS = [
-  { key: 'frame', label: 'Frame' },
-  { key: 'leanness', label: 'Leanness' },
-  { key: 'proportions', label: 'Proportions' },
-  { key: 'posture', label: 'Posture' },
-  { key: 'overall_presentation', label: 'Presentation' },
+  { key: 'overall', label: 'Overall' },
+  { key: 'potential', label: 'Potential' },
+  { key: 'muscle_mass', label: 'Muscle Mass' },
+  { key: 'body_fat_score', label: 'Body Fat' },
+  { key: 'v_taper', label: 'V-Taper' },
+  { key: 'frame_width', label: 'Frame Width' },
 ]
 
 function getPhysiqueMetricScore(scan, key) {
-  const aliases = key === 'overall_presentation' ? [key, 'overallPresentation', 'presentation'] : [key]
+  const aliases = {
+    overall: ['overall', 'overallPhysique'],
+    potential: ['potential', 'physiquePotential'],
+    muscle_mass: ['muscle_mass', 'muscleMass'],
+    body_fat_score: ['body_fat_score', 'bodyFatScore'],
+    v_taper: ['v_taper', 'vTaper'],
+    frame_width: ['frame_width', 'frameWidth'],
+  }[key] ?? (key === 'overall_presentation' ? [key, 'overallPresentation', 'presentation'] : [key])
   const sources = [scan?.physiqueScore, scan?.aiScore?.physiqueScore, scan?.aiScore?.physiqueResult, scan?.aiScore]
   for (const source of sources) {
     for (const alias of aliases) {
@@ -50,7 +58,7 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
             const validValue = getPhysiqueMetricScore(scan, key)
             const animation = getRevealRatingAnimation(validValue, { unlocked, reduceMotion, metricKey: label, revealRun })
             return (
-              <div key={key} style={{ paddingBottom: idx < 4 ? 28 : 0 }}>
+              <div key={key} style={{ paddingBottom: idx < PHYSIQUE_METRICS.length - 2 ? 28 : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
                   <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
                   <motion.span aria-hidden="true" initial={animation.lock.initial} animate={animation.lock.animate} transition={animation.lock.transition}
@@ -110,7 +118,9 @@ function PhysiquePaywall({ photo, scan, onClose, onAscend, onInvite, isPurchasin
           See your full physique ratings with Ascendus Max
         </p>
 
-        <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />
+        <div style={{ marginTop: 120, width: '100%' }}>
+          <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />
+        </div>
 
         {/* CTAs */}
         <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>

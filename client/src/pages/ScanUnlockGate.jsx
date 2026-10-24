@@ -1053,9 +1053,9 @@ function PaywallRatingsCard() {
     <div className="grid grid-cols-3 gap-2">
       {items.map(({ label, pct }) => (
         <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
-          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>
-            {pct}
+          <p className="font-heading font-bold leading-tight mb-2" style={{ color: '#A3A3A3', fontFamily: '"Plus Jakarta Sans", sans-serif', fontSize: 'clamp(9px, 3vw, 18px)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>{label}</p>
+          <p className="font-heading font-extrabold leading-none mb-2.5" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontSize: 30, fontVariantNumeric: 'tabular-nums' }}>
+            {(pct / 10).toFixed(1)}
           </p>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
@@ -1075,24 +1075,27 @@ function PaywallPhysiqueCard() {
     return `hsl(${hue}, 85%, 45%)`
   }
   const items = [
-    { label: 'Overall',       pct: 66 },
-    { label: 'Potential',     pct: 91 },
-    { label: 'Muscle Mass',   pct: 58 },
-    { label: 'Body Fat',      pct: 54 },
-    { label: 'V-Taper',       pct: 62 },
-    { label: 'Frame Width',   pct: 71 },
+    { label: 'Overall',       score: 6.6 },
+    { label: 'Potential',     score: 9.1 },
+    { label: 'Muscle Mass',   score: 5.8 },
+    { label: 'Body Fat',      score: 5.4 },
+    { label: 'V-Taper',       score: 6.2 },
+    { label: 'Frame Width',   score: 7.1 },
   ]
   return (
     <div className="grid grid-cols-3 gap-2">
-      {items.map(({ label, pct }) => (
-        <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
-          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>{pct}</p>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
+      {items.map(({ label, score }) => {
+        const pct = score * 10
+        return (
+          <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
+            <p className="font-heading font-bold leading-tight mb-2" style={{ color: '#A3A3A3', fontFamily: '"Plus Jakarta Sans", sans-serif', fontSize: 'clamp(8px, 2.6vw, 13px)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>{label}</p>
+            <p className="font-heading font-extrabold leading-none mb-2.5" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontSize: 26, fontVariantNumeric: 'tabular-nums' }}>{score.toFixed(1)}</p>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -1423,7 +1426,6 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
         </motion.button>
         <div className="mt-3 mb-3">
           <SocialProofTicker />
-          <p className="text-center font-body text-[10px] mt-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Sample activity</p>
         </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (

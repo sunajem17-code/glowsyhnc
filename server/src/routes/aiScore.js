@@ -646,7 +646,7 @@ async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', body
     temperature: 0,
     system: `You are a physique and body composition analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
-Score physique on a 1.0–10.0 scale across 5 categories.
+Score physique on a 1.0–10.0 scale. Return all legacy categories plus the six display ratings: overall, potential, muscle_mass, body_fat_score, v_taper, and frame_width.
 
 ${isFemale ? `FEMALE PHYSIQUE SCORING:
 - proportions: Waist-to-hip ratio, shoulder width, leg/torso balance, overall silhouette harmony. High score: defined waist, proportional hips/shoulders.
@@ -672,6 +672,12 @@ SCORING RULES:
 - Score based only on what is VISIBLE in the photo. If the body is partially hidden by clothing, score what you can see and note it.
 - Never penalize for natural body type — score relative to ideal proportions for that body type.
 - Body fat levels: very_lean / lean / average / above_average / heavy
+- potential: realistic physique development potential from visible structure and apparent training headroom; do not infer age, health, or genetics from a photo.
+- muscle_mass: apparent visible muscular development relative to body size and the visible areas; clothing can limit confidence.
+- body_fat_score: a 1–10 appearance rating where higher means leaner visible body composition; this is not a body-fat percentage or medical estimate.
+- v_taper: visible shoulder-to-waist taper; use measured shoulderHipRatio when available.
+- frame_width: visible skeletal frame and shoulder width, accounting for pose and clothing uncertainty.
+- Keep overall on the same 1–10 scale and calculate it from the five legacy categories as before.
 
 Return ONLY this JSON — no markdown, nothing else:
 {
@@ -680,6 +686,11 @@ Return ONLY this JSON — no markdown, nothing else:
   "frame": <number 1.0–10.0>,
   "posture": <number 1.0–10.0>,
   "overall_presentation": <number 1.0–10.0>,
+  "potential": <number 1.0–10.0>,
+  "muscle_mass": <number 1.0–10.0>,
+  "body_fat_score": <number 1.0–10.0, higher is leaner visible appearance>,
+  "v_taper": <number 1.0–10.0>,
+  "frame_width": <number 1.0–10.0>,
   "body_fat_level": "<very_lean|lean|average|above_average|heavy>",
   "physique_strengths": ["<strength 1>", "<strength 2>"],
   "physique_improvements": ["<improvement 1>", "<improvement 2>"],
@@ -705,6 +716,11 @@ Return ONLY this JSON — no markdown, nothing else:
     frame:                Math.round(clamp(parsed.frame)               * 10) / 10,
     posture:              Math.round(clamp(parsed.posture)             * 10) / 10,
     overall_presentation: Math.round(clamp(parsed.overall_presentation)* 10) / 10,
+    potential:            Math.round(clamp(parsed.potential)           * 10) / 10,
+    muscle_mass:          Math.round(clamp(parsed.muscle_mass)         * 10) / 10,
+    body_fat_score:       Math.round(clamp(parsed.body_fat_score)      * 10) / 10,
+    v_taper:              Math.round(clamp(parsed.v_taper)             * 10) / 10,
+    frame_width:          Math.round(clamp(parsed.frame_width)         * 10) / 10,
     overall:              Math.round(overall                           * 10) / 10,
     body_fat_level:       parsed.body_fat_level ?? 'average',
     physique_strengths:   Array.isArray(parsed.physique_strengths)   ? parsed.physique_strengths   : [],

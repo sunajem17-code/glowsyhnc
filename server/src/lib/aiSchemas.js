@@ -44,7 +44,7 @@ const extended = object({ extended_metrics: object({
   miscellaneous: metrics(['skin', 'harmony', 'symmetry', 'neck_width', 'bloat', 'bone_mass']),
 }) })
 
-const physique = object({ ...scores(['proportions', 'leanness', 'frame', 'posture', 'overall_presentation']).properties,
+const physique = object({ ...scores(['proportions', 'leanness', 'frame', 'posture', 'overall_presentation', 'potential', 'muscle_mass', 'body_fat_score', 'v_taper', 'frame_width']).properties,
   body_fat_level: enumeration(['very_lean', 'lean', 'average', 'above_average', 'heavy']),
   physique_strengths: strings, physique_improvements: strings, physique_notes: string,
 })

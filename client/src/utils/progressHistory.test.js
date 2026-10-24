@@ -12,10 +12,19 @@ test('device-saved rating appears in Progress when cloud history is empty', () =
 })
 test('does not duplicate a rating already saved by the cloud', () => {
   const remote = { id: 'db-1', created_at: '2026-10-17T12:00:10Z', overall_score: 6.1 }
-  assert.deepEqual(mergeProgressHistory([remote], [scan], scan), [remote])
+  const [row] = mergeProgressHistory([remote], [{ ...scan, tier: 'Mid tier normie' }], { ...scan, tier: 'Mid tier normie' })
+  assert.equal(row.id, 'db-1')
+  assert.equal(row.localMediaScanId, 'scan-1')
+  assert.equal(row.tier, 'Mid tier normie')
 })
-test('does not publish unselected scans to Progress', () => {
-  assert.deepEqual(mergeProgressHistory([], [{ ...scan, progressSavedAt: undefined }], null), [])
+test('unselected local scans can enrich matching cloud history without being published', () => {
+  const local = { ...scan, progressSavedAt: undefined, tier: 'Mid Tier Normie' }
+  const remote = { id: 'db-1', created_at: '2026-10-17T12:00:10Z', overall_score: 6.1 }
+  const rows = mergeProgressHistory([remote], [local], null)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].localMediaScanId, 'scan-1')
+  assert.equal(rows[0].tier, 'Mid Tier Normie')
+  assert.deepEqual(mergeProgressHistory([], [{ ...local, scanDate: '2026-10-18T12:00:00Z' }], null), [])
 })
 
 test('Progress keeps body scans in their own history and reads body-only score payloads', () => {

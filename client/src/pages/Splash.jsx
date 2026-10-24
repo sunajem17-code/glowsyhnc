@@ -141,7 +141,7 @@ export default function Splash({ onDone }) {
                 fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
                 fontWeight: 800,
                 fontSize: 25.3,
-                letterSpacing: '-0.02em',
+                letterSpacing: '0.26em',
                 color: SPLASH_COPY.welcomeTitleColor,
                 WebkitTextFillColor: SPLASH_COPY.welcomeTitleColor,
                 marginBottom: 4,

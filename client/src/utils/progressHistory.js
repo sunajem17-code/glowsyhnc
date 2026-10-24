@@ -85,7 +85,6 @@ export function formatProgressTrendLabels(series) {
 export function mergeProgressHistory(remoteScans, localScans, currentScan) {
   const rows = [...remoteScans]
   for (const local of localScans) {
-    if (!local.progressSavedAt && !isPhysiqueProgressScan(local)) continue
     const scan = currentScan?.id === local.id ? currentScan : local
     const overall = isPhysiqueProgressScan(scan)
       ? getProgressScore(scan, 'physique', 'overall')
@@ -97,7 +96,25 @@ export function mergeProgressHistory(remoteScans, localScans, currentScan) {
       && Number(row.overall_score) === overall
       && Math.abs(Date.parse(row.created_at) - Date.parse(date)) < 60000
     ))
-    if (match) continue
+    if (match) {
+      // Photos are intentionally kept in IndexedDB under the device scan id,
+      // while the cloud history row uses the server scan id. Preserve that
+      // lookup key when the cloud row wins deduplication so history can still
+      // show the person's captured face after localStorage strips the photo.
+      const localPhoto = scan.facePhotoUrl ?? scan.face_photo_url ?? scan.face_image_url ?? null
+      Object.assign(match, {
+        facePhotoUrl: match.facePhotoUrl ?? match.face_photo_url ?? match.face_image_url ?? localPhoto,
+        face_image_url: match.face_image_url ?? match.face_photo_url ?? localPhoto,
+        localMediaScanId: scan.id,
+        gender: match.gender ?? scan.gender ?? null,
+        tier: match.tier ?? scan.tier ?? scan.aiScore?.tier ?? null,
+        aiScore: match.aiScore ?? scan.aiScore ?? null,
+      })
+      continue
+    }
+    // Unselected local scans should not be published into Progress, but they
+    // can still carry the IndexedDB photo key for a matching cloud history row.
+    if (!local.progressSavedAt && !isPhysiqueProgressScan(local)) continue
     rows.push({
       id: scan.id,
       scanType: isPhysiqueProgressScan(scan) ? 'physique' : 'face',
