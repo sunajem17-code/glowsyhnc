@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
+import AppearanceBreakdown from '../components/AppearanceBreakdown'
 import PromoModal from '../components/PromoModal'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
@@ -1708,7 +1709,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </div>
         <div className="h-5 flex items-start justify-center">
           {unlocked ? (
-            <span aria-hidden="true" />
+            <span className="text-[13px]" style={{ color: '#bcbcbc' }}>{activeView === 'photo' ? 'Your personalized appearance analysis' : ''}</span>
           ) : (
             <p className="font-body text-[14px] text-center leading-5" style={{ color: 'rgba(255,255,255,0.5)' }}>
               See your full facial analysis with Ascendus Max
@@ -1780,9 +1781,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           </div>
           </div>
           {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
-            <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
-              {facePhoto ? <img src={facePhoto} draggable={false} alt="Your original front scan photo" className="w-full h-full object-contain" /> : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
-            </div>
+            {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} />}
           </div>}
           {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
             {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} />}
@@ -1868,7 +1867,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             </>, document.body,
           )}
         {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
-          {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
+          {[['results', 'Show results'], ['photo', 'Show appearance breakdown'], ['compare', 'Show photo comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
               onClick={() => showView(view)} onKeyDown={event => {
                 if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -2002,7 +2001,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, developerPreviewUnlocked, currentScan)
+  const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, currentScan)
   const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: hasUnlockedAccess, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {

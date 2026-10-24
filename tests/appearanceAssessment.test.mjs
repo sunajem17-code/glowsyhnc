@@ -193,13 +193,15 @@ test('structured records keep null point scores and historical rubrics untouched
  const withheld=assessmentScan({assessment:A.withheld(quality('insufficient'),null,'insufficient_image')},{id:'none'})
  assert.equal(withheld.aiScore.assessment.scoreRange,null);assert.equal(withheld.glowScore,null)
 })
-test('capture requests explicit profile/minor flag, ignores previous score, rejects old server',async()=>{
+test('capture keeps explicit profile metadata and supports restored point-score and historical assessment responses',async()=>{
  let payload
  const a=A.validate(raw(),context)
  const base={faceImage:'photo',evidence:{status:'measured'},knownMinor:true,gender:null,previousScore:9}
  await requestProductionAnalysis({...base,apiClient:{ai:{score:async p=>{payload=p;return {assessment:a}}}}})
  assert.equal(payload.assessmentProfile,null);assert.equal(payload.knownMinor,true);assert.equal('previousScore' in payload,false)
- await assert.rejects(requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({overallScore:8})}}}),/older rubric/)
+ const pointResult=await requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({overallScore:8})}}})
+ assert.equal(pointResult.overallScore,8)
+ await assert.rejects(requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({assessment:{rubricVersion:'unsupported'}})}}}),/older rubric/)
  await assert.rejects(requestProductionAnalysis({...base,evidence:{status:'additional_image_required'},apiClient:{ai:{score:()=>assert.fail()}}}),/could not be measured/)
 })
 test('primary response returns before presentation follow-up resolves',async()=>{
@@ -230,11 +232,14 @@ test('completed server responses do not repeat secondary analysis during rollout
  assert.equal(result.presentationPromise,undefined)
  assert.deepEqual(result.assessment.presentation,a.presentation)
 })
-test('new route does not use anchoring, historical cache, score defaults or leaderboard writes',()=>{
+test('restored working score route uses provider switching and saves only server-calculated results',()=>{
  const source=readFileSync(new URL('../server/src/routes/aiScore.js',import.meta.url),'utf8')
  const route=source.slice(source.indexOf("router.post('/score',"),source.indexOf('// ── POST /api/ai/score/physique'))
- for(const old of ['previousScore','getScanCache','calculateFinalScore','updateLeaderboard','Math.max','fallback = 5']) assert.equal(route.includes(old),false,old)
- assert.match(route,/assessment.runPrimaryAssessment/)
+ assert.match(source,/createAIClient/)
+ assert.match(route,/verifyToken, resolvePro, scanLimit, claudeLimit/)
+ assert.match(route,/finishScan/)
+ assert.match(route,/calculateFinalScore/)
+ for(const clientScore of ['req.body.overallScore','req.body.isPremium','req.body.faceScore']) assert.equal(route.includes(clientScore),false)
 })
 
 function feedback() {

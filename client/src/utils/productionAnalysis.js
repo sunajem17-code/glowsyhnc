@@ -1,5 +1,6 @@
 import { analyzeLandmarkEvidence, buildProfileEvidence } from './evidenceAnalysis.js'
 import { ASSESSMENT_VERSION } from './assessment.js'
+import { withDeadline } from './requestTimeout.js'
 
 function imageDimensions(source) {
   return new Promise((resolve, reject) => {
@@ -67,17 +68,8 @@ export async function requestProductionAnalysis({
     ...(presentationGoals ? { presentationGoals } : {}),
   }
   const scoreCall = apiClient.ai.score(payload)
-  let timeoutId
-  const timeoutCall = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('Analysis timed out. Please try again')), timeoutMs)
-  })
-  let result
-  try {
-    result = await Promise.race([scoreCall, timeoutCall])
-  } finally {
-    clearTimeout(timeoutId)
-  }
-  if (result.assessment?.rubricVersion !== ASSESSMENT_VERSION) {
+  const result = await withDeadline(scoreCall, timeoutMs, 'Analysis timed out. Please try again')
+  if (result.assessment && result.assessment.rubricVersion !== ASSESSMENT_VERSION) {
     throw new Error('The scoring server returned an older rubric. Please update the server and try again.')
   }
   const presentationPromise = result.assessment?.presentationStatus === 'pending' && typeof apiClient.ai.scorePresentation === 'function'

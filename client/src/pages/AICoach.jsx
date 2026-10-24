@@ -1,3 +1,4 @@
+import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,8 +10,6 @@ import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { UPGRADE_WELCOME } from '../utils/coachWelcome'
-import { buildLocalCoachPreviewReply } from '../utils/coachPreview'
-import { getCoachAccessMode } from '../utils/coachAccess'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -20,22 +19,10 @@ const STARTER_PROMPTS = [
 ]
 
 const DEMO_TEASER = [
-  { role: 'assistant', content: "Your scan is loaded. Your biggest growth opportunity is jawline definition. Targeting this is your fastest path to 7+.", locked: false },
+  { role: 'assistant', content: "Adonis can explain your completed scan and help you choose practical next steps.", locked: false },
   { role: 'user', content: 'What should I do about it?', locked: false },
   { role: 'assistant', content: 'Unlock AI Coach to get your personalized jawline protocol and full improvement plan.', locked: true },
 ]
-
-function buildScanContext(latestScan, userProfile) {
-  if (!latestScan) return null
-  return {
-    glowScore: latestScan.glowScore,
-    faceScore: latestScan.faceScore,
-    presentationScore: latestScan.presentationScore,
-    faceData: latestScan.faceData,
-    presentationData: latestScan.presentationData,
-    userProfile,
-  }
-}
 
 function TypingIndicator() {
   return (
@@ -67,22 +54,6 @@ function TypingIndicator() {
 }
 
 // Renders coach responses with bold headers and line breaks
-function formatMessage(content) {
-  const lines = content.split('\n')
-  return lines.map((line, i) => {
-    if (!line.trim()) return <div key={i} style={{ height: 6 }} />
-    // **bold** or __bold__
-    const parts = line.split(/(\*\*[^*]+\*\*|__[^_]+__)/g)
-    const rendered = parts.map((part, j) => {
-      if (/^\*\*[^*]+\*\*$/.test(part) || /^__[^_]+__$/.test(part)) {
-        const text = part.replace(/^\*\*|\*\*$|^__|__$/g, '')
-        return <span key={j} className="font-heading font-bold" style={{ color: 'rgba(255,255,255,0.95)' }}>{text}</span>
-      }
-      return <span key={j}>{part}</span>
-    })
-    return <div key={i} className="leading-snug mb-1.5">{rendered}</div>
-  })
-}
 
 function MessageBubble({ msg, isNew }) {
   const isUser = msg.role === 'user'
@@ -102,7 +73,7 @@ function MessageBubble({ msg, isNew }) {
         </div>
       )}
       <div
-        className={`px-4 py-3 rounded-2xl max-w-[78%] relative ${msg.locked ? 'select-none' : ''}`}
+        className={`px-4 py-3 rounded-2xl ${isUser ? 'max-w-[78%]' : 'max-w-[90%]'} min-w-0 relative ${msg.locked ? 'select-none' : ''}`}
         style={isUser ? {
           background: `linear-gradient(135deg, ${GOLD}22 0%, ${GOLD}14 100%)`,
           border: `1px solid ${GOLD}30`,
@@ -133,7 +104,7 @@ function MessageBubble({ msg, isNew }) {
             filter: msg.locked ? 'blur(3px)' : 'none',
           }}
         >
-          {isUser ? msg.content : formatMessage(msg.content)}
+          {isUser ? msg.content : <CoachMessage content={msg.content} reveal={msg.reveal === true} />}
         </div>
       </div>
     </motion.div>
@@ -144,14 +115,16 @@ const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
-  const { scans, isPremium: actualIsPremium, isLocalProPreview: localPreviewEnabled, userProfile, freeCoachMessages, incrementFreeCoachMessages } = useStore()
+  const { scans, isPremium: actualIsPremium, userProfile, freeCoachMessages, user } = useStore()
   const isPremium = usePremiumUiAccess()
-  const coachAccessMode = getCoachAccessMode({ isPremium: actualIsPremium, localPreviewEnabled })
-  const isLocalProPreview = coachAccessMode === 'local-preview'
   const freeMessagesLeft = Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages || 0))
   const freeCoachLocked = !isPremium && freeMessagesLeft === 0
   const latestScan = scans[0]
-  const scanContext = buildScanContext(latestScan, userProfile)
+  const [serverScan, setServerScan] = useState(null)
+  const hasScan = !!latestScan || !!serverScan?.hasCompletedScan
+  const conversationRef = useRef(null)
+  const requestGenerationRef = useRef(0)
+  const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -161,39 +134,67 @@ export default function AICoach() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Scroll to bottom on new message
+  // Server decides which completed scan belongs to this user. Local scan state
+  // is used only for availability/navigation, never as trusted model context.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+    let active = true
+    requestGenerationRef.current += 1
+    setLoading(false)
+    setError('')
+    setMessagesOwner(user?.id ?? null)
+    setServerScan(null)
+    setMessages([])
+    conversationRef.current = null
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
+      if (saved?.conversationId && Array.isArray(saved.messages)) {
+        conversationRef.current = saved.conversationId
+        setMessages(saved.messages.slice(-12).map(message => ({ ...message, reveal: false })))
+      }
+    } catch { /* private browsing/storage unavailable */ }
+    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {})
+    return () => { active = false; requestGenerationRef.current += 1 }
+  }, [user?.id, latestScan?.id])
 
   useEffect(() => {
-    if (isLocalProPreview) setError('')
-  }, [isLocalProPreview])
+    if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
+    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+  }, [messages, user?.id, messagesOwner])
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    const container = messagesEndRef.current?.closest('[data-coach-scroll]')
+    if (container) {
+      container.scrollTop = container.scrollHeight
+      // Hidden app-shell ancestors must never scroll with a chat reply.
+      const shell = container.closest('main')
+      if (shell) shell.scrollTop = 0
+    }
+  }, [messages, loading])
 
   // Initial greeting on mount
   useEffect(() => {
-    if (messages.length > 0 || !latestScan || !isPremium) return
+    if (messages.length > 0 || !hasScan || !isPremium) return
     const pending = useStore.getState().upgradeWelcomePending
     setMessages([{ role: 'assistant', content: pending ? UPGRADE_WELCOME : `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
     if (pending) useStore.getState().setUpgradeWelcomePending(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPremium, latestScan])
+  }, [isPremium, hasScan])
 
   async function sendMessage(text) {
     const msgText = (text || input).trim()
     if (!msgText || loading) return
 
     // No scan → redirect to scan
-    if (!latestScan) { navigate('/scan'); return }
+    if (!hasScan) { navigate('/scan'); return }
 
     // Not premium → open paywall immediately
-    if (coachAccessMode === 'paywall') { navigate('/unlock?paywall=1'); return }
+    if (freeCoachLocked) { navigate('/unlock?paywall=1'); return }
 
     setInput('')
     setError('')
 
-    // Increment free usage counter before sending
-    if (!isPremium) incrementFreeCoachMessages()
+    const generation = requestGenerationRef.current
 
     const userMsg = { role: 'user', content: msgText }
     const nextMessages = [...messages, userMsg]
@@ -201,35 +202,26 @@ export default function AICoach() {
     setNewMsgIdx(nextMessages.length - 1)
     setLoading(true)
 
-    if (isLocalProPreview) {
-      // Simulate a coach reply locally so preview mode never asks the paid API
-      // for access and never changes the account's subscription entitlement.
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const previewReply = buildLocalCoachPreviewReply(msgText, scanContext)
-      setMessages(prev => {
-        const updated = [...prev, { role: 'assistant', content: previewReply }]
-        setNewMsgIdx(updated.length - 1)
-        return updated
-      })
-      setLoading(false)
-      inputRef.current?.focus()
-      return
-    }
 
     try {
       const data = await api.coach.message({
-        messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
-        scanContext,
+        messages: [{ role: 'user', content: msgText }],
+        conversationId: conversationRef.current,
+        preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
-      const aiMsg = { role: 'assistant', content: data.message }
+      if (generation !== requestGenerationRef.current) return
+      conversationRef.current = data.conversationId
+      const aiMsg = { role: 'assistant', content: data.message, reveal: true }
       setMessages(prev => {
         const updated = [...prev, aiMsg]
         setNewMsgIdx(updated.length - 1)
         return updated
       })
     } catch (err) {
+      if (generation !== requestGenerationRef.current) return
       setError(err.message || "Couldn’t connect just now. Please try again.")
     } finally {
+      if (generation !== requestGenerationRef.current) return
       setLoading(false)
       inputRef.current?.focus()
     }
@@ -266,15 +258,13 @@ export default function AICoach() {
                 className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
                 style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
               >
-                {isLocalProPreview ? 'PRO PREVIEW' : isPremium ? 'PRO' : 'FREE'}
+                {isPremium ? 'PRO' : 'FREE'}
               </span>
             </div>
             <p className="font-body text-[11px] text-secondary">
-              {!latestScan
+              {!hasScan
                 ? 'Scan Your Face To Unlock'
-                : isLocalProPreview
-                  ? 'Local preview · sample replies'
-                  : isPremium
+                : isPremium
                   ? 'Your pal. Your coach. In your corner.'
                   : 'Pro required — tap to upgrade'}
             </p>
@@ -284,9 +274,14 @@ export default function AICoach() {
           <button
             onClick={() => {
               triggerHaptic()
-              if (latestScan) {
+              requestGenerationRef.current += 1
+              setLoading(false)
+              setError('')
+              conversationRef.current = null
+              try { sessionStorage.removeItem(`adonis-chat:${user?.id}`) } catch {}
+              if (hasScan) {
                 const greeting = isPremium
-                  ? `Scan loaded. You're a ${latestScan.glowScore?.toFixed(1)}/10 overall. Ask me anything. I'll tell you exactly what to work on.`
+                  ? 'Your completed scan is available. Ask me what it found or what to work on.'
                   : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
                 setMessages([{ role: 'assistant', content: greeting }])
               } else {
@@ -302,7 +297,7 @@ export default function AICoach() {
       </motion.div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
+      <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
         {/* Citations / Medical Disclaimer */}
         <motion.div
           initial={{ opacity: 0, y: -4 }}
@@ -410,7 +405,7 @@ export default function AICoach() {
       </div>
 
       {/* Input bar — disabled state if no scan */}
-      {!latestScan ? (
+      {!hasScan ? (
         <div className="px-4 pb-8 pt-3 flex-shrink-0">
           <button
             onClick={() => { triggerHaptic(); navigate('/scan') }}

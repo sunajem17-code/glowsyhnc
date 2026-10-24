@@ -456,7 +456,7 @@ function LegacyResults() {
     { key: 'dimorphism', label: mascFemLabel,  detail: gender === 'female' ? 'Soft features · Femininity' : 'Jaw strength · Hunter eyes' },
   ]
 
-  function amazonUrl(q) { return `https://www.amazon.com/s?k=${encodeURIComponent(q)}` }
+  function amazonUrl(q) { return `https://www.amazon.ca/s?k=${encodeURIComponent(q)}&tag=ascendusapp05-20` }
 
   // ── Percentile label ──────────────────────────────────────────────────────
   const pctLabel = glowScore == null ? null
@@ -1099,7 +1099,7 @@ function LegacyResults() {
 
         {!productsLoading && products.map((product, i) => (
           <motion.a key={i}
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(product.searchQuery || product.name)}`}
+            href={product.amazonUrl || amazonUrl(product.searchQuery || product.name)}
             target="_blank" rel="noopener noreferrer"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}

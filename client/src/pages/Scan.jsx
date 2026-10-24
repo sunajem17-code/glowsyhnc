@@ -13,9 +13,9 @@ import { assignPhase } from '../utils/phase'
 import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/side-profile-guide.png'
-import sideProfileGuideFemale from '../assets/side-profile-guide-female.png'
+import sideProfileGuideFemale from '../assets/female-side-cutout.png'
 import faceGuidePhoto from '../assets/face-metrics-demo.jpg'
-import faceGuidePhotoFemale from '../assets/face-metrics-demo-female.jpg'
+import faceGuidePhotoFemale from '../assets/female-front-cutout.png'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { CameraPreview } from '@capacitor-community/camera-preview'
@@ -147,6 +147,7 @@ function SideGuide({ size = 'normal', gender }) {
         display: 'block',
         margin: '0 auto',
         opacity: 0.4,
+        transform: gender === 'female' ? 'scaleX(-1)' : undefined,
         borderRadius: 16,
       }}
     />
@@ -750,7 +751,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
               </div>
             </>
           ) : (
-            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" style={{ transform: gender === 'female' && photoType === 'side' ? 'scaleX(-1)' : undefined }} />
           )}
         </div>
 
@@ -831,7 +832,7 @@ export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLa
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center top', transform: 'scale(1.2)', transformOrigin: 'center top' }}
+            style={{ objectFit: 'cover', objectPosition: 'center top', transform: gender === 'female' ? 'scale(1.2) scaleX(-1)' : 'scale(1.2)', transformOrigin: 'center top' }}
           />
         ) : stepNum === 1 ? (
           // object-fit: cover + object-position: bottom (not contain) — this
@@ -2207,11 +2208,10 @@ export default function Scan() {
       }
       const sideB64 = (!skipSide && sidePhoto) ? await toBase64(sidePhoto) : null
       if (sideB64) setSidePhoto(sideB64)
-      let sideLandmarksPromise = Promise.resolve(null)
       if (sideB64 && !isNative()) {
         // FaceMesh uses one shared instance: wait for the front photo before
         // asking it to inspect the side photo for visual callout anchors.
-        sideLandmarksPromise = frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
+        frontLandmarksPromise.then(() => import('../utils/faceLandmarks.js'))
           .then(({ getLandmarks }) => getLandmarks(sideB64))
           .then(lm => {
             setSideAnalysisLandmarks(lm)
@@ -2242,8 +2242,9 @@ export default function Scan() {
         : null
       const frontDetection = await frontLandmarksPromise
       if (!frontDetection?.points || !frontDetection?.landmarks) throw new Error('LANDMARK DETECTION FAILED — retake a clear front photo and try again.')
-      const detectedSidePoints = sideB64 ? (isNative() ? nativeSidePoints : await sideLandmarksPromise) : null
-      if (sideB64 && !detectedSidePoints) throw new Error('PROFILE LANDMARK DETECTION FAILED — retake a clear side photo and try again.')
+      // FaceMesh is a front-face model and may not map a true side profile.
+      // Profile anchors are optional decoration, not an analysis prerequisite.
+      // Send the actual side image to the AI; unavailable geometry stays null.
       const analysisEvidence = await buildProductionEvidence({
         frontImage: faceB64,
         frontLandmarks: frontDetection.landmarks,
@@ -2325,6 +2326,7 @@ export default function Scan() {
 
       const scanRecord = {
         id:             `scan-${Date.now()}`,
+        serverScanId:   aiResult.scanId ?? null,
         scanDate:       new Date().toISOString(),
         analyzedAt:     new Date().toISOString(),
         facePhotoUrl:   faceB64,
@@ -2448,13 +2450,14 @@ export default function Scan() {
             const base64Data = commaIdx >= 0 ? photoForUpload.slice(commaIdx + 1) : photoForUpload
             const mediaType = /image\/(jpeg|png|webp)/.exec(header)?.[0] || 'image/jpeg'
             const uploadResult = await (earlyFaceUpload || api.supabase.uploadImage({ imageData: base64Data, mediaType, folder: 'face' }))
-            faceImageUrl = uploadResult?.path || null
+            faceImageUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.path || null
           } catch (err) {
             console.warn('[Scan] Photo upload to Supabase Storage failed (non-fatal):', err?.message)
           }
         }
 
         api.supabase.saveScan({
+          scanId:           aiResult.scanId,
           overallScore:     aiResult.overallScore,
           tier:             aiResult.tier,
           faceScore:        aiResult.faceScore,
@@ -2637,7 +2640,9 @@ export default function Scan() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait">
+        {/* Reset presence bookkeeping with the step: a retained exiting guide
+            must never outlive its matching heading or become the next guide. */}
+        <AnimatePresence key={`scan-step-${step}`} mode="wait">
           {step === 0 && (
             <motion.div key="gender" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               <GenderSelector selected={gender} onSelect={setLocalGender} onAdvance={() => setStep(1)} />
@@ -2646,34 +2651,36 @@ export default function Scan() {
           {(step === 1 || step === 2) && !cameraOpen && !previewPhoto && (
             <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6" style={{ overflow: 'visible' }}>
               {step === 1 ? (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
-                    alt="Guide"
+                    alt="Front photo guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
-                      transform: 'scale(1.05) translateY(16px)',
+                      transform: gender === 'female' ? 'scale(1.15)' : 'scale(1.05) translateY(16px)',
+                      objectFit: gender === 'female' ? 'contain' : undefined,
                       transformOrigin: 'center bottom',
                       objectPosition: 'center bottom',
                       position: 'relative',
                       zIndex: 5,
-                      mixBlendMode: 'lighten',
+                      mixBlendMode: gender === 'female' ? 'normal' : 'lighten',
                     }}
                   />
                 </div>
               ) : (
-                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
+                <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px', transform: gender === 'female' ? 'translateY(32px)' : undefined }}>
                   <img
                     src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
-                    alt="Guide"
+                    alt="Side profile photo guide"
                     className="w-full h-full object-cover rounded-2xl"
                     style={{
-                      transform: 'scale(1.1) translateY(34px)',
+                      transform: gender === 'female' ? 'scale(1.15) scaleX(-1)' : 'scale(1.1) translateY(34px)',
+                      objectFit: gender === 'female' ? 'contain' : undefined,
                       transformOrigin: 'center bottom',
                       objectPosition: 'center bottom',
                       position: 'relative',
                       zIndex: 5,
-                      mixBlendMode: 'lighten',
+                      mixBlendMode: gender === 'female' ? 'normal' : 'lighten',
                     }}
                   />
                 </div>
@@ -2691,7 +2698,7 @@ export default function Scan() {
                     setCameraOpen(true)
                   }}
                   className="w-full flex-shrink-0 mt-[30px] py-4 rounded-2xl font-heading font-bold text-[15px]"
-                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)', width: gender === 'female' && step === 1 ? 'min(115%, calc(100% + 48px))' : undefined }}
                 >
                   Begin Scan
                 </motion.button>

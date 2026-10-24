@@ -1,4 +1,6 @@
+import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Send } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -14,17 +16,6 @@ const STARTER_PROMPTS = [
   'Give me a daily routine to look better',
   'What should I fix first to attract more?',
 ]
-
-function buildScanContext(scan, userProfile) {
-  if (!scan) return null
-  return {
-    glowScore: scan.glowScore,
-    faceScore: scan.faceScore,
-    presentationScore: scan.presentationScore,
-    faceData: scan.faceData,
-    userProfile,
-  }
-}
 
 function TypingIndicator() {
   const reduceMotion = useReducedMotion()
@@ -49,20 +40,6 @@ function TypingIndicator() {
   )
 }
 
-function formatMessage(content) {
-  return content.split('\n').map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*)/g)
-    return (
-      <p key={i} className={i > 0 && line.trim() ? 'mt-2' : ''}>
-        {parts.map((part, j) =>
-          part.startsWith('**') && part.endsWith('**')
-            ? <strong key={j} style={{ color: 'rgba(255,255,255,0.95)' }}>{part.slice(2, -2)}</strong>
-            : part
-        )}
-      </p>
-    )
-  })
-}
 
 // Animated typing bubble — streams the text character by character
 function TypewriterBubble({ text, onDone }) {
@@ -117,41 +94,80 @@ function MessageBubble({ msg }) {
       className={`flex mb-4 ${isAI ? 'items-end' : 'items-end flex-row-reverse'}`}
     >
       <div
-        className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
+        className={`${isAI ? 'max-w-[92%] sm:max-w-[85%]' : 'max-w-[80%]'} min-w-0 px-4 py-3 text-[14px] font-body leading-relaxed`}
         style={isAI
           ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', borderRadius: '18px 18px 18px 4px' }
           : { background: GOLD, color: '#0A0A0A', fontWeight: 600, borderRadius: '18px 18px 4px 18px' }}
       >
-        {isAI ? formatMessage(msg.content) : msg.content}
+        {isAI ? <CoachMessage content={msg.content} reveal={msg.reveal === true} /> : msg.content}
       </div>
     </motion.div>
   )
 }
 
 export default function Progress() {
-  const { scans, userProfile } = useStore()
+  const location = useLocation()
+  const selectedScanId = location.state?.scanId
+
+  const { scans, userProfile, user } = useStore()
   const latestScan = scans?.[0] ?? null
-  const scanContext = buildScanContext(latestScan, userProfile)
+  const [serverScan, setServerScan] = useState(null)
+  const conversationRef = useRef(null)
+  const requestGenerationRef = useRef(0)
+  const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
   const [showTypewriter, setShowTypewriter] = useState(true)
   const [chipsVisible, setChipsVisible] = useState(false)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(location.state?.coachPrompt || '')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    let active = true
+    requestGenerationRef.current += 1
+    setLoading(false)
+    setMessagesOwner(user?.id ?? null)
+    setMessages([])
+    setServerScan(null)
+    conversationRef.current = null
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
+      if (saved?.conversationId && Array.isArray(saved.messages)) {
+        conversationRef.current = saved.conversationId
+        setMessages(saved.messages.slice(-12).map(message => ({ ...message, reveal: false })))
+      }
+    } catch {}
+    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {
+      if (active) setServerScan({ status: 'unavailable' })
+    })
+    return () => { active = false; requestGenerationRef.current += 1 }
+  }, [user?.id, latestScan?.id])
+
+  useEffect(() => {
+    if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
+    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+  }, [messages, user?.id, messagesOwner])
+
+  useEffect(() => {
+    const container = bottomRef.current?.closest('[data-coach-scroll]')
+    if (container) {
+      container.scrollTop = container.scrollHeight
+      // Hidden app-shell ancestors must never scroll with a chat reply.
+      const shell = container.closest('main')
+      if (shell) shell.scrollTop = 0
+    }
   }, [messages, loading, showTypewriter])
 
   async function send(text) {
     const txt = (text || input).trim()
-    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan), loading })
+    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
     if (sendState === 'ignore') return
 
     setInput('')
     setChipsVisible(false)
+    const generation = requestGenerationRef.current
 
     if (sendState === 'needs-scan') {
       setShowTypewriter(false)
@@ -160,6 +176,7 @@ export default function Progress() {
       setLoading(true)
       const requestStartedAt = Date.now()
       await waitForMinimumCoachThinking(requestStartedAt)
+      if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, assistantMessage])
       setLoading(false)
       inputRef.current?.focus()
@@ -172,17 +189,23 @@ export default function Progress() {
     const requestStartedAt = Date.now()
     try {
       const data = await api.coach.message({
-        messages: next.map(m => ({ role: m.role, content: m.content })),
-        scanContext,
+        messages: [{ role: 'user', content: txt }],
+        conversationId: conversationRef.current,
+        ...(selectedScanId ? { scanId: selectedScanId } : {}),
+        preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
       await waitForMinimumCoachThinking(requestStartedAt)
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+      if (generation !== requestGenerationRef.current) return
+      conversationRef.current = data.conversationId
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message, reveal: true }])
     } catch (err) {
+      if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: err.message || 'Something went wrong. Try again.',
       }])
     } finally {
+      if (generation !== requestGenerationRef.current) return
       setLoading(false)
       inputRef.current?.focus()
     }
@@ -220,7 +243,7 @@ export default function Progress() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-2">
+      <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-5 pb-2">
 
         {/* Typewriter greeting on first load */}
         {showTypewriter && !hasHistory && (
