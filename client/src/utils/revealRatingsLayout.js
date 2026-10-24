@@ -20,3 +20,11 @@ export const SHARE_RATINGS_LAYOUT = Object.freeze({
   valueMarginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom + 8,
   metricRowPaddingBottom: REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom - 8,
 })
+
+export function getLockedRatingPresentation(isLocked) {
+  return {
+    blurValue: Boolean(isLocked),
+    showLock: Boolean(isLocked),
+    fillBar: !isLocked,
+  }
+}

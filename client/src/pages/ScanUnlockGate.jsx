@@ -1,5 +1,3 @@
-import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
-import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
@@ -8,6 +6,7 @@ import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Download, Loader2, Users, ChevronRight, ChevronLeft, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
+  Droplets, Dumbbell, Moon, Sun, Heart, Circle, Frown, Meh, SmilePlus, Laugh,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
@@ -19,15 +18,15 @@ import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
-import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { getLockedResultsHeadingStyle, getRevealMetricTextStyles, getRevealRatingAnimation, getRevealRatingsPanelHeight, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
-import { getProgressSaveFlight } from '../utils/progressSaveAnimation'
+import { getProgressSaveSequence } from '../utils/progressSaveAnimation'
 import { hasLocalUnlockedScanUiAccess, isLocalDeveloperPreview, markScanResultsUnlocked } from '../utils/developerUnlock'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
 import { cropPhotoToSquare } from '../utils/shareCardPhoto'
-import { getProgressCardReturnTo } from '../utils/scanResultContext'
+import { getProgressCardReturnTo, getSavedProgressResultPresentation } from '../utils/scanResultContext'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
@@ -1034,10 +1033,11 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
 
 // ── Pro Paywall (full-screen modal, opens when "Get Ascendus Pro" is tapped) ──
 function PaywallRatingsCard() {
+  const metricTextStyles = getRevealMetricTextStyles()
   const barColor = pct => {
     // red at 0-40, yellow around 60, green at 100
-    const mapped = Math.max(0, (pct - 40) / 60) // 0→0, 40→0, 100→1
-    const hue = Math.round(mapped * 120) // 0=red, 60=yellow, 120=green
+    const mapped = Math.max(0, (pct - 40) / 60)
+    const hue = Math.round(mapped * 120)
     return `hsl(${hue}, 85%, 45%)`
   }
   const items = [
@@ -1052,9 +1052,9 @@ function PaywallRatingsCard() {
     <div className="grid grid-cols-3 gap-2">
       {items.map(({ label, pct }) => (
         <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
-          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>
-            {pct}
+          <p className="text-[11px] mb-2" style={{ ...metricTextStyles.label, fontSize: 11 }}>{label}</p>
+          <p className="text-[26px] leading-none mb-2.5" aria-label={`${label}: ${(pct / 10).toFixed(1)} out of 10`} style={{ ...metricTextStyles.value, fontSize: 26, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {(pct / 10).toFixed(1)}
           </p>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
@@ -1067,6 +1067,7 @@ function PaywallRatingsCard() {
 
 // Physique ratings — parallel to face ratings but body metrics
 function PaywallPhysiqueCard() {
+  const metricTextStyles = getRevealMetricTextStyles()
   const barColor = pct => {
     // red at 0-40, yellow around 60, green at 100
     const mapped = Math.max(0, (pct - 40) / 60) // 0→0, 40→0, 100→1
@@ -1085,8 +1086,8 @@ function PaywallPhysiqueCard() {
     <div className="grid grid-cols-3 gap-2">
       {items.map(({ label, pct }) => (
         <div key={label} className="rounded-2xl p-2.5" style={{ background: '#1a1a1a' }}>
-          <p className="font-body text-[11px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</p>
-          <p className="font-heading font-bold text-[26px] leading-none mb-2.5" style={{ color: '#fff' }}>{pct}</p>
+          <p className="text-[11px] mb-2" style={{ ...metricTextStyles.label, fontSize: 11 }}>{label}</p>
+          <p className="text-[26px] leading-none mb-2.5" aria-label={`${label}: ${(pct / 10).toFixed(1)} out of 10`} style={{ ...metricTextStyles.value, fontSize: 26, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{(pct / 10).toFixed(1)}</p>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(pct) }} />
           </div>
@@ -1096,45 +1097,64 @@ function PaywallPhysiqueCard() {
   )
 }
 
-// Daily To-Do preview — checklist style matching the Daily Check-In screenshot
+// Daily To-Do preview — compact version of the real Daily Check-In controls.
 function PaywallDailyTodoCard() {
-  const sections = [
-    {
-      icon: '💧', label: 'Hydration',
-      items: ['Glass of water on wake', 'Hit 8 glasses today', 'Electrolytes after workout'],
-      done: [true, false, false],
-    },
-    {
-      icon: '✨', label: 'Skincare',
-      items: ['AM Routine', 'PM Routine'],
-      done: [false, false],
-    },
-    {
-      icon: '💪', label: 'Exercise',
-      items: ['Mark today\'s gym routine', 'Today\'s jaw exercises'],
-      done: [false],
-    },
-  ]
+  const cardStyle = { background: 'transparent', border: 'none' }
+  const headingStyle = { color: 'rgba(255,255,255,0.92)' }
+  const iconStyle = { color: GOLD, filter: 'drop-shadow(0 0 3px rgba(198,168,92,0.35))' }
   return (
-    <div className="flex flex-col gap-2">
-      {sections.map(({ icon, label, items, done }) => (
-        <div key={label} className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="flex items-center gap-2 mb-2">
-            <span style={{ fontSize: 14 }}>{icon}</span>
-            <p className="font-heading font-bold text-[13px]" style={{ color: '#fff' }}>{label}</p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {items.map((item, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, border: `1.5px solid ${done[i] ? G : 'rgba(255,255,255,0.25)'}`, background: done[i] ? G : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {done[i] && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </div>
-                <p className="font-body text-[11px]" style={{ color: done[i] ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)' }}>{item}</p>
-              </div>
-            ))}
-          </div>
+    <div className="flex flex-col gap-1.5 pr-1" style={{ maxHeight: 170, overflowY: 'auto', overscrollBehaviorY: 'contain', touchAction: 'pan-y' }}>
+      <div className="p-1">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Droplets size={14} style={iconStyle} />
+          <p className="font-heading font-bold text-[11px]" style={headingStyle}>Hydration</p>
+          <span className="ml-auto font-heading font-bold text-[10px]" style={{ color: GOLD }}>0/8</span>
         </div>
-      ))}
+        <div className="flex items-center justify-between px-0.5">
+          {Array.from({ length: 8 }, (_, index) => <Droplets key={index} size={13} style={{ color: 'rgba(255,255,255,0.65)' }} />)}
+        </div>
+        <div className="h-1 rounded-full mt-1.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+          <div className="h-full w-0 rounded-full" style={{ background: GOLD }} />
+        </div>
+      </div>
+
+      <div className="p-1">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Sparkles size={14} style={iconStyle} />
+          <p className="font-heading font-bold text-[11px]" style={headingStyle}>Skincare</p>
+        </div>
+        <div className="flex gap-1.5">
+          {[{ label: 'AM Routine', Icon: Sun }, { label: 'PM Routine', Icon: Moon }].map(({ label, Icon }) => (
+            <div key={label} className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#161616' }}>
+              <Icon size={11} style={{ color: 'rgba(255,255,255,0.8)' }} />
+              <span className="font-heading font-bold text-[9px]" style={headingStyle}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-1">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Dumbbell size={14} style={iconStyle} />
+          <p className="font-heading font-bold text-[11px]" style={headingStyle}>Exercise</p>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#161616' }}>
+          <Circle size={13} style={{ color: 'rgba(255,255,255,0.8)' }} />
+          <span className="font-heading font-semibold text-[9px]" style={headingStyle}>Mark today’s routine complete</span>
+        </div>
+      </div>
+
+      <div className="p-1">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Heart size={14} style={iconStyle} />
+          <p className="font-heading font-bold text-[11px]" style={headingStyle}>Confidence Level</p>
+        </div>
+        <div className="flex items-center justify-around">
+          {[Frown, Meh, SmilePlus, Smile, Laugh].map((Icon, index) => (
+            <Icon key={index} size={16} style={{ color: '#FFFFFF' }} />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1422,7 +1442,6 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
         </motion.button>
         <div className="mt-3 mb-3">
           <SocialProofTicker />
-          <p className="text-center font-body text-[10px] mt-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Sample activity</p>
         </div>
         <div className="flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
@@ -1518,7 +1537,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, developerUnlockAvailable, onDeveloperUnlock, developerUnlocking, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const savedScans = useStore(state => state.scans)
@@ -1531,14 +1550,14 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const [progressAdded, setProgressAdded] = useState(Boolean(scan?.progressSavedAt))
   const [isDownloadingCard, setIsDownloadingCard] = useState(false)
   const [downloadError, setDownloadError] = useState('')
-  const [showScorecardShareMenu, setShowScorecardShareMenu] = useState(false)
   const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [saveFlight, setSaveFlight] = useState(null)
   const saveFlightIdRef = useRef(0)
   const resultsCardRef = useRef(null)
-  const progressButtonRef = useRef(null)
   const downloadCardRef = useRef(null)
   const reduceMotion = useReducedMotion()
+  const showUnlockedResults = unlocked
+  const blurResultCard = blurSavedProgressResults
 
   useEffect(() => {
     if (!facePhoto) {
@@ -1583,21 +1602,15 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
     if (!saveResult()) return
     triggerHaptic()
     setProgressAdded(true)
-    const openProgress = () => navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
-    if (reduceMotion) {
-      openProgress()
-      return
-    }
-
     const source = activeView === 'results'
       ? resultsCardRef.current
       : document.getElementById(`scan-${activeView}-panel`)
-    const flight = getProgressSaveFlight(
-      source?.getBoundingClientRect(),
-      progressButtonRef.current?.getBoundingClientRect(),
-    )
-    if (flight) setSaveFlight({ ...flight, id: ++saveFlightIdRef.current })
-    else openProgress()
+    const sequence = getProgressSaveSequence(source?.getBoundingClientRect(), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }, reduceMotion)
+    if (sequence) setSaveFlight({ ...sequence, id: ++saveFlightIdRef.current })
+    else navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
   }
 
   async function downloadResultsCard() {
@@ -1620,10 +1633,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   }
 
   useEffect(() => {
+    if (saveFlight?.phase !== 'saved') return undefined
+    const timer = window.setTimeout(() => {
+      if (saveFlightIdRef.current !== saveFlight.id) return
+      setSaveFlight(null)
+      navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
+    }, saveFlight.holdMs ?? 950)
+    return () => window.clearTimeout(timer)
+  }, [saveFlight, navigate, scan?.id])
+
+  useEffect(() => {
     setRecoveredRatingValues(null)
     setIsRecoveringRatings(false)
     setRatingsRecoveryError('')
-    if (!unlocked || !scan || getRevealRatings(scan).every(({ value }) => value != null)) return undefined
+    if (!showUnlockedResults || !scan || getRevealRatings(scan).every(({ value }) => value != null)) return undefined
     let active = true
     setIsRecoveringRatings(true)
     recoverMissingRevealRatings(scan, api)
@@ -1660,7 +1683,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
       })
       .finally(() => { if (active) setIsRecoveringRatings(false) })
     return () => { active = false }
-  }, [unlocked, scan?.id])
+  }, [showUnlockedResults, scan?.id])
 
   const recoveredScan = recoveredRatingValues
     ? {
@@ -1681,7 +1704,8 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
       }
     : scan
   const metrics = getRevealRatings(recoveredScan)
-  const resultsHeading = unlocked ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
+  const resultsHeading = showUnlockedResults ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
+  const resultsHeadingStyle = showUnlockedResults ? getUnlockedResultsHeadingStyle(resultsHeading) : getLockedResultsHeadingStyle()
   const isPreparingDownloadPhoto = downloadPhoto.source !== facePhoto || downloadPhoto.status === 'processing'
   const preparedDownloadPhoto = downloadPhoto.source === facePhoto && downloadPhoto.status === 'ready'
     ? downloadPhoto.url
@@ -1689,8 +1713,8 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
-      <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
-      {unlocked && (
+      <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} blurNumbers={blurResultCard} />
+      {showUnlockedResults && (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
           className="fixed left-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
           style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
@@ -1701,13 +1725,13 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
 
       {/* Header */}
-        <div className="relative w-full">
-        <h1 className={`font-heading font-bold text-[32px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? getUnlockedResultsHeadingStyle(resultsHeading) : {}) }}>
+        <div className="relative flex h-[44px] w-full items-center justify-center">
+        <h1 className="font-heading font-bold text-[32px] text-center m-0" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...resultsHeadingStyle }}>
           {resultsHeading}
         </h1>
         </div>
         <div className="h-5 flex items-start justify-center">
-          {unlocked ? (
+          {showUnlockedResults ? (
             <span aria-hidden="true" />
           ) : (
             <p className="font-body text-[14px] text-center leading-5" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -1717,7 +1741,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </div>
         {/* Face circle + card */}
         <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
-          drag={unlocked && activeView !== 'compare' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
+          drag={showUnlockedResults && activeView !== 'compare' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
           onDragEnd={(_, info) => {
             const index = RESULT_VIEWS.indexOf(activeView)
             if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
@@ -1725,7 +1749,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           }}
           >
           <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
-          <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
+          <div id="scan-results-panel" role={showUnlockedResults ? 'tabpanel' : undefined} aria-labelledby={showUnlockedResults ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
             <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
@@ -1736,10 +1760,11 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           </div>
 
           {/* Metrics card */}
-          <div ref={resultsCardRef} className="w-full rounded-3xl" style={{ background: '#141414', position: 'relative', zIndex: 1, padding: `${REVEAL_RATINGS_LAYOUT.panelPaddingTop}px ${REVEAL_RATINGS_LAYOUT.panelPaddingHorizontal}px ${REVEAL_RATINGS_LAYOUT.panelPaddingBottom}px` }}>
+          <div ref={resultsCardRef} className="w-full rounded-3xl" style={{ background: '#141414', position: 'relative', zIndex: 1, opacity: saveFlight ? 0 : 1, transition: 'opacity 100ms ease-out', height: getRevealRatingsPanelHeight(), padding: `${REVEAL_RATINGS_LAYOUT.panelPaddingTop}px ${REVEAL_RATINGS_LAYOUT.panelPaddingHorizontal}px ${REVEAL_RATINGS_LAYOUT.panelPaddingBottom}px` }}>
             <div className="grid grid-cols-2" style={{ columnGap: REVEAL_RATINGS_LAYOUT.columnGap, rowGap: 0 }}>
               {metrics.map(({ label, value }, idx) => {
-                const ratingAnimation = getRevealRatingAnimation(value, { unlocked, reduceMotion, metricKey: label, revealRun, savedProgressCard })
+                const cardShowsUnlockedRatings = showUnlockedResults && !blurResultCard
+                const ratingAnimation = getRevealRatingAnimation(value, { unlocked: cardShowsUnlockedRatings, reduceMotion, metricKey: label, revealRun, savedProgressCard })
                 const metricTextStyles = getRevealMetricTextStyles()
                 return (
                 <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
@@ -1755,22 +1780,22 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
                       <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
                     </motion.span>
                   </div>
-                  {unlocked ? (
+                  {cardShowsUnlockedRatings ? (
                     <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom, fontVariantNumeric: 'tabular-nums', height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
                       {value == null ? isRecoveringRatings ? 'Scoring…' : 'Unavailable' : value.toFixed(1)}
                     </motion.div>
                   ) : (
                     <div aria-label={`${label}: Locked`} style={{ height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom }}>
-                      <div style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
+                      <div aria-hidden="true" style={{ width: 72, height: 26, borderRadius: 99, background: '#ffffff', filter: 'blur(8px)', opacity: 0.9 }} />
                     </div>
                   )}
-                  <div role={unlocked && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={unlocked && value != null ? 0 : undefined} aria-valuemax={unlocked && value != null ? 10 : undefined} aria-valuenow={unlocked && value != null ? value : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
+                  <div role={cardShowsUnlockedRatings && value != null ? 'progressbar' : undefined} aria-label={`${label} score`} aria-valuemin={cardShowsUnlockedRatings && value != null ? 0 : undefined} aria-valuemax={cardShowsUnlockedRatings && value != null ? 10 : undefined} aria-valuenow={cardShowsUnlockedRatings && value != null ? value : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
                     <motion.div
-                      key={unlocked ? 'revealed' : 'locked'}
+                      key={cardShowsUnlockedRatings ? 'revealed' : 'locked'}
                       initial={ratingAnimation.bar.initial}
                       animate={ratingAnimation.bar.animate}
                       transition={ratingAnimation.bar.transition}
-                      style={{ height: '100%', borderRadius: 99, color: unlocked && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
+                      style={{ height: '100%', borderRadius: 99, color: cardShowsUnlockedRatings && value != null ? getRatingColor(value) : '#444', background: 'currentColor' }}
                     />
                   </div>
                 </div>
@@ -1779,20 +1804,19 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             </div>
           </div>
           </div>
-          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
+          {showUnlockedResults && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
             <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
               {facePhoto ? <img src={facePhoto} draggable={false} alt="Your original front scan photo" className="w-full h-full object-contain" /> : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
             </div>
           </div>}
-          {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} />}
+          {showUnlockedResults && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} />}
           </div>}
           </motion.div>
         </motion.div>
 
         {/* CTAs */}
-        {unlocked && !savedProgressCard && <motion.button
-          ref={progressButtonRef}
+        {showUnlockedResults && !savedProgressCard && <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={saveToProgress}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
@@ -1800,74 +1824,18 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         >
           {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
         </motion.button>}
-        {unlocked && savedProgressCard && activeView === 'results' && <motion.button
+        {showUnlockedResults && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); setShowScorecardShareMenu(true) }}
-          disabled={isDownloadingCard}
+          onClick={downloadResultsCard}
+          disabled={isDownloadingCard || isPreparingDownloadPhoto}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Share2 size={19} />}
-          {isDownloadingCard ? 'Preparing scorecard…' : 'Share Scorecard'}
+          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}
+          {isDownloadingCard ? 'Preparing download…' : 'Download'}
         </motion.button>}
-        {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
-        {showScorecardShareMenu && createPortal(
-            <>
-              <motion.button
-                type="button"
-                aria-label="Close scorecard sharing options"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                onClick={() => setShowScorecardShareMenu(false)}
-                className="fixed inset-0"
-                style={{ background: 'rgba(0,0,0,0.75)', zIndex: 10020 }}
-              />
-              <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-                className="fixed inset-x-0 bottom-0 rounded-t-2xl overflow-hidden"
-                style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 0, boxShadow: '0 -12px 48px rgba(0,0,0,0.4)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10021 }}
-              >
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-                </div>
-                <div className="flex items-center justify-between px-5 pt-3 pb-4">
-                  <div>
-                    <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>YOUR RESULTS</p>
-                    <h2 className="font-heading font-bold text-xl text-primary">Share Scorecard</h2>
-                  </div>
-                  <button type="button" aria-label="Close" onClick={() => setShowScorecardShareMenu(false)} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#242424', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.65)' }}><X size={17} /></button>
-                </div>
-                <div className="px-4 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); downloadResultsCard() }}
-                    disabled={isPreparingDownloadPhoto || isDownloadingCard}
-                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left disabled:opacity-50"
-                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.2)', boxShadow: '0 0 16px rgba(198,168,92,0.08)' }}
-                  >
-                    <Download size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.35))' }} />
-                    <div>
-                      <p className="font-heading font-bold text-sm text-primary">Download scorecard</p>
-                      <p className="font-body text-xs text-secondary">Save your results as an image</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); navigate('/community', { state: { shareScanId: scan?.id, shareType: 'glow-up' } }) }}
-                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left"
-                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.32)', boxShadow: '0 0 18px rgba(198,168,92,0.12)' }}
-                  >
-                    <Users size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.4))' }} />
-                    <div>
-                      <p className="font-heading font-bold text-sm text-primary">Share to Community</p>
-                      <p className="font-body text-xs text-secondary">Create a post with this scan</p>
-                    </div>
-                  </button>
-                </div>
-              </motion.div>
-            </>, document.body,
-          )}
-        {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
+        {showUnlockedResults && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
+        {showUnlockedResults && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
           {[['results', 'Show results'], ['photo', 'Show face photo'], ['compare', 'Show photo comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
               onClick={() => showView(view)} onKeyDown={event => {
@@ -1884,7 +1852,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </div>}
         {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
         {ratingsRecoveryError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{ratingsRecoveryError}</p>}
-        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
+        {!showUnlockedResults && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
@@ -1913,35 +1881,41 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
       </div>
       {saveFlight && typeof document !== 'undefined' && createPortal(
         <motion.div
-          aria-hidden="true"
-          initial={{ ...saveFlight.from, borderRadius: 24, opacity: 1 }}
-          animate={{ ...saveFlight.to, borderRadius: 22, opacity: 1 }}
-          transition={{ duration: 0.72, ease: [0.22, 0.8, 0.2, 1] }}
-          onAnimationComplete={() => {
-            if (saveFlightIdRef.current !== saveFlight.id) return
-            setSaveFlight(null)
-            navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
-          }}
-          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(209,183,109,0.9)', boxShadow: '0 0 28px rgba(209,183,109,0.35)', pointerEvents: 'none' }}
+          key={saveFlight.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 10000, overflow: 'hidden', background: 'radial-gradient(ellipse at center, rgba(198,168,92,0.12) 0%, rgba(5,5,5,0.94) 42%, rgba(5,5,5,0.97) 100%)', backdropFilter: 'blur(9px)', pointerEvents: 'auto' }}
         >
+          <div aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', width: 110, height: 146, borderRadius: 22, transform: 'translate(-50%, -50%)', border: '1px solid rgba(198,168,92,0.58)', background: 'rgba(198,168,92,0.035)', boxShadow: '0 0 42px rgba(198,168,92,0.16), inset 0 0 28px rgba(198,168,92,0.06)' }} />
           <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ delay: 0.3, duration: 0.18 }}
-            style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(180deg, transparent 38%, rgba(0,0,0,0.86) 100%)' }}
+            aria-hidden="true"
+            initial={{ ...saveFlight.from, borderRadius: 24, opacity: saveFlight.animateCard ? 1 : 0, rotate: 0 }}
+            animate={{ ...saveFlight.to, borderRadius: 16, opacity: 1, rotate: saveFlight.phase === 'saved' && saveFlight.animateCard ? -4 : 0 }}
+            transition={saveFlight.animateCard ? { duration: 1.15, delay: 0.08, type: 'spring', stiffness: 115, damping: 18 } : { duration: 0.24 }}
+            onAnimationComplete={() => {
+              if (saveFlight.phase !== 'flight' || saveFlightIdRef.current !== saveFlight.id) return
+              setSaveFlight(current => current?.id === saveFlight.id ? { ...current, phase: 'saved' } : current)
+            }}
+            style={{ position: 'fixed', zIndex: 10001, overflow: 'hidden', background: '#171717', border: `1px solid ${G}`, boxShadow: '0 12px 45px rgba(0,0,0,0.58), 0 0 30px rgba(198,168,92,0.32)', pointerEvents: 'none', transformOrigin: 'center center' }}
           >
-            {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />}
-            <div style={{ position: 'relative', color: '#D1B76D', font: '800 12px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.16em' }}>ASCENDUS</div>
-            <div style={{ position: 'relative', color: '#fff', font: '800 42px "Plus Jakarta Sans", sans-serif' }}>{metrics[0]?.value?.toFixed(1) ?? '—'}</div>
+            {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.84 }} />}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.88) 100%)' }}>
+              <div style={{ color: G, font: '800 7px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.12em' }}>ASCENDUS</div>
+              <div style={{ color: '#fff', font: '800 28px "Plus Jakarta Sans", sans-serif', lineHeight: 1.05 }}>{metrics[0]?.value?.toFixed(1) ?? '—'}</div>
+            </div>
+            {saveFlight.phase === 'saved' && <motion.div initial={{ scale: saveFlight.animateCard ? 0.4 : 1, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={saveFlight.animateCard ? { type: 'spring', stiffness: 420, damping: 18 } : { duration: 0.2 }} style={{ position: 'absolute', top: 8, right: 8, width: 25, height: 25, borderRadius: 99, display: 'grid', placeItems: 'center', color: '#080808', background: G, boxShadow: '0 0 18px rgba(198,168,92,0.65)' }}><Check size={15} strokeWidth={3} /></motion.div>}
           </motion.div>
           <motion.div
-            initial={{ opacity: 0, scale: 0.45 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.43, duration: 0.2, ease: 'easeOut' }}
-            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1B76D' }}
+            aria-live="polite"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: saveFlight.phase === 'saved' ? 1 : 0, y: saveFlight.phase === 'saved' ? 0 : 10 }}
+            transition={saveFlight.animateCard ? { duration: 0.24, delay: saveFlight.phase === 'saved' ? 0.08 : 0 } : { duration: 0.18 }}
+            style={{ position: 'absolute', top: 'calc(50% + 88px)', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: G, font: '800 12px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.15em', textShadow: '0 0 18px rgba(198,168,92,0.42)' }}
           >
-            <Check size={23} strokeWidth={3} />
+            <Check size={15} strokeWidth={3} /> SAVED TO PROGRESS
           </motion.div>
+          <div style={{ position: 'absolute', top: 'calc(50% - 104px)', left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.56)', font: '700 9px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.2em' }}>PROGRESS ARCHIVE</div>
         </motion.div>,
         document.body,
       )}
@@ -1951,10 +1925,10 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
+export default function ScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentScan, scans, pendingFacePhoto, isPremium, developerPreviewUnlocked, setIsPremium, setDeveloperPreviewUnlocked, updateUser, setShowUnlockSlideshow, setGuestSession } = useStore()
+  const { currentScan, scans, pendingFacePhoto, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow, setGuestSession } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
@@ -2002,14 +1976,13 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, developerPreviewUnlocked, currentScan)
-  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: hasUnlockedAccess, paywallRequested: isPaywallRedirect || showPaywall })
+  const hasUnlockedAccess = hasLocalUnlockedScanUiAccess(isPremium || justUnlocked, currentScan)
+  const savedProgressResultPresentation = getSavedProgressResultPresentation({ savedProgressCard: Boolean(progressCardReturnTo), isPremium, hasUnlockedAccess })
+  // A scan can be locally revealed without the account having a Pro
+  // entitlement. Keep those states separate so a requested upgrade always
+  // opens the purchase paywall for non-Pro users.
+  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
-    if (isCurrentAssessment(currentScan)) {
-      setIsPremium(true)
-      navigate('/results', { replace: true })
-      return
-    }
     justUnlockedRef.current = true
     // Replay only the compact lock-to-score animation on the existing card.
     setRevealRun(run => run + 1)
@@ -2079,7 +2052,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     // The real server-authoritative unlock path below is unchanged elsewhere.
     if (isLocalDeveloperPreview()) {
       useStore.setState(state => markScanResultsUnlocked(state, currentScan?.id))
-      setDeveloperPreviewUnlocked(true)
       setRevealRun(run => run + 1)
       setJustUnlocked(true)
       setShowPaywall(false)
@@ -2121,11 +2093,12 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
           <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
         </div>
       ) : hasUnlockedAccess ? (
-        <LockedRevealScreen scan={revealScan} unlocked savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
+        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
       ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}
           savedProgressCard={Boolean(progressCardReturnTo)}
+          canAccessProUi={isPremium}
           onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })}
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
@@ -2178,11 +2151,4 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
       </AnimatePresence>
     </MotionPage>
   )
-}
-
-export default function ScanUnlockGate(props) {
-  const scan = useStore(s => s.currentScan)
-  const [params] = useSearchParams()
-  if (isCurrentAssessment(scan) && !props?.pendingScan && !props?.directPaywall && params.get('paywall') !== '1') return <AppearanceAssessmentResults key={scan.id} scan={scan} />
-  return <LegacyScanUnlockGate {...props} />
 }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from './revealAnimation.js'
+import { getLockedResultsHeadingStyle, getRevealMetricTextStyles, getRevealRatingAnimation, getRevealRatingsPanelHeight, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from './revealAnimation.js'
 
 test('unlocked metric labels and locks use neutral gray without glow', () => {
   const styles = getRevealMetricTextStyles(true)
@@ -65,6 +65,18 @@ test('results headings stay larger and on one line with navigation dots using ti
   assert.deepEqual(getResultsNavigationDotButtonStyle(), { width: 25, height: 44 })
 })
 
+test('locked Reveal your ratings heading stays on one line', () => {
+  assert.deepEqual(getLockedResultsHeadingStyle(), {
+    fontSize: 'clamp(21px, 7vw, 30px)',
+    whiteSpace: 'nowrap',
+    lineHeight: '1.1',
+  })
+})
+
+test('locked and unlocked rating panels use one fixed shared height', () => {
+  assert.equal(getRevealRatingsPanelHeight(), 416)
+})
+
 test('unlock fades the lock before animating the scored bar to its rating', () => {
   const animation = getRevealRatingAnimation(7.2, { unlocked: true })
   assert.deepEqual(animation.lock.animate, { opacity: 0 })
@@ -107,7 +119,7 @@ test('missing ratings do not animate a fake score into the bar', () => {
   assert.equal(animation.bar.initial, false)
 })
 
-test('locked ratings retain the neutral full-width placeholder bar', () => {
+test('the on-screen locked reveal keeps its existing neutral placeholder bar', () => {
   const animation = getRevealRatingAnimation(7.2, { unlocked: false })
   assert.deepEqual(animation.lock.animate, { opacity: 1 })
   assert.deepEqual(animation.bar.animate, { width: '100%', opacity: 1, boxShadow: 'none' })

@@ -1,3 +1,5 @@
+import { REVEAL_RATINGS_LAYOUT } from './revealRatingsLayout.js'
+
 const REVEAL_GOLD = '#D1B76D'
 const REVEAL_LABEL = '#A3A3A3'
 
@@ -40,6 +42,20 @@ export function getUnlockedResultsHeadingStyle() {
     lineHeight: '1.1',
     transform: 'translateY(8px)',
   }
+}
+
+export function getLockedResultsHeadingStyle() {
+  return {
+    fontSize: 'clamp(21px, 7vw, 30px)',
+    whiteSpace: 'nowrap',
+    lineHeight: '1.1',
+  }
+}
+
+export function getRevealRatingsPanelHeight(layout = REVEAL_RATINGS_LAYOUT) {
+  const metricHeight = layout.labelHeight + layout.labelMarginBottom + layout.valueHeight + layout.valueMarginBottom + layout.barHeight
+  const rowCount = 3
+  return layout.panelPaddingTop + layout.panelPaddingBottom + metricHeight * rowCount + layout.metricRowPaddingBottom * (rowCount - 1)
 }
 
 export function getResultsNavigationDotButtonStyle() {

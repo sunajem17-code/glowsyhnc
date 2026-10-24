@@ -2253,7 +2253,6 @@ export default function Scan() {
       setAnalysisStep(2)
 
       let aiResult
-      let presentationFollowup = null
       if (import.meta.env.DEV) console.log('[ASCENDUS SCAN] Analysis request started')
       const localScorePreview = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AI_SCORE_FALLBACK === 'true'
       if (token === 'demo-token' || localScorePreview) {
@@ -2294,7 +2293,6 @@ export default function Scan() {
       } else {
         try {
           setScanInFlight(true)
-          const lastGlowScore = scans?.[0]?.glowScore ?? null
           aiResult = await requestProductionAnalysis({
             apiClient: api,
             faceImage: faceB64,
@@ -2302,11 +2300,7 @@ export default function Scan() {
             sideProfileGeometry,
             evidence: analysisEvidence,
             gender: g,
-            knownMinor: userProfile?.knownMinor === true || (typeof userProfile?.age === 'number' && userProfile.age < 18),
-            previousScore: lastGlowScore,
           })
-          presentationFollowup = aiResult.presentationPromise ?? null
-          delete aiResult.presentationPromise
           setAnalysisResult(aiResult)
 
         } finally {
@@ -2367,9 +2361,6 @@ export default function Scan() {
       if (faceB64) setPendingFacePhoto(faceB64)
       addScan(scanRecord)
       setCurrentScan(scanRecord)
-      presentationFollowup?.then(feedback => {
-        if (feedback) useStore.getState().patchScanPresentation(scanRecord.id, feedback)
-      }).catch(() => {})
       if (faceB64) {
         import('../utils/scanPhotoDb.js').then(({ saveScanMedia }) =>
           saveScanMedia(scanRecord.id, { photo: faceB64 })
@@ -2678,24 +2669,6 @@ export default function Scan() {
                   />
                 </div>
               )}
-              {(step === 1 || step === 2) && (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={async () => {
-                    triggerHaptic()
-                    if (isNative()) {
-                      try {
-                        await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
-                      } catch {}
-                    }
-                    setCameraOpen(true)
-                  }}
-                  className="w-full flex-shrink-0 mt-[30px] py-4 rounded-2xl font-heading font-bold text-[15px]"
-                  style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-                >
-                  Begin Scan
-                </motion.button>
-              )}
             </motion.div>
           )}
           {(step === 1 || step === 2) && previewPhoto && (
@@ -2939,11 +2912,29 @@ export default function Scan() {
         </div>
       )}
 
-      {/* Optional library upload stays in the footer; the scan action sits
-          directly beneath the guide photo, as in the original capture flow. */}
+      {/* CTAs — pinned at bottom, same position/size on every step */}
       <input ref={libraryUploadRef} type="file" accept="image/*" onChange={selectLibraryPhoto} className="hidden" />
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
+          {(step === 1 || step === 2) && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={async () => {
+                triggerHaptic()
+                if (isNative()) {
+                  try {
+                    // Triggers the iOS "Allow camera access" system dialog if not yet granted
+                    await CapacitorCamera.requestPermissions({ permissions: ['camera'] })
+                  } catch {}
+                }
+                setCameraOpen(true)
+              }}
+              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+            >
+              Begin Scan
+            </motion.button>
+          )}
           {((step === 1 && frontTitleTaps >= 3) || (step === 2 && sideTitleTaps >= 3)) && (
             <button
               type="button"
