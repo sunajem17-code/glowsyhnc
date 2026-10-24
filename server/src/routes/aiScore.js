@@ -9,6 +9,7 @@ const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
 const { calculatePotentialScore, withPotentialScore } = require('../utils/potentialScore')
+const { normalizePhysiqueScores } = require('../utils/physiqueScore')
 
 const router = express.Router()
 
@@ -47,7 +48,7 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
   h.update('||' + cacheNamespace())
-  h.update('||v4_eye_guidance') // bump to bust Supabase cache — Rekognition path replaces Claude lookalike
+  h.update('||v5_physique_visual_scoring') // bust results created before body photos were part of the cache identity
   return h.digest('hex') // 64-char hex string
 }
 
@@ -661,23 +662,29 @@ ${isFemale ? `FEMALE PHYSIQUE SCORING:
 - posture: Spine alignment, shoulder position, chest position. Rounded forward posture = low score. Upright, chest out = high score.
 - overall_presentation: Grooming, clothing fit, how well the body is presented. Clean presentation = high score.`}${measuredGeometryNote}
 
-SCORE DISTRIBUTION — think of these as a bell curve across the general population, not a fitness-influencer feed:
-- 5.0 is the TRUE MIDDLE — an average build, nothing notably impressive or lacking. Most people land here, and that is not a bad score.
-- 3.0 — below average: poor proportions, minimal muscle definition, or a noticeably underdeveloped frame for that category.
-- 7.0 — clearly above average: visible muscle definition or good proportions. This is a genuinely good score — do not reserve 7+ for exceptional cases only.
-- 9.0 — exceptional, physique-competitor or fitness-model tier. Rare — most photos, even good ones, should not get a 9 across the board.
+SCORING RUBRIC — apply the same population reference separately to every category:
+- 1–2: very limited visible development or a pronounced weakness in this category.
+- 3–4: below average for this category, with clear visible evidence for the rating.
+- 5–6: typical development; 5 is the population midpoint, not a default or a safe answer.
+- 7–8: clearly above average, supported by visible definition, development, or proportions.
+- 9–10: exceptional development for this category; rare and supported by unusually strong visual evidence.
+Use tenths to distinguish real differences. Do not round every ordinary-looking photo to 5.0. Two photos with visibly different muscle development, leanness, or shoulder-to-waist proportions must receive different relevant scores. Do not force unrelated categories to match or let one category determine the others.
 
 SCORING RULES:
-- Use the FULL 1–10 range in both directions — do not compress everyone into 5–7 out of politeness, but also don't treat a 5–6 as a punishment; it is the honest, common result for an average physique.
-- Score based only on what is VISIBLE in the photo. If the body is partially hidden by clothing, score what you can see and note it.
-- Never penalize for natural body type — score relative to ideal proportions for that body type.
-- Body fat levels: very_lean / lean / average / above_average / heavy
-- potential: realistic physique development potential from visible structure and apparent training headroom; do not infer age, health, or genetics from a photo.
-- muscle_mass: apparent visible muscular development relative to body size and the visible areas; clothing can limit confidence.
-- body_fat_score: a 1–10 appearance rating where higher means leaner visible body composition; this is not a body-fat percentage or medical estimate.
-- v_taper: visible shoulder-to-waist taper; use measured shoulderHipRatio when available.
-- frame_width: visible skeletal frame and shoulder width, accounting for pose and clothing uncertainty.
-- Keep overall on the same 1–10 scale and calculate it from the five legacy categories as before.
+- Score only visible evidence in the supplied body photo. Clothing, crop, lighting, pose, and camera perspective limit confidence; mention material limitations in physique_notes and never fill hidden anatomy with assumptions.
+- Assess each category independently, using the full 1.0–10.0 range. Do not infer measurements, exact body-fat percentage, muscle mass in units, skeletal dimensions, age, health, genetics, or training history.
+- proportions: visible balance and silhouette. For men, shoulder-to-waist and chest-to-waist balance; for women, waist-to-hip and shoulder/hip balance. Do not infer a hidden waist or hips.
+- leanness: visible definition and separation, accounting for lighting and pose. Do not equate shadows with muscle definition.
+- frame: apparent natural build only where the photo provides evidence; do not claim to measure bone structure.
+- posture: visible alignment and pose in this image, not a lasting posture diagnosis.
+- overall_presentation: photo presentation and clothing fit only; do not use it as a proxy for muscularity or leanness.
+- muscle_mass: visible development of observable muscle groups (such as shoulders, chest, arms, back, and legs when shown). A covered body is not evidence of either high or low muscle mass.
+- body_fat_score: visual leanness/definition on a 1–10 scale where higher means leaner. This is not a medical estimate or body-fat percentage. Keep it related to, but assess it separately from, muscle_mass.
+- v_taper: visible shoulder-to-waist taper, supported by image evidence and measured shoulderHipRatio when available; account for pose and camera perspective.
+- frame_width: apparent shoulder and torso width relative to the visible body proportions, with uncertainty for clothing, pose, and perspective. Do not pretend to determine exact skeletal width.
+- potential: realistic room for aesthetic improvement suggested by visible development and headroom. It is not a guarantee, genetic ceiling, or prediction. Its score must be at least the computed overall score.
+- body_fat_level: choose the closest visual category (very_lean / lean / average / above_average / heavy), not a medical classification.
+- Keep overall on the existing 1–10 scale and calculate it from the five legacy categories as before.
 
 Return ONLY this JSON — no markdown, nothing else:
 {
@@ -707,26 +714,7 @@ Return ONLY this JSON — no markdown, nothing else:
 
   const raw = response.content[0]?.text?.trim() || ''
   const parsed = parseJSON(raw, 'Physique scorer')
-  const clamp = (v, fallback = 5.0) => Math.min(Math.max(Number(v) || fallback, 1.0), 10.0)
-  const overall = (clamp(parsed.proportions) + clamp(parsed.leanness) + clamp(parsed.frame) + clamp(parsed.posture) + clamp(parsed.overall_presentation)) / 5
-
-  return {
-    proportions:          Math.round(clamp(parsed.proportions)         * 10) / 10,
-    leanness:             Math.round(clamp(parsed.leanness)            * 10) / 10,
-    frame:                Math.round(clamp(parsed.frame)               * 10) / 10,
-    posture:              Math.round(clamp(parsed.posture)             * 10) / 10,
-    overall_presentation: Math.round(clamp(parsed.overall_presentation)* 10) / 10,
-    potential:            Math.round(clamp(parsed.potential)           * 10) / 10,
-    muscle_mass:          Math.round(clamp(parsed.muscle_mass)         * 10) / 10,
-    body_fat_score:       Math.round(clamp(parsed.body_fat_score)      * 10) / 10,
-    v_taper:              Math.round(clamp(parsed.v_taper)             * 10) / 10,
-    frame_width:          Math.round(clamp(parsed.frame_width)         * 10) / 10,
-    overall:              Math.round(overall                           * 10) / 10,
-    body_fat_level:       parsed.body_fat_level ?? 'average',
-    physique_strengths:   Array.isArray(parsed.physique_strengths)   ? parsed.physique_strengths   : [],
-    physique_improvements:Array.isArray(parsed.physique_improvements) ? parsed.physique_improvements : [],
-    physique_notes:       parsed.physique_notes ?? null,
-  }
+  return normalizePhysiqueScores(parsed)
 }
 
 // ── Blend weights — tune here, not scattered through code ─────────────────────
@@ -825,7 +813,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     // ── L1: in-process memory cache ───────────────────────────────────────────
     // v2: suffix bumped to invalidate stale celebrity results from before the
     // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
-    const cacheKey = hashImages(faceBase64, 'FACE_ONLY_v4_eye_guidance', sideBase64)
+    const cacheKey = hashImages(faceBase64, bodyBase64, sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
       const cached = withPotentialScore(scoreCache.get(cacheKey))
@@ -834,7 +822,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
-    const fullHash = computeFullHash(faceBase64, null, sideBase64)
+    const fullHash = computeFullHash(faceBase64, bodyBase64, sideBase64)
     const tL2Start = Date.now()
     const sbCached = await getScanCache(fullHash)
     console.log(`[aiScore:TIMING] L2 Supabase cache lookup took ${Date.now() - tL2Start}ms`)
