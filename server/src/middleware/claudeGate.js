@@ -4,7 +4,7 @@
  *
  * Exports:
  *   verifyToken   — JWT required; demo-token accepted as rate-limited guest
- *   claudeLimit   — Claude calls per hour (100 pro / 25 free / 5 demo)
+ *   claudeLimit   — short burst protection (30 pro / 15 free / 5 demo per minute)
  *   scanLimit     — 50 scans/day free users; 5/hour demo; unlimited pro
  *   requirePro    — 403 unless user has active Pro or trial
  *   resolvePro    — sets req.isPro without blocking
@@ -23,9 +23,11 @@ const { monthlyBudgetStatus, budgetError, runWithBudgetUser } = require('../lib/
 
 // ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
 const checkClaude = {
-  pro:  createLimiter('claude:pro',  100, '1 h',  60 * 60 * 1000),
-  free: createLimiter('claude:free', 25,  '1 h',  60 * 60 * 1000),
-  demo: createLimiter('claude:demo', 5,   '1 h',  60 * 60 * 1000),
+  // New namespaces ensure counters from the retired hourly limiter cannot
+  // continue blocking requests after deployment.
+  pro:  createLimiter('claude-burst-v1:pro',  30, '1 m', 60 * 1000),
+  free: createLimiter('claude-burst-v1:free', 15, '1 m', 60 * 1000),
+  demo: createLimiter('claude-burst-v1:demo', 5,  '1 m', 60 * 1000),
 }
 
 // DEV_SCAN_LIMIT: raises the free-tier daily cap for local/simulator testing.
@@ -69,8 +71,9 @@ function verifyToken(req, res, next) {
   }
 }
 
-// ── 2. Claude call rate limit ──────────────────────────────────────────────────
-// Pro: 100/hour · Free: 25/hour · Demo: 5/hour
+// ── 2. Claude call burst limit ─────────────────────────────────────────────────
+// There is no hourly AI quota. The monthly spend cap remains enforced below.
+// This distributed per-minute limiter only prevents rapid bursts.
 async function claudeLimit(req, res, next) {
   let budget
   try {
@@ -85,9 +88,7 @@ async function claudeLimit(req, res, next) {
   const tier    = req.isPro ? 'pro' : req.isDemo ? 'demo' : 'free'
   const allowed = await checkClaude[tier](req.userId)
   if (!allowed) {
-    // retryAfter=3600 signals "hourly limit" to the client so it shows a
-    // "limit reached" message instead of a 30-second server-busy countdown.
-    return res.status(429).json({ error: 'claude_rate_limited', retryAfter: 3600 })
+    return res.status(429).json({ error: 'claude_burst_limited', retryAfter: 60 })
   }
   next()
 }

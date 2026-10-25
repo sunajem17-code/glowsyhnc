@@ -72,31 +72,6 @@ router.post('/post', authMiddleware, async (req, res) => {
   res.json({ post })
 })
 
-// ── PATCH /api/community/post/:id ────────────────────────────────────────────
-router.patch('/post/:id', authMiddleware, (req, res) => {
-  if (req.isDemo) return res.status(403).json({ error: 'Sign up to edit posts.' })
-
-  const existing = db.prepare('SELECT id, user_id FROM community_posts WHERE id = ?').get(req.params.id)
-  if (!existing) return res.status(404).json({ error: 'Post not found.' })
-  if (existing.user_id !== req.userId) return res.status(403).json({ error: 'Not your post.' })
-
-  const { caption, displayName } = req.body
-  db.prepare(`
-    UPDATE community_posts
-    SET caption = COALESCE(?, caption), display_name = COALESCE(?, display_name)
-    WHERE id = ?
-  `).run(
-    caption      != null ? caption.slice(0, 280)      : null,
-    displayName  != null ? displayName.slice(0, 30)   : null,
-    req.params.id,
-  )
-
-  const updated = db.prepare(
-    'SELECT id, display_name, caption FROM community_posts WHERE id = ?'
-  ).get(req.params.id)
-  res.json({ post: updated })
-})
-
 // ── DELETE /api/community/post/:id ───────────────────────────────────────────
 router.delete('/post/:id', authMiddleware, (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign up to delete posts.' })
@@ -172,10 +147,11 @@ router.post('/post/:id/rate', authMiddleware, (req, res) => {
   if (!post)                      return res.status(404).json({ error: 'Post not found' })
   if (post.post_type !== 'rate-me') return res.status(400).json({ error: 'This post does not accept ratings' })
 
-  const score = parseInt(req.body.score, 10)
-  if (isNaN(score) || score < 1 || score > 10) {
+  const submittedScore = req.body.score
+  if (typeof submittedScore !== 'number' || !Number.isFinite(submittedScore) || submittedScore < 1 || submittedScore > 10) {
     return res.status(400).json({ error: 'Score must be 1–10' })
   }
+  const score = Math.round(submittedScore * 10) / 10
 
   // Upsert: update if user already rated, insert otherwise
   const existing = db.prepare('SELECT id FROM community_ratings WHERE post_id = ? AND user_id = ?')

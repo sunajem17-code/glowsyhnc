@@ -137,13 +137,12 @@ export default function Splash({ onDone }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.6, ease: EASE }}
+              className="splash-wordmark-gold"
               style={{
                 fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
                 fontWeight: 800,
                 fontSize: 25.3,
                 letterSpacing: '0.26em',
-                color: SPLASH_COPY.welcomeTitleColor,
-                WebkitTextFillColor: SPLASH_COPY.welcomeTitleColor,
                 marginBottom: 4,
               }}
             >
@@ -156,7 +155,7 @@ export default function Splash({ onDone }) {
               style={{
                 fontFamily: 'var(--font-body, "Inter", sans-serif)',
                 fontSize: 15.4,
-                color: 'rgba(255,255,255,0.48)',
+                color: '#FFFFFF',
                 letterSpacing: '0.01em',
               }}
             >

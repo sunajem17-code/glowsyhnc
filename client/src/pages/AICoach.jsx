@@ -1,6 +1,6 @@
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Lock, ChevronRight, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -10,6 +10,7 @@ import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { UPGRADE_WELCOME } from '../utils/coachWelcome'
+import { prepareCoachPhoto } from '../utils/coachPhoto'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -104,6 +105,10 @@ function MessageBubble({ msg, isNew }) {
             filter: msg.locked ? 'blur(3px)' : 'none',
           }}
         >
+          {msg.image && (
+            <img src={msg.image} alt="Scan photo attached to your message"
+              className="mb-2 max-h-56 w-full rounded-xl object-cover" style={{ maxWidth: 240 }} />
+          )}
           {isUser ? msg.content : <CoachMessage content={msg.content} reveal={msg.reveal === true} />}
         </div>
       </div>
@@ -115,6 +120,8 @@ const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const selectedScanId = location.state?.scanId
   const { scans, isPremium: actualIsPremium, userProfile, freeCoachMessages, user } = useStore()
   const isPremium = usePremiumUiAccess()
   const freeMessagesLeft = Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages || 0))
@@ -127,12 +134,18 @@ export default function AICoach() {
   const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(location.state?.coachPrompt || '')
+  const [coachPhoto, setCoachPhoto] = useState(location.state?.coachPhotoUrl || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [newMsgIdx, setNewMsgIdx] = useState(-1)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (location.state?.coachPrompt) setInput(location.state.coachPrompt)
+    setCoachPhoto(location.state?.coachPhotoUrl || null)
+  }, [location.key])
 
   // Server decides which completed scan belongs to this user. Local scan state
   // is used only for availability/navigation, never as trusted model context.
@@ -158,7 +171,12 @@ export default function AICoach() {
 
   useEffect(() => {
     if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
-    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+    try {
+      const savedMessages = messages.slice(-12).map(message => Object.fromEntries(
+        Object.entries(message).filter(([key]) => key !== 'image'),
+      ))
+      sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: savedMessages }))
+    } catch {}
   }, [messages, user?.id, messagesOwner])
 
   // Scroll to bottom on new message
@@ -185,6 +203,7 @@ export default function AICoach() {
     const msgText = (text || input).trim()
     if (!msgText || loading) return
 
+    const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(msgText))
     // No scan → redirect to scan
     if (!hasScan) { navigate('/scan'); return }
 
@@ -196,17 +215,23 @@ export default function AICoach() {
 
     const generation = requestGenerationRef.current
 
-    const userMsg = { role: 'user', content: msgText }
+    const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
+    const scanPhotoSource = coachPhoto
     const nextMessages = [...messages, userMsg]
     setMessages(nextMessages)
+    setCoachPhoto(null)
     setNewMsgIdx(nextMessages.length - 1)
     setLoading(true)
 
 
     try {
+      const scanPhotoData = await prepareCoachPhoto(scanPhotoSource).catch(() => null)
       const data = await api.coach.message({
         messages: [{ role: 'user', content: msgText }],
         conversationId: conversationRef.current,
+        ...(selectedScanId ? { scanId: selectedScanId } : {}),
+        includeScanPhoto,
+        ...(scanPhotoData ? { scanPhotoData } : {}),
         preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
       if (generation !== requestGenerationRef.current) return
@@ -429,12 +454,15 @@ export default function AICoach() {
             className="flex items-end gap-2 px-4 py-2.5 rounded-2xl"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
           >
+            {coachPhoto && (
+              <img src={coachPhoto} alt="Selected scan attached" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+            )}
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Adonis anything…" aria-label="Message Adonis"
+              placeholder={coachPhoto ? 'Selected scan attached' : 'Ask Adonis anything…'} aria-label="Message Adonis"
               rows={1}
               className="flex-1 bg-transparent outline-none resize-none font-body text-[14px]"
               style={{

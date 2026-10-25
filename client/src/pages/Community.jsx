@@ -2,29 +2,29 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { Heart, MessageCircle, Share2, Plus, X, Send, Trash2, Pencil, MoreVertical, TrendingUp, Users, Loader2, Copy, Image, Check, Star, BarChart2, Flag, Settings, ChevronLeft } from 'lucide-react'
+import { Heart, MessageCircle, Plus, X, Send, Trash2, MoreVertical, TrendingUp, Users, Loader2, Copy, Image, Camera, Check, BarChart2, Flag, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
-import PageHeader from '../components/PageHeader'
+import ScanHistoryRow from '../components/ScanHistoryRow'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { isPhysiqueProgressScan } from '../utils/progressHistory'
+import { getHistoryScoreColor } from '../utils/scanHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-import demoMaleScan from '../assets/face-metrics-demo-cropped.jpg'
+import demoMaleScan from '../assets/face-metrics-demo.jpg'
 import demoFemaleScan from '../assets/face-metrics-demo-female.jpg'
-import demoMaleScanOverlay from '../assets/face-metrics-demo.jpg'
 
 const BORDER = 'rgba(255,255,255,0.07)'
 const GOLD_LINE_GLOW = '0 0 14px rgba(198,168,92,0.4), 0 0 28px rgba(198,168,92,0.18), inset 0 0 10px rgba(198,168,92,0.1)'
 const SAMPLE_LIKES_STORAGE_KEY = 'community.sample-liked-posts'
 
 const SAMPLE_COMMUNITY_POSTS = [
-  { id: 'sample-1', display_name: 'Jordan', post_type: 'glow-up', created_at: new Date(Date.now() - 18 * 60_000).toISOString(), score_before: 6.2, score_after: 7.4, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Six weeks of consistency is starting to show.', likes_count: 28, comments_count: 6, sample_comments: [{ id: 'sample-1-comment-1', display_name: 'Maya', content: 'The progress is really clear!', created_at: new Date(Date.now() - 10 * 60_000).toISOString() }, { id: 'sample-1-comment-2', display_name: 'Ethan', content: 'Consistency pays off. Nice work.', created_at: new Date(Date.now() - 5 * 60_000).toISOString() }] },
+  { id: 'sample-1', display_name: 'Jordan', post_type: 'glow-up', created_at: new Date(Date.now() - 18 * 60_000).toISOString(), score_before: 6.2, score_after: 7.4, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Six weeks of consistency is starting to show.', likes_count: 28, comments_count: 6, sample_comments: [{ id: 'sample-1-comment-1', display_name: 'Maya', content: 'The progress is really clear!', created_at: new Date(Date.now() - 10 * 60_000).toISOString() }, { id: 'sample-1-comment-2', display_name: 'Ethan', content: 'Consistency pays off. Nice work.', created_at: new Date(Date.now() - 5 * 60_000).toISOString() }] },
   { id: 'sample-2', display_name: 'Maya', post_type: 'rate-me', created_at: new Date(Date.now() - 52 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.1, rating_count: 24, caption: 'Trying a new haircut. What do you think?', likes_count: 17, comments_count: 4, sample_comments: [{ id: 'sample-2-comment-1', display_name: 'Sofia', content: 'That style suits you!', created_at: new Date(Date.now() - 30 * 60_000).toISOString() }] },
-  { id: 'sample-3', display_name: 'Ethan', post_type: 'glow-up', created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(), score_before: 5.8, score_after: 6.6, before_photo_url: demoMaleScanOverlay, photo_url: demoMaleScan, caption: 'Better sleep and a simpler routine.', likes_count: 21, comments_count: 3, sample_comments: [{ id: 'sample-3-comment-1', display_name: 'Noah', content: 'What did you change in your routine?', created_at: new Date(Date.now() - 90 * 60_000).toISOString() }] },
+  { id: 'sample-3', display_name: 'Ethan', post_type: 'glow-up', created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(), score_before: 5.8, score_after: 6.6, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Better sleep and a simpler routine.', likes_count: 21, comments_count: 3, sample_comments: [{ id: 'sample-3-comment-1', display_name: 'Noah', content: 'What did you change in your routine?', created_at: new Date(Date.now() - 90 * 60_000).toISOString() }] },
   { id: 'sample-4', display_name: 'Ava', post_type: 'rate-me', created_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 7.6, rating_count: 16, caption: 'New lighting setup for my scan. Any tips?', likes_count: 13, comments_count: 2, sample_comments: [{ id: 'sample-4-comment-1', display_name: 'Jordan', content: 'Natural window light usually works well.', created_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString() }] },
-  { id: 'sample-5', display_name: 'Noah', post_type: 'glow-up', created_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), score_before: 6.5, score_after: 7.0, before_photo_url: demoMaleScan, photo_url: demoMaleScanOverlay, caption: 'Keeping the routine simple and sticking with it.', likes_count: 35, comments_count: 8, sample_comments: [{ id: 'sample-5-comment-1', display_name: 'Ethan', content: 'Simple routines are easier to stay consistent with.', created_at: new Date(Date.now() - 6 * 60 * 60_000).toISOString() }] },
+  { id: 'sample-5', display_name: 'Noah', post_type: 'glow-up', created_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), score_before: 6.5, score_after: 7.0, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Keeping the routine simple and sticking with it.', likes_count: 35, comments_count: 8, sample_comments: [{ id: 'sample-5-comment-1', display_name: 'Ethan', content: 'Simple routines are easier to stay consistent with.', created_at: new Date(Date.now() - 6 * 60 * 60_000).toISOString() }] },
   { id: 'sample-6', display_name: 'Sofia', post_type: 'rate-me', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.4, rating_count: 31, caption: 'Which style suits me better?', likes_count: 26, comments_count: 5, sample_comments: [{ id: 'sample-6-comment-1', display_name: 'Maya', content: 'I like this look best!', created_at: new Date(Date.now() - 9 * 60 * 60_000).toISOString() }] },
   { id: 'sample-7', display_name: 'Jordan', post_type: 'question', created_at: new Date(Date.now() - 13 * 60 * 60_000).toISOString(), photo_url: demoMaleScan, caption: 'Any advice for reducing under-eye puffiness in the morning?', likes_count: 12, comments_count: 3, sample_comments: [{ id: 'sample-7-comment-1', display_name: 'Maya', content: 'A cool compress and getting enough sleep helped me.', created_at: new Date(Date.now() - 12 * 60 * 60_000).toISOString() }, { id: 'sample-7-comment-2', display_name: 'Ethan', content: 'Try keeping your hydration consistent too.', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString() }] },
 ].map(post => ({ ...post, user_liked: 0, is_mine: 0 }))
@@ -70,7 +70,7 @@ const Avatar = memo(function Avatar({ name, size = 9, subtle = false }) {
         background: subtle ? 'rgba(198,168,92,0.12)' : 'rgba(198,168,92,0.15)',
         color: GOLD,
         border: `1px solid rgba(198,168,92,${subtle ? '0.16' : '0.2'})`,
-        boxShadow: subtle ? '0 0 5px rgba(198,168,92,0.12), inset 0 0 3px rgba(198,168,92,0.05)' : GOLD_LINE_GLOW,
+        boxShadow: 'none',
       }}
     >
       {(name?.[0] ?? '?').toUpperCase()}
@@ -85,54 +85,81 @@ const CARD_VARIANTS = {
 }
 
 // Community posts can only use photos already saved with a face scan.
-function FaceScanPhotoPicker({ label, value, onChange, photos, disabled }) {
+function FaceScanPhotoPicker({ label, pickerTitle, value, onChange, photos, disabled, emptyMessage, hideLabel = false }) {
   const [open, setOpen] = useState(false)
-  const selected = photos.find(photo => photo.id === value?.id)
+  const title = pickerTitle || (label === 'Before' || label === 'After' ? `${label} photo` : label)
 
   return (
     <div className="flex-1 min-w-0">
-      <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5"
+      {!hideLabel && <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5"
         style={{ color: 'rgba(255,255,255,0.35)' }}>
         {label}
-      </p>
+      </p>}
       <button
         type="button"
         disabled={disabled}
+        aria-label={`Choose ${title.toLowerCase()} from saved scans`}
         onClick={() => { triggerHaptic(); setOpen(value ? !open : true) }}
-        className="relative w-full rounded-2xl overflow-hidden flex items-center justify-center disabled:opacity-50"
-        style={{ aspectRatio: '3/4', background: value ? 'transparent' : '#1C1C1C', border: `1.5px dashed ${value ? 'transparent' : 'rgba(255,255,255,0.12)'}` }}
+        className={`relative w-full rounded-2xl overflow-hidden disabled:opacity-50 ${value ? 'text-left' : 'flex items-center justify-center'}`}
+        style={value
+          ? { aspectRatio: '4 / 5', background: 'transparent', border: 0 }
+          : { aspectRatio: '4 / 5', background: '#111111', border: '1.5px dashed rgba(255,255,255,0.08)' }}
       >
         {value ? (
-          <>
-            <img src={value.src} alt={`${label} face scan`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"
-              style={{ background: 'rgba(0,0,0,0.38)' }}>
-              <Image size={18} color="#fff" />
-              <span className="font-body text-[10px] text-white">{selected?.date ?? 'Change scan'}</span>
-            </div>
-          </>
+          <div className="absolute inset-0">
+            <TradingScanCard image={value.src} imageAlt={`${label} face scan`} label={label} score={value.score} compact />
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5">
-            <Image size={22} style={{ color: 'rgba(255,255,255,0.3)' }} />
+            <Camera size={30} style={{ color: GOLD, filter: 'drop-shadow(0 0 8px rgba(198,168,92,0.38))' }} />
             <span className="font-body text-[11px] text-center px-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
               {disabled ? 'No face scans yet' : 'Choose a face scan'}
             </span>
           </div>
         )}
       </button>
-      {open && photos.length > 0 && (
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {photos.map(photo => (
-            <button key={photo.id} type="button" onClick={() => { onChange(photo); setOpen(false); triggerHaptic() }}
-              className="relative rounded-xl overflow-hidden aspect-[3/4]"
-              style={{ border: `1px solid ${photo.id === value?.id ? GOLD : 'rgba(255,255,255,0.12)'}`, boxShadow: photo.id === value?.id ? GOLD_LINE_GLOW : 'none' }}>
-              <img src={photo.src} alt={`Face scan from ${photo.date}`} className="w-full h-full object-cover" />
-              <span className="absolute inset-x-0 bottom-0 py-1 text-[9px] text-white text-center"
-                style={{ background: 'rgba(0,0,0,0.7)' }}>{photo.date}</span>
-            </button>
-          ))}
-        </div>
+      {open && (photos.length > 0 || emptyMessage) && createPortal(
+        <div className="fixed inset-0 z-[10060] flex flex-col bg-black" role="dialog" aria-modal="true" aria-labelledby={`community-photo-picker-${label}`}>
+        <header className="flex shrink-0 items-center justify-between px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]" style={{ borderBottom: `1px solid ${BORDER}` }}>
+            <div>
+              <h2 id={`community-photo-picker-${label}`} className="font-heading text-xl font-bold text-white">Choose {title}</h2>
+              <p className="mt-1 font-body text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>Select a saved scan from Progress</p>
+            </div>
+            <button type="button" aria-label="Close scan picker" onClick={() => setOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: '#151515', color: '#fff', border: `1px solid ${BORDER}` }}><X size={18} /></button>
+          </header>
+          <div aria-label={`Saved scans for ${label}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" style={{ touchAction: 'pan-y' }}>
+            <div>
+              {photos.map((photo, index) => photo.scan && <ScanHistoryRow
+                key={photo.id}
+                scan={photo.scan}
+                index={index}
+                showChevron={false}
+                onTap={() => { onChange(photo); setOpen(false) }}
+              />)}
+            </div>
+            {!photos.length && emptyMessage && <p className="px-2 py-6 text-center font-body text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
+          </div>
+        </div>,
+        document.body,
       )}
+    </div>
+  )
+}
+
+function TradingScanCard({ image, imageAlt, label, subtitle, score, selected = false, compact = false }) {
+  const hasFooter = Boolean(label || subtitle || score != null)
+  return (
+    <div className={`flex h-full w-full min-h-0 flex-col rounded-2xl ${compact ? 'p-2' : 'p-3'}`} style={{ background: '#141414', border: `1px solid ${selected ? GOLD : 'rgba(255,255,255,0.07)'}` }}>
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl bg-[#111]">
+        <img src={image} alt={imageAlt} className="h-full w-full object-cover" />
+      </div>
+      {hasFooter && <div className={`flex shrink-0 items-center justify-between gap-2 ${compact ? 'pt-1.5' : 'pt-2.5'}`}>
+          <div className="min-w-0">
+            {label && <p className={`truncate font-heading font-semibold leading-tight text-primary ${compact ? 'text-[10px] uppercase tracking-wider' : 'text-[15px]'}`}>{label}</p>}
+            {subtitle && <p className="mt-0.5 truncate font-heading font-bold text-[10px] tracking-wide" style={{ color: score != null ? getHistoryScoreColor(score) : 'rgba(255,255,255,0.48)' }}>{subtitle.toUpperCase()}</p>}
+          </div>
+          {score != null && <span className={`shrink-0 font-heading font-bold leading-none ${compact ? 'text-[14px]' : 'text-[22px]'}`} style={{ color: getHistoryScoreColor(score), letterSpacing: '-0.02em' }}>{Number(score).toFixed(1)}</span>}
+        </div>}
     </div>
   )
 }
@@ -253,7 +280,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
   const latestScan  = faceScans[0]
 
   const [postType,    setPostType]    = useState('glow-up')
-  const [displayName, setDisplayName] = useState(user?.name?.split(' ')[0] ?? 'Anonymous')
+  const displayName = user?.name?.split(' ')[0] ?? 'Anonymous'
   const [caption,     setCaption]     = useState('')
   const [afterPhoto,  setAfterPhoto]  = useState(null)
   const [beforePhoto, setBeforePhoto] = useState(null)
@@ -276,10 +303,11 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
       if (!src) return null
       const timestamp = scan.scanDate ?? scan.analyzedAt ?? scan.created_at
       const parsedDate = timestamp ? new Date(timestamp) : null
+      const timestampMs = parsedDate && Number.isFinite(parsedDate.getTime()) ? parsedDate.getTime() : null
       const date = parsedDate && Number.isFinite(parsedDate.getTime())
         ? parsedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
         : 'Face scan'
-      return { id: scan.id ?? `face-scan-${index}`, src, date, score: getFaceScanOverallScore(scan) }
+      return { id: scan.id ?? `face-scan-${index}`, src, date, timestamp: timestampMs, score: getFaceScanOverallScore(scan), scan }
     })).then(photos => {
       if (!active) return
       const available = photos.filter(Boolean)
@@ -292,6 +320,12 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
 
   const scoreBefore = beforePhoto?.score ?? null
   const scoreAfter = afterPhoto?.score ?? null
+  const beforePhotoChoices = faceScanPhotos.filter(photo => afterPhoto
+    ? photo.timestamp != null && afterPhoto.timestamp != null && photo.timestamp < afterPhoto.timestamp
+    : photo.id !== beforePhoto?.id)
+  const afterPhotoChoices = faceScanPhotos.filter(photo => beforePhoto
+    ? photo.timestamp != null && beforePhoto.timestamp != null && photo.timestamp > beforePhoto.timestamp
+    : photo.id !== afterPhoto?.id)
 
   // Shrink modal when keyboard appears using visualViewport
   const [vvH, setVvH] = useState(window.visualViewport?.height ?? window.innerHeight)
@@ -306,6 +340,12 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
 
   async function submit() {
     if (postType === 'glow-up' && !latestScan) { setErr('You need a scan first.'); return }
+    if (postType === 'glow-up' && beforePhoto && afterPhoto && (
+      beforePhoto.timestamp == null || afterPhoto.timestamp == null || beforePhoto.timestamp >= afterPhoto.timestamp
+    )) {
+      setErr('Choose an earlier scan for Before and a later scan for After.')
+      return
+    }
     if (postType === 'rate-me' && !ratePhoto)  { setErr('Add a photo to get rated.'); return }
     if (postType === 'question' && !caption.trim()) { setErr('Write your question first.'); return }
     setPosting(true); setErr('')
@@ -346,29 +386,27 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
       exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[10050] flex flex-col"
-      style={{ background: '#141414', height: vvH, minHeight: vvH }}
+      style={{ background: '#0A0A0A', height: vvH, minHeight: vvH }}
     >
       <div className="w-full h-full min-h-0 flex flex-col" style={{ height: vvH }}>
         {/* Fixed header */}
-        <div className="flex items-center justify-between px-5 pb-3 flex-shrink-0 border-b" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', borderColor: BORDER }}>
-          <div>
-            <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-0.5" style={{ color: GOLD }}>Community</p>
-            <p className="font-heading font-bold text-base text-primary">New Post</p>
-          </div>
-          <button type="button" aria-label="Close post composer" onClick={() => { triggerHaptic(); onClose() }} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#1C1C1C', border: `1px solid ${BORDER}` }}><X size={18} style={{ color: 'rgba(255,255,255,0.65)' }} /></button>
+        <div className="relative flex-shrink-0 px-6 pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+          <button type="button" aria-label="Go back" onClick={() => { triggerHaptic(); onClose() }} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+12px)] w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}><ChevronLeft size={18} className="text-primary" /></button>
+          <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>COMMUNITY</p>
+          <h1 className="font-heading font-bold text-[22px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>New Post</h1>
         </div>
 
         {/* Post type selector */}
         <div className="px-5 pb-3 flex-shrink-0">
-          <div className="flex gap-2 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.035)' }}>
-            {[{ id: 'glow-up', icon: <TrendingUp size={13} />, label: 'Glow-Up' }, { id: 'rate-me', icon: <Star size={13} />, label: 'Rate Me' }, { id: 'question', icon: <MessageCircle size={13} />, label: 'Question' }].map(t => (
+          <div className="mx-auto grid grid-cols-3 gap-[3px] rounded-full p-[3px]" style={{ width: 'min(360px, 100%)', height: 38, background: '#050505', border: '1px solid #292929' }}>
+            {[{ id: 'glow-up', label: 'Glow-Up' }, { id: 'rate-me', label: 'Rate Me' }, { id: 'question', label: 'Question' }].map(t => (
               <button
                 key={t.id}
                 onClick={() => { triggerHaptic(); setPostType(t.id) }}
-                className="min-w-0 flex-1 flex items-center justify-center gap-1 py-2.5 px-1 rounded-xl font-heading font-bold text-[11px] transition-all"
+                className="min-w-0 flex items-center justify-center rounded-full font-heading font-medium text-[13px] transition-all"
                 style={postType === t.id
-                  ? { background: GOLD, color: '#0A0A0A' }
-                  : { color: 'rgba(255,255,255,0.4)' }}
+                  ? { background: '#242424', color: '#fff' }
+                  : { background: 'transparent', color: '#929292' }}
               >
                 {t.icon} {t.label}
               </button>
@@ -383,12 +421,15 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
             <>
               {/* Before / After photos */}
               <div>
-                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">
-                  Before &amp; After Photos
-                </p>
                 <div className="flex gap-3">
-                  <FaceScanPhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
-                  <FaceScanPhotoPicker label="After"  value={afterPhoto}  onChange={setAfterPhoto}  photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Before</p>
+                    <FaceScanPhotoPicker label="Before" value={beforePhoto} onChange={setBeforePhoto} photos={beforePhotoChoices} disabled={loadingFacePhotos || !faceScanPhotos.length} emptyMessage="No earlier scans are available than the selected After photo." hideLabel />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading font-bold text-[11px] uppercase tracking-widest mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>After</p>
+                    <FaceScanPhotoPicker label="After" value={afterPhoto} onChange={setAfterPhoto} photos={afterPhotoChoices} disabled={loadingFacePhotos || !faceScanPhotos.length} emptyMessage="No later scans are available than the selected Before photo." hideLabel />
+                  </div>
                 </div>
                 {!loadingFacePhotos && !faceScanPhotos.length && (
                   <p className="font-body text-[11px] mt-2 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -396,26 +437,10 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
                   </p>
                 )}
               </div>
-              {/* Score preview */}
-              {scoreAfter != null && (
-                <div className="flex items-center gap-3 p-3 rounded-2xl"
-                  style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.18)', boxShadow: GOLD_LINE_GLOW }}>
-                  <TrendingUp size={18} style={{ color: GOLD }} />
-                  <div>
-                    <p className="font-heading font-bold text-sm" style={{ color: GOLD }}>
-                      {scoreBefore != null && scoreBefore !== scoreAfter
-                        ? `${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`
-                        : `Score: ${scoreAfter.toFixed(1)}`}
-                    </p>
-                    <p className="font-body text-[11px] text-secondary">Visible on your post</p>
-                  </div>
-                </div>
-              )}
             </>
           ) : postType === 'rate-me' ? (
             <>
               <div>
-                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">Your Photo</p>
                 <div className="w-1/2 mx-auto">
                   <FaceScanPhotoPicker label="Photo" value={ratePhoto} onChange={setRatePhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
                 </div>
@@ -428,17 +453,9 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
             </>
           ) : (
             <>
-              <div className="flex items-start gap-3 p-3 rounded-2xl" style={{ background: 'rgba(198,168,92,0.06)', border: '1px solid rgba(198,168,92,0.14)' }}>
-                <MessageCircle size={18} className="mt-0.5 flex-shrink-0" style={{ color: GOLD }} />
-                <div>
-                  <p className="font-heading font-bold text-sm text-primary">Ask the community</p>
-                  <p className="font-body text-[12px] leading-relaxed text-secondary">Share what you’re working through and get advice in the comments.</p>
-                </div>
-              </div>
               <div>
-                <p className="font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-3">Photo (optional)</p>
                 <div className="w-1/2 mx-auto">
-                  <FaceScanPhotoPicker label="Add a face scan" value={questionPhoto} onChange={setQuestionPhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
+                  <FaceScanPhotoPicker label="Add a photo (optional)" pickerTitle="photo" value={questionPhoto} onChange={setQuestionPhoto} photos={faceScanPhotos} disabled={loadingFacePhotos || !faceScanPhotos.length} />
                 </div>
                 {!loadingFacePhotos && !faceScanPhotos.length && (
                   <p className="font-body text-[11px] mt-2 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>A photo is optional. Complete a face scan to attach one.</p>
@@ -446,20 +463,6 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
               </div>
             </>
           )}
-
-          {/* Display name */}
-          <div>
-            <label className="block font-heading font-bold text-[11px] uppercase tracking-widest text-secondary mb-1.5">
-              Display Name
-            </label>
-            <input
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value.slice(0, 30))}
-              placeholder="Anonymous"
-              className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none"
-              style={{ background: '#1C1C1C', border: `1px solid ${BORDER}`, fontSize: 16 }}
-            />
-          </div>
 
           {/* Caption */}
           <div>
@@ -477,7 +480,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
               placeholder={postType === 'question' ? 'What would you like advice on?' : postType === 'rate-me' ? 'Add context (age, improvements made…)' : 'What worked for you?'}
               rows={postType === 'question' ? 4 : 3}
               className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none resize-none"
-              style={{ background: '#1C1C1C', border: `1px solid ${BORDER}`, fontSize: 16 }}
+              style={{ background: '#111111', border: `1px solid ${BORDER}`, fontSize: 16 }}
             />
           </div>
 
@@ -487,12 +490,12 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
             whileTap={{ scale: 0.97 }}
             onClick={() => { triggerHaptic(); submit() }}
             disabled={posting}
-            className="w-full py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
+            className="w-full rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ minHeight: 66, padding: '0 16px', borderRadius: 16, background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
             {posting
               ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
-              : postType === 'rate-me' ? <><Star size={14} /> Post for Rating</> : postType === 'question' ? <><MessageCircle size={14} /> Ask for Advice</> : 'Share Glow-Up'
+              : postType === 'rate-me' ? 'Post for Rating' : postType === 'question' ? 'Ask for Advice' : 'Post Glow-Up'
             }
           </motion.button>
 
@@ -710,78 +713,107 @@ function PostShareSheet({ post, onClose }) {
 }
 
 // ── Rate Me scoring UI ────────────────────────────────────────────────────────
-const RateMeScorer = memo(function RateMeScorer({ post, currentUserId, onRate, previewOnly = false }) {
-  const isOwn = !!post.is_mine
-  const [hoveredScore, setHoveredScore] = useState(null)
+const RateMeScorer = memo(function RateMeScorer({ post, onRate }) {
+  const [score, setScore] = useState(() => Number(post.user_rating ?? 5))
   const [submitting, setSubmitting] = useState(false)
-  const displayScore = hoveredScore ?? post.user_rating ?? null
+  const [justVoted, setJustVoted] = useState(false)
+  const [voteError, setVoteError] = useState('')
+  const scoreRef = useRef(Number(post.user_rating ?? 5))
+  const submittingRef = useRef(false)
+
+  useEffect(() => {
+    if (post.user_rating != null) {
+      const nextScore = Number(post.user_rating)
+      scoreRef.current = nextScore
+      setScore(nextScore)
+    }
+  }, [post.user_rating])
 
   async function handleScore(score) {
-    if (isOwn || submitting) return
+    if (submittingRef.current || Number(post.user_rating) === score) return
+    submittingRef.current = true
     setSubmitting(true)
-    try { await onRate(post.id, score) }
-    finally { setSubmitting(false) }
+    setVoteError('')
+    try {
+      await onRate(post.id, score)
+      setJustVoted(true)
+      triggerHaptic()
+      window.setTimeout(() => setJustVoted(false), 2200)
+    } catch { setVoteError('Could not save your rating. Try again.') }
+    finally {
+      submittingRef.current = false
+      setSubmitting(false)
+    }
   }
 
   return (
-    <div className="px-4 pb-4">
-      {/* Avg + count */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex items-center gap-1">
-          <Star size={14} fill={GOLD} style={{ color: GOLD }} />
-          <span className="font-mono font-bold text-[15px]" style={{ color: GOLD }}>
-            {post.avg_rating != null ? Number(post.avg_rating).toFixed(1) : 'N/A'}
-          </span>
-        </div>
-        <span className="font-body text-[11px] text-secondary">
-          {post.rating_count > 0 ? `${post.rating_count} vote${post.rating_count !== 1 ? 's' : ''}` : 'No ratings yet'}
-        </span>
-        {post.user_rating != null && !isOwn && (
-          <span className="ml-auto font-body text-[10px] px-2 py-0.5 rounded-full"
-            style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}>
-            You: {post.user_rating}/10
-          </span>
-        )}
-      </div>
-
-      {/* 1–10 score buttons */}
-      {!isOwn && (
-        <div>
-          <p className="font-heading font-bold text-[10px] uppercase tracking-widest text-secondary mb-2">
-            {post.user_rating != null ? 'Change your rating' : 'Rate this person'}
-          </p>
-          <div className="grid grid-cols-10 gap-1">
-            {[1,2,3,4,5,6,7,8,9,10].map(n => {
-              const filled = displayScore != null && n <= displayScore
-              const isRated = post.user_rating === n
-              return (
-                <motion.button
-                  key={n}
-                  type="button"
-                  whileTap={{ scale: 0.9 }}
-                  onPointerEnter={() => setHoveredScore(n)}
-                  onPointerLeave={() => setHoveredScore(null)}
-                  onClick={event => { event.stopPropagation(); triggerHaptic(); handleScore(n) }}
-                  disabled={submitting}
-                  aria-label={`Rate ${post.display_name} ${n} out of 10`}
-                  aria-pressed={isRated}
-                  className="relative z-10 pointer-events-auto touch-manipulation select-none aspect-square rounded-lg flex items-center justify-center font-heading font-bold text-[11px] transition-colors disabled:cursor-wait"
-                  style={{
-                    background: filled ? (n >= 8 ? 'rgba(52,199,89,0.25)' : n >= 5 ? 'rgba(198,168,92,0.25)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${filled ? (n >= 8 ? 'rgba(52,199,89,0.5)' : n >= 5 ? 'rgba(198,168,92,0.45)' : 'rgba(239,68,68,0.3)') : 'rgba(255,255,255,0.08)'}`,
-                    color: filled ? (n >= 8 ? '#34C759' : n >= 5 ? GOLD : '#E07A5F') : 'rgba(255,255,255,0.35)',
-                    outline: isRated ? `2px solid ${GOLD}` : 'none',
-                    outlineOffset: 1,
-                    boxShadow: isRated || (filled && n >= 5 && n < 8) ? GOLD_LINE_GLOW : 'none',
-                  }}
+    <div className="px-4 pb-4" onClick={event => event.stopPropagation()}>
+      <div>
+          <div className="relative mb-2 min-h-7">
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 font-heading font-bold text-[22px]" style={{ color: GOLD, letterSpacing: '-0.02em' }}>
+              {score.toFixed(1)} <span className="text-sm text-secondary">/ 10</span>
+            </span>
+            {submitting && <span className="absolute left-0 top-1/2 -translate-y-1/2 font-body text-[11px] text-secondary">Saving…</span>}
+            <AnimatePresence>
+              {justVoted && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.6, x: -10, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, scale: 0.85, x: 8 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+                  className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-1.5 font-heading text-xs font-semibold whitespace-nowrap"
+                  style={{ color: GOLD }}
+                  aria-live="polite"
                 >
-                  {n}
-                </motion.button>
-              )
-            })}
+                  <motion.span initial={{ rotate: -35, scale: 0 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 16 }}><Check size={15} /></motion.span>
+                  Saved
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
-      )}
+          <div className="relative flex h-7 items-center">
+            <input
+              id={`rate-me-${post.id}`}
+              type="range"
+              min="1"
+              max="10"
+              step="0.1"
+              value={score}
+              disabled={submitting || post.user_rating != null}
+              aria-label={`Your rating for ${post.display_name}`}
+              aria-valuetext={score.toFixed(1)}
+              onPointerDown={event => event.stopPropagation()}
+              onPointerUp={event => { event.stopPropagation(); handleScore(scoreRef.current) }}
+              onKeyUp={event => {
+                event.stopPropagation()
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) handleScore(scoreRef.current)
+              }}
+              onChange={event => {
+                event.stopPropagation()
+                const nextScore = Number(event.target.value)
+                scoreRef.current = nextScore
+                setScore(nextScore)
+                setJustVoted(false)
+              }}
+              className="community-rating-slider block w-full touch-pan-x disabled:opacity-50"
+              style={{ background: `linear-gradient(to right, ${GOLD} ${((score - 1) / 9) * 100}%, rgba(255,255,255,0.16) ${((score - 1) / 9) * 100}%)` }}
+            />
+            <AnimatePresence>
+              {justVoted && (
+                <motion.span
+                  initial={{ opacity: 0.8, scale: 0.25 }}
+                  animate={{ opacity: 0, scale: 2.4 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.65, ease: 'easeOut' }}
+                  className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+                  style={{ left: `${((score - 1) / 9) * 100}%`, borderColor: 'rgba(198,168,92,0.9)', boxShadow: '0 0 14px rgba(198,168,92,0.35)' }}
+                  aria-hidden="true"
+                />
+              )}
+            </AnimatePresence>
+          </div>
+          {voteError && <p className="mt-2 font-body text-xs" style={{ color: '#F87171' }} role="alert">{voteError}</p>}
+      </div>
     </div>
   )
 })
@@ -870,131 +902,12 @@ function ReportSheet({ postId, onClose }) {
   )
 }
 
-// ── EditSheet ─────────────────────────────────────────────────────────────────
-function EditSheet({ post, onClose, onSaved }) {
-  const [caption,     setCaption]     = useState(post.caption     ?? '')
-  const [displayName, setDisplayName] = useState(post.display_name ?? '')
-  const [saving,      setSaving]      = useState(false)
-  const [error,       setError]       = useState(null)
-
-  async function handleSave() {
-    setSaving(true)
-    setError(null)
-    try {
-      const { post: updated } = await api.community.editPost(post.id, { caption, displayName })
-      onSaved(updated)
-      onClose()
-    } catch (e) {
-      setError(e?.message || 'Could not save. Try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <motion.div
-        initial={{ y: 80, opacity: 0 }}
-        animate={{ y: 0,  opacity: 1 }}
-        exit={{    y: 80, opacity: 0 }}
-        transition={SPRING_STANDARD}
-        className="w-full rounded-t-2xl p-6"
-        style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-heading font-bold text-base text-primary">Edit Post</h3>
-          <button onClick={() => { triggerHaptic(); onClose() }} className="p-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <X size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
-          </button>
-        </div>
-
-        <label className="block text-[11px] font-heading font-semibold uppercase tracking-widest text-secondary mb-1.5">
-          Display Name
-        </label>
-        <input
-          value={displayName}
-          onChange={e => setDisplayName(e.target.value.slice(0, 30))}
-          maxLength={30}
-          className="w-full rounded-xl px-4 py-3 text-sm font-body text-primary mb-4"
-          style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
-        />
-
-        <label className="block text-[11px] font-heading font-semibold uppercase tracking-widest text-secondary mb-1.5">
-          Caption <span style={{ color: 'rgba(255,255,255,0.3)' }}>(optional)</span>
-        </label>
-        <textarea
-          value={caption}
-          onChange={e => setCaption(e.target.value.slice(0, 280))}
-          maxLength={280}
-          rows={3}
-          placeholder="What's your story?"
-          className="w-full rounded-xl px-4 py-3 text-sm font-body text-primary resize-none mb-1"
-          style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
-        />
-        <p className="text-[11px] text-right mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>{caption.length}/280</p>
-
-        {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
-
-        <button
-          onClick={() => { triggerHaptic(); handleSave() }}
-          disabled={saving || !displayName.trim()}
-          className="w-full py-3.5 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2"
-          style={{ background: GOLD, color: '#0A0A0A', opacity: (saving || !displayName.trim()) ? 0.5 : 1 }}
-        >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : 'Save Changes'}
-        </button>
-      </motion.div>
-    </div>
-  )
-}
-
-// ── ConfirmDialog ─────────────────────────────────────────────────────────────
-function ConfirmDialog({ message, onConfirm, onCancel }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={onCancel}>
-      <motion.div
-        initial={{ scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1,    opacity: 1 }}
-        exit={{    scale: 0.92, opacity: 0 }}
-        className="w-full max-w-xs rounded-2xl p-6"
-        style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <p className="font-body text-sm text-primary mb-5 text-center leading-relaxed">{message}</p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => { triggerHaptic(); onCancel() }}
-            className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { triggerHaptic(); onConfirm() }}
-            className="flex-1 py-3 rounded-xl font-heading font-bold text-[13px]"
-            style={{ background: '#c0392b', color: '#fff' }}
-          >
-            Delete
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onEdit, onRate, previewOnly = false }) {
+export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onRate, previewOnly = false }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
   const [showMenu, setShowMenu]             = useState(false)
-  const [showEdit, setShowEdit]             = useState(false)
   const isRateMe = post.post_type === 'rate-me'
   const isQuestion = post.post_type === 'question'
-
-  const improvement = post.score_before != null && post.score_after != null
-    ? (post.score_after - post.score_before).toFixed(1)
-    : null
-  const sign = improvement >= 0 ? '+' : ''
 
   const hasBefore = !!post.before_photo_url
   const hasAfter  = !!post.photo_url
@@ -1012,7 +925,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
       tabIndex={onOpenPost ? 0 : undefined}
       aria-label={onOpenPost ? `Open ${post.display_name}'s post` : undefined}
       className="rounded-2xl overflow-hidden mb-3"
-      style={{ background: '#141414', border: BORDER, cursor: onOpenPost ? 'pointer' : undefined }}
+      style={{ background: '#111111', border: BORDER, cursor: onOpenPost ? 'pointer' : undefined }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
@@ -1026,26 +939,21 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
                 RATE ME
               </span>
             )}
-            {isQuestion && (
-              <span className="flex items-center gap-1 text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full"
+            {!isRateMe && !isQuestion && (
+              <span className="text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full"
                 style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}>
-                <MessageCircle size={10} /> QUESTION
+                GLOW UP
+              </span>
+            )}
+            {isQuestion && (
+              <span className="text-[9px] font-heading font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}>
+                QUESTION
               </span>
             )}
           </div>
           <p className="font-body text-[11px] text-secondary">{timeAgo(post.created_at)}</p>
         </div>
-        {!isRateMe && improvement !== null && (
-          <div className="px-2.5 py-1 rounded-full" style={{
-            background: improvement >= 0 ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${improvement >= 0 ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.25)'}`,
-          }}>
-            <span className="font-heading font-bold text-[12px]"
-              style={{ color: improvement >= 0 ? '#34D399' : '#EF4444' }}>
-              {sign}{improvement} pts
-            </span>
-          </div>
-        )}
         {!!post.is_mine && (
           <div className="relative">
             <button
@@ -1064,18 +972,12 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
                   transition={{ duration: 0.12 }}
                   className="absolute right-0 top-8 rounded-xl overflow-hidden z-30"
                   style={{ background: '#222', border: '1px solid rgba(255,255,255,0.12)', minWidth: 140 }}
+                  onClick={event => event.stopPropagation()}
                 >
                   <button
-                    onClick={() => { triggerHaptic(); setShowMenu(false); setShowEdit(true) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body text-primary"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-                  >
-                    <Pencil size={13} style={{ color: GOLD }} /> Edit
-                  </button>
-                  <button
-                    onClick={() => { triggerHaptic(); setShowMenu(false); onDelete(post.id) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body"
-                    style={{ color: '#ef4444' }}
+                    onClick={event => { event.stopPropagation(); triggerHaptic(); setShowMenu(false); onDelete(post.id) }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-heading font-semibold"
+                    style={{ color: '#ff6b6b', background: 'rgba(239,68,68,0.10)' }}
                   >
                     <Trash2 size={13} /> Delete
                   </button>
@@ -1085,38 +987,23 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           </div>
         )}
       </div>
-      <AnimatePresence>
-        {showEdit && (
-          <EditSheet
-            post={post}
-            onClose={() => setShowEdit(false)}
-            onSaved={updated => onEdit(post.id, updated)}
-          />
-        )}
-      </AnimatePresence>
 
-      {/* Score bar (glow-up only) */}
-      {!isRateMe && post.score_before != null && post.score_after != null && (
-        <div className="px-4 pb-3 flex items-center gap-3">
-          <span className="font-mono text-[13px] text-secondary">{post.score_before.toFixed(1)}</span>
-          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(post.score_after / 10) * 100}%` }}
-              transition={{ duration: 1, ease: EASE_STANDARD }}
-              className="h-full rounded-full"
-              style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
-            />
-          </div>
-          <span className="font-mono font-bold text-[13px]" style={{ color: GOLD }}>{post.score_after.toFixed(1)}</span>
-        </div>
+      {/* Social post captions sit above their media */}
+      {post.caption && (
+        isQuestion ? (
+          <p className="px-4 pb-3 font-body text-[13px] text-primary leading-snug">{post.caption}</p>
+        ) : (
+          <p className="px-4 pb-3 font-body text-[13px] text-primary leading-snug">{post.caption}</p>
+        )
       )}
 
       {/* Rate Me photo (large, centered) */}
       {isRateMe && hasAfter && (
         <div className="px-3 pb-3">
-          <div className="rounded-xl overflow-hidden">
-            <img src={post.photo_url} alt="Rate Me" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 340 }} />
+          <div className="relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl" style={{ aspectRatio: '4 / 5' }}>
+            <div className="absolute inset-0">
+            <TradingScanCard image={post.photo_url} imageAlt="Rate Me photo" compact />
+            </div>
           </div>
         </div>
       )}
@@ -1133,48 +1020,29 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
       {!isRateMe && !isQuestion && (hasBefore || hasAfter) && (
         <div className={`px-3 pb-3 ${hasBefore && hasAfter ? 'grid grid-cols-2 gap-2' : ''}`}>
           {hasBefore && (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={post.before_photo_url} alt="Before" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 280 }} />
-              <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
-                style={{ background: 'rgba(0,0,0,0.55)' }}>
-                <span className="font-heading font-bold text-[11px] text-white tracking-wider">BEFORE</span>
+            <div className={`relative overflow-hidden rounded-2xl ${hasBefore && hasAfter ? '' : 'mx-auto w-full max-w-[360px]'}`} style={{ aspectRatio: '4 / 5' }} aria-label={post.score_before != null ? `Before score ${post.score_before.toFixed(1)}` : 'Before photo'}>
+              <div className="absolute inset-0">
+                <TradingScanCard image={post.before_photo_url} imageAlt="Before scan" label="Before" score={post.score_before} compact />
               </div>
             </div>
           )}
           {hasAfter && (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={post.photo_url} alt="After" loading="lazy" decoding="async" className="w-full object-cover" style={{ maxHeight: 280 }} />
-              <div className="absolute bottom-0 inset-x-0 py-1 flex justify-center"
-                style={{ background: 'rgba(0,0,0,0.55)' }}>
-                <span className="font-heading font-bold text-[11px]" style={{ color: GOLD }}>AFTER</span>
+            <div className={`relative overflow-hidden rounded-2xl ${hasBefore && hasAfter ? '' : 'mx-auto w-full max-w-[360px]'}`} style={{ aspectRatio: '4 / 5' }} aria-label={post.score_after != null ? `After score ${post.score_after.toFixed(1)}` : 'After photo'}>
+              <div className="absolute inset-0">
+                <TradingScanCard image={post.photo_url} imageAlt="After scan" label="After" score={post.score_after} compact />
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Caption */}
-      {post.caption && (
-        isQuestion ? (
-          <div className="mx-3 mb-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.055)', border: '1px solid rgba(198,168,92,0.12)' }}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <MessageCircle size={13} style={{ color: GOLD }} />
-              <span className="font-heading font-bold text-[10px] uppercase tracking-widest" style={{ color: GOLD }}>Question</span>
-            </div>
-            <p className="font-body text-[15px] text-primary leading-relaxed">{post.caption}</p>
-          </div>
-        ) : (
-          <p className="px-4 py-2 font-body text-[13px] text-primary leading-snug">{post.caption}</p>
-        )
-      )}
-
       {/* Rate Me scoring */}
       {isRateMe && (
-        <RateMeScorer post={post} currentUserId={currentUserId} onRate={onRate} />
+        <RateMeScorer post={post} onRate={onRate} />
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-1 px-3 py-3 border-t" style={{ borderColor: BORDER }}>
+      <div className="flex items-center gap-1 px-3 py-3">
         <button
           onClick={event => { event.stopPropagation(); triggerHaptic(); onLike(post.id) }}
           className="community-like-button flex items-center gap-1.5 px-3 py-2 rounded-xl"
@@ -1211,15 +1079,6 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
               aria-label="Report post"
             >
               <Flag size={14} />
-            </button>
-          )}
-          {!isRateMe && (
-            <button
-              onClick={event => { event.stopPropagation(); triggerHaptic(); setShowShareSheet(true) }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-              style={{ color: 'rgba(255,255,255,0.4)' }}
-            >
-              <Share2 size={16} />
             </button>
           )}
         </div>
@@ -1336,27 +1195,12 @@ export default function Community() {
     } catch {}
   }, [posts])
 
-  const [confirmDelete, setConfirmDelete] = useState(null) // postId pending confirm
-
-  const handleDelete = useCallback((postId) => {
-    setConfirmDelete(postId)
-  }, [])
-
-  const handleConfirmDelete = useCallback(async () => {
-    const postId = confirmDelete
-    setConfirmDelete(null)
+  const handleDelete = useCallback(async (postId) => {
     try {
       await api.community.deletePost(postId)
       setPosts(prev => prev.filter(p => p.id !== postId))
+      setActivePost(current => current?.id === postId ? null : current)
     } catch {}
-  }, [confirmDelete])
-
-  const handleEdit = useCallback((postId, updated) => {
-    setPosts(prev => prev.map(p =>
-      p.id === postId
-        ? { ...p, caption: updated.caption, display_name: updated.display_name }
-        : p
-    ))
   }, [])
 
   const handleCommentAdded = useCallback(() => {
@@ -1379,7 +1223,7 @@ export default function Community() {
       const updated = { ...post, avg_rating: nextAverage, rating_count: nextCount, user_rating: score }
       setPosts(prev => prev.map(item => item.id === postId ? updated : item))
       setActivePost(current => current?.id === postId ? { ...current, avg_rating: updated.avg_rating, rating_count: updated.rating_count, user_rating: updated.user_rating } : current)
-      return
+      return true
     }
     try {
       const data = await api.community.rate(postId, score)
@@ -1394,37 +1238,20 @@ export default function Community() {
         rating_count: data.rating_count,
         user_rating: data.user_rating,
       } : current)
-    } catch {}
+      return true
+    } catch (error) {
+      throw error
+    }
   }, [posts])
 
   return (
-    <MotionPage className="px-4 pb-8" style={activePost || showShare ? { overflow: 'hidden', touchAction: 'none' } : undefined}>
-      <div className="flex items-center justify-between pb-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <div>
-          <p className="text-[11px] text-secondary font-body uppercase tracking-widest mb-0.5">Community</p>
-          <h1 className="font-heading font-bold text-[26px] text-primary" style={{ letterSpacing: '-0.02em' }}>
-            Feed
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => { triggerHaptic(); setShowShare(true) }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-heading font-bold text-[12px]"
-            style={{ background: 'rgba(198,168,92,0.14)', border: '1px solid rgba(198,168,92,0.4)', color: GOLD, boxShadow: GOLD_LINE_GLOW }}
-          >
-            <Plus size={14} /> Post
-          </motion.button>
-          <button
-            onClick={() => { triggerHaptic(); navigate('/settings') }}
-            className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-            aria-label="Settings"
-          >
-            <Settings size={17} style={{ color: 'var(--text-secondary)' }} />
-          </button>
-        </div>
-      </div>
+    <MotionPage
+      className="px-4 pb-8"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+        ...(activePost || showShare ? { overflow: 'hidden', touchAction: 'none' } : {}),
+      }}
+    >
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -1472,7 +1299,6 @@ export default function Community() {
             onOpenComments={post => openPost(post, true)}
             onOpenPost={post => openPost(post, false)}
             onDelete={handleDelete}
-            onEdit={handleEdit}
             onRate={handleRate}
             previewOnly={previewFeed}
           />
@@ -1481,13 +1307,6 @@ export default function Community() {
       )}
 
       <AnimatePresence>
-        {confirmDelete && (
-          <ConfirmDialog
-            message="Delete this post? This can't be undone."
-            onConfirm={handleConfirmDelete}
-            onCancel={() => setConfirmDelete(null)}
-          />
-        )}
         {showShare && (
           <ShareModal
             onClose={() => { setShowShare(false); setShareDraft(null) }}
@@ -1499,6 +1318,28 @@ export default function Community() {
           />
         )}
       </AnimatePresence>
+      {!activePost && !showShare && createPortal(
+        <motion.button
+          type="button"
+          aria-label="Create a post"
+          title="Create a post"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileTap={{ scale: 0.93 }}
+          onClick={() => { triggerHaptic(); setShowShare(true) }}
+          className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full"
+          style={{
+            right: 20,
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+            background: GOLD_GRADIENT,
+            color: '#0A0A0A',
+            boxShadow: '0 6px 22px rgba(198,168,92,0.32)',
+          }}
+        >
+          <Plus size={22} strokeWidth={2.5} />
+        </motion.button>,
+        document.body,
+      )}
       {activePost && createPortal(
             <motion.div
               key={`post-detail-${activePost.id}`}
@@ -1526,7 +1367,6 @@ export default function Community() {
                   onLike={handleLike}
                   onOpenComments={scrollToPostComments}
                   onDelete={handleDelete}
-                  onEdit={handleEdit}
                   onRate={handleRate}
                   previewOnly={previewFeed}
                 />

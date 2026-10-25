@@ -6,7 +6,7 @@ const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
-const { loadContext, clean, ownedResult, normalize } = require('../lib/coachScanContext')
+const { loadContext, clean, ownedResult, normalize, parseProvidedImage } = require('../lib/coachScanContext')
 const { answer } = require('../lib/coachIntelligence')
 
 router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) => {
@@ -18,7 +18,22 @@ router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) =>
 })
 
 // On-demand enrichment of an owned completed scan; never delays capture/scoring.
-router.post('/appearance', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+async function serveSavedAppearance(req, res, next) {
+  if (req.isDemo) return next()
+  if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return next()
+  try {
+    const saved = ownedResult(req.body.scanId, req.userId)
+    if (!saved) return next()
+    const { cachedBreakdown } = require('../lib/appearanceBreakdown')
+    const analysis = cachedBreakdown(saved.result, req.body.scanId)
+    if (analysis) return res.json({ analysis })
+    return next()
+  } catch {
+    return res.status(503).json({ error: 'Your saved scan could not be loaded. Please retry.' })
+  }
+}
+
+router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claudeLimit, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign in to analyze your saved scan.' })
   if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return res.status(400).json({ error: 'A saved scan ID is required.' })
   try {
@@ -71,12 +86,17 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
       context.latest = scan
       context.status = 'completed'
     }
+    const providedImage = parseProvidedImage(req.body.scanPhotoData)
+    if (req.body.scanPhotoData && !providedImage) return res.status(400).json({ error: 'The attached scan photo must be a supported image under 1 MB.' })
     const preferences = {}
     for (const key of ['goal', 'goal_type', 'improvement_focus', 'hairType']) {
       if (typeof req.body.preferences?.[key] === 'string') preferences[key] = req.body.preferences[key].slice(0, 300)
     }
     const result = await answer({ userId: req.userId, conversationId,
-      question: messages.at(-1).content, context, isPro: req.isPro, preferences: clean(preferences) })
+      question: messages.at(-1).content, context, isPro: req.isPro,
+      includeScanPhoto: req.body.includeScanPhoto === true || typeof req.body.scanId === 'string',
+      providedImage,
+      preferences: clean(preferences) })
     res.json(result)
   } catch (err) {
     console.error('[coach] Request failed', { status: err.status || 503 })

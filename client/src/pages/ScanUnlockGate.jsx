@@ -1535,7 +1535,6 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const blurResultCard = blurSavedProgressResults
   const [isDownloadingCard, setIsDownloadingCard] = useState(false)
   const [downloadError, setDownloadError] = useState('')
-  const [showScorecardShareMenu, setShowScorecardShareMenu] = useState(false)
   const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [saveFlight, setSaveFlight] = useState(null)
   const saveFlightIdRef = useRef(0)
@@ -1690,9 +1689,10 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
   const preparedDownloadPhoto = downloadPhoto.source === facePhoto && downloadPhoto.status === 'ready'
     ? downloadPhoto.url
     : null
+  const isAppearanceView = unlocked && activeView === 'photo'
 
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className={`flex flex-col h-full ${isAppearanceView ? 'overflow-hidden' : 'overflow-y-auto'}`} style={{ background: '#0A0A0A' }}>
       <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
       {unlocked && (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
@@ -1701,10 +1701,17 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           <ChevronLeft size={18} className="text-primary" />
         </button>
       )}
-      <div className="flex flex-col items-center px-5 pb-10"
-           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+      <div className={`flex flex-col px-5 ${isAppearanceView ? 'flex-1 min-h-0 overflow-hidden items-stretch pb-0' : 'items-center pb-10'}`}
+           style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 16px)`, ...(isAppearanceView ? { paddingBottom: 'max(0px, calc(100svh - 731px))' } : {}) }}>
 
       {/* Header */}
+      {isAppearanceView && <>
+        <div className="relative w-full">
+          <h1 className="w-full px-0 font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...getUnlockedResultsHeadingStyle(resultsHeading) }}>Your Results</h1>
+        </div>
+        <div className="h-5 flex items-start justify-center" aria-hidden="true" />
+      </>}
+      {!isAppearanceView && <>
         <div className="relative w-full">
         <h1 className={`font-heading font-bold text-[32px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? getUnlockedResultsHeadingStyle(resultsHeading) : {}) }}>
           {resultsHeading}
@@ -1719,8 +1726,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             </p>
           )}
         </div>
+      </>}
         {/* Face circle + card */}
-        <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+        <motion.div className={`relative w-full ${isAppearanceView ? 'flex flex-1 min-h-0 flex-col' : ''}`} style={{ marginTop: activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
           drag={unlocked && activeView !== 'compare' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
           onDragEnd={(_, info) => {
             const index = RESULT_VIEWS.indexOf(activeView)
@@ -1728,7 +1736,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             else if (info.offset.x > 60 || info.velocity.x > 400) showView(RESULT_VIEWS[Math.max(index - 1, 0)])
           }}
           >
-          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
+          <motion.div className={isAppearanceView ? 'flex flex-1 min-h-0 flex-col' : ''} key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
           <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
@@ -1784,8 +1792,8 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             </div>
           </div>
           </div>
-          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
-            {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} />}
+          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'} className={isAppearanceView ? 'flex flex-1 min-h-0 flex-col' : ''}>
+            {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} coachPhotoUrl={facePhoto} />}
           </div>}
           {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
             {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} />}
@@ -1805,72 +1813,16 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => { triggerHaptic(); setShowScorecardShareMenu(true) }}
-          disabled={isDownloadingCard}
+          onClick={() => { triggerHaptic(); downloadResultsCard() }}
+          disabled={isDownloadingCard || isPreparingDownloadPhoto}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
         >
-          {isDownloadingCard ? <Loader2 size={19} className="animate-spin" /> : <Share2 size={19} />}
-          {isDownloadingCard ? 'Preparing scorecard…' : 'Share Scorecard'}
+          {isDownloadingCard || isPreparingDownloadPhoto ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}
+          {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
-        {showScorecardShareMenu && createPortal(
-            <>
-              <motion.button
-                type="button"
-                aria-label="Close scorecard sharing options"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                onClick={() => setShowScorecardShareMenu(false)}
-                className="fixed inset-0"
-                style={{ background: 'rgba(0,0,0,0.75)', zIndex: 10020 }}
-              />
-              <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-                className="fixed inset-x-0 bottom-0 rounded-t-2xl overflow-hidden"
-                style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 0, boxShadow: '0 -12px 48px rgba(0,0,0,0.4)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10021 }}
-              >
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-                </div>
-                <div className="flex items-center justify-between px-5 pt-3 pb-4">
-                  <div>
-                    <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>YOUR RESULTS</p>
-                    <h2 className="font-heading font-bold text-xl text-primary">Share Scorecard</h2>
-                  </div>
-                  <button type="button" aria-label="Close" onClick={() => setShowScorecardShareMenu(false)} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#242424', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.65)' }}><X size={17} /></button>
-                </div>
-                <div className="px-4 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); downloadResultsCard() }}
-                    disabled={isPreparingDownloadPhoto || isDownloadingCard}
-                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left disabled:opacity-50"
-                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.2)', boxShadow: '0 0 16px rgba(198,168,92,0.08)' }}
-                  >
-                    <Download size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.35))' }} />
-                    <div>
-                      <p className="font-heading font-bold text-sm text-primary">Download scorecard</p>
-                      <p className="font-body text-xs text-secondary">Save your results as an image</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic(); setShowScorecardShareMenu(false); navigate('/community', { state: { shareScanId: scan?.id, shareType: 'glow-up' } }) }}
-                    className="w-full rounded-2xl px-5 py-4 flex items-center gap-4 text-left"
-                    style={{ background: '#242424', border: '1px solid rgba(198,168,92,0.32)', boxShadow: '0 0 18px rgba(198,168,92,0.12)' }}
-                  >
-                    <Users size={23} className="flex-shrink-0" style={{ color: GOLD, filter: 'drop-shadow(0 0 5px rgba(198,168,92,0.4))' }} />
-                    <div>
-                      <p className="font-heading font-bold text-sm text-primary">Share to Community</p>
-                      <p className="font-body text-xs text-secondary">Create a post with this scan</p>
-                    </div>
-                  </button>
-                </div>
-              </motion.div>
-            </>, document.body,
-          )}
-        {unlocked && <div role="tablist" aria-label="Results view" className="flex justify-center mt-2">
+        {unlocked && <div role="tablist" aria-label="Results view" className="mt-2 flex shrink-0 justify-center">
           {[['results', 'Show results'], ['photo', 'Show appearance breakdown'], ['compare', 'Show photo comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
               onClick={() => showView(view)} onKeyDown={event => {
@@ -1917,20 +1869,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
       {saveFlight && typeof document !== 'undefined' && createPortal(
         <motion.div
           aria-hidden="true"
-          initial={{ ...saveFlight.from, borderRadius: 24, opacity: 1 }}
-          animate={{ ...saveFlight.to, borderRadius: 22, opacity: 1 }}
-          transition={{ duration: 0.72, ease: [0.22, 0.8, 0.2, 1] }}
+          initial={{ ...saveFlight.from, borderRadius: 30, opacity: 1, rotateZ: 0 }}
+          animate={{ ...saveFlight.to, borderRadius: 18, opacity: 1, rotateZ: -3 }}
+          transition={{ duration: 0.82, ease: [0.2, 0.75, 0.25, 1] }}
           onAnimationComplete={() => {
             if (saveFlightIdRef.current !== saveFlight.id) return
             setSaveFlight(null)
             navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
           }}
-          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(209,183,109,0.9)', boxShadow: '0 0 28px rgba(209,183,109,0.35)', pointerEvents: 'none' }}
+          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(198,168,92,0.75)', boxShadow: '0 12px 36px rgba(0,0,0,0.5), 0 0 22px rgba(198,168,92,0.24)', pointerEvents: 'none', transformOrigin: 'center center' }}
         >
           <motion.div
             initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ delay: 0.3, duration: 0.18 }}
+            animate={{ opacity: 0, scale: 0.28 }}
+            transition={{ delay: 0.22, duration: 0.34, ease: 'easeIn' }}
             style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(180deg, transparent 38%, rgba(0,0,0,0.86) 100%)' }}
           >
             {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />}
@@ -1940,7 +1892,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
           <motion.div
             initial={{ opacity: 0, scale: 0.45 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.43, duration: 0.2, ease: 'easeOut' }}
+            transition={{ delay: 0.5, duration: 0.24, type: 'spring', stiffness: 420, damping: 22 }}
             style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1B76D' }}
           >
             <Check size={23} strokeWidth={3} />

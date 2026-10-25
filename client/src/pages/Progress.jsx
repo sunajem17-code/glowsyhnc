@@ -10,6 +10,7 @@ import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages, waitForMinimumCoachThinking } from '../utils/coachChat'
 import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
+import { prepareCoachPhoto } from '../utils/coachPhoto'
 
 const STARTER_PROMPTS = [
   "What's holding my score back the most?",
@@ -99,6 +100,14 @@ function MessageBubble({ msg }) {
           ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', borderRadius: '18px 18px 18px 4px' }
           : { background: GOLD, color: '#0A0A0A', fontWeight: 600, borderRadius: '18px 18px 4px 18px' }}
       >
+        {msg.image && (
+          <img
+            src={msg.image}
+            alt="Scan photo attached to your message"
+            className="mb-2 max-h-56 w-full rounded-xl object-cover"
+            style={{ maxWidth: 240 }}
+          />
+        )}
         {isAI ? <CoachMessage content={msg.content} reveal={msg.reveal === true} /> : msg.content}
       </div>
     </motion.div>
@@ -120,9 +129,15 @@ export default function Progress() {
   const [showTypewriter, setShowTypewriter] = useState(true)
   const [chipsVisible, setChipsVisible] = useState(false)
   const [input, setInput] = useState(location.state?.coachPrompt || '')
+  const [coachPhoto, setCoachPhoto] = useState(location.state?.coachPhotoUrl || null)
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (location.state?.coachPrompt) setInput(location.state.coachPrompt)
+    setCoachPhoto(location.state?.coachPhotoUrl || null)
+  }, [location.key])
 
   useEffect(() => {
     let active = true
@@ -147,7 +162,12 @@ export default function Progress() {
 
   useEffect(() => {
     if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
-    try { sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: messages.slice(-12) })) } catch {}
+    try {
+      const savedMessages = messages.slice(-12).map(message => Object.fromEntries(
+        Object.entries(message).filter(([key]) => key !== 'image'),
+      ))
+      sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: savedMessages }))
+    } catch {}
   }, [messages, user?.id, messagesOwner])
 
   useEffect(() => {
@@ -165,6 +185,7 @@ export default function Progress() {
     const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
     if (sendState === 'ignore') return
 
+    const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(txt))
     setInput('')
     setChipsVisible(false)
     const generation = requestGenerationRef.current
@@ -183,15 +204,20 @@ export default function Progress() {
       return
     }
 
-    const next = [...messages, { role: 'user', content: txt }]
+    const next = [...messages, { role: 'user', content: txt, ...(coachPhoto ? { image: coachPhoto } : {}) }]
+    const scanPhotoSource = coachPhoto
     setMessages(next)
+    setCoachPhoto(null)
     setLoading(true)
     const requestStartedAt = Date.now()
     try {
+      const scanPhotoData = await prepareCoachPhoto(scanPhotoSource).catch(() => null)
       const data = await api.coach.message({
         messages: [{ role: 'user', content: txt }],
         conversationId: conversationRef.current,
         ...(selectedScanId ? { scanId: selectedScanId } : {}),
+        includeScanPhoto,
+        ...(scanPhotoData ? { scanPhotoData } : {}),
         preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
       await waitForMinimumCoachThinking(requestStartedAt)
@@ -302,15 +328,20 @@ export default function Progress() {
             border: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder="Ask anything…"
-            className="flex-1 bg-transparent text-[14px] font-body text-primary outline-none"
-            style={{ color: 'rgba(255,255,255,0.9)' }}
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {coachPhoto && (
+              <img src={coachPhoto} alt="Scan photo attached" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+            )}
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+              placeholder={coachPhoto ? 'Scan photo attached' : 'Ask anything…'}
+              className="min-w-0 flex-1 bg-transparent text-[14px] font-body text-primary outline-none"
+              style={{ color: 'rgba(255,255,255,0.9)' }}
+            />
+          </div>
           <motion.button
             whileTap={{ scale: 0.88 }}
             onClick={() => { triggerHaptic(); send() }}

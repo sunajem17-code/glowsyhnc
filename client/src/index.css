@@ -423,6 +423,27 @@ input[type="range"].comparison-slider::-webkit-slider-thumb {
   -webkit-text-fill-color: transparent;
 }
 
+/* Soft metallic gold flowing inside the welcome wordmark */
+@keyframes splashGoldLiquid {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 48%; }
+  100% { background-position: 12% 52%; }
+}
+
+.splash-wordmark-gold {
+  color: #D7B85D;
+  background-image: linear-gradient(110deg, #B9903F 0%, #F0CD68 18%, #FFF8D6 31%, #D5AE4E 45%, #A78334 60%, #FFE486 78%, #FFF4C5 90%, #B9903F 100%);
+  background-size: 230% 200%;
+  animation: splashGoldLiquid 6s ease-in-out infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-wordmark-gold { animation: none; background-position: 50% 50%; }
+}
+
 /* ── Nav dot pop ───────────────────────────────────────────────────── */
 @keyframes dotPop {
   0% { transform: scale(0); }
@@ -453,3 +474,37 @@ input:focus-visible, button:focus-visible {
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 0; height: 0; }
 input[type=range]::-moz-range-thumb { width: 0; height: 0; border: none; }
 input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; }
+
+/* Community Rate Me slider */
+input[type="range"].community-rating-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"].community-rating-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #111;
+  border-radius: 50%;
+  background: #C6A85C;
+  box-shadow: 0 0 0 2px rgba(198,168,92,0.55), 0 0 12px rgba(198,168,92,0.35);
+  cursor: grab;
+}
+
+input[type="range"].community-rating-slider:active::-webkit-slider-thumb { cursor: grabbing; }
+
+input[type="range"].community-rating-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #111;
+  border-radius: 50%;
+  background: #C6A85C;
+  box-shadow: 0 0 0 2px rgba(198,168,92,0.55), 0 0 12px rgba(198,168,92,0.35);
+  cursor: grab;
+}

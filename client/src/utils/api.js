@@ -18,7 +18,8 @@ export function setScanInFlight(v) { _scanInFlight = v }
 const RAW_ERROR_CODES = {
   internal_error: 'Something went wrong on our end. Please try again.',
   server_error:   'Something went wrong on our end. Please try again.',
-  claude_rate_limited: 'The AI request limit has been reached. Please try again in about an hour.',
+  claude_rate_limited: 'Please wait a moment and try again.',
+  claude_burst_limited: 'Please wait a moment and try again.',
   monthly_ai_budget_reached: 'You have reached your $2 monthly AI limit. Your AI features will be available again next month.',
   monthly_ai_budget_unavailable: 'AI features are temporarily unavailable. Please try again later.',
 }
@@ -205,7 +206,6 @@ export const api = {
   community: {
     feed:           ()           => request('/community/feed'),
     post:           (data)       => request('/community/post', { method: 'POST', body: JSON.stringify(data) }),
-    editPost:       (id, data)   => request(`/community/post/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deletePost:     (id)         => request(`/community/post/${id}`, { method: 'DELETE' }),
     like:           (id)         => request(`/community/post/${id}/like`, { method: 'POST' }),
     comments:       (id)         => request(`/community/post/${id}/comments`),

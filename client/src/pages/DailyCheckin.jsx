@@ -37,15 +37,18 @@ function GlossyCard({ children, className = '' }) {
   )
 }
 
-function ToggleButton({ checked, onToggle, label, icon: Icon }) {
+function ToggleButton({ checked, onToggle, label, icon: Icon, disabled = false }) {
   return (
     <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={checked}
       onClick={() => { triggerHaptic(); onToggle() }}
-      className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 transition-all duration-200"
-      style={checked ? { borderColor: GOLD, background: `${GOLD}14` } : { borderColor: 'rgba(255,255,255,0.08)', background: '#161616' }}
+      className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 transition-all duration-200 disabled:cursor-not-allowed"
+      style={checked ? { borderColor: GOLD, background: `${GOLD}14`, opacity: disabled ? 0.78 : 1 } : { borderColor: 'rgba(255,255,255,0.08)', background: '#161616', opacity: disabled ? 0.72 : 1 }}
     >
-      <Icon size={22} style={{ color: checked ? GOLD : 'rgba(255,255,255,0.8)', filter: checked ? GOLD_ICON_GLOW : 'none' }} />
-      <span className="text-xs font-heading font-bold" style={{ color: checked ? GOLD : TEXT, textShadow: checked ? GOLD_GLOW : 'none' }}>{label}</span>
+      <Icon size={22} style={{ color: checked ? GOLD : 'rgba(255,255,255,0.48)', filter: checked ? GOLD_ICON_GLOW : 'none' }} />
+      <span className="text-xs font-heading font-bold" style={{ color: checked ? GOLD : TEXT_DIM, textShadow: checked ? GOLD_GLOW : 'none' }}>{label}</span>
     </button>
   )
 }
@@ -156,16 +159,16 @@ export default function DailyCheckin() {
           initial={{ opacity: 0, scale: 0.3, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 220, damping: 15, delay: 0.05 }}
-          className="mb-6 relative"
+          className="mb-5 relative"
         >
-          <StreakFlame size={150} />
+          <StreakFlame size={112} />
         </motion.div>
         <motion.p
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
-          className="font-heading font-bold text-[13px] tracking-[0.28em] uppercase mb-2 relative"
-          style={{ color: GOLD, textShadow: GOLD_GLOW }}
+          className="font-heading font-bold text-xs tracking-[0.2em] uppercase mb-1 relative"
+          style={{ color: GOLD }}
         >
           Streak
         </motion.p>
@@ -174,7 +177,7 @@ export default function DailyCheckin() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4, duration: 0.4, ease: EASE_STANDARD }}
           className="font-heading font-bold relative"
-          style={{ fontSize: 84, lineHeight: 1, color: GOLD, textShadow: GOLD_GLOW, letterSpacing: '-0.03em' }}
+          style={{ fontSize: 'clamp(38px, 10vw, 46px)', lineHeight: 1.08, color: GOLD, textShadow: GOLD_GLOW, letterSpacing: '-0.035em' }}
         >
           Day {streak.current}
         </motion.h2>
@@ -231,8 +234,11 @@ export default function DailyCheckin() {
               {Array.from({ length: WATER_GOAL }, (_, i) => (
                 <button
                   key={i}
+                  type="button"
+                  disabled={alreadyDone}
+                  aria-label={`${i + 1} glasses of water`}
                   onClick={() => { triggerHaptic(); setWater(i < water ? i : i + 1) }}
-                  className="flex flex-col items-center"
+                  className="flex flex-col items-center disabled:cursor-not-allowed"
                 >
                   <motion.div
                     animate={{ scale: i < water ? [1, 1.2, 1] : 1 }}
@@ -240,7 +246,7 @@ export default function DailyCheckin() {
                   >
                     <Droplets
                       size={24}
-                      style={{ color: i < water ? GOLD : 'rgba(255,255,255,0.8)', filter: i < water ? GOLD_ICON_GLOW : 'none' }}
+                      style={{ color: i < water ? GOLD : 'rgba(255,255,255,0.48)', filter: i < water ? GOLD_ICON_GLOW : 'none', opacity: alreadyDone ? 0.78 : 1 }}
                       fill="none"
                     />
                   </motion.div>
@@ -269,12 +275,14 @@ export default function DailyCheckin() {
                 onToggle={() => setSkincareAm(v => !v)}
                 label="AM Routine"
                 icon={Sun}
+                disabled={alreadyDone}
               />
               <ToggleButton
                 checked={skincarePm}
                 onToggle={() => setSkincarePm(v => !v)}
                 label="PM Routine"
                 icon={Moon}
+                disabled={alreadyDone}
               />
             </div>
           </GlossyCard>
@@ -286,16 +294,19 @@ export default function DailyCheckin() {
               <h3 className="font-heading font-bold text-sm" style={{ color: TEXT }}>Exercise</h3>
             </div>
             <button
+              type="button"
+              disabled={alreadyDone}
+              aria-pressed={exerciseDone}
               onClick={() => { triggerHaptic(); setExerciseDone(v => !v) }}
-              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 transition-all"
-              style={exerciseDone ? { borderColor: GOLD, background: `${GOLD}14` } : { borderColor: 'rgba(255,255,255,0.08)', background: '#161616' }}
+              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 transition-all disabled:cursor-not-allowed"
+              style={exerciseDone ? { borderColor: GOLD, background: `${GOLD}14`, opacity: alreadyDone ? 0.78 : 1 } : { borderColor: 'rgba(255,255,255,0.08)', background: '#161616', opacity: alreadyDone ? 0.72 : 1 }}
             >
               {exerciseDone ? (
                 <CheckCircle2 size={20} style={{ color: GOLD, filter: GOLD_ICON_GLOW }} />
               ) : (
-                <Circle size={20} style={{ color: 'rgba(255,255,255,0.8)' }} />
+                <Circle size={20} style={{ color: 'rgba(255,255,255,0.48)' }} />
               )}
-              <span className="font-heading font-semibold text-sm" style={{ color: exerciseDone ? GOLD : TEXT, textShadow: exerciseDone ? GOLD_GLOW : 'none' }}>
+              <span className="font-heading font-semibold text-sm" style={{ color: exerciseDone ? GOLD : TEXT_DIM, textShadow: exerciseDone ? GOLD_GLOW : 'none' }}>
                 {exerciseDone ? <span className="flex items-center gap-1">Today's routine done! <Dumbbell size={14} style={{ color: GOLD, filter: GOLD_ICON_GLOW }} /></span> : "Mark today's routine complete"}
               </span>
             </button>
@@ -310,10 +321,7 @@ export default function DailyCheckin() {
               <h3 className="font-heading font-bold text-sm" style={{ color: TEXT }}>Confidence Level</h3>
             </div>
             <div className="flex gap-3 justify-center">
-              {/* No box/border here — selection reads through the same
-                  gold-vs-white language as the rest of the page (hydration,
-                  toggles): the picked mood turns gold with a glow and scales
-                  up, everything else stays plain white. */}
+              {/* Selected mood uses gold; unselected moods stay muted grey. */}
               {[
                 { val: 1, Icon: Frown,    label: 'Low' },
                 { val: 2, Icon: Meh,      label: 'Meh' },
@@ -323,16 +331,19 @@ export default function DailyCheckin() {
               ].map(({ val, Icon, label }) => (
                 <button
                   key={val}
+                  type="button"
+                  disabled={alreadyDone}
+                  aria-pressed={mood === val}
                   onClick={() => { triggerHaptic(); setMood(val) }}
-                  className="flex flex-col items-center gap-1.5"
+                  className="flex flex-col items-center gap-1.5 disabled:cursor-not-allowed"
                 >
                   <motion.div
                     animate={{ scale: mood === val ? 1.25 : 1 }}
                     transition={SPRING_STANDARD}
                   >
-                    <Icon size={30} style={{ color: mood === val ? GOLD : '#FFFFFF', filter: mood === val ? GOLD_ICON_GLOW : 'none' }} />
+                    <Icon size={30} style={{ color: mood === val ? GOLD : 'rgba(255,255,255,0.48)', filter: mood === val ? GOLD_ICON_GLOW : 'none', opacity: alreadyDone ? 0.78 : 1 }} />
                   </motion.div>
-                  <span className="text-[10px] font-body" style={{ color: mood === val ? GOLD : 'rgba(255,255,255,0.75)', fontWeight: mood === val ? 600 : 400, textShadow: mood === val ? GOLD_GLOW : 'none' }}>{label}</span>
+                  <span className="text-[10px] font-body" style={{ color: mood === val ? GOLD : TEXT_DIM, fontWeight: mood === val ? 600 : 400, textShadow: mood === val ? GOLD_GLOW : 'none' }}>{label}</span>
                 </button>
               ))}
             </div>
