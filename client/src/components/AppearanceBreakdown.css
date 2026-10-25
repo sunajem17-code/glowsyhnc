@@ -134,6 +134,47 @@
 }
 .appearance-coach-button:active { transform:scale(.985) }
 .appearance-dashboard button:disabled { opacity:.5; cursor:not-allowed }
+.physique-analysis-list {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  gap:18px;
+  min-height:0;
+  margin:16px 0 0;
+  padding:0 6px 0 17px;
+  list-style:disc;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#4a4a4a transparent
+}
+.physique-analysis-item {
+  flex:0 0 auto;
+  padding:0 0 0 2px;
+  color:#fff;
+  overflow-wrap:anywhere
+}
+.physique-analysis-item::marker { color:#ddd; font-size:.9em }
+.physique-analysis-bullet { display:none }
+.physique-analysis-copy { min-width:0 }
+.physique-analysis-copy .appearance-point-title {
+  color:#fff;
+  font:600 15px/1.45 "Plus Jakarta Sans",sans-serif
+}
+.physique-analysis-copy p {
+  margin:4px 0 0;
+  color:#aaa;
+  font:400 13px/1.55 Inter,sans-serif;
+  overflow-wrap:anywhere
+}
+.physique-analysis-item.appearance-points-empty {
+  color:#aaa;
+  font:400 13px/1.6 Inter,sans-serif
+}
+@media(max-width:360px) {
+  .physique-analysis-copy .appearance-point-title { font-size:14px }
+  .physique-analysis-copy p { font-size:12px }
+}
 @keyframes appearance-pulse { 50% { opacity:.35 } }
 @media(max-width:360px) {
   .appearance-points { padding:15px 17px }

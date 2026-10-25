@@ -11,9 +11,10 @@ import { api } from '../utils/api'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigationDotButtonStyle, getUnlockedResultsHeadingStyle } from '../utils/revealAnimation'
 import { getRatingColor } from '../utils/revealRatings'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
+import PhysiqueBreakdown from '../components/PhysiqueBreakdown'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 
-const RESULT_VIEWS = ['results', 'photo', 'compare']
+const RESULT_VIEWS = ['results', 'analysis', 'compare']
 const PHYSIQUE_METRICS = [
   { key: 'overall', label: 'Overall' },
   { key: 'potential', label: 'Potential' },
@@ -414,9 +415,9 @@ export default function PhysiqueResults() {
         className="relative w-full px-2"
         style={{
           marginTop: activeView === 'results' ? 150 : 0,
-          flex: activeView === 'photo' ? '1 1 auto' : '0 0 auto',
-          display: activeView === 'photo' ? 'flex' : undefined,
-          alignItems: activeView === 'photo' ? 'center' : undefined,
+          flex: activeView === 'analysis' ? '1 1 auto' : '0 0 auto',
+          display: activeView === 'analysis' ? 'flex' : undefined,
+          alignItems: activeView === 'analysis' ? 'stretch' : undefined,
           transformOrigin: '50% 50%',
           touchAction: 'pan-y',
         }}
@@ -448,13 +449,9 @@ export default function PhysiqueResults() {
               )}
             </motion.div>
           )}
-          {activeView === 'photo' && (
-            <motion.div key="photo" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-              <div className="rounded-3xl overflow-hidden" style={{ background: '#141414', height: 'min(54vh, 510px)' }}>
-                {photo
-                  ? <img src={photo} draggable={false} alt="Your original physique scan photo" className="w-full h-full object-contain" />
-                  : <p className="p-6 text-center text-white">Your photo is unavailable on this device</p>}
-              </div>
+          {activeView === 'analysis' && (
+            <motion.div key="analysis" className="flex flex-1 min-h-0 flex-col" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+              <PhysiqueBreakdown scan={currentScan} coachPhotoUrl={photo} />
             </motion.div>
           )}
           {activeView === 'compare' && (
@@ -480,7 +477,7 @@ export default function PhysiqueResults() {
       <div role="tablist" aria-label="Results view" className="flex justify-center mt-2 mb-6 flex-shrink-0">
         {[
           ['results', 'Show results'],
-          ['photo', 'Show physique photo'],
+          ['analysis', 'Show physique pros and cons'],
           ['compare', 'Show photo comparison'],
         ].map(([view, label]) => (
           <button key={view} role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}

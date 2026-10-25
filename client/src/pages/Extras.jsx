@@ -24,7 +24,7 @@ const CARDS = [
     subtitle: 'Track habits and tasks',
   },
   {
-    to: '/workout-plan',
+    to: '/face-body-routine',
     icon: CalendarCheck,
     title: 'Face and Body Routine',
     subtitle: 'Build your glow-up plan',

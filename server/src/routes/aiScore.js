@@ -646,7 +646,7 @@ async function getPhysiqueScore(bodyBase64, bodyMediaType, gender = 'male', body
   const response = await client.generate({
     responseSchema: aiSchemas.physique, responseName: 'physique',
     model: 'claude-sonnet-4-6',
-    max_tokens: 600,
+    max_tokens: 900,
     temperature: 0,
     system: `You are a physique and body composition analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
@@ -687,6 +687,9 @@ SCORING RULES:
 - frame_width: apparent shoulder and torso width relative to the visible body proportions, with uncertainty for clothing, pose, and perspective. Do not pretend to determine exact skeletal width.
 - potential: realistic room for aesthetic improvement suggested by visible development and headroom. It is not a guarantee, genetic ceiling, or prediction. Its score must be at least the computed overall score.
 - body_fat_level: choose the closest visual category (very_lean / lean / average / above_average / heavy), not a medical classification.
+- Write 3–5 physique_strengths and 3–5 physique_improvements when the photo supports them; never pad the list with generic advice or repeat the same observation.
+- Make every finding useful and explanatory: return each as "Short title — 1–2 complete sentences explaining the visible evidence and why it matters." Aim for 20–35 words per finding. Be specific to this photo and mention uncertainty where pose, clothing, crop, or lighting limits the read.
+- Strengths should identify genuinely strong visible traits. Improvements should be focused, realistic opportunities supported by visible evidence; do not describe above-average categories as weaknesses just to fill the list.
 - Keep overall on the existing 1–10 scale and calculate it from the five legacy categories as before.
 
 Return ONLY this JSON — no markdown, nothing else:
@@ -702,8 +705,8 @@ Return ONLY this JSON — no markdown, nothing else:
   "v_taper": <number 1.0–10.0>,
   "frame_width": <number 1.0–10.0>,
   "body_fat_level": "<very_lean|lean|average|above_average|heavy>",
-  "physique_strengths": ["<strength 1>", "<strength 2>"],
-  "physique_improvements": ["<improvement 1>", "<improvement 2>"],
+  "physique_strengths": ["<short title — specific evidence and why it stands out>", "<short title — specific evidence and why it stands out>", "<additional supported finding>", "<additional supported finding>"],
+  "physique_improvements": ["<short title — specific evidence and a realistic focus>", "<short title — specific evidence and a realistic focus>", "<additional supported finding>", "<additional supported finding>"],
   "physique_notes": "<one sentence summary of physique, max 15 words>"
 }`,
     messages: [{

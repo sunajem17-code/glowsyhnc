@@ -42,6 +42,7 @@ const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
 const ScanReady      = lazy(() => import('./pages/ScanReady'))
 const ScanQualityFail = lazy(() => import('./pages/ScanQualityFail'))
 const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
+const FaceBodyRoutine = lazy(() => import('./pages/FaceBodyRoutine'))
 const PhysiqueScan      = lazy(() => import('./pages/PhysiqueScan'))
 const PhysiqueResults   = lazy(() => import('./pages/PhysiqueResults'))
 const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
@@ -248,6 +249,7 @@ export default function App() {
                 <Route path="community" element={<Community />} />
                 <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
+                <Route path="face-body-routine" element={<FaceBodyRoutine />} />
                 <Route path="physique-scan" element={<PhysiqueScan />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />
