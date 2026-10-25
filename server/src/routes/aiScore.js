@@ -717,6 +717,35 @@ Return ONLY this JSON — no markdown, nothing else:
 
   const raw = response.content[0]?.text?.trim() || ''
   const parsed = parseJSON(raw, 'Physique scorer')
+  const displayFields = ['potential', 'muscle_mass', 'body_fat_score', 'v_taper', 'frame_width']
+  const missing = displayFields.filter(field => typeof parsed?.[field] !== 'number' || !Number.isFinite(parsed[field]))
+  if (missing.length) {
+    console.warn(`[aiScore:physique] Primary analysis omitted display ratings (${missing.join(', ')}); requesting a focused photo-based completion`)
+    const completion = await client.generate({
+      responseSchema: aiSchemas.physiqueDisplayRatings,
+      responseName: 'physique_display_ratings',
+      model: 'claude-sonnet-4-6',
+      max_tokens: 300,
+      temperature: 0,
+      system: `You are completing missing ratings from a previous physique analysis. Examine only visible evidence in the supplied photo. Return one score from 1.0 to 10.0 for each requested rating. Do not use 5 as a default. Muscle mass means visible muscular development, body_fat_score means visible leanness (higher is leaner), v_taper means visible shoulder-to-waist taper, frame_width means apparent visible shoulder and torso width, and potential means realistic aesthetic headroom. Do not infer hidden anatomy, exact measurements, body-fat percentage, health, genetics, or training history.`,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: bodyMediaType, data: bodyBase64 } },
+          { type: 'text', text: `Complete only these missing ratings: ${missing.join(', ')}. Gender: ${gender}. ${bodyGeometry ? `Measured shoulder-to-hip ratio: ${bodyGeometry.shoulderHipRatio ?? 'unavailable'}.` : ''} Return only the required JSON scores.` },
+        ],
+      }],
+    })
+    const completionText = completion.content[0]?.text?.trim() || ''
+    const completedRatings = parseJSON(completionText, 'Physique rating completion')
+    for (const field of missing) {
+      const value = completedRatings[field]
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`Physique rating completion did not return ${field}`)
+      }
+      parsed[field] = value
+    }
+  }
   return normalizePhysiqueScores(parsed)
 }
 

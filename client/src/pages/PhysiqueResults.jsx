@@ -11,6 +11,7 @@ import { api } from '../utils/api'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigationDotButtonStyle, getUnlockedResultsHeadingStyle } from '../utils/revealAnimation'
 import { getRatingColor } from '../utils/revealRatings'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
+import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 
 const RESULT_VIEWS = ['results', 'photo', 'compare']
 const PHYSIQUE_METRICS = [
@@ -21,26 +22,6 @@ const PHYSIQUE_METRICS = [
   { key: 'v_taper', label: 'V-Taper' },
   { key: 'frame_width', label: 'Frame Width' },
 ]
-
-function getPhysiqueMetricScore(scan, key) {
-  const aliases = {
-    overall: ['overall', 'overallPhysique'],
-    potential: ['potential', 'physiquePotential'],
-    muscle_mass: ['muscle_mass', 'muscleMass'],
-    body_fat_score: ['body_fat_score', 'bodyFatScore'],
-    v_taper: ['v_taper', 'vTaper'],
-    frame_width: ['frame_width', 'frameWidth'],
-  }[key] ?? (key === 'overall_presentation' ? [key, 'overallPresentation', 'presentation'] : [key])
-  const sources = [scan?.physiqueScore, scan?.aiScore?.physiqueScore, scan?.aiScore?.physiqueResult, scan?.aiScore]
-  for (const source of sources) {
-    for (const alias of aliases) {
-      const raw = source?.[alias]
-      const value = Number(raw && typeof raw === 'object' ? raw.score : raw)
-      if (raw != null && Number.isFinite(value) && value >= 0 && value <= 10) return value
-    }
-  }
-  return 5
-}
 
 function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
   const reduceMotion = useReducedMotion()
@@ -67,10 +48,10 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
                   </motion.span>
                 </div>
                 {unlocked ? (
-                  <motion.div aria-label={`${label}: ${validValue == null ? 'Not scored' : `${validValue.toFixed(1)} out of 10`}`}
+                  <motion.div aria-label={`${label}: ${validValue == null ? 'Unavailable' : `${validValue.toFixed(1)} out of 10`}`}
                     initial={animation.number.initial} animate={animation.number.animate} transition={animation.number.transition}
                     style={{ ...metricTextStyles.value, fontSize: validValue == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
-                    {validValue == null ? 'Unavailable' : validValue.toFixed(1)}
+                    {validValue == null ? '—' : validValue.toFixed(1)}
                   </motion.div>
                 ) : (
                   <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -211,6 +192,8 @@ export default function PhysiqueResults() {
   const reduceMotion = useReducedMotion()
   const currentScan = useStore(s => s.currentScan)
   const savedScans = useStore(s => s.scans)
+  const setCurrentScan = useStore(s => s.setCurrentScan)
+  const setScans = useStore(s => s.setScans)
   const isPremium = usePremiumUiAccess()
   const setIsPremium = useStore(s => s.setIsPremium)
   const updateUser = useStore(s => s.updateUser)
@@ -225,6 +208,8 @@ export default function PhysiqueResults() {
   const [referralCount, setReferralCount] = useState(0)
   const [shareStatus, setShareStatus] = useState('')
   const [sharingResults, setSharingResults] = useState(false)
+  const [rescoring, setRescoring] = useState(false)
+  const [rescoreError, setRescoreError] = useState('')
   const purchaseLockRef = useRef(false)
 
   const aiScore = currentScan?.aiScore ?? {}
@@ -260,7 +245,10 @@ export default function PhysiqueResults() {
 
   async function handleShareResults() {
     const scores = PHYSIQUE_METRICS
-      .map(({ key, label }) => `${label}: ${getPhysiqueMetricScore(currentScan, key).toFixed(1)}/10`)
+      .map(({ key, label }) => {
+        const value = getPhysiqueMetricScore(currentScan, key)
+        return `${label}: ${value == null ? 'Unavailable' : `${value.toFixed(1)}/10`}`
+      })
       .join('\n')
     const shareData = { title: 'My Physique Results', text: `My Ascendus physique results:\n${scores}` }
     setSharingResults(true)
@@ -278,6 +266,42 @@ export default function PhysiqueResults() {
       if (error?.name !== 'AbortError') setShareStatus('Could not share results')
     } finally {
       setSharingResults(false)
+    }
+  }
+
+  const missingMetrics = PHYSIQUE_METRICS.filter(({ key }) => getPhysiqueMetricScore(currentScan, key) == null)
+
+  async function handleRescoreMissingMetrics() {
+    const bodyImage = currentScan?.bodyPhotoUrl || currentScan?.facePhotoUrl || storedPhoto
+    if (!bodyImage) {
+      setRescoreError('The saved scan photo is unavailable. Start a new physique scan to get these ratings.')
+      return
+    }
+    setRescoring(true)
+    setRescoreError('')
+    try {
+      const result = await api.ai.scorePhysique({ bodyImage, gender: currentScan?.gender || 'male' })
+      const physiqueScore = result?.physiqueScore ?? result?.physiqueResult ?? result
+      const updated = {
+        ...currentScan,
+        physiqueScore,
+        aiScore: { ...(currentScan.aiScore || {}), ...physiqueScore, physiqueScore },
+      }
+      const stillMissing = PHYSIQUE_METRICS.filter(({ key }) => getPhysiqueMetricScore(updated, key) == null)
+      if (stillMissing.length) {
+        const returnedFields = Object.keys(physiqueScore || {}).join(', ')
+        console.error('[PhysiqueResults] Rescore response is missing display ratings', {
+          missing: stillMissing.map(({ key }) => key),
+          returnedFields,
+        })
+        throw new Error(`The scorer response is incomplete. Missing: ${stillMissing.map(({ label }) => label).join(', ')}. Returned fields: ${returnedFields || 'none'}.`)
+      }
+      setCurrentScan(updated)
+      setScans([updated, ...savedScans.filter(scan => scan.id !== updated.id)])
+    } catch (error) {
+      setRescoreError(error?.message || 'Could not calculate the missing ratings. Please try again.')
+    } finally {
+      setRescoring(false)
     }
   }
 
@@ -409,6 +433,19 @@ export default function PhysiqueResults() {
           {activeView === 'results' && (
             <motion.div key="results" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
               <PhysiqueScorecard photo={photo} scan={currentScan} unlocked />
+              {missingMetrics.length > 0 && (
+                <div className="mt-3 rounded-2xl p-4 text-center" style={{ background: '#141414', border: '1px solid rgba(198,168,92,0.18)' }}>
+                  <p className="font-body text-[13px] mb-3" style={{ color: 'rgba(255,255,255,0.62)' }}>
+                    {missingMetrics.length} rating{missingMetrics.length === 1 ? '' : 's'} missing from this saved scan. Re-score its photo to fill them in.
+                  </p>
+                  <button type="button" onClick={handleRescoreMissingMetrics} disabled={rescoring}
+                    className="rounded-xl px-5 py-3 font-heading font-bold text-[14px] disabled:opacity-60"
+                    style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}>
+                    {rescoring ? 'Re-scoring…' : 'Rescore Missing Metrics'}
+                  </button>
+                  {rescoreError && <p role="alert" className="mt-3 text-[12px]" style={{ color: '#FF6B57' }}>{rescoreError}</p>}
+                </div>
+              )}
             </motion.div>
           )}
           {activeView === 'photo' && (

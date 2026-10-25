@@ -48,6 +48,7 @@ const physique = object({ ...scores(['proportions', 'leanness', 'frame', 'postur
   body_fat_level: enumeration(['very_lean', 'lean', 'average', 'above_average', 'heavy']),
   physique_strengths: strings, physique_improvements: strings, physique_notes: string,
 })
+const physiqueDisplayRatings = scores(['potential', 'muscle_mass', 'body_fat_score', 'v_taper', 'frame_width'])
 const validation = object({ valid: { type: 'boolean' }, faceCount: { type: 'integer', minimum: 0 },
   issues: array(object({ type: enumeration(['no_face', 'not_a_person', 'multiple_faces', 'too_far', 'too_close', 'face_cropped', 'too_dark', 'too_blurry']), message: string }), { maxItems: 5 }),
 })
@@ -60,4 +61,4 @@ function ranking(count) { return object({ winner_index: { type: 'integer', minim
   rankings: array(object({ index: { type: 'integer', minimum: 0, maximum: count - 1 }, rank: { type: 'integer', minimum: 1, maximum: count }, score, reason: string }), { minItems: count, maxItems: count }), winner_tips: strings,
 }) }
 
-module.exports = { core, extended, physique, validation, workout, products, potential, ranking }
+module.exports = { core, extended, physique, physiqueDisplayRatings, validation, workout, products, potential, ranking }

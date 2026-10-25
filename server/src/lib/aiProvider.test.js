@@ -105,7 +105,7 @@ test('cache namespaces distinguish providers and model overrides', () => {
   assert.notEqual(cacheNamespace(env), cacheNamespace({ ...env, OPENAI_MODEL: 'another-image-model' }))
 })
 
-for (const [name, schema] of Object.entries({ core: schemas.core(false), profile: schemas.core(true), extended: schemas.extended, physique: schemas.physique, validation: schemas.validation, workout: schemas.workout, products: schemas.products, potential: schemas.potential, ranking: schemas.ranking(3) })) {
+for (const [name, schema] of Object.entries({ core: schemas.core(false), profile: schemas.core(true), extended: schemas.extended, physique: schemas.physique, physiqueDisplayRatings: schemas.physiqueDisplayRatings, validation: schemas.validation, workout: schemas.workout, products: schemas.products, potential: schemas.potential, ranking: schemas.ranking(3) })) {
   test(`${name} contract is valid and rejects missing required fields`, () => {
     const value = fixture(schema)
     validate(value, schema)
