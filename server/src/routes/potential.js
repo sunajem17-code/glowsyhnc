@@ -6,6 +6,7 @@
 const express   = require('express')
 const { createAIClient, getAIKey } = require('../lib/aiProvider')
 const aiSchemas = require('../lib/aiSchemas')
+const { reserveImageEdit } = require('../lib/aiBudget')
 const { verifyToken, requirePro, claudeLimit } = require('../middleware/claudeGate')
 const { MALE_TIERS: MALE_TIER_TABLE, FEMALE_TIERS: FEMALE_TIER_TABLE } = require('../lib/tier')
 
@@ -138,12 +139,15 @@ Rules:
     console.error('[Potential] Status:', err.status)
     console.error('[Potential] Error type:', err.error?.type)
     console.error('[Potential] Error detail:', JSON.stringify(err.error ?? err, null, 2))
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     return res.status(500).json({ error: 'AI analysis failed — please try again' })
   }
 })
 
 // ── POST /api/potential/glow-up — Claude writes the prompt, OpenAI renders it ─
-router.post('/glow-up', verifyToken, requirePro, async (req, res) => {
+router.post('/glow-up', verifyToken, requirePro, claudeLimit, async (req, res) => {
   try {
     const openaiKey    = process.env.OPENAI_API_KEY
     const analysisKey = getAIKey()
@@ -221,13 +225,21 @@ Rules:
     const finalPrompt = `${enhancementPrompt} Maintain exact identity. Photorealistic, same angle, natural lighting.`
 
     console.log('[GlowUp] Step 2: OpenAI rendering enhanced image...')
-    const response = await openai.images.edit({
-      model:  'gpt-image-1',
-      image:  file,
-      prompt: finalPrompt,
-      size:   '1024x1024',
-      n:      1,
-    })
+    const imageBudget = await reserveImageEdit()
+    let response
+    try {
+      response = await openai.images.edit({
+        model:  'gpt-image-1',
+        image:  file,
+        prompt: finalPrompt,
+        size:   '1024x1024',
+        n:      1,
+      })
+      await imageBudget.settle()
+    } catch (error) {
+      await imageBudget.settleReserved()
+      throw error
+    }
 
     const b64 = response.data[0]?.b64_json
     if (!b64) return res.status(500).json({ error: 'No image returned from OpenAI' })
@@ -236,6 +248,9 @@ Rules:
     return res.json({ image: `data:image/png;base64,${b64}`, prompt: enhancementPrompt })
   } catch (err) {
     console.error('[GlowUp] Error:', err.message, err.status)
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     return res.status(500).json({ error: 'Image enhancement failed — please try again' })
   }
 })

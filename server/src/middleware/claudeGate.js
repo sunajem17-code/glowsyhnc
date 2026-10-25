@@ -19,6 +19,7 @@ const { getSupabase, getUserById } = require('../supabase')
 const { createLimiter } = require('./ratelimit')
 const { hasLocalProPreview } = require('../utils/localProPreview')
 const { JWT_SECRET } = require('./auth') // single hardened source of truth
+const { monthlyBudgetStatus, budgetError, runWithBudgetUser } = require('../lib/aiBudget')
 
 // ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
 const checkClaude = {
@@ -54,14 +55,14 @@ function verifyToken(req, res, next) {
     req.userId = 'demo'
     req.isDemo = true
     req.isPro  = false
-    return next()
+    return runWithBudgetUser(req.userId, next)
   }
 
   try {
     const payload = jwt.verify(token, JWT_SECRET)
     req.userId = payload.userId
     req.isDemo = false
-    next()
+    return runWithBudgetUser(req.userId, next)
   } catch (jwtErr) {
     console.error('[claudeGate] verifyToken rejected:', jwtErr.name, jwtErr.message)
     res.status(401).json({ error: 'Invalid or expired token' })
@@ -71,6 +72,16 @@ function verifyToken(req, res, next) {
 // ── 2. Claude call rate limit ──────────────────────────────────────────────────
 // Pro: 100/hour · Free: 25/hour · Demo: 5/hour
 async function claudeLimit(req, res, next) {
+  let budget
+  try {
+    budget = await monthlyBudgetStatus(req.userId)
+  } catch (error) {
+    return res.status(error.status || 503).json({ error: error.code || 'monthly_ai_budget_unavailable' })
+  }
+  if (budget.spentMicros + budget.reservedMicros >= budget.limitMicros) {
+    const error = budgetError()
+    return res.status(error.status).json({ error: error.code })
+  }
   const tier    = req.isPro ? 'pro' : req.isDemo ? 'demo' : 'free'
   const allowed = await checkClaude[tier](req.userId)
   if (!allowed) {

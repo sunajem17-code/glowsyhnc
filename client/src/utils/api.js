@@ -18,6 +18,9 @@ export function setScanInFlight(v) { _scanInFlight = v }
 const RAW_ERROR_CODES = {
   internal_error: 'Something went wrong on our end. Please try again.',
   server_error:   'Something went wrong on our end. Please try again.',
+  claude_rate_limited: 'The AI request limit has been reached. Please try again in about an hour.',
+  monthly_ai_budget_reached: 'You have reached your $2 monthly AI limit. Your AI features will be available again next month.',
+  monthly_ai_budget_unavailable: 'AI features are temporarily unavailable. Please try again later.',
 }
 function friendlyError(raw, fallback) {
   if (raw && RAW_ERROR_CODES[raw]) return RAW_ERROR_CODES[raw]

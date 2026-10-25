@@ -1,5 +1,6 @@
 const OpenAI = require('openai')
 const Anthropic = require('@anthropic-ai/sdk')
+const { reserveProviderRequest } = require('./aiBudget')
 
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
 const REQUEST_TIMEOUT_MS = 60_000
@@ -82,16 +83,29 @@ function createAIClient({ env = process.env, openai, anthropic, logger = console
   return {
     async generate(request) {
       const { responseSchema, responseName = 'ascendus_response', ...legacyRequest } = request
+      const budgetModel = config.provider === 'openai' ? config.model : legacyRequest.model
+      const reservation = await reserveProviderRequest(config.provider, budgetModel, { ...legacyRequest, responseSchema })
       // Keep the existing Anthropic transport, models, prompts and forced tool
       // behavior available. Switching providers is always explicit, never silent.
-      if (config.provider === 'anthropic') return client.messages.create(legacyRequest)
+      if (config.provider === 'anthropic') {
+        try {
+          const response = await client.messages.create(legacyRequest)
+          await reservation.settleUsage(response.usage)
+          return response
+        } catch (error) {
+          await reservation.settleReserved()
+          throw error
+        }
+      }
       const forcedTool = request.tool_choice?.type === 'tool'
         ? request.tools?.find(tool => tool.name === request.tool_choice.name) : null
       const schema = responseSchema || forcedTool?.input_schema
       const normalized = schema ? normalizeSchema(schema) : null
       const wrappedArray = normalized?.type === 'array'
       const formatSchema = wrappedArray ? { type: 'object', properties: { items: normalized }, required: ['items'], additionalProperties: false } : normalized
-      const response = await client.responses.create({
+      let response
+      try {
+        response = await client.responses.create({
         model: config.model,
         ...(request.system ? { instructions: typeof request.system === 'string' ? request.system : request.system.map(block => block.text).join('\n') } : {}),
         input: request.messages.map(message => {
@@ -105,7 +119,12 @@ function createAIClient({ env = process.env, openai, anthropic, logger = console
         max_output_tokens: Math.max(512, request.max_tokens || 1024),
         store: false,
         ...(formatSchema ? { text: { format: { type: 'json_schema', name: forcedTool?.name || responseName, strict: true, schema: formatSchema } } } : {}),
-      })
+        })
+      } catch (error) {
+        await reservation.settleReserved()
+        throw error
+      }
+      await reservation.settleUsage(response.usage)
       if (response.output?.some(item => item.content?.some(block => block.type === 'refusal'))) {
         throw failure('AI could not analyze this request. Please try another photo or request.', 422, 'ai_refusal')
       }

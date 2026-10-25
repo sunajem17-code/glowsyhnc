@@ -12,6 +12,8 @@ async function withRetry(fn, label = 'api') {
     try {
       return await fn()
     } catch (err) {
+      // Budget rejections are final for this month; retries only waste time.
+      if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') throw err
       const status  = err.status ?? err.statusCode ?? 0
       const apiMsg  = err.error?.error?.message || err.error?.message || ''
       const rawMsg  = err.message || ''

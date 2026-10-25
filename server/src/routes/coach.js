@@ -25,6 +25,9 @@ router.post('/appearance', verifyToken, resolvePro, claudeLimit, async (req, res
     const { getBreakdown } = require('../lib/appearanceBreakdown')
     res.json({ analysis: await getBreakdown(req.userId, req.body.scanId) })
   } catch (err) {
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     res.status([404, 422].includes(err.status) ? err.status : 503).json({ error: [404, 422].includes(err.status) ? err.message : 'Your appearance analysis could not be completed. Please retry. Your scan is safe.' })
   }
 })
@@ -77,6 +80,9 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     res.json(result)
   } catch (err) {
     console.error('[coach] Request failed', { status: err.status || 503 })
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     if (err.status === 409) return res.status(409).json({ error: 'A coach reply is already in progress. Please wait.' })
     res.status(503).json({ error: 'Adonis could not load your scan or complete this reply. Please retry. Your results have not been replaced.' })
   }

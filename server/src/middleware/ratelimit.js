@@ -98,4 +98,4 @@ function createLimiter(name, max, upstashWindow, fallbackWindowMs) {
   }
 }
 
-module.exports = { createLimiter }
+module.exports = { createLimiter, getRedis }

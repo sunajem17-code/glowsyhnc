@@ -98,6 +98,9 @@ async function withRetry(fn, label = 'api') {
     try {
       return await fn()
     } catch (err) {
+      // A monthly-budget rejection is deliberate and must not be retried as a
+      // provider rate-limit/overload response.
+      if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') throw err
       const status  = err.status ?? err.statusCode ?? 0
       // Anthropic SDK nests the real message inside err.error on some versions
       const apiMsg  = err.error?.error?.message || err.error?.message || ''
@@ -1030,6 +1033,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     res.json(await coachScans.finishScan(completedScanId, req.userId, result))
   } catch (err) {
     try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     const status = err.status ?? err.statusCode ?? 0
     const msg    = err.message || ''
     const lower  = msg.toLowerCase()
@@ -1087,6 +1093,9 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
 
     res.json({ physiqueScore: physiqueResult })
   } catch (err) {
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     const status = err.status ?? err.statusCode ?? 0
     const msg    = err.message || ''
     const lower  = msg.toLowerCase()
@@ -1171,6 +1180,9 @@ router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, asy
 
     res.json(result)
   } catch (err) {
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     const status = err.status ?? err.statusCode ?? 0
     const msg    = err.message || ''
     const lower  = msg.toLowerCase()
@@ -1265,6 +1277,9 @@ Respond ONLY with valid JSON — no extra text:
     const plan = parseJSON(raw, 'workout-plan')
     res.json(plan)
   } catch (err) {
+    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
+      return res.status(err.status || 503).json({ error: err.code })
+    }
     console.error('[workout-plan] error:', err.message)
     res.status(500).json({ error: 'Plan generation failed', fallback: true })
   }
