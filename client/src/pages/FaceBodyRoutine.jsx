@@ -204,6 +204,11 @@ function uniqueRecommendations(recommendations) {
   }).slice(0, 12)
 }
 
+function adviceTitle(text) {
+  const firstLine = text.split(/\n|(?<=[.!?])\s+/)[0]?.replace(/^[-•\d.)\s]+/, '').trim() ?? text
+  return firstLine.length > 72 ? `${firstLine.slice(0, 69).trimEnd()}…` : firstLine
+}
+
 function isTrainingSplitRecommendation(item) {
   return /\b(push[ /-]?pull|upper[ /-]?lower|full[ -]?body|workout split|training split|session\s*[ab]|day\s*[1-7]|monday|tuesday|wednesday|thursday|friday|saturday|sunday|3[ -]?day|4[ -]?day|5[ -]?day)\b/i.test(item.text)
 }
@@ -263,6 +268,8 @@ export default function FaceBodyRoutine() {
   const [selectedPlanWeek, setSelectedPlanWeek] = useState(1)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState('')
+  const [expandedAdvice, setExpandedAdvice] = useState(null)
+  const [showAllAdvice, setShowAllAdvice] = useState(false)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setTodayKey(getLocalDateKey()), getNextMidnightDelay())
@@ -450,15 +457,23 @@ export default function FaceBodyRoutine() {
           </div>
         </section>
 
-        <details className="group rounded-2xl border border-white/10 bg-white/[0.025] p-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span><span className="block font-heading text-sm font-bold text-primary">Scan &amp; Coach advice</span><span className="mt-0.5 block font-body text-[11px] text-white/50">{otherRecommendations.length ? `${otherRecommendations.length} saved recommendations` : 'No saved advice yet'}</span></span><ArrowRight size={16} className="rotate-90 text-white/45 transition-transform group-open:rotate-[270deg]" /></summary>
-          <div className="mt-4 space-y-2">
+        <details className="group rounded-2xl border border-white/10 bg-[#111] p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#C6A85C]"><span><span className="block font-heading text-sm font-bold text-primary">Scan &amp; Coach advice</span><span className="mt-0.5 block font-body text-[11px] text-white/50">{otherRecommendations.length ? `${otherRecommendations.length} saved · tap an item to read` : 'No saved advice yet'}</span></span><ArrowRight size={16} className="rotate-90 text-white/45 transition-transform group-open:rotate-[270deg]" /></summary>
+          <div className="mt-3 space-y-2">
           {otherRecommendations.length > 0 ? <div className="space-y-2">
-            {otherRecommendations.map(item => <article key={item.id} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-              <div className="mb-1 flex items-center justify-between gap-2"><span className="font-heading text-xs font-semibold text-primary">{item.kind}</span><span className="font-body text-[10px] text-white/45">{item.source}</span></div>
-              <p className="font-body text-xs leading-relaxed text-white/65">{item.text}</p>
-              {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer sponsored" className="mt-2 inline-flex items-center gap-1 font-heading text-xs font-semibold" style={{ color: GOLD }}>View recommended product <ArrowRight size={13} /></a>}
-            </article>)}
+            {otherRecommendations.slice(0, showAllAdvice ? 12 : 3).map(item => {
+              const expanded = expandedAdvice === item.id
+              const title = adviceTitle(item.text)
+              const body = item.text.slice(title.replace(/…$/, '').length).replace(/^\s*[-–—:.]?\s*/, '').trim()
+              return <article key={item.id} className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
+                <button type="button" aria-expanded={expanded} onClick={() => setExpandedAdvice(expanded ? null : item.id)} className="flex w-full items-start justify-between gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[#C6A85C]">
+                  <span className="min-w-0"><span className="mb-1 block font-body text-[10px] font-semibold uppercase tracking-wide" style={{ color: GOLD }}>{item.kind} <span className="px-1 text-white/25">·</span> <span className="normal-case tracking-normal text-white/45">{item.source}</span></span><span className="block font-heading text-sm font-semibold leading-snug text-primary">{title}</span>{(body || expanded) && <span className={`mt-1 block font-body text-xs leading-relaxed text-white/60 ${expanded ? '' : 'line-clamp-2'}`}>{body || item.text}</span>}</span>
+                  <ArrowRight size={15} className={`mt-1 shrink-0 text-white/40 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                </button>
+                {expanded && item.url && <a href={item.url} target="_blank" rel="noopener noreferrer sponsored" className="mt-2 inline-flex items-center gap-1 font-heading text-xs font-semibold" style={{ color: GOLD }}>View recommended product <ArrowRight size={13} /> </a>}
+              </article>
+            })}
+            {otherRecommendations.length > 3 && <button type="button" onClick={() => setShowAllAdvice(value => !value)} className="w-full rounded-xl border border-white/[0.08] px-3 py-2.5 text-center font-heading text-xs font-semibold text-white/65 transition-colors hover:bg-white/[0.04]">{showAllAdvice ? 'Show less' : `Show all ${otherRecommendations.length} recommendations`}</button>}
           </div> : <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
             <p className="font-body text-xs leading-relaxed text-white/65">No saved scan or coach recommendations yet. Ask the AI Coach and the advice will appear here.</p>
             <button type="button" onClick={() => { triggerHaptic(); navigate('/coach', { state: { coachPrompt: 'Using my completed face and body scans, give me practical recommendations to add to my Face and Body Routine. Include any specific products you recommend and how to use them.' } }) }} className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 font-heading text-xs font-bold text-black" style={{ background: GOLD }}>Ask AI Coach <ArrowRight size={14} /></button>
