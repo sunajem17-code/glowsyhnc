@@ -7,7 +7,7 @@ import { triggerHaptic } from '../utils/haptics'
 // header is the reference design this matches); pass icon={X} for screens
 // where tapping this button exits the whole flow rather than stepping back —
 // same button container/position, just a different icon + onBack target.
-export default function PageHeader({ title, subtitle, back, onBack, action, icon: Icon = ChevronLeft }) {
+export default function PageHeader({ title, subtitle, back, onBack, action, hideTitle = false, icon: Icon = ChevronLeft }) {
   const navigate = useNavigate()
 
   return (
@@ -26,7 +26,7 @@ export default function PageHeader({ title, subtitle, back, onBack, action, icon
           <Icon size={18} className="text-primary" />
         </button>
       )}
-      <div className="flex-1">
+      {!hideTitle && <div className="flex-1">
         <h1
           className="font-heading font-bold text-[22px] text-primary leading-tight"
           style={{ letterSpacing: '-0.02em' }}
@@ -36,7 +36,7 @@ export default function PageHeader({ title, subtitle, back, onBack, action, icon
         {subtitle && (
           <p className="text-[12px] text-secondary font-body mt-0.5">{subtitle}</p>
         )}
-      </div>
+      </div>}
       {action && action}
     </div>
   )

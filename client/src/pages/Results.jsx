@@ -21,6 +21,7 @@ import DevRankCard from '../components/DevRankCard'
 import ProLock from '../components/ProLock'
 import PaywallModal from '../components/PaywallModal'
 import { GOLD_GRADIENT } from '../utils/theme'
+import { conciseFinding } from '../utils/conciseFinding'
 
 // ─── Tier color map ───────────────────────────────────────────────────────────
 const TIER_COLORS = {
@@ -597,13 +598,13 @@ function LegacyResults() {
             <div className="px-4 py-3">
               {aiScore?.topImprovement ? (
                 isPremium
-                  ? <p className="text-[12px] font-body text-primary leading-relaxed">{aiScore.topImprovement}</p>
-                  : <ProText text={aiScore.topImprovement} onUpgrade={upgrade} />
+                  ? <p className="text-[12px] font-body text-primary leading-relaxed">{conciseFinding(aiScore.topImprovement, 14)}</p>
+                  : <ProText text={conciseFinding(aiScore.topImprovement, 14)} onUpgrade={upgrade} />
               ) : aiScore?.keyWeaknesses?.length > 0 ? (
                 <div className="space-y-1">
                   {aiScore.keyWeaknesses.map((w, i) => (
                     <p key={i} className="text-[12px] font-body text-primary leading-snug flex items-start gap-2">
-                      <span style={{ color: '#C6A85C', flexShrink: 0 }}>→</span> {w}
+                      <span style={{ color: '#C6A85C', flexShrink: 0 }}>→</span> {conciseFinding(w)}
                     </p>
                   ))}
                 </div>
@@ -626,7 +627,7 @@ function LegacyResults() {
             <div className="px-4 py-3 space-y-1.5">
               {aiScore.keyStrengths.map((s, i) => (
                 <p key={i} className="text-[12px] font-body text-primary leading-snug flex items-start gap-2">
-                  <span style={{ color: '#34C759', flexShrink: 0 }}>✓</span> {s}
+                  <span style={{ color: '#34C759', flexShrink: 0 }}>✓</span> {conciseFinding(s)}
                 </p>
               ))}
             </div>

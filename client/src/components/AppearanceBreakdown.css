@@ -1,8 +1,8 @@
 .appearance-dashboard {
   display:flex;
-  flex:1;
+  flex:0 0 auto;
   flex-direction:column;
-  min-height:0;
+  min-height:auto;
   width:100%;
   max-width:680px;
   margin:0 auto;
@@ -42,10 +42,10 @@
 }
 .appearance-points {
   display:flex;
-  flex:1;
+  flex:0 0 auto;
   flex-direction:column;
-  min-height:0;
-  overflow:hidden;
+  min-height:auto;
+  overflow:visible;
   padding:14px 18px;
   border:1px solid var(--appearance-border);
   border-radius:22px;
@@ -60,15 +60,15 @@
 }
 .appearance-points-list {
   display:flex;
-  flex:1;
+  flex:0 0 auto;
   flex-direction:column;
   gap:20px;
-  min-height:0;
+  min-height:auto;
   margin:12px 0 0;
   padding-left:18px;
   padding-right:8px;
   list-style:disc;
-  overflow-y:auto;
+  overflow:visible;
   overscroll-behavior:contain;
   scrollbar-width:thin;
   scrollbar-color:#4a4a4a transparent
@@ -88,13 +88,17 @@
   font:400 14px/1.5 Inter,sans-serif;
   overflow-wrap:anywhere
 }
+.appearance-points li details,
+.physique-analysis-copy details { margin-top:5px; color:#bcbcbc; font:400 12px/1.5 Inter,sans-serif }
+.appearance-points li details summary,
+.physique-analysis-copy details summary { width:max-content; cursor:pointer; color:#c6a85c; font:600 11px/1.4 "Plus Jakarta Sans",sans-serif }
 .appearance-points li.appearance-points-empty {
   color:#aaa;
   font:400 13px/1.6 Inter,sans-serif
 }
 .appearance-state {
   display:flex;
-  flex:1;
+  flex:0 0 auto;
   flex-direction:column;
   justify-content:center;
   gap:10px;
@@ -136,14 +140,14 @@
 .appearance-dashboard button:disabled { opacity:.5; cursor:not-allowed }
 .physique-analysis-list {
   display:flex;
-  flex:1;
+  flex:0 0 auto;
   flex-direction:column;
   gap:18px;
-  min-height:0;
+  min-height:auto;
   margin:16px 0 0;
   padding:0 6px 0 17px;
   list-style:disc;
-  overflow-y:auto;
+  overflow:visible;
   overscroll-behavior:contain;
   scrollbar-width:thin;
   scrollbar-color:#4a4a4a transparent

@@ -52,9 +52,14 @@ const physiqueDisplayRatings = scores(['potential', 'muscle_mass', 'body_fat_sco
 const validation = object({ valid: { type: 'boolean' }, faceCount: { type: 'integer', minimum: 0 },
   issues: array(object({ type: enumeration(['no_face', 'not_a_person', 'multiple_faces', 'too_far', 'too_close', 'face_cropped', 'too_dark', 'too_blurry']), message: string }), { maxItems: 5 }),
 })
-const workout = object({ split: string, trainingLevel: string, days: array(object({ name: string, focus: string,
-  exercises: array(object({ name: string, sets: { type: 'integer', minimum: 1 }, reps: string, why: string })),
-})) })
+const workout = object({
+  split: string, trainingLevel: string, trainingEmphasis: string, emphasisReason: string,
+  priorities: array(object({ area: string, muscles: array(string, { minItems: 1, maxItems: 4 }), role: enumeration(['Primary', 'Secondary']), reason: string, confidence: enumeration(['supported observation', 'tentative visual cue', 'user-selected']) }), { maxItems: 3 }),
+  maintenanceAreas: array(string, { minItems: 1, maxItems: 10 }),
+  days: array(object({ name: string, focus: string, targetMuscles: array(string, { minItems: 1, maxItems: 6 }),
+    exercises: array(object({ name: string, targetMuscles: array(string, { minItems: 1, maxItems: 4 }), sets: { type: 'integer', minimum: 1, maximum: 6 }, reps: string, restSeconds: { type: 'integer', minimum: 30, maximum: 300 }, effortTarget: string, why: string, instructions: string, progressionInstructions: string, alternatives: array(string, { minItems: 1, maxItems: 2 }) }), { minItems: 3, maxItems: 6 }),
+  }))
+})
 const products = array(object({ name: string, description: string, searchQuery: string }), { minItems: 5, maxItems: 5 })
 const potential = object({ improvements: array(string, { minItems: 3, maxItems: 3 }), potential_tier: string, timeline: string, headline: string })
 function ranking(count) { return object({ winner_index: { type: 'integer', minimum: 0, maximum: count - 1 },

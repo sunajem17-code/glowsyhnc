@@ -2,7 +2,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const Database = require('better-sqlite3')
 const database = new Database(':memory:')
-database.exec(`CREATE TABLE scans (id TEXT PRIMARY KEY,user_id TEXT,scan_date TEXT,face_photo_url TEXT,face_data TEXT,
+database.exec(`CREATE TABLE scans (id TEXT PRIMARY KEY,user_id TEXT,scan_date TEXT,face_photo_url TEXT,face_data TEXT,body_data TEXT,
   glow_score REAL,face_total_score REAL,presentation_score REAL,insights TEXT,analyzed_at TEXT);
   CREATE TABLE users (id TEXT PRIMARY KEY,subscription_tier TEXT,is_pro INTEGER,pro_trial_expires_at TEXT,coach_messages_used INTEGER);
   INSERT INTO users VALUES ('alice','premium',1,NULL,0),('bob','premium',1,NULL,0);`)
@@ -36,6 +36,12 @@ const baseResult = { overallScore: 5.6, faceScore: 5.6, groomingScore: 6, pillar
   topImprovement: 'Establish a gentle routine', visualObservations: [{ id: 'grooming_issue', confidence: 'medium' }],
   evidenceSummary: { measurements: { eyeSpacing: { value: 0.22, confidence: 'medium' } }, limitations: ['2D photograph'] },
 }
+test('saved scan normalization exposes the actual physique findings for server-side workout planning', () => {
+  const physique = { frame_width: 4.8, v_taper: 5.2, physique_improvements: ['Shoulder development could be emphasized based on the visible front view.'] }
+  const scan = scans.normalize({ id: 'body-plan-scan', user_id: 'alice', glow_score: 6.2, body_data: JSON.stringify({ physiqueScore: physique }) })
+  assert.deepEqual(scan.physique, physique)
+  assert.equal(scans.normalize({ id: 'other-user-scan', user_id: 'alice', glow_score: 6.2, body_data: null }).physique, null)
+})
 async function completed(userId, result = baseResult) { const id = scans.startScan(userId); await scans.finishScan(id, userId, result); return id }
 function fakeCloud(rows, profile = { ai_consent: false }, error = null, image) {
   return { from(table) {

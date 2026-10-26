@@ -79,6 +79,7 @@ function normalize(row) {
   const score = result?.overallScore ?? row.overall_score ?? row.glow_score
   if (score == null || !Number.isFinite(Number(score))) return null
   const legacyFace = data?.kind === KIND ? null : data
+  const bodyData = parse(row.body_data)
   return {
     id: row.id, completedAt: row.analyzed_at || row.created_at || row.scan_date,
     scores: clean({ overall: Number(score), face: result?.faceScore ?? row.face_score ?? row.face_total_score,
@@ -97,7 +98,7 @@ function normalize(row) {
     hairType: clean(result?.hairType ?? row.hair_type_detected),
     savedHairstyleRecommendations: clean([row.hairstyle_recommendation_1, row.hairstyle_recommendation_2, row.hairstyle_recommendation_3].filter(Boolean)),
     profile: clean(result?.profileData),
-    physique: clean(result?.physiqueScore),
+    physique: clean(result?.physiqueScore ?? bodyData?.physiqueScore ?? bodyData?.physique_score ?? bodyData?.physiqueResult ?? bodyData),
     extendedMetrics: clean(result?.extendedMetrics ?? row.extended_metrics),
     source: result ? 'saved_analysis' : 'legacy_saved_summary',
     // Kept internal, excluded from the prompt and response metadata.

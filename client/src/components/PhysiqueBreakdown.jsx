@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { triggerHaptic } from '../utils/haptics'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
+import { conciseFinding } from '../utils/conciseFinding'
 import './AppearanceBreakdown.css'
 
 function getPhysiqueAnalysis(scan) {
@@ -95,13 +96,13 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
     .filter(metric => metric.score != null && !representedMetrics.has(metric.key)
       && (page === 'pros' ? metric.score >= 7.5 : metric.score <= 6.5))
     .sort((a, b) => page === 'pros' ? b.score - a.score : a.score - b.score)
-    .slice(0, Math.max(0, 5 - savedPoints.length))
+    .slice(0, Math.max(0, 4 - savedPoints.length))
     .map(metric => ({
       text: metric.label,
       metric,
       source: 'score',
     }))
-  const points = [...savedPoints, ...metricPoints]
+  const points = [...savedPoints, ...metricPoints].slice(0, 4)
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
@@ -116,12 +117,14 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
         {points.length
           ? points.map(({ text, metric: scoredMetric }, index) => {
             const metric = scoredMetric || relatedMetric(text, scan)
-            const { title: pointTitle, explanation } = explainPoint(text, metric, page, scan)
+            const { title: rawTitle, explanation } = explainPoint(text, metric, page, scan)
+            const pointTitle = conciseFinding(rawTitle)
+            const supportingText = text === pointTitle ? explanation : text
             return <li className="physique-analysis-item" key={`${text}-${index}`}>
               <span className="physique-analysis-bullet" aria-hidden="true">•</span>
               <div className="physique-analysis-copy">
                 <span className="appearance-point-title">{pointTitle}</span>
-                <p>{explanation}</p>
+                {(supportingText || explanation) && <details><summary>Details</summary><p>{supportingText}{supportingText && explanation ? ` ${explanation}` : explanation}</p></details>}
               </div>
             </li>
           })

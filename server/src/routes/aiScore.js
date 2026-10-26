@@ -10,6 +10,7 @@ const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
 const { calculatePotentialScore, withPotentialScore } = require('../utils/potentialScore')
 const { normalizePhysiqueScores } = require('../utils/physiqueScore')
+const { buildBaselineWorkout, inferMusclePriorities, validateWorkoutPlan } = require('../lib/workoutPlan')
 
 const router = express.Router()
 
@@ -374,7 +375,7 @@ Descriptor rules: describe what IS there, not what is missing. Max 10 words. No 
 ${profileSection}${evidenceNote}
 
 VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
-KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
+KEY STRENGTHS: return 2–4 scan-supported findings. Each should be a concise 3–8 word phrase naming a visible feature, not a sentence. Examples: "Balanced facial symmetry", "Clear skin texture". Do not pad or invent a finding.
 
 ${GENERAL_GUIDANCE}
 
@@ -382,7 +383,9 @@ ${EYE_GUIDANCE}
 
 For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
 
-TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
+KEY WEAKNESSES: return up to 4 concise 3–8 word phrases supported by visible evidence. Preserve uncertainty in the phrase when needed (for example, "Skin texture in this lighting"). No diagnosis or unsupported structural claim.
+
+TOP IMPROVEMENT: one short actionable sentence, maximum 14 words. Keep frequency or safety qualification only when needed. Do not repeat the weakness list.
 
 Return ONLY this JSON — no markdown, nothing else:
 {
@@ -687,8 +690,8 @@ SCORING RULES:
 - frame_width: apparent shoulder and torso width relative to the visible body proportions, with uncertainty for clothing, pose, and perspective. Do not pretend to determine exact skeletal width.
 - potential: realistic room for aesthetic improvement suggested by visible development and headroom. It is not a guarantee, genetic ceiling, or prediction. Its score must be at least the computed overall score.
 - body_fat_level: choose the closest visual category (very_lean / lean / average / above_average / heavy), not a medical classification.
-- Write 3–5 physique_strengths and 3–5 physique_improvements when the photo supports them; never pad the list with generic advice or repeat the same observation.
-- Make every finding useful and explanatory: return each as "Short title — 1–2 complete sentences explaining the visible evidence and why it matters." Aim for 20–35 words per finding. Be specific to this photo and mention uncertainty where pose, clothing, crop, or lighting limits the read.
+- Write 2–4 physique_strengths and 2–4 physique_improvements when supported; never pad the list or repeat an observation.
+- Each finding is a 3–8 word phrase only (for example, "Defined abdominal muscles" or "Build wider shoulders"). Keep it specific to the visible evidence. Include uncertainty in the phrase when needed; do not diagnose or infer hidden areas.
 - Strengths should identify genuinely strong visible traits. Improvements should be focused, realistic opportunities supported by visible evidence; do not describe above-average categories as weaknesses just to fill the list.
 - Keep overall on the existing 1–10 scale and calculate it from the five legacy categories as before.
 
@@ -707,7 +710,7 @@ Return ONLY this JSON — no markdown, nothing else:
   "body_fat_level": "<very_lean|lean|average|above_average|heavy>",
   "physique_strengths": ["<short title — specific evidence and why it stands out>", "<short title — specific evidence and why it stands out>", "<additional supported finding>", "<additional supported finding>"],
   "physique_improvements": ["<short title — specific evidence and a realistic focus>", "<short title — specific evidence and a realistic focus>", "<additional supported finding>", "<additional supported finding>"],
-  "physique_notes": "<one sentence summary of physique, max 15 words>"
+  "physique_notes": "<concise scan summary, max 8 words>"
 }`,
     messages: [{
       role: 'user',
@@ -1239,81 +1242,150 @@ router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, asy
 // Uses haiku for speed + cost. Falls back to 500 so the client can show a
 // generic plan rather than an error screen.
 router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, res) => {
-  const { physiqueScores, gender, trainingLevel } = req.body
-  if (!physiqueScores || typeof physiqueScores !== 'object') {
-    return res.status(400).json({ error: 'physiqueScores object required' })
+  const scanId = typeof req.body.scanId === 'string' ? req.body.scanId : ''
+  const hasSavedScanId = Boolean(scanId)
+  const allowedLevels = ['beginner', 'intermediate', 'advanced']
+  const allowedGoals = ['build muscle', 'gain strength', 'improve fitness', 'lose fat']
+  const allowedEquipment = ['bodyweight', 'dumbbells', 'home gym', 'full gym']
+  const allowedFocuses = ['Auto from scan', 'Balanced', 'Shoulders', 'Chest', 'Back', 'Arms', 'Core', 'Legs', 'Hamstrings and glutes', 'Calves']
+  const requestedLevel = String(req.body.trainingLevel ?? '').toLowerCase()
+  const level = allowedLevels.includes(requestedLevel) ? requestedLevel : (requestedLevel ? null : 'beginner')
+  const requestedGoal = String(req.body.trainingGoal ?? (hasSavedScanId ? '' : 'build muscle')).toLowerCase()
+  const trainingGoal = allowedGoals.includes(requestedGoal) ? requestedGoal : null
+  const requestedEquipment = String(req.body.equipment ?? '').toLowerCase()
+  const equipment = allowedEquipment.includes(requestedEquipment) ? requestedEquipment : (hasSavedScanId ? null : 'full gym')
+  const daysPerWeek = Number(req.body.daysPerWeek ?? (level === 'advanced' ? 5 : level === 'intermediate' ? 4 : 3))
+  const requestedFocus = allowedFocuses.find(value => value.toLowerCase() === String(req.body.priorityFocus ?? 'Auto from scan').toLowerCase())
+  const userFocus = requestedFocus || 'Auto from scan'
+  if (!scanId || !level || !trainingGoal || !equipment || !Number.isInteger(daysPerWeek) || daysPerWeek < 2 || daysPerWeek > 6 || !requestedFocus) {
+    return res.status(400).json({ error: 'Choose a valid training goal, experience level, equipment, and 2–6 training days.' })
   }
 
+  let ownedScan = null
+  if (hasSavedScanId) {
+    try {
+      ownedScan = await coachScans.ownedCoachScan(scanId, req.userId)
+    } catch (error) {
+      console.warn('[workout-plan] saved scan lookup failed:', error.message)
+      return res.status(503).json({ error: 'Your saved body scan is temporarily unavailable. Try again shortly.' })
+    }
+    if (!ownedScan) return res.status(404).json({ error: 'The selected body scan was not found in your account. Choose a saved scan and try again.' })
+  } else if (!req.body.physiqueScores || typeof req.body.physiqueScores !== 'object') {
+    return res.status(400).json({ error: 'A saved scan is required to personalize this plan.' })
+  }
+  const physique = ownedScan?.scan?.physique ?? ownedScan?.result?.physiqueScore ?? req.body.physiqueScores ?? {}
+  const scoreKeys = ['proportions', 'leanness', 'frame', 'posture', 'overall_presentation', 'potential', 'muscle_mass', 'body_fat_score', 'v_taper', 'frame_width']
+  const availableScores = Object.fromEntries(scoreKeys.flatMap(key => {
+    if (physique[key] == null || physique[key] === '') return []
+    const value = Number(typeof physique[key] === 'object' ? physique[key].score : physique[key])
+    return Number.isFinite(value) && value >= 0 && value <= 10 ? [[key, value]] : []
+  }))
+  const equipmentTitle = { bodyweight: 'Bodyweight', dumbbells: 'Dumbbells', 'home gym': 'Home gym', 'full gym': 'Full gym' }[equipment]
+  const priorities = inferMusclePriorities(physique, availableScores, userFocus)
+  const baseline = () => buildBaselineWorkout({ daysPerWeek, level, goal: trainingGoal, equipment: equipmentTitle, scores: availableScores, physique, userFocus })
   const apiKey = getAIKey()
-  if (!apiKey) return res.status(500).json({ error: 'AI unavailable', fallback: true })
+  if (!apiKey) return res.json(baseline())
 
   try {
     const client = getClient()
-    const level = trainingLevel || 'beginner'
-    const isFemale = gender === 'female'
+    const scored = Object.entries(availableScores)
+      .filter(([name]) => ['proportions', 'frame', 'posture', 'muscle_mass', 'v_taper', 'frame_width'].includes(name))
+      .map(([name, score]) => ({ name, score }))
+      .sort((a, b) => a.score - b.score)
 
-    const scored = [
-      { name: 'proportions', score: physiqueScores.proportions ?? 5 },
-      { name: 'leanness',    score: physiqueScores.leanness    ?? 5 },
-      { name: 'frame',       score: physiqueScores.frame       ?? 5 },
-      { name: 'posture',     score: physiqueScores.posture     ?? 5 },
-      { name: 'presentation', score: physiqueScores.overall_presentation ?? 5 },
-    ].sort((a, b) => a.score - b.score)
+    const weakAreas   = scored.slice(0, 2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ') || 'no feature-level priority available'
+    const strongAreas = [...scored].reverse().slice(0, 2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ') || 'no feature-level strength available'
+    const scanEmphasis = trainingGoal === 'lose fat'
+      ? 'Use balanced full-body resistance training. Do not infer a need for weight loss from appearance ratings.'
+      : priorities.length
+        ? `Emphasize ${priorities.map(priority => priority.muscles.join(', ')).join('; ')}. Use only these supported/selected priorities; keep all other major muscle groups in maintenance.`
+        : 'No supported muscle-specific concern is available. Use balanced goal-based training and list unknown body parts as unknown; do not invent a deficiency.'
 
-    const weakAreas   = scored.slice(0, 2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
-    const strongAreas = scored.slice(-2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
+    const splitRule = daysPerWeek <= 3 ? `${daysPerWeek}-day Full Body`
+      : daysPerWeek === 4 ? '4-day Upper/Lower'
+        : daysPerWeek === 5 ? '5-day Upper/Lower + accessories'
+          : '6-day Push/Pull/Legs'
 
-    const splitRule = level === 'advanced' ? '6-day PPL (Push/Pull/Legs)'
-      : level === 'intermediate' ? '4-day Upper/Lower'
-      : '3-day Full Body'
+    const scanFindings = {
+      improvements: Array.isArray(physique.physique_improvements) ? physique.physique_improvements.slice(0, 5) : [],
+      strengths: Array.isArray(physique.physique_strengths) ? physique.physique_strengths.slice(0, 5) : [],
+      notes: typeof physique.physique_notes === 'string' ? physique.physique_notes : '',
+    }
+    const scanSourceNote = hasSavedScanId ? 'Ratings and observations were read from the selected saved scan on the server.' : 'Legacy workout screen supplied cached scan ratings; treat them as unverified estimates and do not claim they were verified against the saved scan.'
+    const prompt = `You are a practical, safety-minded strength coach. Generate one complete weekly workout schedule for a ${level} person whose goal is ${trainingGoal}.
 
-    const prompt = `You are an elite physique coach. Generate a personalized weekly workout plan for a ${level} ${isFemale ? 'female' : 'male'}.
-
-Physique scores (1–10 scale): ${JSON.stringify(physiqueScores)}
-Priority weak areas: ${weakAreas}
-Current strengths: ${strongAreas}
-Training split: ${splitRule}
+Scan source: ${scanSourceNote}
+Actual saved physique scan ratings (visual estimates, not medical measurements): ${JSON.stringify(availableScores)}
+Actual saved scan findings: ${JSON.stringify(scanFindings)}
+Supported priorities derived from findings or selected by the user: ${JSON.stringify(priorities)}
+Lower trainable visual ratings: ${weakAreas}; higher relative ratings: ${strongAreas}
+Training emphasis: ${scanEmphasis}
+User-selected override: ${userFocus}
+Training split: ${splitRule} (${daysPerWeek} training days each week)
+Available equipment: ${equipment}
 
 Requirements:
-- Each day: 4–6 exercises
-- Every exercise: sets (number), reps (string like "8-12" or "5"), why (1 sentence tying directly to one of their specific sub-scores)
-- Make "why" hyper-specific: reference the actual score number and what improving that exercise will do for that metric
-- Day names must match the split (e.g. "Push Day", "Upper Body", "Full Body A")
-- Focus field: the primary goal of that day in ≤8 words
+- Return exactly ${daysPerWeek} training days. Rest days are handled by the app.
+- Build an actual plan whose exercise choices, order, weekly frequency, and sets change to reflect the stated primary priority. Give its primary area modest extra weekly work; maintain balanced coverage for other muscle groups and allow recovery.
+- Include a primary and, only if supported, secondary priority. For each, return area, related muscles, role (Primary or Secondary), concise evidence-based reason, and confidence (supported observation, tentative visual cue, user-selected). If scan evidence is insufficient, priorities must be empty and body parts must remain unknown; never invent ratings.
+- Return targetMuscles for every day and exercise, effortTarget for each exercise (usually 2–3 reps in reserve), and at least one realistic equipment-compatible alternative.
+- Choose movements possible with only the listed equipment. Bodyweight means no assumed pull-up bar, table, step, band, or other fixture. Dumbbells means no barbells or machines. Home gym means dumbbells/bodyweight/bands only; no specific machine assumed. Full gym can use standard gym equipment.
+- Use only actual saved scan findings above and the user override. Scan scores are uncertain photo estimates, not proof of weak muscles; never claim they are measurements or diagnose posture/body composition.
+- Do not treat leanness or body-fat ratings as body-fat measurements or use them to prescribe weight loss. Only follow a user-selected Lose fat goal for that purpose.
+- For Bodyweight, do not assume access to a pull-up bar, table, or other fixture; select movements requiring no unlisted equipment.
+- Each training day: 3–5 practical exercises, suitable for the user's experience.
+- Every exercise: name, targetMuscles, sets (integer), reps (short range), restSeconds (integer from 30–300), effortTarget, why (one concise sentence), instructions (one concise, concrete form cue), progressionInstructions (safe double progression tied to logging), and alternatives (one or two equipment-compatible substitutions).
+- For an Improve fitness or Lose fat goal, include manageable low-impact cardio on 1–2 of the requested training days when appropriate (for example, brisk walking or stationary cycling for 20–30 minutes at a conversational pace). Represent it as one entry with sets=1 and a duration in reps; do not prescribe maximal effort or infer that the photo establishes a need to lose weight.
+- For Build muscle or Gain strength, prioritize resistance training. Do not add cardio just to satisfy a quota.
+- Explain a training rationale without claiming a visual rating is a measurement, diagnosis, or guaranteed outcome. Do not invent exact body composition or claim an exercise changes bone structure.
+- Use an appropriate, balanced workload and recovery; no extreme diets, max-effort prescriptions, or unsafe volume.
+- Day names must match the split, and focus must be ≤8 words.
 
-Respond ONLY with valid JSON — no extra text:
+Respond ONLY with valid JSON matching the required schema — no extra text:
 {
   "split": "${splitRule}",
   "trainingLevel": "${level}",
+  "trainingEmphasis": "short title",
+  "emphasisReason": "grounded short rationale",
+  "priorities": [{"area":"shoulders","muscles":["side delts"],"role":"Primary","reason":"supported observation","confidence":"supported observation"}],
+  "maintenanceAreas": ["chest", "back", "legs"],
   "days": [
     {
       "name": "Day name",
       "focus": "Primary goal",
+      "targetMuscles": ["Primary target"],
       "exercises": [
-        { "name": "Exercise", "sets": 3, "reps": "8-12", "why": "One sentence tied to their scores" }
+        { "name": "Exercise", "targetMuscles": ["Target muscle"], "sets": 3, "reps": "8-12", "restSeconds": 90, "effortTarget": "2–3 reps in reserve", "why": "A cautious goal and priority rationale", "instructions": "Clear setup and movement cue", "progressionInstructions": "Progress only after recorded sets reach the top of the range with controlled form.", "alternatives": ["Equipment-compatible alternative"] }
       ]
     }
   ]
 }`
 
-    const raw = await withRetry(async () => {
-      const msg = await client.generate({
-        responseSchema: aiSchemas.workout, responseName: 'workout_plan',
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2500,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      return msg.content[0].text
-    }, 'workout-plan')
-
-    const plan = parseJSON(raw, 'workout-plan')
-    res.json(plan)
-  } catch (err) {
-    if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
-      return res.status(err.status || 503).json({ error: err.code })
+    let plan = null
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const raw = await withRetry(async () => {
+          const msg = await client.generate({
+            responseSchema: aiSchemas.workout, responseName: 'workout_plan',
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 6500,
+            messages: [{ role: 'user', content: `${prompt}${attempt === 2 ? `\n\nREPAIR PASS: return all ${daysPerWeek} complete days and all required fields. Do not shorten or omit later sessions.` : ''}` }],
+          })
+          return msg.content[0].text
+        }, 'workout-plan')
+        const candidate = parseJSON(raw, 'workout-plan')
+        if (validateWorkoutPlan(candidate, daysPerWeek, equipmentTitle, priorities)) { plan = candidate; break }
+        console.warn(`[workout-plan] structured response incomplete or incompatible; regeneration ${attempt}/2`)
+      } catch (error) {
+        console.warn(`[workout-plan] generation attempt ${attempt}/2 failed: ${error.name || 'Error'}`)
+        if (attempt === 2) throw error
+      }
     }
-    console.error('[workout-plan] error:', err.message)
-    res.status(500).json({ error: 'Plan generation failed', fallback: true })
+    if (!plan) return res.json(baseline())
+    res.json({ ...plan, fallbackUsed: false, prioritySource: priorities[0]?.confidence || 'balanced baseline', priorities, scanId })
+  } catch (err) {
+    console.error('[workout-plan] AI failed; returning equipment-matched baseline:', err.code || err.name || 'Error')
+    return res.json(baseline())
   }
 })
 

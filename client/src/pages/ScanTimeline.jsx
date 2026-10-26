@@ -192,7 +192,7 @@ export default function ScanTimeline() {
               ref={streakIconRef}
               size={20}
               className={streakCompletedToday && !streakFlameFlight ? 'fire-icon' : ''}
-              style={canAccessProUi && streakCompletedToday && !streakFlameFlight
+              style={streakCompletedToday && !streakFlameFlight
                 ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 4px rgba(198,168,92,0.42))' }
                 : { color: canAccessProUi ? 'rgba(255,255,255,0.32)' : GOLD }}
             />

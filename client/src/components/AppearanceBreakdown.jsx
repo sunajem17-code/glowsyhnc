@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import useStore from '../store/useStore'
+import { conciseFinding } from '../utils/conciseFinding'
 import './AppearanceBreakdown.css'
 
 const pending = new Map()
@@ -80,7 +81,7 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
 
   const pros = uniquePoints(analysis?.strengths, analysis?.positiveObservations)
   const focusAreas = uniquePoints(analysis?.improvementOpportunities)
-  const points = page === 'pros' ? pros : focusAreas
+  const points = (page === 'pros' ? pros : focusAreas).slice(0, 4)
   const pageTitle = page === 'pros' ? 'Pros' : 'Cons'
   return <div className="appearance-dashboard">
     <div role="tablist" aria-label="Appearance points" className="appearance-page-switch">
@@ -92,11 +93,12 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
       {loading && <div className="appearance-state" role="status"><span className="appearance-loading-line" /><p>Finding your points…</p></div>}
       {error && <div className="appearance-state appearance-error" role="alert"><p>{error}</p>{scanId ? <button type="button" onClick={() => setRetry(value => value + 1)}>Try Again</button> : <button type="button" onClick={() => navigate('/scan')}>Take a New Scan<ChevronRight size={15} /></button>}</div>}
       {analysis && <ul className="appearance-points-list" tabIndex={0} aria-label={`${pageTitle} details`}>{points.length ? points.map((item, index) => {
-        const pointTitle = item.title?.trim() || item.observation?.trim()
+        const fullTitle = item.title?.trim() || item.observation?.trim()
+        const pointTitle = conciseFinding(fullTitle)
         const explanation = item.observation?.trim() || item.significance?.trim()
         return <li key={`${pointTitle}-${index}`}>
           <span className="appearance-point-title">{pointTitle}</span>
-          {explanation && explanation !== pointTitle && <p>{explanation}</p>}
+          {(explanation || fullTitle !== pointTitle) && <details><summary>Details</summary><p>{explanation && explanation !== fullTitle ? explanation : fullTitle}</p></details>}
         </li>
       }) : <li className="appearance-points-empty">{page === 'pros' ? 'No clear pros were identified in this scan.' : 'No specific cons were identified in this scan.'}</li>}</ul>}
     </section>

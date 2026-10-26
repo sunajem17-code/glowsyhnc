@@ -245,6 +245,57 @@ router.get('/tasks', auth, async (req, res) => {
   }
 })
 
+// ── GET /supabase/routine ─────────────────────────────────────────────────────
+// Load the signed-in user's current scan-linked routine document.
+router.get('/routine', auth, async (req, res) => {
+  if (!requireSupabase(res)) return
+  try {
+    const { data, error } = await getSupabase()
+      .from('routine_plans')
+      .select('routine, face_scan_id, body_scan_id, updated_at')
+      .eq('user_id', req.userId)
+      .maybeSingle()
+    if (error) throw error
+    res.json({ routine: data?.routine ?? null, faceScanId: data?.face_scan_id ?? null, bodyScanId: data?.body_scan_id ?? null, updatedAt: data?.updated_at ?? null })
+  } catch (err) {
+    console.error('[Supabase] Load routine failed:', err.message)
+    res.status(500).json({ error: 'Could not load your saved routine.' })
+  }
+})
+
+// ── PUT /supabase/routine ─────────────────────────────────────────────────────
+// Store plan + check-in state under the JWT user ID; never accept a user ID.
+router.put('/routine', auth, async (req, res) => {
+  if (!requireSupabase(res)) return
+  const routine = req.body?.routine
+  if (!routine || typeof routine !== 'object' || Array.isArray(routine)) return res.status(400).json({ error: 'A routine document is required.' })
+  let serialized
+  try { serialized = JSON.stringify(routine) } catch { return res.status(400).json({ error: 'Routine data must be valid JSON.' }) }
+  if (serialized.length > 250_000) return res.status(413).json({ error: 'Routine document is too large.' })
+  const faceScanId = typeof req.body.faceScanId === 'string' ? req.body.faceScanId : null
+  const bodyScanId = typeof req.body.bodyScanId === 'string' ? req.body.bodyScanId : null
+  try {
+    const sb = getSupabase()
+    for (const scanId of [faceScanId, bodyScanId].filter(Boolean)) {
+      const { data: ownedScan, error: scanError } = await sb.from('scans').select('id').eq('id', scanId).eq('user_id', req.userId).maybeSingle()
+      if (scanError) throw scanError
+      if (!ownedScan) return res.status(403).json({ error: 'Routine scans must belong to your account.' })
+    }
+    const { error } = await sb.from('routine_plans').upsert({
+      user_id: req.userId,
+      routine,
+      face_scan_id: faceScanId,
+      body_scan_id: bodyScanId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    if (error) throw error
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[Supabase] Save routine failed:', err.message)
+    res.status(500).json({ error: 'Could not save your routine.' })
+  }
+})
+
 // ── PUT /supabase/user ─────────────────────────────────────────────────────────
 // Update user profile fields (gender, phase, pro status, etc).
 router.put('/user', auth, async (req, res) => {

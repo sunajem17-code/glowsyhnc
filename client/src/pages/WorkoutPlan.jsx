@@ -503,8 +503,8 @@ export default function WorkoutPlan() {
 
     try {
       const result = await callWorkoutPlanWithRetry({ physiqueScores, gender, trainingLevel: inferredLevel })
-      if (result?.fallback) throw new Error('server fallback')
       setPlan(result)
+      setIsFallback(Boolean(result?.fallbackUsed || result?.fallback))
     } catch (err) {
       // Log the real error — status/errorCode/message/stack — instead of
       // silently swallowing it. This was the actual reason "why did it fail"
