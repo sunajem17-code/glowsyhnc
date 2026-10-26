@@ -6,7 +6,7 @@ const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
-const { loadContext, clean, ownedResult, normalize, parseProvidedImage } = require('../lib/coachScanContext')
+const { loadContext, clean, ownedResult, ownedCoachScan, parseProvidedImage } = require('../lib/coachScanContext')
 const { answer } = require('../lib/coachIntelligence')
 
 router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) => {
@@ -79,9 +79,9 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     // this user's bounded server session, not client-forged conversation data.
     const context = await loadContext(req.userId)
     if (typeof req.body.scanId === 'string') {
-      const selected = ownedResult(req.body.scanId, req.userId)
+      const selected = await ownedCoachScan(req.body.scanId, req.userId)
       if (!selected) return res.status(404).json({ error: 'The selected scan is unavailable. Return to your results and retry.' })
-      const scan = normalize(selected.row)
+      const scan = selected.scan
       context.previous = [context.latest, ...context.previous].filter(row => row && row.id !== scan.id).slice(0, 2)
       context.latest = scan
       context.status = 'completed'

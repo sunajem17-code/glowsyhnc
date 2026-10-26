@@ -11,6 +11,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { UPGRADE_WELCOME } from '../utils/coachWelcome'
 import { prepareCoachPhoto } from '../utils/coachPhoto'
+import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -74,7 +75,7 @@ function MessageBubble({ msg, isNew }) {
         </div>
       )}
       <div
-        className={`px-4 py-3 rounded-2xl ${isUser ? 'max-w-[78%]' : 'max-w-[90%]'} min-w-0 relative ${msg.locked ? 'select-none' : ''}`}
+        className={`px-4 py-3 rounded-2xl max-w-[78%] min-w-0 relative ${msg.locked ? 'select-none' : ''}`}
         style={isUser ? {
           background: `linear-gradient(135deg, ${GOLD}22 0%, ${GOLD}14 100%)`,
           border: `1px solid ${GOLD}30`,
@@ -99,7 +100,7 @@ function MessageBubble({ msg, isNew }) {
           </div>
         )}
         <div
-          className="font-body text-[14px]"
+          className="font-body text-[14px] leading-snug"
           style={{
             color: msg.locked ? 'rgba(255,255,255,0.15)' : isUser ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.82)',
             filter: msg.locked ? 'blur(3px)' : 'none',
@@ -109,7 +110,7 @@ function MessageBubble({ msg, isNew }) {
             <img src={msg.image} alt="Scan photo attached to your message"
               className="mb-2 max-h-56 w-full rounded-xl object-cover" style={{ maxWidth: 240 }} />
           )}
-          {isUser ? msg.content : <CoachMessage content={msg.content} reveal={msg.reveal === true} />}
+          {isUser ? msg.content : <div className="adonis-pineapple-message"><CoachMessage content={msg.content} reveal={msg.reveal === true} /></div>}
         </div>
       </div>
     </motion.div>
@@ -266,33 +267,25 @@ export default function AICoach() {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="px-4 pb-3 flex items-center justify-between flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+        className="relative flex items-center justify-center px-5 flex-shrink-0"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          paddingBottom: 16,
+          background: 'radial-gradient(ellipse at 50% 12%, rgba(209,183,109,0.07) 0%, rgba(209,183,109,0.025) 38%, transparent 76%)',
+        }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.2)' }}
-          >
-            <img src="/adonis-coach-gold.png" alt="Adonis" className="w-full h-full object-contain p-0.5" />
+        <div className="relative flex translate-y-[11px] flex-col items-center gap-[2px]">
+          <div className="relative w-[72px] h-[64px] flex items-center justify-center">
+            <div className="absolute w-[56px] h-[50px] blur-[8px]" style={{
+              borderRadius: '46% 54% 52% 48% / 57% 45% 55% 43%',
+              background: 'radial-gradient(ellipse at 48% 45%, rgba(226,197,119,0.32) 0%, rgba(209,183,109,0.16) 52%, transparent 78%)',
+              boxShadow: '0 0 24px rgba(209,183,109,0.2)',
+            }} />
+            <img src="/adonis-coach-gold.png?v=transparent" alt="Adonis" className="relative w-full h-full object-contain"
+              style={{ transform: `scale(${scaleCoachHeaderSize(1.19)})` }} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-heading font-bold text-[18px] text-primary">Adonis</h1>
-              <span
-                className="text-[9px] font-bold font-body px-1.5 py-0.5 rounded"
-                style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
-              >
-                {isPremium ? 'PRO' : 'FREE'}
-              </span>
-            </div>
-            <p className="font-body text-[11px] text-secondary">
-              {!hasScan
-                ? 'Scan Your Face To Unlock'
-                : isPremium
-                  ? 'Your pal. Your coach. In your corner.'
-                  : 'Pro required — tap to upgrade'}
-            </p>
+          <div className="translate-y-1">
+            <h1 className="font-heading font-bold leading-tight text-primary" style={{ fontSize: `${scaleCoachHeaderSize(17)}px` }}>Adonis</h1>
           </div>
         </div>
         {messages.length > 1 && !freeCoachLocked && (
@@ -313,8 +306,9 @@ export default function AICoach() {
                 setMessages([])
               }
             }}
-            className="p-2 rounded-xl"
+            className="absolute right-4 top-2 p-2 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.04)' }}
+            aria-label="Restart chat"
           >
             <RotateCcw size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
           </button>
@@ -323,56 +317,6 @@ export default function AICoach() {
 
       {/* Messages */}
       <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
-        {/* Citations / Medical Disclaimer */}
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-4"
-          style={{ background: 'rgba(198,168,92,0.07)', border: '1px solid rgba(198,168,92,0.22)' }}
-        >
-          <span className="text-[12px] flex-shrink-0 mt-0.5" style={{ color: GOLD }}>ℹ</span>
-          <p className="font-body text-[10px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            For informational purposes only, not medical advice. Sources:{' '}
-            <a href="https://www.healthline.com/nutrition/12-ways-to-look-younger" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>Healthline</a>
-            ,{' '}
-            <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3583892/" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>NIH</a>
-            ,{' '}
-            <a href="https://www.aad.org/public/everyday-care/skin-care-basics" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: 'underline' }}>AAD</a>
-            . Consult a qualified professional before making any health decisions.
-          </p>
-        </motion.div>
-
-        {/* Free usage counter banner */}
-        {!isPremium && !freeCoachLocked && freeMessagesLeft <= FREE_COACH_LIMIT && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl mb-4"
-            style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}
-          >
-            <div className="flex gap-1">
-              {Array.from({ length: FREE_COACH_LIMIT }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: i < freeMessagesLeft ? GOLD : 'rgba(255,255,255,0.15)' }}
-                />
-              ))}
-            </div>
-            <p className="font-body text-[11px] flex-1" style={{ color: `${GOLD}CC` }}>
-              {freeMessagesLeft} of {FREE_COACH_LIMIT} free questions left
-            </p>
-            <button
-              onClick={() => { triggerHaptic(); navigate('/premium') }}
-              className="text-[10px] font-heading font-bold px-2 py-1 rounded-lg"
-              style={{ background: GOLD, color: '#0A0A0A' }}
-            >
-              Go Pro
-            </button>
-          </motion.div>
-        )}
-
         {messages.length === 0 && !loading && (
           <motion.div
             initial={{ opacity: 0 }}

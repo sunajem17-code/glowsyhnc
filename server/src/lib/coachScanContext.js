@@ -48,6 +48,23 @@ function ownedResult(id, userId) {
   return data?.kind === KIND && data.status === 'completed' ? { row, result: data.result } : null
 }
 
+// A selected scan can outlive the server instance that created its local
+// analysis row. Resolve that same scan from the authenticated user's cloud
+// history when the local row is gone; never substitute another scan.
+async function ownedCoachScan(id, userId) {
+  const local = ownedResult(id, userId)
+  if (local) return { scan: normalize(local.row), result: local.result }
+
+  const supabase = getSupabase()
+  if (!supabase) return null
+  const { data, error } = await timeout(supabase.from('scans').select('*')
+    .eq('id', id).eq('user_id', userId).maybeSingle())
+  if (error) throw new Error('Selected scan lookup failed')
+  if (!data || String(data.user_id) !== String(userId)) return null
+  const scan = normalize(data)
+  return scan ? { scan, result: null } : null
+}
+
 function latestOwnedResult(userId) {
   const rows = db.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC LIMIT 12').all(userId)
   const row = rows.find(row => parse(row.face_data)?.kind === KIND && parse(row.face_data)?.status === 'completed')
@@ -156,4 +173,4 @@ function parseProvidedImage(value) {
   return { type: 'image', source: { type: 'base64', media_type: match[1].toLowerCase(), data: buffer.toString('base64') } }
 }
 
-module.exports = { startScan, finishScan, failScan, ownedResult, latestOwnedResult, loadContext, publicContext, imageForScan, parseProvidedImage, ownedImagePath, normalize, clean, timeout }
+module.exports = { startScan, finishScan, failScan, ownedResult, ownedCoachScan, latestOwnedResult, loadContext, publicContext, imageForScan, parseProvidedImage, ownedImagePath, normalize, clean, timeout }
