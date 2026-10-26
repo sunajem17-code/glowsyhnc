@@ -18,4 +18,11 @@
 @keyframes coach-cursor { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .coach-typing-cursor { animation: none; } }
 
+/* Adonis's Pineapple chat used compact, conversational message spacing. Keep
+   the newer structured links/products, but restore that quieter text rhythm. */
+.adonis-pineapple-message .coach-reply { line-height: 1.375; }
+.adonis-pineapple-message .coach-reply > * + * { margin-top: 6px; }
+.adonis-pineapple-message .coach-product { padding-top: 8px; }
+.adonis-pineapple-message .coach-product p { line-height: 1.4; }
+
 .coach-reply > .sr-only { top: 0; left: 0; margin: 0; }
