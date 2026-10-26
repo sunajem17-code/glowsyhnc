@@ -49,6 +49,9 @@ import type4MediumFroMidTaperReference from '../assets/hair-examples/type4-mediu
 import type4MediumCornrowsReference from '../assets/hair-examples/type4-medium-cornrows.png'
 import type4MediumDreadlocksReference from '../assets/hair-examples/type4-medium-dreadlocks.png'
 import type4MediumBraidsReference from '../assets/hair-examples/type4-medium-braids.png'
+import type4LongFroMidTaperReference from '../assets/hair-examples/type4-long-fro-mid-taper.png'
+import type4LongDreadlocksReference from '../assets/hair-examples/type4-long-dreadlocks.png'
+import type4LongBraidsReference from '../assets/hair-examples/type4-long-braids.png'
 
 const BG = '#080808'
 const PANEL = 'rgba(255,255,255,0.045)'
@@ -91,12 +94,12 @@ function LengthPortrait({ length }) {
 // no sticky title bar. Each stage already carries its own "HairMax" eyebrow
 // + heading in its content, so nothing is lost by dropping the bar's title.
 function Header({ onBack, right }) {
-  return <div className="flex items-center justify-between px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8 }}>
+  return <div className="sticky top-0 z-50 flex items-center justify-between px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 8, background: BG }}>
     <button
       type="button"
-      onClick={event => { event.preventDefault(); event.stopPropagation(); onBack() }}
+      onClick={onBack}
       aria-label="Go back"
-      className="relative z-10 pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+      className="relative z-10 pointer-events-auto w-11 h-11 rounded-full flex items-center justify-center active:scale-95 transition-transform"
       style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
     >
       <ChevronLeft size={18} className="text-primary" />
@@ -156,7 +159,7 @@ function ConnectedIntro({ structure, image, onBack, onContinue, onRescan }) {
     <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
       <button
         type="button"
-        onClick={event => { event.preventDefault(); event.stopPropagation(); onBack() }}
+        onClick={onBack}
         aria-label="Go back"
         className="absolute left-4 z-10 pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
         style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
@@ -369,6 +372,7 @@ export default function HairMaxx() {
     const isType3LongProfile = hairProfile.hairType === 'curly' && hairProfile.desiredLength === 'long'
     const isType4ShortProfile = hairProfile.hairType === 'coily' && hairProfile.desiredLength === 'short'
     const isType4MediumProfile = hairProfile.hairType === 'coily' && hairProfile.desiredLength === 'medium'
+    const isType4LongProfile = hairProfile.hairType === 'coily' && hairProfile.desiredLength === 'long'
     const isType2MediumProfile = hairProfile.hairType === 'wavy' && hairProfile.desiredLength === 'medium'
     const excludedType1ShortStyles = new Set(['straight_crew', 'side_swept_crop', 'compact_crop', 'short_taper'])
     const excludedType2ShortStyles = new Set(['compact_crop', 'short_taper'])
@@ -569,6 +573,79 @@ export default function HairMaxx() {
           styling: reference.styling,
           barber: reference.barber,
           image: { src: reference.image, width: 941, height: 1672 },
+        },
+      })))
+    }
+
+    if (isType4LongProfile) {
+      const type4LongReferences = [
+        {
+          id: 'community-reference-type4-long-fro-mid-taper',
+          name: 'Fro with Mid Taper',
+          image: type4LongFroMidTaperReference,
+          reasons: ['Reference photo for a Type 4 long Fro with Mid Taper.'],
+          growth: 'Keeps long coils full and rounded with a mid taper to define the outline.',
+          styling: 'Moisturize the coils and pick them out gently to preserve the full shape and definition.',
+          barber: {
+            top: 'Preserve long coils and shape them into a large, rounded fro.',
+            sides: 'Keep the fro full while blending the sides into a mid taper.',
+            back: 'Maintain long, full coils through the back.',
+            taper: 'Blend a mid taper at the temples and nape without reducing the fro length.',
+          },
+        },
+        {
+          id: 'community-reference-type4-long-dreadlocks',
+          name: 'Dreadlocks',
+          image: type4LongDreadlocksReference,
+          reasons: ['Reference photo for Type 4 long dreadlocks.'],
+          growth: 'Keeps long locs flowing past the shoulders with a natural center part.',
+          styling: 'Keep the locs clean and moisturized, and protect them while sleeping.',
+          barber: {
+            top: 'Maintain long locs with clean, balanced sections and a natural center part.',
+            sides: 'Keep the locs full and even around the sides.',
+            back: 'Preserve long locs through the back, extending past the shoulders.',
+            taper: 'Keep the outline natural without a fade.',
+          },
+        },
+        {
+          id: 'community-reference-type4-long-braids',
+          name: 'Braids',
+          image: type4LongBraidsReference,
+          imageHeight: 1671,
+          reasons: ['Reference photo for Type 4 long braids.'],
+          growth: 'Keeps long individual braids falling past the shoulders with clean, even sections.',
+          styling: 'Keep the braids neat and moisturized, and protect them while sleeping.',
+          barber: {
+            top: 'Create long individual braids with clean, balanced sections across the crown.',
+            sides: 'Continue the braids evenly around the sides while preserving the natural hairline.',
+            back: 'Preserve long braids through the back, extending past the shoulders.',
+            taper: 'Keep the outline natural without a fade.',
+          },
+        },
+      ]
+
+      resolved.unshift(...type4LongReferences.map((reference, rank) => ({
+        hairstyleId: reference.id,
+        rank,
+        compatibility: 100,
+        reasons: reference.reasons,
+        relevantMeasurements: [],
+        compatibilityFactors: ['Type 4 hair', 'Long length', 'Any density'],
+        limitations: [],
+        engine: 'user_reference',
+        style: {
+          id: reference.id,
+          name: reference.name,
+          appearance: 'Type 4 reference photo',
+          compatibleHairTypes: ['coily'],
+          compatibleDensity: ['low', 'medium', 'high'],
+          compatibleThickness: ['fine', 'medium', 'thick'],
+          length: 'long',
+          maintenance: 'some',
+          growth: reference.growth,
+          styling: reference.styling,
+          barber: reference.barber,
+          image: { src: reference.image, width: 941, height: reference.imageHeight ?? 1672 },
         },
       })))
     }
@@ -1509,6 +1586,14 @@ export default function HairMaxx() {
     else setStage('intro')
   }
 
+  function backToHairLength() {
+    if (barber) { setBarber(null); return }
+    if (detail) { setDetail(null); return }
+    const lengthQuestion = questions.findIndex(item => item.key === 'desiredLength')
+    setQuestion(lengthQuestion >= 0 ? lengthQuestion : 0)
+    setStage('questions')
+  }
+
   const selectedQuestion = questions[question]
   // Intro uses the same plain "flex flex-col h-full" root Scan.jsx uses for
   // its own step screens (real available height inherited from Layout's
@@ -1523,7 +1608,7 @@ export default function HairMaxx() {
   >
     {/* ConnectedIntro carries its own back button (matching Scan.jsx's step
         header exactly), so the generic bar is skipped for that stage. */}
-    {stage !== 'intro' && <Header onBack={back} />}
+    {stage !== 'intro' && <Header onBack={stage === 'looks' ? backToHairLength : back} />}
     <AnimatePresence mode="wait">
       {stage === 'intro' && <motion.div key="intro" className="flex-1 min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ConnectedIntro structure={structure} image={sourceImage} onBack={back} onContinue={startQuestions} onRescan={() => navigate('/scan/capture')} /></motion.div>}
       {stage === 'questions' && selectedQuestion && <motion.div key={`q-${question}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 min-h-0 flex flex-col px-5"><ChoiceGrid {...selectedQuestion} questionKey={selectedQuestion.key} questionNumber={question + 1} questionCount={questions.length} value={profile[selectedQuestion.key]} onChange={answer} /></motion.div>}
