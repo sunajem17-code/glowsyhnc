@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import useStore from '../store/useStore'
-import { getDisplayableAppearanceAnalysis, isCurrentAppearanceAnalysis } from '../utils/appearanceAnalysis'
+import { appearanceScoresForScan, getDisplayableAppearanceAnalysis, isCurrentAppearanceAnalysis, prepareAppearancePhoto } from '../utils/appearanceAnalysis'
 import './AppearanceBreakdown.css'
 
 const pending = new Map()
@@ -54,7 +54,10 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
     }
     setLoading(true)
     const key = `${owner}:${scanId}`
-    if (!pending.has(key)) pending.set(key, api.coach.appearance(scanId).finally(() => pending.delete(key)))
+    if (!pending.has(key)) pending.set(key, (async () => {
+      const scanPhotoData = await prepareAppearancePhoto(scan)
+      return api.coach.appearance(scanId, scanPhotoData ? { scanPhotoData, scanScores: appearanceScoresForScan(scan) } : {})
+    })().finally(() => pending.delete(key)))
     pending.get(key).then(({ analysis: result }) => {
       if (!active) return
       if (!isCurrentAppearanceAnalysis(result, scanId)) throw new Error('The saved analysis could not be refreshed yet. Please retry.')

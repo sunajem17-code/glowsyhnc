@@ -56,7 +56,7 @@ function validateAnalysis(analysis, evidence) {
   return analysis
 }
 const flights = new Map()
-async function getBreakdown(userId, scanId, { client, database = db, find = ownedResult, loadImage } = {}) {
+async function getBreakdown(userId, scanId, { client, database = db, find = ownedResult, loadImage, providedPhoto, scanScores } = {}) {
   let saved = await find(scanId, userId)
   let selectedScan
   if (saved) selectedScan = { row: saved.row, result: saved.result, scan: normalize(saved.row) }
@@ -80,6 +80,20 @@ async function getBreakdown(userId, scanId, { client, database = db, find = owne
       saved = { row: selected.row, result, remoteOnly: !selected.result }
     }
   }
+  // Some legacy scans exist only in the signed-in device's local history.
+  // Accept that user's original inline photo for a one-time refresh, but do
+  // not treat a client-supplied scan ID or photo as an owned database record.
+  if (!saved && !selectedScan?.scan && providedPhoto) {
+    const numericScores = (value, allowedFields) => Object.fromEntries(allowedFields
+      .filter(key => typeof value?.[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 1 && value[key] <= 10)
+      .map(key => [key, value[key]]))
+    const result = {
+      faceSubScores: numericScores(scanScores?.faceSubScores, ['symmetry', 'skinClarity', 'jawlineDefinition', 'cheekbones', 'facialProportions', 'eyeArea', 'underEyeHealth', 'midfaceProportion', 'chinProportion', 'lowerFaceDefinition']),
+      pillars: numericScores(scanScores?.pillars, ['harmony', 'angularity', 'features', 'dimorphism']),
+    }
+    selectedScan = { row: null, result, scan: { id: scanId, imagePath: null }, inlineOnly: true }
+    saved = { row: null, result, inlineOnly: true }
+  }
   if (!saved || !selectedScan?.scan) throw Object.assign(new Error('This completed scan is not available for analysis. Please run a new scan.'), { status: 404 })
   const cached = cachedBreakdown(saved.result, scanId)
   if (cached) {
@@ -90,7 +104,7 @@ async function getBreakdown(userId, scanId, { client, database = db, find = owne
   if (flights.has(key)) return flights.get(key)
   const task = (async () => {
     const supabase = getSupabase()
-    const photo = await (loadImage
+    const photo = selectedScan.inlineOnly ? providedPhoto : await (loadImage
       ? loadImage({ scan: selectedScan.scan, row: selectedScan.row, userId })
       : imageForScan({ latest: selectedScan.scan, imageConsent: false, supabase }, userId, null, true))
     if (!photo) throw Object.assign(new Error('The original scan photo is unavailable. Add a new photo to refresh this analysis.'), { status: 422 })
@@ -104,8 +118,12 @@ async function getBreakdown(userId, scanId, { client, database = db, find = owne
     recordAppearanceCounts('reanalyzer_response_parsed', parsed.strengths, parsed.improvementOpportunities)
     validateAnalysis(parsed, evidence)
     const analysis = { ...parsed,
-      version: APPEARANCE_ANALYSIS_VERSION, scanId, generatedAt: new Date().toISOString(), source: 'saved_scan_photo',
+      version: APPEARANCE_ANALYSIS_VERSION, scanId, generatedAt: new Date().toISOString(), source: selectedScan.inlineOnly ? 'device_scan_photo' : 'saved_scan_photo',
       products: parsed.products.map(row => ({ ...CATALOG[row.catalogId], reason: row.reason, basedOn: row.basedOn, amazonUrl: amazonUrl(CATALOG[row.catalogId].searchQuery) })) }
+    if (selectedScan.inlineOnly) {
+      recordAppearanceCounts('reanalyzed_result_returned', analysis.strengths, analysis.improvementOpportunities)
+      return analysis
+    }
     // Re-read before writing, preserving follow-up fields saved concurrently.
     const current = await find(scanId, userId)
     if (current) {

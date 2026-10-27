@@ -39,9 +39,11 @@ async function serveSavedAppearance(req, res, next) {
 router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claudeLimit, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign in to analyze your saved scan.' })
   if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return res.status(400).json({ error: 'A saved scan ID is required.' })
+  const providedPhoto = parseProvidedImage(req.body.scanPhotoData)
+  if (req.body.scanPhotoData && !providedPhoto) return res.status(400).json({ error: 'The attached scan photo must be a supported image under 1 MB.' })
   try {
     const { getBreakdown } = require('../lib/appearanceBreakdown')
-    res.json({ analysis: await getBreakdown(req.userId, req.body.scanId) })
+    res.json({ analysis: await getBreakdown(req.userId, req.body.scanId, { providedPhoto, scanScores: req.body.scanScores }) })
   } catch (err) {
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
       return res.status(err.status || 503).json({ error: err.code })
