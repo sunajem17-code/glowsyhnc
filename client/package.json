@@ -15,23 +15,21 @@
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor-community/camera-preview": "^8.0.1",
     "@capacitor-community/in-app-review": "^8.0.0",
-    "@capacitor/android": "^8.4.0",
+    "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/camera": "^8.2.0",
-    "@capacitor/core": "^8.3.4",
+    "@capacitor/core": "^8.5.3",
     "@capacitor/device": "^8.0.2",
     "@capacitor/haptics": "^8.0.2",
-    "@capacitor/ios": "^8.3.4",
+    "@capacitor/ios": "^8.5.3",
     "@capacitor/keyboard": "^8.0.3",
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/push-notifications": "^8.1.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@mediapipe/face_mesh": "^0.4.1633559619",
-    "@remotion/cli": "4.0.495",
     "@revenuecat/purchases-capacitor": "^13.1.2",
-    "firebase": "^12.18.0",
     "framer-motion": "^11.3.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.427.0",
@@ -40,11 +38,11 @@
     "react-helmet-async": "^3.0.0",
     "react-router-dom": "^6.26.0",
     "recharts": "^2.12.7",
-    "remotion": "4.0.495",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.4",
+    "@remotion/cli": "^4.0.539",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.2",
@@ -54,8 +52,12 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",
     "postcss": "^8.4.41",
+    "remotion": "^4.0.539",
     "tailwindcss": "^3.4.10",
     "typescript": "^6.0.3",
     "vite": "^8.0.13"
+  },
+  "overrides": {
+    "zod": "^4.6.7"
   }
 }

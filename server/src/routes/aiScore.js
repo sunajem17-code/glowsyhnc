@@ -1,7 +1,8 @@
 const express = require('express')
 const { createAIClient, getAIKey, cacheNamespace } = require('../lib/aiProvider')
 const aiSchemas = require('../lib/aiSchemas')
-const { normalizeAppearanceAnalysis, bindAppearanceScoreReferences, hasValidScoreReferences } = require('../lib/appearanceAnalysis')
+const { normalizeAppearanceAnalysis, bindAppearanceScoreReferences, hasValidScoreReferences, hasConsistentScoreDirection, filterVagueAppearanceText } = require('../lib/appearanceAnalysis')
+const { recordAppearanceCounts } = require('../lib/appearanceDiagnostics')
 const coachScans = require('../lib/coachScanContext')
 const { EYE_GUIDANCE, GENERAL_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
@@ -34,7 +35,7 @@ function sampleB64(s) {
 
 function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(cacheNamespace() + '||v9_appearance_analysis_depth||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
+    .update(cacheNamespace() + '||v13_specific_feature_findings||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -50,15 +51,15 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
   h.update('||' + cacheNamespace())
-  h.update('||v9_appearance_analysis_depth') // invalidate cached responses with shallow or unlinked Pros/Cons
+  h.update('||v13_specific_feature_findings') // invalidate cached responses with broad or low-information findings
   return h.digest('hex') // 64-char hex string
 }
 
 function cachedResultForScan(value, scanId) {
-  if (!value?.appearanceAnalysis || Number(value.appearanceAnalysis.version) < 10) return null
+  if (!value?.appearanceAnalysis || Number(value.appearanceAnalysis.version) < 15) return null
   try {
     const appearanceAnalysis = normalizeAppearanceAnalysis(value.appearanceAnalysis, scanId)
-    if (!hasValidScoreReferences(appearanceAnalysis)) return null
+    if (!appearanceAnalysis.strengths.length || !hasValidScoreReferences(appearanceAnalysis) || !hasConsistentScoreDirection(appearanceAnalysis)) return null
     return withPotentialScore({
       ...value,
       appearanceAnalysis,
@@ -390,7 +391,7 @@ Descriptor rules: describe what IS there, not what is missing. Max 10 words. No 
 ${profileSection}${evidenceNote}
 
 VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
-KEY STRENGTHS: return up to 6 distinct scan-supported findings, aiming for 4–6 when the photos support them. Each should be a concise 3–8 word phrase naming a visible feature, not a sentence. Examples: "Balanced facial symmetry", "Clear skin texture". Do not pad or invent a finding.
+KEY STRENGTHS: return up to 6 distinct scan-supported findings, aiming for 4–6 only when supported. Each concise title names a specific visible feature and its property, such as eye spacing, cheekbone contour, symmetry, skin tone or jawline edge. Avoid general praise or merely saying a region is unobstructed. Do not treat average metrics as strengths or pad the list.
 
 ${GENERAL_GUIDANCE}
 
@@ -398,11 +399,13 @@ ${EYE_GUIDANCE}
 
 For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
 
-KEY WEAKNESSES: return up to 6 distinct concise 3–8 word phrases supported by visible evidence, aiming for 4–6 when the photos support them. Preserve uncertainty in the phrase when needed (for example, "Skin texture in this lighting"). No diagnosis or unsupported structural claim.
+KEY WEAKNESSES: return up to 6 distinct concise 3–7 word constructive improvement titles supported by visible evidence, aiming for 3–5 only when supported. Use ordinary everyday words: “Your jawline looks softer,” “Uneven skin texture,” “Under-eyes look tired.” Do not use specialist terms such as angularity, mandibular, periorbital, dermal, malar, or compressed lower face. Preserve uncertainty in plain language. Avoid broad labels, diagnosis, insults, or unsupported structural claims.
 
 TOP IMPROVEMENT: one short actionable sentence, maximum 14 words. Keep frequency or safety qualification only when needed. Do not repeat the weakness list.
 
-PROS AND CONS — return distinct, useful entries in appearance_analysis. Aim for 4–6 strengths and 4–6 improvement opportunities when the front/profile photos and scores support that many; return fewer when evidence is limited. Never invent or repeat a point to reach a count. Each point must name a specific visible feature, use a 3–8 word title, give one concise evidence-based observation, a short significance, and one practical recommendation. Keep observation and recommendation brief enough to display as two sentences when expanded. Do not restate one finding under different titles or repeat the same underlying feature across a tab. Use positive_observations as an empty array; include supported positives in strengths instead.
+PROS AND CONS — return distinct, useful entries in appearance_analysis. Aim for 3–5 strengths and improvement opportunities only when the photos and scores support that many; return fewer rather than pad. Each 3–7 word title names one specific feature in ordinary language, such as “Balanced eye spacing,” “Defined cheekbones,” or “Jawline looks softer.” Avoid specialist terms (angularity, mandibular, periorbital, dermal, malar, submental, gonial, or ramus), abstract wording, and hedged filler (“workable,” “reasonably clear,” “unobstructed,” “features read as”). An observation names what is actually visible. Significance explains briefly why it matters. Each expanded explanation (observation + significance + recommendation) must total no more than 2–3 short sentences.
+
+TONE AND USEFULNESS — sound like a helpful, knowledgeable person. Use short, common words and direct sentences. Never use jargon to sound scientific; never insult, shame, rank, or describe a feature as unattractive or inferior. Pros must name a genuine positive trait and explain its benefit; “nothing wrong” is not a strength. Do not exaggerate or force a strength. Every Con must identify one visible concern, give a specific action the user can try, and briefly say how that action may help. Make the action relevant to that concern (for example, gentle cleanser + moisturizer + daily SPF for visible skin texture; haircut or optional facial-hair styling for a softer jaw outline; sleep and gentle moisturizer for visible under-eye shadowing). Never give the same advice for unrelated findings. Do not treat temporary pose, expression, posture, or camera angle as a facial weakness; do not make them separate findings. If they affect what can be judged, state the limitation only. Do not recommend photo retakes or comparison rituals as actions. For structural features, suggest reversible styling or presentation only; routines cannot change adult bone structure. Do not recommend facial exercises as bone reshaping, extreme dieting, risky skincare, medication, or supplements. For skin, stay with gentle basic care; advise professional evaluation for persistent irritation or pain. Do not diagnose or promise results. Keep all advice consistent with exact scores and visible evidence.
 
 SCORE CONSISTENCY — every finding must include 1–2 metric_keys that directly support that finding. Use only these exact keys: face_score, grooming_score, pillar_harmony, pillar_angularity, pillar_features, pillar_dimorphism, sub_symmetry, sub_jawline_definition, sub_skin_clarity, sub_facial_proportions, sub_eye_area, sub_facial_harmony, metric_jawline, metric_cheekbones, metric_symmetry, metric_skin_quality, metric_masculinity_femininity, metric_facial_thirds. Check those exact scores in this response before labeling a finding a strength or improvement. A higher score is relatively stronger on that metric; a lower score can support an improvement only when the photo also shows the specific concern. Do not call an average score a serious flaw or infer a visible condition from a score alone. Do not give a low-score metric a positive title or a high-score metric a negative title unless the written rubric explicitly explains the difference. The overall score and potential score are different: current appearance describes this photo; potential is a separate estimate, not a current strength. Evidence must still be visible in the supplied photo, not score-only.
 
@@ -461,7 +464,9 @@ Return ONLY this JSON — no markdown, nothing else:
     }],
   })
 
-  return parseJSON(response.content[0]?.text?.trim() || '', 'Core scorer')
+  const parsed = parseJSON(response.content[0]?.text?.trim() || '', 'Core scorer')
+  recordAppearanceCounts('scorer_response_parsed', parsed.appearance_analysis?.strengths, parsed.appearance_analysis?.improvement_opportunities)
+  return parsed
 }
 
 // ── CALL: Extended Metrics — 30-metric breakdown, split out of the core call ──
@@ -1041,8 +1046,8 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         features:   Math.round(features   * 10) / 10,
         dimorphism: Math.round(dimorphism * 10) / 10,
       } : null,
-      keyStrengths:      faceResult.key_strengths,
-      keyWeaknesses:     faceResult.key_weaknesses,
+      keyStrengths:      filterVagueAppearanceText(faceResult.key_strengths),
+      keyWeaknesses:     filterVagueAppearanceText(faceResult.key_weaknesses),
       topImprovement:    faceResult.top_improvement,
       appearanceAnalysis: bindAppearanceScoreReferences(
         normalizeAppearanceAnalysis(faceResult.appearance_analysis, completedScanId),
@@ -1077,6 +1082,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       physiqueScore:  physiqueResult ?? null,
       bodyFatLevel:   physiqueResult?.body_fat_level ?? null,
     }
+    recordAppearanceCounts('score_result_normalized', result.appearanceAnalysis.strengths, result.appearanceAnalysis.improvementOpportunities)
 
     // ── Write to both caches (L1 in-memory + L2 Supabase) ─────────────────────
     if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)

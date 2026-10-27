@@ -36,7 +36,7 @@ test('fails closed when both suitability responses have an invalid status', asyn
   assert.equal(calls, 2)
 })
 
-test('keeps a validated score range when the model omits the optional written explanation', () => {
+test('rejects a scored assessment when its written evidence explanation is missing', () => {
   const raw = {
     confidence: 'moderate',
     scoreRange: { min: 3.8, max: 4.2 },
@@ -52,12 +52,9 @@ test('keeps a validated score range when the model omits the optional written ex
     unassessableDetails: [],
   }
 
-  const result = validate(raw, {
+  assert.throws(() => validate(raw, {
     assessmentProfile: 'male',
     imageSuitability: { status: 'assessable' },
     knownMinor: false,
-  })
-
-  assert.deepEqual(result.scoreRange, { min: 3.8, max: 4.2 })
-  assert.match(result.scoreExplanation, /written explanation could not be generated/i)
+  }), /requires a concise explanation/i)
 })

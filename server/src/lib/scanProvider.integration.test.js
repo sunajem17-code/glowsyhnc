@@ -39,9 +39,8 @@ core.key_strengths = [...supportedStrengths]
 core.key_weaknesses = [...supportedWeaknesses]
 coreWithoutSide.key_strengths = [...supportedStrengths]
 coreWithoutSide.key_weaknesses = [...supportedWeaknesses]
-const metricFinding = (title, observation, metric_keys) => ({ title, observation,
-  significance: 'This affects the visible balance of the face.',
-  recommendation: 'Use a practical, low-risk next step.', metric_keys })
+const metricFinding = (title, observation, metric_keys, recommendation = '') => ({ title, observation,
+  significance: 'This affects the visible balance of the face.', recommendation, metric_keys })
 const detailedFindings = {
   strengths: [
     metricFinding('Balanced symmetry', 'The eyes and midline appear balanced.', ['sub_symmetry']),
@@ -51,11 +50,11 @@ const detailedFindings = {
     metricFinding('Clear eye area', 'The eye area appears open in this lighting.', ['sub_eye_area']),
   ],
   improvement_opportunities: [
-    metricFinding('Skin texture', 'Mild texture is visible in the supplied light.', ['metric_skin_quality']),
-    metricFinding('Jaw definition', 'The jaw edge looks soft from the front.', ['sub_jawline_definition']),
-    metricFinding('Facial thirds', 'The lower third appears slightly longer.', ['metric_facial_thirds']),
-    metricFinding('Eye-area contrast', 'Under-eye contrast is visible in this photo.', ['sub_eye_area']),
-    metricFinding('Grooming consistency', 'Hair styling appears less controlled here.', ['grooming_score']),
+    metricFinding('Skin texture', 'Mild texture is visible in the supplied light.', ['metric_skin_quality'], 'Start with a gentle cleanser, moisturizer, and SPF 30+ each morning.'),
+    metricFinding('Jaw definition', 'The jaw edge looks soft from the front.', ['sub_jawline_definition'], 'Choose a haircut or facial-hair style that frames your lower face.'),
+    metricFinding('Facial thirds', 'The lower third appears slightly longer.', ['metric_facial_thirds'], 'Try different hairstyle proportions to balance the face in photos.'),
+    metricFinding('Eye-area contrast', 'Under-eye contrast is visible in this photo.', ['sub_eye_area'], 'Keep a regular sleep schedule and compare photos in even lighting.'),
+    metricFinding('Grooming consistency', 'Hair styling appears less controlled here.', ['grooming_score'], 'Explore a hairstyle suited to your hair texture in HairMaxx.'),
   ],
   positive_observations: [],
 }
@@ -145,7 +144,7 @@ test('image payload -> real HTTP validation -> scoring -> unchanged client ratin
   assert.equal(savedResult.appearanceAnalysis.strengths.length, 5)
   assert.equal(savedResult.appearanceAnalysis.improvementOpportunities.length, 5)
   assert.equal(savedResult.appearanceAnalysis.scanId, scored.body.scanId)
-  assert.equal(scored.body.appearanceAnalysis.version, 10)
+  assert.equal(scored.body.appearanceAnalysis.version, 15)
   assert.equal(scored.body.appearanceAnalysis.scanId, scored.body.scanId)
   assert.equal(scored.body.appearanceAnalysis.strengths.length, 5)
   assert.equal(scored.body.appearanceAnalysis.improvementOpportunities.length, 5)
@@ -178,14 +177,14 @@ test('a cached score is rebound to the ID of each newly saved scan', async () =>
   assert.equal(calls.filter(call => call.request.text?.format?.name === 'face_core').length, before)
 })
 
-test('a cached score with the old two-point analysis version is rescored', async () => {
-  persistentCache = { overallScore: 8, appearanceAnalysis: { version: 9, strengths: [{ title: 'Old point one', observation: 'Old text.' }, { title: 'Old point two', observation: 'Old text.' }], improvementOpportunities: [{ title: 'Old concern one', observation: 'Old text.' }, { title: 'Old concern two', observation: 'Old text.' }] } }
+test('a cached score with the previous analysis version is rescored', async () => {
+  persistentCache = { overallScore: 8, appearanceAnalysis: { version: 12, strengths: [{ title: 'Old point one', observation: 'Old text.' }, { title: 'Old point two', observation: 'Old text.' }], improvementOpportunities: [{ title: 'Old concern one', observation: 'Old text.' }, { title: 'Old concern two', observation: 'Old text.' }] } }
   const before = calls.filter(call => call.request.text?.format?.name === 'face_core').length
   const result = await post('/api/ai/score', { faceImage: front + 'unique-stale-cache', gender: 'male' })
   persistentCache = null
   assert.equal(result.status, 200)
   assert.equal(calls.filter(call => call.request.text?.format?.name === 'face_core').length, before + 1)
-  assert.equal(result.body.appearanceAnalysis.version, 10)
+  assert.equal(result.body.appearanceAnalysis.version, 15)
 })
 
 test('switching to Anthropic does not reuse an OpenAI cached assessment', async () => {

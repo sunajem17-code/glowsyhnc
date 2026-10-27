@@ -184,7 +184,7 @@ router.post('/post/:id/report', authMiddleware, (req, res) => {
     db.prepare(
       'INSERT OR IGNORE INTO community_reports (id, post_id, reporter_id, reason) VALUES (?, ?, ?, ?)'
     ).run(uuid(), postId, req.userId, reason)
-    console.log(`[community] report filed: post=${postId} by=${req.userId} reason=${reason}`)
+    console.log('[community] report filed')
     res.json({ ok: true })
   } catch (err) {
     console.error('[community report]', err.message)

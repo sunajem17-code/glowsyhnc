@@ -44,7 +44,7 @@ router.post('/redeem', authMiddleware, async (req, res) => {
   }
 
   if (totalRedeemed >= MAX_REDEMPTIONS) {
-    console.warn(`[Promo] Code ${VALID_CODE} hit global cap (${MAX_REDEMPTIONS}) — rejected for user ${req.userId}`)
+    console.warn(`[Promo] Code reached global cap (${MAX_REDEMPTIONS})`)
     return res.status(400).json({ error: 'This promo code has reached its redemption limit' })
   }
 
@@ -101,7 +101,7 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     }
   }
 
-  console.log(`[Promo] ${VALID_CODE} redeemed by user ${req.userId} (total: ${totalRedeemed + 1}/${MAX_REDEMPTIONS})`)
+  console.log(`[Promo] Redemption accepted (total: ${totalRedeemed + 1}/${MAX_REDEMPTIONS})`)
 
   return res.json({
     success: true,

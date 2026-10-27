@@ -171,7 +171,7 @@ export const api = {
     createCheckout: (plan) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
     portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
-    syncRc: (rcUserId) => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({ rcUserId }) }),
+    syncRc: () => request('/payments/sync-rc', { method: 'POST' }),
   },
   ai: {
     validateScan: (imageB64) => request('/ai/validate-scan', { method: 'POST', body: JSON.stringify({ imageB64 }) }),
@@ -182,7 +182,7 @@ export const api = {
     workoutPlan: (data) => request('/ai/workout-plan', { method: 'POST', body: JSON.stringify(data) }),
   },
   coach: {
-    appearance: (scanId) => request('/coach/appearance', { method: 'POST', body: JSON.stringify({ scanId }) }),
+    appearance: (scanId, options = {}) => request('/coach/appearance', { method: 'POST', body: JSON.stringify({ scanId, ...options }) }),
     context: () => request('/coach/context'),
     message: (data) => request('/coach/message', { method: 'POST', body: JSON.stringify(data) }),
   },

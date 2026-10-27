@@ -11,6 +11,7 @@ import { getRevealRatings } from '../utils/revealRatings'
 import { parseCoachMessage } from '../utils/coachMessage'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { getValidatedFaceRecommendations } from '../utils/scanRoutineRecommendations'
 
 const FACE_RATINGS = [
   { label: 'Skin Quality', key: 'skin' },
@@ -165,7 +166,9 @@ function getScanRecommendations(scan, area) {
   const assessment = ai.assessment ?? {}
   const presentation = assessment.presentation ?? {}
   const physique = scan?.physiqueScore ?? {}
+  const validatedFaceAdvice = area === 'Face' ? getValidatedFaceRecommendations(scan) : []
   const commonCandidates = [
+    ...validatedFaceAdvice,
     ...(Array.isArray(presentation.recommendations) ? presentation.recommendations : []),
     ...(Array.isArray(assessment.recommendations) ? assessment.recommendations : []),
     ...(Array.isArray(ai.recommendations) ? ai.recommendations : []),
@@ -180,9 +183,14 @@ function getScanRecommendations(scan, area) {
     ...(Array.isArray(physique.suggestions) ? physique.suggestions : []),
   ] : commonCandidates
   return candidates
-    .map(recommendationText)
-    .filter(text => text && !/demo mode/i.test(text))
-    .map((text, index) => ({ id: `${area}-ai-${index}`, text, source: `${area} scan`, kind: /cerave|cleanser|moistur|serum|spf|sunscreen|product/i.test(text) ? 'Product or care' : 'Action' }))
+    .map(candidate => {
+      if (candidate?.source === 'Face scan' && candidate?.recommendation) {
+        return { ...candidate, text: `${candidate.title} — ${candidate.recommendation}` }
+      }
+      return { text: recommendationText(candidate) }
+    })
+    .filter(item => item.text && !/demo mode/i.test(item.text))
+    .map((item, index) => ({ id: item.id || `${area}-ai-${index}`, ...item, source: item.source || `${area} scan`, kind: item.kind || (/cerave|cleanser|moistur|serum|spf|sunscreen|product/i.test(item.text) ? 'Product or care' : 'Action') }))
 }
 
 function getSavedCoachRecommendations(userId) {
@@ -403,7 +411,7 @@ export default function FaceBodyRoutineExperience() {
     ...(bodyScan ? getScanRecommendations(bodyScan, 'Body') : []),
     ...getSavedCoachRecommendations(userId),
   ]), [faceScan, bodyScan, userId])
-  const faceRecommendations = recommendations.filter(item => item.source === 'Face scan' && /skin|cleanser|moistur|spf|sunscreen|groom|hair|photo|presentation|jaw|symmetr|face|puffiness/i.test(item.text)).slice(0, 5)
+  const faceRecommendations = recommendations.filter(item => item.source === 'Face scan' && /skin|cleanser|moistur|spf|sunscreen|groom|hair|photo|presentation|jaw|symmetr|face|puffiness|eye|under-eye|cheek|chin|midface|texture/i.test(item.text)).slice(0, 5)
   const [intro, setIntro] = useState(true)
   const [routineFocus, setRoutineFocus] = useState('both')
   const [slide, setSlide] = useState(0)
@@ -707,8 +715,8 @@ export default function FaceBodyRoutineExperience() {
   const goldButton = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 py-3 font-heading text-sm font-bold text-black transition-transform active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60'
   const surface = 'rounded-3xl border border-white/[.08] bg-[#141414] p-4'
   const faceRoutineItems = faceRecommendations.slice(0, 4).map(item => {
-    const title = adviceTitle(item.text)
-    const detail = item.text.slice(title.length).replace(/^[\s—–:.-]+/, '').trim()
+    const title = item.title || adviceTitle(item.text)
+    const detail = item.recommendation || item.text.slice(title.length).replace(/^[\s—–:.-]+/, '').trim()
     return { id: `face-routine-${item.id}`, title, detail }
   })
   if (!faceRoutineItems.length && focus?.faceFocus?.key === 'skin') {

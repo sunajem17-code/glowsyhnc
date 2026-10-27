@@ -1141,9 +1141,13 @@ function StepAuth({ onNext, onSkip }) {
       const timeoutId = setTimeout(() => controller.abort(), 20_000)
       let authRes
       try {
+        const currentToken = useStore.getState().token
         authRes = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(isGuest && currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
+          },
           body: JSON.stringify({
             identityToken,
             user: appleResult.response.user,

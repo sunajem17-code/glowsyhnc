@@ -13,8 +13,8 @@ const { getBreakdown, evidenceFor, CATALOG, cachedBreakdown } = require('./appea
 global.setInterval = originalSetInterval
 const { ownedResult, normalize, publicContext } = require('./coachScanContext')
 const original = { overallScore: 6.2, faceScore: 6.2, keyStrengths: ['A visible side part frames the face.'], faceSubScores: { symmetry: 6.8, jawlineDefinition: 5.4 }, visualObservations: [{ id: 'visible_dullness', category: 'skin', confidence: 'medium', limitations: ['Uneven light'] }] }
-const finding = { title: 'Balanced symmetry', observation: 'The eyes and facial midline appear balanced.', significance: 'This supports a cohesive front view.', recommendation: 'Keep future photos straight-on for comparison.', confidence: 'high', basedOn: ['photo:front', 'score:faceSubScores.symmetry'] }
-const improvement = { title: 'Soft jaw definition', observation: 'The jaw edge is less distinct in this photo.', significance: 'The lower face reads softer from the front.', recommendation: 'Use consistent side lighting to track definition.', confidence: 'medium', basedOn: ['photo:front', 'score:faceSubScores.jawlineDefinition'] }
+const finding = { title: 'Balanced symmetry', observation: 'The eyes and facial midline appear balanced.', significance: 'This supports a cohesive front view.', recommendation: 'Keep the grooming choice that feels natural to you.', confidence: 'high', basedOn: ['photo:front', 'score:faceSubScores.symmetry'] }
+const improvement = { title: 'Soft jaw definition', observation: 'The jaw edge is less distinct in this photo.', significance: 'The lower face reads softer from the front.', recommendation: 'Try a haircut with cleaner structure around the temples.', confidence: 'medium', basedOn: ['photo:front', 'score:faceSubScores.jawlineDefinition'] }
 function result() { return { strengths: [finding], improvementOpportunities: [improvement], positiveObservations: [], recommendedActions: [{ title: 'Use consistent photos', reason: 'The saved scan uses mixed lighting.', steps: ['Use the same angle and lighting.'], frequency: 'Each scan', timeframe: '', basedOn: ['photo:front'] }], products: [], limitations: ['Lighting can affect appearance.'] } }
 const image = { type:'image', source:{type:'base64',media_type:'image/jpeg',data:'isolated-photo-bytes'} }
 const analyze = (userId, id, options = {}) => getBreakdown(userId, id, { loadImage: async () => image, ...options })
@@ -33,12 +33,28 @@ test('personalized analysis persists with the same scan, retains scores, and rea
   assert.equal(prompt.responseName, 'appearance_breakdown')
   assert.ok(prompt.messages[0].content.some(block => block.type === 'image'))
   assert.ok(prompt.messages[0].content.find(block => block.type === 'text').text.includes('savedScores'))
-  assert.equal(analysis.version, 10)
+  assert.equal(analysis.version, 15)
   assert.equal(analysis.strengths.length, 1)
   assert.equal(analysis.improvementOpportunities.length, 1)
   const context = publicContext({ status:'completed',latest:normalize(saved.row),previous:[],profile:null },true)
   assert.deepEqual(context.latest.appearanceAnalysis.strengths, analysis.strengths)
   assert.deepEqual(context.latest.appearanceAnalysis.recommendedActions, analysis.recommendedActions)
+})
+test('semantic deduplication is saved with stable finding metadata', async () => {
+  const id = seed()
+  const duplicated = result()
+  duplicated.strengths = [
+    { ...finding, title: 'Overall facial balance', observation: 'In photo:front, the face looks cohesive.', basedOn: ['photo:front', 'score:faceSubScores.symmetry'] },
+    finding,
+  ]
+  const analysis = await analyze('alice', id, { client: { generate: async () => response(duplicated) } })
+  const stored = ownedResult(id, 'alice').result.appearanceAnalysis
+  assert.equal(analysis.strengths.length, 1)
+  assert.equal(analysis.strengths[0].title, 'Balanced symmetry')
+  assert.equal(analysis.strengths[0].observation.startsWith('In photo:front'), false)
+  assert.equal(analysis.strengths[0].category, 'symmetry')
+  assert.ok(analysis.strengths[0].id.startsWith('appearance-symmetry-'))
+  assert.deepEqual(stored.strengths, analysis.strengths)
 })
 test('coach context preserves all findings and applies existing numeric-score access rules', () => {
   const source = { status:'completed', latest:{ id:'scan', appearanceAnalysis:{
@@ -58,11 +74,11 @@ test('cached analysis is reused without another AI request', async () => {
   const id=seed(); await analyze('alice',id,{client:{generate:async()=>response(result())}})
   await analyze('alice',id,{client:{generate:async()=>{throw new Error('must not call')}}})
 })
-test('older saved analysis is refreshed from its owner-scoped original photo without changing scores or history', async () => {
-  // Version 9 was previously accepted even when it contained only two points.
-  const old = { ...original, appearanceAnalysis: { version: 9, strengths: [{ title: 'Old point one', observation: 'Old text.' }, { title: 'Old point two', observation: 'Old text.' }], improvementOpportunities: [{ title: 'Old concern one', observation: 'Old text.' }, { title: 'Old concern two', observation: 'Old text.' }] } }
+test('production version-3 two-point analysis is refreshed from its owner-scoped photo without changing scores or history', async () => {
+  // Production v3 treated any saved arrays as current and skipped reanalysis.
+  const old = { ...original, appearanceAnalysis: { version: 3, strengths: [{ title: 'Old point one', observation: 'Old text.' }, { title: 'Old point two', observation: 'Old text.' }], improvementOpportunities: [{ title: 'Old concern one', observation: 'Old text.' }, { title: 'Old concern two', observation: 'Old text.' }] } }
   const id = seed('alice', old)
-  const five = prefix => Array.from({ length: 5 }, (_, index) => ({ ...finding, title: `${prefix} ${index + 1}`, observation: `Distinct visible photo evidence ${index + 1}.`, basedOn: ['photo:front'] }))
+  const five = prefix => Array.from({ length: 5 }, (_, index) => ({ ...finding, title: `${prefix} ${index + 1}`, observation: `Distinct visible photo evidence ${index + 1}.`, recommendation: `Try a distinct styling adjustment number ${index + 1}.`, basedOn: ['photo:front'] }))
   let photoWasLoaded = false
   const analysis = await analyze('alice', id, {
     loadImage: async ({ scan, userId }) => { photoWasLoaded = true; assert.equal(userId, 'alice'); assert.equal(scan.imagePath, 'scan/alice/original.jpg'); return image },
@@ -73,9 +89,11 @@ test('older saved analysis is refreshed from its owner-scoped original photo wit
   assert.equal(analysis.source, 'saved_scan_photo')
   assert.equal(analysis.strengths.length, 5)
   assert.equal(analysis.improvementOpportunities.length, 5)
+  assert.ok(!analysis.strengths.some(point => point.title === 'Old point one'))
+  assert.ok(!analysis.improvementOpportunities.some(point => point.title === 'Old concern one'))
   assert.equal(saved.result.overallScore, original.overallScore)
   assert.equal(saved.row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(saved.result.appearanceAnalysis.version, 10)
+  assert.equal(saved.result.appearanceAnalysis.version, 15)
   assert.equal(cachedBreakdown({ appearanceAnalysis: old.appearanceAnalysis }, id), null)
 })
 test('legacy local scan history is reanalyzed and its old score data stays intact', async () => {
@@ -86,9 +104,9 @@ test('legacy local scan history is reanalyzed and its old score data stays intac
   assert.equal(analysis.scanId, id)
   assert.equal(saved.overallScore, original.overallScore)
   assert.equal(saved.keyStrengths[0], original.keyStrengths[0])
-  assert.equal(saved.appearanceAnalysis.version, 10)
+  assert.equal(saved.appearanceAnalysis.version, 15)
   assert.equal(row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(normalize(row).appearanceAnalysis.version, 10)
+  assert.equal(normalize(row).appearanceAnalysis.version, 15)
 })
 test('another owner cannot read, generate or overwrite a scan', async () => {
   const id=seed('bob')
@@ -106,6 +124,57 @@ test('failed provider leaves the scan intact and permits retry', async () => {
   await assert.rejects(analyze('alice',id,{client:{generate:async()=>{throw new Error('provider failure')}}}),/provider failure/)
   assert.equal(ownedResult(id,'alice').result.appearanceAnalysis,undefined)
   assert.equal((await analyze('alice',id,{client:{generate:async()=>response(result())}})).scanId,id)
+})
+test('empty reanalysis cannot overwrite previously saved Pros or Cons', async () => {
+  const prior = {
+    ...original,
+    appearanceAnalysis: {
+      version: 12,
+      strengths: [{ title: 'Balanced eye spacing', observation: 'The eyes appear evenly spaced.' }],
+      improvementOpportunities: [{ title: 'Skin texture', observation: 'Some uneven texture is visible.' }],
+    },
+  }
+  const id = seed('alice', prior)
+  const before = ownedResult(id, 'alice').result.appearanceAnalysis
+  const emptyPros = result()
+  emptyPros.strengths = []
+
+  await assert.rejects(analyze('alice', id, { client: { generate: async () => response(emptyPros) } }), /no supported strengths/)
+  assert.deepEqual(ownedResult(id, 'alice').result.appearanceAnalysis, before)
+})
+test('one bounded quality retry replaces generic findings only after a complete valid result', async () => {
+  const id = seed()
+  const before = ownedResult(id, 'alice').result
+  const generic = result()
+  generic.strengths = [{ ...finding, title: 'Eye area is even and unobstructed', observation: 'The eye area is unobstructed.' }]
+  let calls = 0
+  const analysis = await analyze('alice', id, { client: { generate: async () => {
+    calls += 1
+    return response(calls === 1 ? generic : result())
+  } } })
+  assert.equal(calls, 2)
+  assert.equal(analysis.strengths[0].title, 'Balanced symmetry')
+  assert.deepEqual(ownedResult(id, 'alice').result.appearanceAnalysis, analysis)
+  assert.deepEqual({ ...ownedResult(id, 'alice').result, appearanceAnalysis: undefined }, { ...before, appearanceAnalysis: undefined })
+})
+test('reanalysis corrects specialist jargon and pose-based jaw weaknesses before saving', async () => {
+  const id = seed()
+  const old = ownedResult(id, 'alice').result
+  const prior = { version: 13, strengths: [{ title: 'Saved strength', observation: 'Previously saved.' }], improvementOpportunities: [{ title: 'Saved concern', observation: 'Previously saved.' }] }
+  db.prepare('UPDATE scans SET face_data = ? WHERE id = ?').run(JSON.stringify({ kind: 'server_analysis_v1', status: 'completed', result: { ...old, appearanceAnalysis: prior } }), id)
+  const generic = result()
+  generic.improvementOpportunities = [{ ...improvement, title: 'Lower face is partially compressed by posture', observation: 'Expression softens definition.' }]
+  let calls = 0
+  const prompts = []
+  const analysis = await analyze('alice', id, { client: { generate: async request => {
+    prompts.push(request.system)
+    calls += 1
+    return response(calls === 1 ? generic : result())
+  } } })
+  assert.equal(calls, 2)
+  assert.match(prompts[1], /everyday language/i)
+  assert.equal(analysis.improvementOpportunities[0].title, improvement.title)
+  assert.notDeepEqual(ownedResult(id, 'alice').result.appearanceAnalysis, prior)
 })
 test('unsupported evidence and invented catalogue IDs are rejected', async () => {
   for(const mutate of [data=>data.strengths[0].basedOn=['invented'],data=>data.products=[{catalogId:'imaginary',reason:'test',basedOn:['strength:0']} ]]) {

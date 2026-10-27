@@ -10,17 +10,18 @@ test('developer preview unlock is only available in dev on loopback hosts', () =
 })
 
 test('developer preview unlock opens premium UI without changing paid entitlement', () => {
-  assert.equal(hasPremiumUiAccess(false, true), true)
-  assert.equal(hasPremiumUiAccess(false, false), false)
-  assert.equal(hasPremiumUiAccess(true, false), true)
+  assert.equal(hasPremiumUiAccess(false), false)
+  assert.equal(hasPremiumUiAccess(true), true)
+  assert.equal(isLocalProPreviewEnabled(true, true, 'localhost'), true)
+  assert.equal(isLocalProPreviewEnabled(true, false, 'localhost'), false)
 })
 
 test('settings preview exposes premium UI only on local development hosts', () => {
-  assert.equal(hasLocalPremiumUiAccess(false, true, true, 'localhost'), true)
-  assert.equal(hasLocalPremiumUiAccess(false, true, true, '127.0.0.1'), true)
-  assert.equal(hasLocalPremiumUiAccess(false, true, true, 'ascendus.store'), false)
-  assert.equal(hasLocalPremiumUiAccess(false, true, false, 'localhost'), false)
-  assert.equal(hasLocalPremiumUiAccess(true, false, false, 'ascendus.store'), true)
+  assert.equal(hasLocalPremiumUiAccess(false), false)
+  assert.equal(hasLocalPremiumUiAccess(true), true)
+  assert.equal(isLocalDeveloperPreview(true, 'localhost'), true)
+  assert.equal(isLocalDeveloperPreview(true, '127.0.0.1'), true)
+  assert.equal(isLocalDeveloperPreview(true, 'ascendus.store'), false)
 })
 
 test('an enabled local preview stays in mock mode even for an actually premium account', () => {
@@ -30,13 +31,15 @@ test('an enabled local preview stays in mock mode even for an actually premium a
 })
 
 test('a previously unlocked saved scan stays unlocked when reopened after preview access ends', () => {
-  assert.equal(hasUnlockedScanUiAccess(false, false, { resultsUnlocked: true }), true)
-  assert.equal(hasUnlockedScanUiAccess(false, false, { resultsUnlocked: false }), false)
+  assert.equal(hasUnlockedScanUiAccess(false, { resultsUnlocked: true }), true)
+  assert.equal(hasUnlockedScanUiAccess(false, { resultsUnlocked: false }), false)
 })
 
 test('local preview scan access is not enabled on non-local hosts', () => {
-  assert.equal(hasLocalUnlockedScanUiAccess(false, true, null, true, 'localhost'), true)
-  assert.equal(hasLocalUnlockedScanUiAccess(false, true, null, true, 'ascendus.store'), false)
+  assert.equal(isLocalDeveloperPreview(true, 'localhost'), true)
+  assert.equal(isLocalDeveloperPreview(true, 'ascendus.store'), false)
+  assert.equal(hasLocalUnlockedScanUiAccess(false, { resultsUnlocked: true }), true)
+  assert.equal(hasLocalUnlockedScanUiAccess(false, { resultsUnlocked: false }), false)
 })
 
 test('developer unlock marks only the selected saved scan as reusable unlocked results', () => {

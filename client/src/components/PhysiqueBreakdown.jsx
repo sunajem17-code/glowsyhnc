@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { triggerHaptic } from '../utils/haptics'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 import { conciseFinding } from '../utils/conciseFinding'
 import './AppearanceBreakdown.css'
@@ -82,9 +80,9 @@ function relatedMetric(point, scan) {
   return RELATED_METRICS.find(metric => metric.key === key && getPhysiqueMetricScore(scan, key) != null)
 }
 
-export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
-  const navigate = useNavigate()
+export default function PhysiqueBreakdown({ scan }) {
   const [page, setPage] = useState('pros')
+  const [expandedFinding, setExpandedFinding] = useState(null)
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? analysis.physique_strengths : analysis.physique_improvements
   const savedPoints = Array.isArray(allPoints)
@@ -104,40 +102,44 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
     }))
   const points = [...savedPoints, ...metricPoints].slice(0, 4)
   const title = page === 'pros' ? 'Pros' : 'Cons'
-  const scanId = scan?.serverScanId || scan?.aiScore?.scanId
-
   return <div className="appearance-dashboard">
     <div role="tablist" aria-label="Physique points" className="appearance-page-switch">
-      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => setPage('pros')}>Pros</button>
-      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => setPage('cons')}>Cons</button>
+      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => { setPage('pros'); setExpandedFinding(null) }}>Pros</button>
+      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => { setPage('cons'); setExpandedFinding(null) }}>Cons</button>
     </div>
     <section id="physique-points-panel" role="tabpanel" aria-label={title} className="appearance-points">
       <h2>{title}</h2>
-      <ul className="physique-analysis-list" tabIndex={0} aria-label={`${title} details`}>
+      <ul className="physique-analysis-list" aria-label={`${title} findings`}>
         {points.length
           ? points.map(({ text, metric: scoredMetric }, index) => {
             const metric = scoredMetric || relatedMetric(text, scan)
             const { title: rawTitle, explanation } = explainPoint(text, metric, page, scan)
             const pointTitle = conciseFinding(rawTitle)
-            const supportingText = text === pointTitle ? explanation : text
+            const delimitedExplanation = text.match(/^.+?\s+[—–:]\s+(.+)$/)?.[1]?.trim()
+            const supportingText = delimitedExplanation || (text !== rawTitle && text !== pointTitle ? text : '')
+            const visibleExplanation = [supportingText, explanation]
+              .filter((value, valueIndex, values) => value && values.indexOf(value) === valueIndex)
+              .join(' ')
+            const detailKey = `${page}-${index}`
+            const isExpanded = expandedFinding === detailKey
+            const detailId = `physique-detail-${page}-${index}`
             return <li className="physique-analysis-item" key={`${text}-${index}`}>
               <span className="physique-analysis-bullet" aria-hidden="true">•</span>
               <div className="physique-analysis-copy">
                 <span className="appearance-point-title">{pointTitle}</span>
-                {(supportingText || explanation) && <details><summary>Details</summary><p>{supportingText}{supportingText && explanation ? ` ${explanation}` : explanation}</p></details>}
+                {visibleExplanation && <>
+                  <button type="button" className="appearance-details-toggle" aria-expanded={isExpanded} aria-controls={detailId} onClick={() => setExpandedFinding(current => current === detailKey ? null : detailKey)}>
+                    <span aria-hidden="true">{isExpanded ? '▾' : '▸'}</span> Details
+                  </button>
+                  <div id={detailId} className={`appearance-detail-panel${isExpanded ? ' is-open' : ''}`} aria-hidden={!isExpanded}>
+                    <div className="appearance-detail-inner"><p>{visibleExplanation}</p></div>
+                  </div>
+                </>}
               </div>
             </li>
           })
           : <li className="physique-analysis-item appearance-points-empty">No saved {page === 'pros' ? 'strengths' : 'improvement areas'} are available for this scan.</li>}
       </ul>
     </section>
-    <button type="button" className="appearance-coach-button" onClick={() => {
-      triggerHaptic()
-      navigate('/coach', { state: {
-        scanId,
-        coachPhotoUrl: coachPhotoUrl || scan?.bodyPhotoUrl || scan?.facePhotoUrl || null,
-        coachPrompt: 'Please help me understand my physique scan and suggest practical next steps based on the visible results.',
-      } })
-    }}>Ask AI Coach</button>
   </div>
 }

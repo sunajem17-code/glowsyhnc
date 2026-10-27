@@ -7,9 +7,12 @@
 // chain that hit SQLite synchronously on every request.
 // ─────────────────────────────────────────────────────────────────────────────
 const express = require('express')
-const { authMiddleware: auth } = require('../middleware/auth')
+const { authMiddleware: auth, JWT_SECRET } = require('../middleware/auth')
 const { getSupabase, isConfigured, updateUserById } = require('../supabase')
 const { calculatePotentialScore } = require('../utils/potentialScore')
+const { createPrivatePhotoUrl } = require('../utils/privatePhoto')
+const { decodeImageBase64 } = require('../utils/validatedImage')
+const { extendedMetricsForPersistence } = require('../lib/appearanceAnalysis')
 
 const router = express.Router()
 
@@ -63,6 +66,7 @@ router.post('/scans', auth, async (req, res) => {
     const image = ownedImagePath(faceImageUrl, req.userId) || ownedImagePath(verified.row.face_photo_url, req.userId) || null
     if (image) require('../db').prepare('UPDATE scans SET face_photo_url = ? WHERE id = ? AND user_id = ?').run(image, verified.row.id, req.userId)
     const result = verified.result
+    const extendedMetrics = extendedMetricsForPersistence(result.extendedMetrics, result.appearanceAnalysis)
 
     // Insert scan
     const { data: scan, error: scanErr } = await sb
@@ -85,12 +89,13 @@ router.post('/scans', auth, async (req, res) => {
         hairstyle_recommendation_3: hairstyleRec3 ?? null,
         hair_type_detected: result.hairType ?? null,
         face_shape: result.facialStructure ?? null,
-        extended_metrics: result.extendedMetrics ?? null,
+        ...(extendedMetrics ? { extended_metrics: extendedMetrics } : {}),
       })
       .select('id')
       .single()
 
     if (scanErr) throw scanErr
+    require('../lib/appearanceDiagnostics').recordAppearanceCounts('scan_saved_supabase', result.appearanceAnalysis?.strengths, result.appearanceAnalysis?.improvementOpportunities)
 
     // Insert progress entry
     await sb.from('progress').insert({
@@ -142,7 +147,12 @@ router.get('/scans', auth, async (req, res) => {
     // credentials must not turn every history refresh into a service failure.
     if (!isConfigured() && process.env.NODE_ENV !== 'production') {
       const { getLocalProgressHistory } = require('../utils/localProgressHistory')
-      return res.json({ scans: getLocalProgressHistory(require('../db'), req.userId), source: 'local' })
+      const scans = getLocalProgressHistory(require('../db'), req.userId).map(scan => ({
+        ...scan,
+        face_image_url: createPrivatePhotoUrl(scan.face_image_url, JWT_SECRET, req.userId),
+        body_image_url: createPrivatePhotoUrl(scan.body_image_url, JWT_SECRET, req.userId),
+      }))
+      return res.json({ scans, source: 'local' })
     }
     if (!requireSupabase(res)) return
     const sb = getSupabase()
@@ -331,14 +341,9 @@ router.post('/upload-image', auth, async (req, res) => {
     const { imageData, mediaType, folder } = req.body
     if (!imageData) return res.status(400).json({ error: 'imageData (base64) required' })
 
-    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
-    const mime = ALLOWED_MIME.includes(mediaType) ? mediaType : 'image/jpeg'
-
-    const buffer = Buffer.from(imageData, 'base64')
-    const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
-    if (buffer.length > MAX_BYTES) {
-      return res.status(413).json({ error: 'Image too large — maximum 10 MB' })
-    }
+    const mime = mediaType
+    const buffer = decodeImageBase64(imageData, mime)
+    if (!buffer) return res.status(400).json({ error: 'Upload a valid JPEG, PNG, or WebP image (maximum 10 MB).' })
 
     const ext        = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
     const storagePath = `scan/${req.userId}/${Date.now()}.${ext}`

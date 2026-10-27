@@ -13,6 +13,7 @@ import { getRatingColor } from '../utils/revealRatings'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import PhysiqueBreakdown from '../components/PhysiqueBreakdown'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
+import { getProgressCardReturnTo } from '../utils/scanResultContext'
 
 const RESULT_VIEWS = ['results', 'analysis', 'compare']
 const PHYSIQUE_METRICS = [
@@ -190,6 +191,7 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
 export default function PhysiqueResults() {
   const navigate = useNavigate()
   const location = useLocation()
+  const progressReturnTo = getProgressCardReturnTo(location.state)
   const reduceMotion = useReducedMotion()
   const currentScan = useStore(s => s.currentScan)
   const savedScans = useStore(s => s.scans)
@@ -372,7 +374,7 @@ export default function PhysiqueResults() {
         <PhysiquePaywall
           photo={photo}
           scan={currentScan}
-          onClose={() => navigate(location.state?.returnTo || '/scan')}
+          onClose={() => navigate(progressReturnTo || '/scan')}
           onAscend={handleAscend}
           onInvite={handleInvite}
           isPurchasing={isPurchasing}
@@ -396,7 +398,7 @@ export default function PhysiqueResults() {
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button
-          onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
+          onClick={() => { triggerHaptic(); navigate(progressReturnTo || '/scan') }}
           aria-label="Go back"
           className="absolute left-4 top-3 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform z-10"
           style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}

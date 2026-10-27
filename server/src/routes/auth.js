@@ -1,11 +1,13 @@
 const express = require('express')
 const bcrypt  = require('bcryptjs')
+const jwt     = require('jsonwebtoken')
 const { v4: uuid } = require('uuid')
 const db = require('../db')
-const { signToken } = require('../middleware/auth')
+const { signToken, JWT_SECRET } = require('../middleware/auth')
 const { getSupabase, getUserByEmail, createUser } = require('../supabase')
 const { createLimiter } = require('../middleware/ratelimit')
 const { verifyAppleToken } = require('../utils/appleAuth')
+const { trustedAppleEmail } = require('../utils/appleAccountIdentity')
 
 const router = express.Router()
 
@@ -98,7 +100,7 @@ router.post('/register', authLimiter, async (req, res) => {
       return res.json({ user, token: signToken(id, email) })
     }
   } catch (err) {
-    console.error('[Auth] Register error:', err.message)
+    console.error('[Auth] Register failed:', err.code || err.name || 'unknown error')
     res.status(500).json({ error: 'internal_error' })
   }
 })
@@ -136,14 +138,14 @@ router.post('/login', authLimiter, async (req, res) => {
     }
     res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
-    console.error('[Auth] Login error:', err.message)
+    console.error('[Auth] Login failed:', err.code || err.name || 'unknown error')
     res.status(500).json({ error: 'internal_error' })
   }
 })
 
 // ── POST /api/auth/apple ──────────────────────────────────────────────────────
 router.post('/apple', authLimiter, async (req, res) => {
-  const { identityToken, name, email, guestUserId, refCode } = req.body
+  const { identityToken, name, guestUserId, refCode } = req.body
   if (!identityToken) return res.status(400).json({ error: 'identityToken required' })
 
   let payload
@@ -152,16 +154,43 @@ router.post('/apple', authLimiter, async (req, res) => {
     // unverified decode — the claims would be attacker-controlled.
     payload = await verifyAppleToken(identityToken)
   } catch (err) {
-    console.warn('[Auth] Apple token verification failed:', err.message)
+    console.warn('[Auth] Apple token verification failed:', err.name || 'unknown error')
     return res.status(401).json({ error: 'Invalid Apple identity token' })
   }
 
   try {
     const appleSub = payload.sub
-    // Trust the email from the verified token over any client-supplied value.
-    const appleEmail = payload.email || email || `${appleSub}@privaterelay.appleid.com`
+    // Never use a request-body email to find or link an account. Apple only
+    // includes email on some sign-ins; an unverified fallback enables account
+    // takeover by pairing an attacker's valid Apple token with a victim email.
+    const appleEmail = trustedAppleEmail(payload)
+    if (!appleEmail) return res.status(401).json({ error: 'Invalid Apple identity token' })
 
     const sb = getSupabase()
+
+    // A guest ID is an account-linking request. Require proof of possession of
+    // that guest's JWT before moving any scans or upgrading the guest row.
+    if (guestUserId) {
+      const authorization = req.headers.authorization || ''
+      const guestToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+      let guestPayload
+      try { guestPayload = jwt.verify(guestToken, JWT_SECRET) } catch {}
+      if (!guestPayload || guestPayload.userId !== guestUserId) {
+        return res.status(401).json({ error: 'Valid guest session required to link scan data' })
+      }
+
+      if (sb) {
+        const { data: guest } = await sb.from('users').select('id,is_guest').eq('id', guestUserId).maybeSingle()
+        if (!guest || guest.is_guest !== true) {
+          return res.status(401).json({ error: 'Valid guest session required to link scan data' })
+        }
+      } else {
+        const guest = db.prepare('SELECT id, name FROM users WHERE id = ?').get(guestUserId)
+        if (!guest || guest.name !== '__guest__') {
+          return res.status(401).json({ error: 'Valid guest session required to link scan data' })
+        }
+      }
+    }
 
     if (sb) {
       // Look up by verified apple_sub first, then by verified email. Values come
@@ -246,7 +275,7 @@ router.post('/apple', authLimiter, async (req, res) => {
     const safe = { id: user.id, name: user.name, email: user.email, subscriptionTier: user.subscription_tier || 'free', createdAt: user.created_at }
     return res.json({ user: safe, token: signToken(user.id, user.email) })
   } catch (err) {
-    console.error('[Auth] Apple sign in error:', err.message, err.stack)
+    console.error('[Auth] Apple sign in failed:', err.code || err.name || 'unknown error')
     res.status(500).json({ error: 'internal_error' })
   }
 })
@@ -298,7 +327,7 @@ router.post('/guest', async (req, res) => {
     const token = signToken(id, null)
     res.json({ userId: id, token, isGuest: true })
   } catch (err) {
-    console.error('[Auth] Guest session error:', err.message)
+    console.error('[Auth] Guest session failed:', err.code || err.name || 'unknown error')
     res.status(500).json({ error: 'internal_error' })
   }
 })

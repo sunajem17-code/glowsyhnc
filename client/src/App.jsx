@@ -6,6 +6,7 @@ import { initRevenueCat } from './utils/iap'
 import { scheduleStreakReminder } from './utils/notifications'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
+import { getSafePostAuthDestination } from './utils/scanResultContext'
 import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
 import Splash, { CinematicIntro } from './pages/Splash'
@@ -76,7 +77,7 @@ function PostAuthLanding() {
   const dest = sessionStorage.getItem(POST_ONBOARD_DEST_KEY)
   if (dest) {
     sessionStorage.removeItem(POST_ONBOARD_DEST_KEY)
-    return <Navigate to={dest} replace />
+    return <Navigate to={getSafePostAuthDestination(dest)} replace />
   }
   return <Navigate to="/scan" replace />
 }

@@ -198,7 +198,7 @@ test('capture keeps explicit profile metadata and supports restored point-score 
  const a=A.validate(raw(),context)
  const base={faceImage:'photo',evidence:{status:'measured'},knownMinor:true,gender:null,previousScore:9}
  await requestProductionAnalysis({...base,apiClient:{ai:{score:async p=>{payload=p;return {assessment:a}}}}})
- assert.equal(payload.assessmentProfile,null);assert.equal(payload.knownMinor,true);assert.equal('previousScore' in payload,false)
+ assert.equal(payload.gender,null);assert.equal(payload.knownMinor,undefined);assert.equal('previousScore' in payload,false)
  const pointResult=await requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({overallScore:8})}}})
  assert.equal(pointResult.overallScore,8)
  await assert.rejects(requestProductionAnalysis({...base,apiClient:{ai:{score:async()=>({assessment:{rubricVersion:'unsupported'}})}}}),/older rubric/)

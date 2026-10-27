@@ -44,7 +44,7 @@ function updateLeaderboard(userId, glowScore) {
     const weekStart = getWeekStart()
     const existing = db.prepare('SELECT * FROM leaderboard WHERE username = ? AND week_start = ?').get(userId, weekStart)
     if (existing) {
-      db.prepare('UPDATE leaderboard SET current_score = ?, updated_at = datetime("now") WHERE username = ? AND week_start = ?')
+      db.prepare("UPDATE leaderboard SET current_score = ?, updated_at = datetime('now') WHERE username = ? AND week_start = ?")
         .run(clamped, userId, weekStart)
     } else {
       db.prepare('INSERT INTO leaderboard (id, username, initial_score, current_score, week_start) VALUES (?, ?, ?, ?, ?)')

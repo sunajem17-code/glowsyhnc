@@ -3,6 +3,7 @@ const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
 const { getUserById, getSupabase, isConfigured, getStreakByUserId } = require('../supabase')
+const { verifyUnsubscribeToken } = require('../utils/unsubscribeToken')
 
 const router = express.Router()
 
@@ -49,7 +50,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (name) updates.name = name
     if (avatarUrl) updates.avatar_url = avatarUrl
     if (Object.keys(updates).length) {
-      try { const { updateUserById } = require('../supabase'); await updateUserById(req.userId, updates) } catch (err) { console.warn('[updateProfile] Supabase update skipped:', err.message) }
+      try { const { updateUserById } = require('../supabase'); await updateUserById(req.userId, updates) } catch (err) { console.warn('[updateProfile] Supabase update skipped:', err.code || err.name || 'unknown error') }
     }
   } else {
     if (name) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.userId)
@@ -64,7 +65,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 // 3. Cascade-delete all user data from SQLite
 router.delete('/account', authMiddleware, async (req, res) => {
   const userId = req.userId
-  console.log('[deleteAccount] Starting deletion for userId:', userId)
+  console.log('[deleteAccount] Account deletion started')
 
   // ── Fetch user (need stripe_subscription_id) — non-fatal if not found ───────
   let user = await getUserById(userId).catch(() => null)
@@ -75,7 +76,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
     try {
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
     } catch (err) {
-      console.error('[deleteAccount] SQLite user lookup error:', err.message)
+      console.error('[deleteAccount] User lookup failed:', err.code || err.name || 'unknown error')
     }
   }
   // Don't 404 — proceed with deletion even if we can't find the row (e.g. user
@@ -90,10 +91,10 @@ router.delete('/account', authMiddleware, async (req, res) => {
         maxNetworkRetries: 1,
       })
       await stripe.subscriptions.cancel(subId)
-      console.log('[deleteAccount] Stripe subscription cancelled:', subId)
+      console.log('[deleteAccount] Billing subscription cancelled')
     } catch (err) {
       // Non-fatal — may already be cancelled or test key mismatch
-      console.warn('[deleteAccount] Stripe cancel skipped:', err.message)
+      console.warn('[deleteAccount] Billing cancellation skipped:', err.code || err.name || 'unknown error')
     }
   }
 
@@ -115,7 +116,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
       try {
         await sb.from(table).delete().eq('user_id', userId)
       } catch (err) {
-        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
+        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.code || err.name || 'unknown error')
       }
     }
     // Also clean up optional tables (may or may not exist in this environment)
@@ -123,20 +124,20 @@ router.delete('/account', authMiddleware, async (req, res) => {
       try {
         await sb.from(table).delete().eq('user_id', userId)
       } catch (err) {
-        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
+        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.code || err.name || 'unknown error')
       }
     }
     try {
       await sb.from('profiles').delete().eq('id', userId)
       console.log('[deleteAccount] Supabase profiles row deleted')
     } catch (err) {
-      console.warn('[deleteAccount] Supabase profiles delete skipped:', err.message)
+      console.warn('[deleteAccount] Supabase profiles delete skipped:', err.code || err.name || 'unknown error')
     }
     try {
       await sb.from('users').delete().eq('id', userId)
       console.log('[deleteAccount] Supabase users row deleted')
     } catch (err) {
-      console.warn('[deleteAccount] Supabase users delete skipped:', err.message)
+      console.warn('[deleteAccount] Supabase users delete skipped:', err.code || err.name || 'unknown error')
     }
 
     // ── Delete scan images from Supabase Storage ────────────────────────────
@@ -157,13 +158,13 @@ router.delete('/account', authMiddleware, async (req, res) => {
         if (removeErr) {
           console.warn('[deleteAccount] Storage remove failed:', removeErr.message)
         } else {
-          console.log(`[deleteAccount] Storage: removed ${paths.length} file(s) for userId:`, userId)
+          console.log(`[deleteAccount] Removed ${paths.length} storage file(s)`)
         }
       } else {
-        console.log('[deleteAccount] Storage: no scan images found for userId:', userId)
+        console.log('[deleteAccount] No scan images found')
       }
     } catch (err) {
-      console.warn('[deleteAccount] Storage cleanup error:', err.message)
+      console.warn('[deleteAccount] Storage cleanup failed:', err.code || err.name || 'unknown error')
     }
   }
 
@@ -172,22 +173,22 @@ router.delete('/account', authMiddleware, async (req, res) => {
     // task_completions may reference tasks; delete via plan ownership
     const plans = db.prepare('SELECT id FROM action_plans WHERE user_id = ?').all(userId)
     for (const plan of plans) {
-      try { db.prepare('DELETE FROM tasks WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] tasks by plan delete skipped:', err.message) }
-      try { db.prepare('DELETE FROM task_completions WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] task_completions by plan delete skipped:', err.message) }
+      try { db.prepare('DELETE FROM tasks WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] tasks by plan delete skipped:', err.code || err.name || 'unknown error') }
+      try { db.prepare('DELETE FROM task_completions WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] task_completions by plan delete skipped:', err.code || err.name || 'unknown error') }
     }
     // Also try direct user_id column in case schema differs
-    try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] task_completions by user delete skipped:', err.message) }
+    try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] task_completions by user delete skipped:', err.code || err.name || 'unknown error') }
     db.prepare('DELETE FROM daily_checkins WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM streaks WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM action_plans WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM scans WHERE user_id = ?').run(userId)
-    try { db.prepare('DELETE FROM community_likes WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_likes delete skipped:', err.message) }
-    try { db.prepare('DELETE FROM community_posts WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_posts delete skipped:', err.message) }
-    try { db.prepare('DELETE FROM leaderboard WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] leaderboard delete skipped:', err.message) }
+    try { db.prepare('DELETE FROM community_likes WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_likes delete skipped:', err.code || err.name || 'unknown error') }
+    try { db.prepare('DELETE FROM community_posts WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_posts delete skipped:', err.code || err.name || 'unknown error') }
+    try { db.prepare('DELETE FROM leaderboard WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] leaderboard delete skipped:', err.code || err.name || 'unknown error') }
     db.prepare('DELETE FROM users WHERE id = ?').run(userId)
     console.log('[deleteAccount] SQLite cleanup done')
   } catch (err) {
-    console.error('[deleteAccount] SQLite cleanup error:', err.message)
+    console.error('[deleteAccount] Local account cleanup failed:', err.code || err.name || 'unknown error')
   }
 
   // This app uses its own `users` table for auth (Apple Sign In verifies an
@@ -195,23 +196,39 @@ router.delete('/account', authMiddleware, async (req, res) => {
   // Deleting the users row above is sufficient — sb.auth.admin.deleteUser
   // would always return "User not found" because auth.users is never populated.
 
-  console.log('[deleteAccount] Done for userId:', userId)
+  console.log('[deleteAccount] Account deletion finished')
   res.json({ success: true })
 })
 
-// ── GET /api/user/unsubscribe?uid=:userId ─────────────────────────────────────
-// One-click unsubscribe link for CAN-SPAM / GDPR compliance.
-// Linked from marketing email footers. No auth required — the uid IS the token.
-router.get('/unsubscribe', async (req, res) => {
-  const { uid } = req.query
-  if (!uid) return res.status(400).send('Missing uid parameter.')
+// Email links use a short-lived signed capability. GET only displays a
+// confirmation page because email security scanners routinely prefetch links.
+router.get('/unsubscribe', (req, res) => {
+  const userId = verifyUnsubscribeToken(req.query.token)
+  res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+  if (!userId) return res.status(400).send('This unsubscribe link is invalid or expired. Request a new email to get a fresh link.')
+  res.type('html').send(`
+    <!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#111;color:#fff;">
+      <h2>Unsubscribe from marketing emails?</h2>
+      <p style="color:#aaa">You can still receive important account and service messages.</p>
+      <form method="post" action="/api/user/unsubscribe">
+        <input type="hidden" name="token" value="${req.query.token}">
+        <button type="submit">Confirm unsubscribe</button>
+      </form>
+    </body></html>
+  `)
+})
+
+router.post('/unsubscribe', async (req, res) => {
+  const userId = verifyUnsubscribeToken(req.body?.token)
+  res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+  if (!userId) return res.status(400).send('This unsubscribe link is invalid or expired. Request a new email to get a fresh link.')
   try {
     const sb = getSupabase()
     if (sb) {
-      const { error } = await sb.from('users').update({ email_unsubscribed: true }).eq('id', uid)
+      const { error } = await sb.from('users').update({ email_unsubscribed: true }).eq('id', userId)
       if (error) throw new Error(error.message)
     } else {
-      db.prepare('UPDATE users SET email_unsubscribed = 1 WHERE id = ?').run(uid)
+      db.prepare('UPDATE users SET email_unsubscribed = 1 WHERE id = ?').run(userId)
     }
     res.send(`
       <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#111;color:#fff;">
@@ -221,7 +238,7 @@ router.get('/unsubscribe', async (req, res) => {
       </body></html>
     `)
   } catch (err) {
-    console.error('[unsubscribe] error:', err.message)
+    console.error('[unsubscribe] update failed:', err.code || err.name || 'unknown error')
     res.status(500).send('Something went wrong. Please contact support@ascendus.store.')
   }
 })

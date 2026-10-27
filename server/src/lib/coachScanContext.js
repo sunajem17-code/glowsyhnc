@@ -34,6 +34,7 @@ async function finishScan(id, userId, result) {
     .run(JSON.stringify({ kind: KIND, status: 'completed', result }), result.overallScore, result.faceScore, result.groomingScore,
       JSON.stringify({ strengths: result.keyStrengths, improvements: result.keyWeaknesses, recommendation: result.topImprovement }), completedAt, id, userId)
   if (updated.changes !== 1) throw new Error('Completed scan could not be saved')
+  require('./appearanceDiagnostics').recordAppearanceCounts('scan_saved_local', result.appearanceAnalysis?.strengths, result.appearanceAnalysis?.improvementOpportunities)
   // Cloud summary persistence is handled by the existing save route. Local
   // server history is available immediately, before its asynchronous upload.
   return { ...result, scanId: id }

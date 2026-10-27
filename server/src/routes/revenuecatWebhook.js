@@ -69,11 +69,11 @@ router.post('/revenuecat', async (req, res) => {
 
   const event = req.body?.event
   if (!event) {
-    console.error('[RC Webhook] ❌ Missing event payload:', JSON.stringify(req.body))
+    console.error('[RC Webhook] Missing event payload')
     return res.status(400).json({ error: 'Missing event' })
   }
 
-  console.log('[RC Webhook] Event type:', event.type, '| id:', event.id, '| app_user_id:', event.app_user_id, '| product:', event.product_id, '| environment:', event.environment)
+  console.log('[RC Webhook] Event received | type:', event.type, '| environment:', event.environment)
 
   // Idempotency — RevenueCat, like Stripe, delivers at-least-once and can redeliver
   if (event.id && await isWebhookProcessed(event.id)) {

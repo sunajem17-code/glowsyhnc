@@ -89,10 +89,9 @@ export default function Premium() {
         const result = await purchasePro('monthly')
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
-          const rcUserId = result.customerInfo?.originalAppUserId
           sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
-          api.payments.syncRc(rcUserId).catch(() => {})
+          api.payments.syncRc().catch(() => {})
         }
       } else {
         const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
@@ -127,8 +126,7 @@ export default function Premium() {
       const info = await restorePurchases()
       const isPro = !!info?.entitlements?.active?.['Ascendus Pro']
       if (isPro) {
-        const rcUserId = info?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
+        api.payments.syncRc().catch(() => {})
         sessionStorage.setItem('asc_pro_splash_shown', '1')
         setIsPremium(true)
         navigate('/dashboard')

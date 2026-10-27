@@ -13,7 +13,7 @@ const metrics = keys => object(Object.fromEntries(keys.map(key => [key, metric])
 const appearanceFinding = object({
   title: { type: 'string', minLength: 1, maxLength: 80 },
   observation: { type: 'string', minLength: 1, maxLength: 240 },
-  significance: { type: 'string', maxLength: 160 },
+  significance: { type: 'string', minLength: 1, maxLength: 160 },
   recommendation: { type: 'string', maxLength: 200 },
   metric_keys: array(enumeration([
     'face_score', 'grooming_score',

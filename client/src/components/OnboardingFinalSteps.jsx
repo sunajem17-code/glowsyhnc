@@ -566,7 +566,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
             Results.jsx (Apple IAP doesn't support external promo codes, so this
             must never appear in a native build). Reuses the existing
             PromoModal/redeem endpoint rather than a new one-off input. */}
-        {!isNative() && (
+        {!Capacitor.isNativePlatform() && (
           <button
             onClick={() => setShowPromo(true)}
             disabled={isPurchasing}

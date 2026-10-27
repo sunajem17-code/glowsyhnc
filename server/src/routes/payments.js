@@ -3,6 +3,7 @@ const Stripe = require('stripe')
 const db = require('../db')
 const { authMiddleware } = require('../middleware/auth')
 const { getUserById, updateUserById, getSupabase, isConfigured, isWebhookProcessed, markWebhookProcessed } = require('../supabase')
+const { authenticatedRevenueCatUserId } = require('../utils/revenueCatIdentity')
 
 // NOTE: This endpoint is for web purchases only.
 // iOS uses Apple In-App Purchases via RevenueCat (@revenuecat/purchases-capacitor).
@@ -99,22 +100,20 @@ async function resolveUserId(metadata, customerId) {
   // ── Step 1: metadata.userId ──────────────────────────────────────────────────
   const uid1 = metadata?.userId || null
   if (uid1) {
-    console.log('[Webhook]   ✅ Step 1 — userId from metadata.userId:', uid1)
+    console.log('[Webhook] Customer account resolved from checkout metadata')
     return { userId: uid1, resolvedBy: 'metadata.userId' }
   }
-  console.log('[Webhook]   ⬜ Step 1 — no userId in metadata.userId')
 
   // ── Step 2: metadata.user_id ─────────────────────────────────────────────────
   const uid2 = metadata?.user_id || null
   if (uid2) {
-    console.log('[Webhook]   ✅ Step 2 — userId from metadata.user_id:', uid2)
+    console.log('[Webhook] Customer account resolved from normalized checkout metadata')
     return { userId: uid2, resolvedBy: 'metadata.user_id' }
   }
-  console.log('[Webhook]   ⬜ Step 2 — no userId in metadata.user_id')
 
   // ── Step 3: Stripe customer metadata ─────────────────────────────────────────
   if (customerId) {
-    console.log('[Webhook]   🔍 Step 3 — fetching Stripe customer:', customerId)
+    console.log('[Webhook] Checking customer account metadata')
     try {
       const customer = await stripe.customers.retrieve(customerId)
       const uid3camel = customer.metadata?.userId  || null
@@ -122,20 +121,19 @@ async function resolveUserId(metadata, customerId) {
       const uid3 = uid3camel || uid3snake
       if (uid3) {
         const via = uid3camel ? 'customer.metadata.userId' : 'customer.metadata.user_id'
-        console.log(`[Webhook]   ✅ Step 3 — userId from ${via}:`, uid3)
+        console.log('[Webhook] Customer account resolved from customer metadata')
         return { userId: uid3, resolvedBy: via }
       }
-      console.log('[Webhook]   ⬜ Step 3 — no userId/user_id in customer metadata:', JSON.stringify(customer.metadata))
+      console.log('[Webhook] Customer metadata did not identify an account')
     } catch (e) {
-      console.error('[Webhook]   ❌ Step 3 — customer fetch failed:', e.message)
+      console.error('[Webhook] Customer account lookup failed:', e.type || e.name || 'unknown error')
     }
   } else {
-    console.log('[Webhook]   ⬜ Step 3 — skipped (no customerId)')
   }
 
   // ── Step 4: Supabase WHERE stripe_customer_id = customerId ────────────────────
   if (customerId) {
-    console.log('[Webhook]   🔍 Step 4 — querying Supabase by stripe_customer_id:', customerId)
+    console.log('[Webhook] Checking customer account link')
     try {
       const supabase = getSupabase()
       if (supabase) {
@@ -145,18 +143,17 @@ async function resolveUserId(metadata, customerId) {
           .eq('stripe_customer_id', customerId)
           .maybeSingle()
         if (!error && data?.id) {
-          console.log('[Webhook]   ✅ Step 4 — userId from Supabase by stripe_customer_id:', data.id)
+          console.log('[Webhook] Customer account resolved from saved billing link')
           return { userId: data.id, resolvedBy: 'supabase.stripe_customer_id' }
         }
-        console.log('[Webhook]   ⬜ Step 4 — no Supabase match:', error?.message || 'no row found')
+        console.log('[Webhook] No saved billing account link was found')
       } else {
-        console.log('[Webhook]   ⬜ Step 4 — Supabase not configured')
+        console.log('[Webhook] Billing account lookup is unavailable')
       }
     } catch (e) {
-      console.error('[Webhook]   ❌ Step 4 — Supabase lookup failed:', e.message)
+      console.error('[Webhook] Billing account lookup failed:', e.code || e.name || 'unknown error')
     }
   } else {
-    console.log('[Webhook]   ⬜ Step 4 — skipped (no customerId)')
   }
 
   return { userId: null, resolvedBy: null }
@@ -165,14 +162,11 @@ async function resolveUserId(metadata, customerId) {
 // ── Stripe webhook handler (exported so index.js can mount at /webhook) ──────
 async function handleWebhook(req, res) {
   console.log('=== [Webhook] REQUEST RECEIVED ===')
-  console.log('[Webhook] URL:', req.originalUrl)
-  console.log('[Webhook] rawBody present:', !!req.rawBody, '| is Buffer:', Buffer.isBuffer(req.rawBody), '| length:', req.rawBody?.length)
   const sig = req.headers['stripe-signature']
   const secret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim()
 
   // express.raw() sets req.body to a Buffer — that's what constructEvent needs
   console.log('[Webhook] sig present:', !!sig)
-  console.log('[Webhook] body is Buffer:', Buffer.isBuffer(req.body), '| length:', req.body?.length)
 
   // Reject immediately if webhook secret is not configured — never process unverified events
   if (!secret) {
@@ -185,84 +179,73 @@ async function handleWebhook(req, res) {
     event = stripe.webhooks.constructEvent(req.body, sig, secret)
     console.log('[Webhook] ✅ Signature verified')
   } catch (err) {
-    console.error('[Webhook] ❌ Signature verification FAILED:', err.message)
+    console.error('[Webhook] Stripe signature verification failed:', err.type || err.name || 'unknown error')
     return res.status(400).json({ error: 'Webhook signature verification failed' })
   }
 
-  console.log('[Webhook] Event type:', event.type, '| Event id:', event.id)
+  console.log('[Webhook] Event type:', event.type)
 
   // Idempotency guard — Stripe delivers events at-least-once; skip duplicates
   if (await isWebhookProcessed(event.id)) {
-    console.log('[Webhook] ⏭️  Already processed event id:', event.id, '— skipping')
+    console.log('[Webhook] Duplicate event ignored')
     return res.json({ received: true })
   }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     const subscriptionId = session.subscription || null
-    const customerEmail  = session.customer_details?.email || session.customer_email || '(none)'
-    console.log('[Webhook] checkout.session.completed | session.id:', session.id)
-    console.log('[Webhook]   customer:', session.customer, '| email:', customerEmail ? customerEmail.replace(/(.{2}).+(@.+)/, '$1***$2') : '(none)')
-    console.log('[Webhook]   subscriptionId:', subscriptionId)
-    console.log('[Webhook]   session.metadata:', JSON.stringify(session.metadata))
+    console.log('[Webhook] Checkout event received | hasCustomer:', !!session.customer, '| hasSubscription:', !!subscriptionId)
 
-    const { userId, resolvedBy } = await resolveUserId(session.metadata, session.customer)
+    const { userId } = await resolveUserId(session.metadata, session.customer)
 
     if (userId) {
-      console.log('[Webhook]   userId resolved via:', resolvedBy)
       try {
         await updateUserById(userId, {
           subscription_tier: 'premium',
           is_pro: true,
           stripe_subscription_id: subscriptionId,
         })
-        console.log('[Webhook] ✅ Supabase updated (checkout) for userId:', userId)
+        console.log('[Webhook] Supabase subscription updated')
       } catch (e) {
-        console.error('[Webhook] ❌ Supabase update failed (checkout):', e.message)
+        console.error('[Webhook] Supabase update failed (checkout):', e.code || e.name || 'unknown error')
       }
       if (!isConfigured()) {
         try {
           db.prepare("UPDATE users SET subscription_tier = 'premium', stripe_subscription_id = ? WHERE id = ?")
             .run(subscriptionId, userId)
-          console.log('[Webhook] ✅ SQLite updated (checkout) for userId:', userId)
+          console.log('[Webhook] Local billing account updated (checkout)')
         } catch (e) {
-          console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+          console.error('[Webhook] Local billing update failed:', e.code || e.name || 'unknown error')
         }
       }
     } else {
-      console.error('[Webhook] ❌ All 4 fallbacks exhausted for checkout.session.completed — full session object:')
-      console.error(JSON.stringify(session, null, 2))
+      console.error('[Webhook] No account matched checkout completion')
     }
   }
 
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object
-    console.log('[Webhook] invoice.payment_succeeded | invoice.id:', invoice.id)
-    console.log('[Webhook]   invoice.customer:', invoice.customer)
-    console.log('[Webhook]   invoice.subscription:', invoice.subscription)
-    console.log('[Webhook]   invoice.metadata:', JSON.stringify(invoice.metadata))
+    console.log('[Webhook] Invoice payment succeeded')
 
-    const { userId, resolvedBy } = await resolveUserId(invoice.metadata, invoice.customer)
+    const { userId } = await resolveUserId(invoice.metadata, invoice.customer)
 
     if (userId) {
-      console.log('[Webhook]   userId resolved via:', resolvedBy)
       try {
         await updateUserById(userId, { subscription_tier: 'premium', is_pro: true })
-        console.log('[Webhook] ✅ Supabase updated (invoice) for userId:', userId)
+        console.log('[Webhook] Billing account updated (invoice)')
       } catch (e) {
-        console.error('[Webhook] ❌ Supabase update failed (invoice):', e.message)
+        console.error('[Webhook] Supabase update failed (invoice):', e.code || e.name || 'unknown error')
       }
       if (!isConfigured()) {
         try {
           db.prepare("UPDATE users SET subscription_tier = 'premium' WHERE id = ?").run(userId)
-          console.log('[Webhook] ✅ SQLite updated (invoice) for userId:', userId)
+          console.log('[Webhook] Local billing account updated (invoice)')
         } catch (e) {
-          console.error('[Webhook] SQLite update failed (non-critical):', e.message)
+          console.error('[Webhook] Local billing update failed:', e.code || e.name || 'unknown error')
         }
       }
     } else {
-      console.error('[Webhook] ❌ All 4 fallbacks exhausted for invoice.payment_succeeded — full invoice object:')
-      console.error(JSON.stringify(invoice, null, 2))
+      console.error('[Webhook] No account matched invoice payment')
     }
   }
 
@@ -274,17 +257,15 @@ async function handleWebhook(req, res) {
     // (metadata.userId → metadata.user_id → customer.metadata) the other two
     // handlers above already use, so a cancellation can't silently no-op.
     const subscription = event.data.object
-    console.log('[Webhook]   subscription.deleted metadata:', JSON.stringify(subscription.metadata))
-    const { userId, resolvedBy } = await resolveUserId(subscription.metadata, subscription.customer)
-    console.log('[Webhook] subscription.deleted userId:', userId, '| resolvedBy:', resolvedBy)
+    const { userId } = await resolveUserId(subscription.metadata, subscription.customer)
+    console.log('[Webhook] Subscription cancellation received')
     if (userId) {
       try { await updateUserById(userId, { subscription_tier: 'free', is_pro: false, stripe_subscription_id: null }) } catch {}
       if (!isConfigured()) {
         try { db.prepare("UPDATE users SET subscription_tier = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId) } catch {}
       }
     } else {
-      console.error('[Webhook] ❌ All fallbacks exhausted for subscription.deleted — full subscription object:')
-      console.error(JSON.stringify(subscription, null, 2))
+      console.error('[Webhook] No account matched subscription cancellation')
     }
   }
 
@@ -338,7 +319,7 @@ router.get('/status', authMiddleware, async (req, res) => {
 // Verifies the subscription is actually active via RevenueCat REST API before granting Pro.
 router.post('/sync-rc', authMiddleware, async (req, res) => {
   const rcApiKey = process.env.REVENUECAT_API_KEY
-  const { rcUserId } = req.body
+  const rcUserId = authenticatedRevenueCatUserId(req)
 
   // Server-side verification via RevenueCat REST API
   if (rcApiKey && rcUserId) {
@@ -347,7 +328,7 @@ router.post('/sync-rc', authMiddleware, async (req, res) => {
         headers: { Authorization: `Bearer ${rcApiKey}`, 'Content-Type': 'application/json' },
       })
       if (!rcRes.ok) {
-        console.warn(`[sync-rc] RevenueCat lookup failed for ${rcUserId}: HTTP ${rcRes.status}`)
+        console.warn(`[sync-rc] RevenueCat lookup failed: HTTP ${rcRes.status}`)
         return res.status(402).json({ error: 'Could not verify purchase — please restore purchases or contact support.' })
       }
       const data = await rcRes.json()
@@ -355,13 +336,13 @@ router.post('/sync-rc', authMiddleware, async (req, res) => {
       const entitlements = subscriber?.entitlements ?? {}
       const isPro = Object.values(entitlements).some(e => e.expires_date == null || new Date(e.expires_date) > new Date())
       if (!isPro) {
-        console.warn(`[sync-rc] No active entitlement for rcUserId=${rcUserId} userId=${req.userId}`)
+        console.warn('[sync-rc] No active entitlement')
         return res.status(402).json({ error: 'No active subscription found — please complete your purchase first.' })
       }
-      console.log(`[sync-rc] RC verified Pro for userId=${req.userId} rcUserId=${rcUserId}`)
+      console.log('[sync-rc] RevenueCat verified an active entitlement')
     } catch (err) {
       // If RevenueCat is unreachable, fail safe — do not grant Pro
-      console.error(`[sync-rc] RevenueCat verification error: ${err.message}`)
+      console.error(`[sync-rc] RevenueCat verification failed: ${err.name || 'Error'}`)
       return res.status(503).json({ error: 'Purchase verification unavailable — please try again in a moment.' })
     }
   } else {

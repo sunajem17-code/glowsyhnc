@@ -20,6 +20,7 @@ const { createLimiter } = require('./ratelimit')
 const { hasLocalProPreview } = require('../utils/localProPreview')
 const { JWT_SECRET } = require('./auth') // single hardened source of truth
 const { monthlyBudgetStatus, budgetError, runWithBudgetUser } = require('../lib/aiBudget')
+const { isPublicDemoBlocked } = require('../utils/aiAccessPolicy')
 
 // ── Rate limiters (Upstash-backed, in-memory fallback) ────────────────────────
 const checkClaude = {
@@ -75,6 +76,12 @@ function verifyToken(req, res, next) {
 // There is no hourly AI quota. The monthly spend cap remains enforced below.
 // This distributed per-minute limiter only prevents rapid bursts.
 async function claudeLimit(req, res, next) {
+  // `demo-token` is a public client-side preview credential, not an identity.
+  // Never let it spend real provider credits in production.
+  if (isPublicDemoBlocked(req.isDemo, process.env.NODE_ENV)) {
+    return res.status(401).json({ error: 'Sign in to use AI features' })
+  }
+
   let budget
   try {
     budget = await monthlyBudgetStatus(req.userId)

@@ -9,6 +9,7 @@ const { createClient } = require('@supabase/supabase-js')
 const fs              = require('fs')
 const path            = require('path')
 const crypto          = require('crypto')
+const { createUnsubscribeToken } = require('./src/utils/unsubscribeToken')
 
 // Lazy init — avoids crash at startup if env vars not yet loaded
 function getResend() {
@@ -107,6 +108,7 @@ async function sendUpgradeNudge(userId) {
     jawline_score:   jawlineScore,
     celebrity_match: celebMatch,
     user_id:         userId,
+    unsubscribe_token: createUnsubscribeToken(userId),
   })
 
   // 5. Send
@@ -125,9 +127,9 @@ async function sendUpgradeNudge(userId) {
     p_type:      'day3_nudge',
     p_resend_id: sent.id,
   })
-  if (logErr1) console.error(`[Mailer] log_email_send failed for ${userId}:`, logErr1.message)
+  if (logErr1) console.error('[Mailer] Email send record write failed')
 
-  console.log(`📧 Nudge sent → ${profile.email} (${sent.id})`)
+  console.log('[Mailer] Upgrade nudge sent')
   return { success: true, resend_id: sent.id, email: profile.email }
 }
 
@@ -198,6 +200,7 @@ async function sendWeeklyRecap(userId) {
   // 7. Build email
   const html = fill(loadTemplate('weekly'), {
     user_id:          userId,
+    unsubscribe_token: createUnsubscribeToken(userId),
     week_number:      curr.week_number,
     current_score:    Number(curr.current_score).toFixed(1),
     score_delta:      fmtDelta(overall_delta),
@@ -249,9 +252,9 @@ async function sendWeeklyRecap(userId) {
     p_type:      'weekly_recap',
     p_resend_id: sent.id,
   })
-  if (logErr2) console.error(`[Mailer] log_email_send failed for ${userId}:`, logErr2.message)
+  if (logErr2) console.error('[Mailer] Email send record write failed')
 
-  console.log(`📧 Weekly recap sent → ${profile.email} (${sent.id})`)
+  console.log('[Mailer] Weekly recap sent')
   return { success: true, resend_id: sent.id, email: profile.email }
 }
 

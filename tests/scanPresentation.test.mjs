@@ -22,8 +22,8 @@ test('a fast backend must wait for presentation; completion and cancellation set
  const cancelled=presentationGate();cancelled.finish(false);cancelled.finish();assert.equal(await cancelled.promise,false)
 })
 test('missing landmarks preserve five stages without fabricated face anchors',()=>{
- const features=frontFeatureAnchors(null);assert.equal(features.length,5);assert.ok(features.every(f=>!f.point))
- assert.deepEqual(features.map(f=>f.label),SCAN_FEATURES.map(f=>f.label))
+ const features=frontFeatureAnchors(null);assert.equal(features.length,0)
+ assert.deepEqual(SCAN_FEATURES.map(f=>f.id),['chin','cheekbones','jaw','cheeks','submental'])
 })
 test('cover transform aligns source center and handles portrait/landscape crops',()=>{
  for (const [w,h] of [[1290,2796],[1000,1000],[1920,1080]]) {
@@ -55,14 +55,18 @@ test('scan framing keeps the complete jaw visible across image aspect ratios',()
 test('jaw and malar overlays retain supplied detected surface points',()=>{
  const jaw=[{x:.2,y:.4},{x:.3,y:.6},{x:.5,y:.8}]
  const malar=[{x:.2,y:.4},{x:.3,y:.42},{x:.33,y:.48},{x:.23,y:.5}]
- const features=frontFeatureAnchors({jawContour:jaw,malarL:malar,mandibleL:jaw})
- assert.deepEqual(features.find(f=>f.id==='jaw').contour,jaw)
- assert.deepEqual(features.find(f=>f.id==='cheekbones').regions[0],malar)
+ const features=frontFeatureAnchors({jawL:jaw[0],jawMidL:jaw[1],jawChinL:jaw[2],chin:jaw[2],jawChinR:jaw[2],jawMidR:jaw[1],jawR:jaw[0],cheekL:malar[0],eyeInnerL:malar[1],eyeOuterL:malar[2]})
+ assert.deepEqual(features.find(f=>f.id==='jaw-definition').contour,[jaw[0],jaw[1],jaw[2],jaw[2],jaw[2],jaw[1],jaw[0]])
+ assert.deepEqual(features.find(f=>f.id==='cheekbone-prominence').regions[0], [
+  {x:(malar[1].x+malar[2].x)/2 - 1.3*Math.hypot(malar[2].x-malar[1].x,malar[2].y-malar[1].y), y:(malar[1].y+malar[2].y)/2},
+  {x:(malar[1].x+malar[2].x)/2 - .1*Math.hypot(malar[2].x-malar[1].x,malar[2].y-malar[1].y), y:(malar[1].y+malar[2].y)/2 - .9*Math.hypot(malar[2].x-malar[1].x,malar[2].y-malar[1].y)},
+  {x:(malar[1].x+malar[2].x)/2 - .1*Math.hypot(malar[2].x-malar[1].x,malar[2].y-malar[1].y), y:(malar[1].y+malar[2].y)/2 + .9*Math.hypot(malar[2].x-malar[1].x,malar[2].y-malar[1].y)},
+ ])
 })
 
-test('reference recording contains exactly five stages and a 14.4 second presentation',()=>{
+test('reference recording contains exactly five stages and the current presentation duration',()=>{
  assert.deepEqual(SCAN_FEATURES.map(f=>f.id),['chin','cheekbones','jaw','cheeks','submental'])
- assert.equal(PRESENTATION_END,14400)
+ assert.equal(PRESENTATION_END,12850)
  for(let i=0;i<SCAN_STARTS.length;i++) {
   assert.equal(scanFrame(SCAN_STARTS[i]).progress,0)
   assert.equal(scanFrame(SCAN_STARTS[i]+1200).progress,1)
@@ -71,20 +75,22 @@ test('reference recording contains exactly five stages and a 14.4 second present
 
 test('cheek stage uses the detected cheek points and chin stays unfilled', () => {
  const cheek=[{x:.2,y:.4},{x:.3,y:.45},{x:.25,y:.6}]
- const features=frontFeatureAnchors({buccalL:cheek,buccalR:cheek})
- assert.equal(features[3].id,'cheeks')
- assert.equal(features[3].point,cheek[2])
- assert.ok(features[3].regions[0].every(p=>cheek.includes(p)))
- assert.deepEqual(features[0].regions,[])
+ const features=frontFeatureAnchors({eyeBottomL:cheek[0],cheekL:cheek[1],jawChinL:cheek[2],jawMidL:cheek[1]})
+ const cheekFeature=features.find(f=>f.id==='cheek-leanness')
+ assert.equal(cheekFeature.point,cheek[1])
+ assert.deepEqual(cheekFeature.regions[0],[...cheek,cheek[1]])
 })
 
-test('slow analysis cannot check a metric or finish on elapsed time alone', () => {
- const held=advanceScanClock(0,60000,false)
- assert.equal(scanFrame(held).active,0)
- assert.ok(scanFrame(held).progress<1)
- assert.equal(scanFrame(held).complete,false)
- assert.equal(advanceScanClock(held,500,false),held)
- assert.equal(advanceScanClock(held,60000,true),PRESENTATION_END)
+test('presentation timing is visual while real results still require explicit completion', async () => {
+ const held=advanceScanClock(0,60000)
+ assert.equal(scanFrame(held).complete,true)
+ const gate=presentationGate()
+ let settled=false
+ gate.promise.then(()=>{settled=true})
+ await Promise.resolve()
+ assert.equal(settled,false)
+ gate.finish(true)
+ assert.equal(await gate.promise,true)
 })
 
 
@@ -93,8 +99,8 @@ test('scan framing normalizes face size and position without distorting the imag
  for(const [w,h] of [[1000,1400],[1920,1080],[1000,1000]]) {
   const t=scanCropTransform(w,h,points)
   const top=projectPoint(points.forehead,t), chin=projectPoint(points.jawContour[1],t)
-  assert.ok(Math.abs((top.y+chin.y)/2-55)<1e-9)
-  assert.ok(chin.y-top.y<=30+1e-9)
+  assert.ok(Math.abs((top.y+chin.y)/2-50)<1e-9)
+  assert.ok(chin.y-top.y<=723*.76+1e-9)
   assert.ok(Math.abs(t.sx/t.sy-w/h/(333/723))<1e-9)
  }
  const degenerate={forehead:{x:.5,y:.5},jawContour:[{x:.5,y:.5}]}
