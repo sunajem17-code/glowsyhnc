@@ -10,6 +10,18 @@ const enumeration = values => ({ type: 'string', enum: values })
 const scores = keys => object(Object.fromEntries(keys.map(key => [key, score])))
 const metric = object({ score, descriptor: string })
 const metrics = keys => object(Object.fromEntries(keys.map(key => [key, metric])))
+const appearanceFinding = object({
+  title: { type: 'string', minLength: 1, maxLength: 80 },
+  observation: { type: 'string', minLength: 1, maxLength: 240 },
+  significance: { type: 'string', maxLength: 160 },
+  recommendation: { type: 'string', maxLength: 200 },
+  metric_keys: array(enumeration([
+    'face_score', 'grooming_score',
+    'pillar_harmony', 'pillar_angularity', 'pillar_features', 'pillar_dimorphism',
+    'sub_symmetry', 'sub_jawline_definition', 'sub_skin_clarity', 'sub_facial_proportions', 'sub_eye_area', 'sub_facial_harmony',
+    'metric_jawline', 'metric_cheekbones', 'metric_symmetry', 'metric_skin_quality', 'metric_masculinity_femininity', 'metric_facial_thirds',
+  ]), { minItems: 1, maxItems: 2 }),
+})
 
 function core(hasSide) {
   const properties = {
@@ -18,8 +30,13 @@ function core(hasSide) {
     hair_type: enumeration(['straight', 'wavy', 'curly', 'coily', 'locs', 'bald', 'unknown']),
     pillars: scores(['harmony', 'angularity', 'features', 'dimorphism']),
     sub_scores: scores(['symmetry', 'jawline_definition', 'skin_clarity', 'facial_proportions', 'eye_area', 'facial_harmony']),
-    key_strengths: array(string, { minItems: 2, maxItems: 2 }), key_weaknesses: strings,
+    key_strengths: array(string, { maxItems: 6 }), key_weaknesses: array(string, { maxItems: 6 }),
     top_improvement: string,
+    appearance_analysis: object({
+      strengths: array(appearanceFinding, { maxItems: 6 }),
+      improvement_opportunities: array(appearanceFinding, { maxItems: 6 }),
+      positive_observations: array(appearanceFinding, { maxItems: 0 }),
+    }),
     visual_observations: array(object({
       id: enumeration(['visible_acne', 'visible_scarring', 'visible_oiliness', 'visible_dark_circles', 'visible_dullness', 'visible_temporal_recession', 'visible_crown_thinning', 'visible_diffuse_thinning', 'hairline_asymmetry', 'facial_hair', 'grooming_issue']),
       category: enumeration(['skin', 'hair', 'grooming']), source: enumeration(['visual_observation']),

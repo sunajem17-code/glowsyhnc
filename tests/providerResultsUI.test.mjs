@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url'
 const require=createRequire(import.meta.url)
 const {build}=require('../client/node_modules/esbuild')
 const compiled=await build({
- stdin:{contents:`import React from 'react';import {renderToStaticMarkup} from 'react-dom/server';import {StaticRouter} from 'react-router-dom/server';import Results from './src/pages/ScanUnlockGate.jsx';import Coach from './src/pages/AICoach.jsx';import MainCoach from './src/pages/Progress.jsx';import Breakdown from './src/components/AppearanceBreakdown.jsx';import CoachMessage from './src/components/CoachMessage.jsx';import {setFixture} from 'fixture-store';export function renderReply(content,reveal=false){return renderToStaticMarkup(<CoachMessage content={content} reveal={reveal}/>)};export function renderBreakdown(scan){setFixture({user:{id:"fixture-user"}});return renderToStaticMarkup(<StaticRouter><Breakdown scan={scan}/></StaticRouter>)};export function render(scan,premium){setFixture({currentScan:scan,scans:[scan],isPremium:premium,developerPreviewUnlocked:false});return renderToStaticMarkup(<StaticRouter location="/unlock"><Results/></StaticRouter>)};export function renderCoach(premium,hasScan,main=false){setFixture({user:{id:"isolated-coach-user"},userProfile:{},scans:hasScan?[{id:"scan",glowScore:6.2}]:[],isPremium:premium});return renderToStaticMarkup(<StaticRouter location="/coach">{main?<MainCoach/>:<Coach/>}</StaticRouter>)}`,
+ stdin:{contents:`import React from 'react';import {renderToStaticMarkup} from 'react-dom/server';import {StaticRouter} from 'react-router-dom/server';import Results from './src/pages/ScanUnlockGate.jsx';import Coach from './src/pages/AICoach.jsx';import MainCoach from './src/pages/Progress.jsx';import Breakdown from './src/components/AppearanceBreakdown.jsx';import CoachMessage from './src/components/CoachMessage.jsx';import {setFixture} from 'fixture-store';export function renderReply(content,reveal=false){return renderToStaticMarkup(<CoachMessage content={content} reveal={reveal}/>)};export function renderBreakdown(scan,page='pros'){setFixture({user:{id:"fixture-user"}});return renderToStaticMarkup(<StaticRouter><Breakdown scan={scan} initialPage={page}/></StaticRouter>)};export function render(scan,premium){setFixture({currentScan:scan,scans:[scan],isPremium:premium,developerPreviewUnlocked:false});return renderToStaticMarkup(<StaticRouter location="/unlock"><Results/></StaticRouter>)};export function renderCoach(premium,hasScan,main=false){setFixture({user:{id:"isolated-coach-user"},userProfile:{},scans:hasScan?[{id:"scan",glowScore:6.2}]:[],isPremium:premium});return renderToStaticMarkup(<StaticRouter location="/coach">{main?<MainCoach/>:<Coach/>}</StaticRouter>)}`,
  resolveDir:fileURLToPath(new URL('../client',import.meta.url)),loader:'jsx'},
  bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',logLevel:'silent',
  loader:{'.png':'dataurl','.jpg':'dataurl','.jpeg':'dataurl','.svg':'dataurl','.css':'empty'},
@@ -47,18 +47,32 @@ test('main AI Coach route preserves its Adonis branding and composer',()=>{
  assert.ok(html.includes('Ask anything'))
 })
 
-test('page two renders persisted personalized findings, ranked actions, verified products and coach starters',()=>{
+test('appearance results render concise persisted points with Pros and Cons tabs',()=>{
  const finding={title:'Saved side part',observation:'The scan identifies a defined side part.',significance:'It frames the face.',recommendation:'Maintain the part.',confidence:'medium'}
- const analysis={version:1,scanId:'fixture-scan',strengths:[finding],improvementOpportunities:[],positiveObservations:[finding],recommendedActions:[{title:'Keep the part',reason:'It works with the saved hairstyle.',steps:['Style the same part.'],frequency:'When styling',timeframe:''}],products:[{id:'daily_lotion',name:'CeraVe Daily Moisturizing Lotion',benefit:'Hydration',reason:'For the saved concern.',imageUrl:'https://www.cerave.com/verified-image.jpg',sourceUrl:'https://www.cerave.ca/en-ca/skincare/moisturizers/daily-moisturizing-lotion',amazonUrl:'https://www.amazon.ca/s?k=CeraVe&tag=ascendusapp05-20'}],limitations:['Photo lighting limits assessment.']}
+ const analysis={version:10,scanId:'fixture-scan',strengths:[finding],improvementOpportunities:[{...finding,title:'Soft jawline',observation:'The jaw edge is less defined in this photo.'}],positiveObservations:[],recommendedActions:[{title:'Keep the part',reason:'It works with the saved hairstyle.',steps:['Style the same part.'],frequency:'When styling',timeframe:''}],products:[{id:'daily_lotion',name:'CeraVe Daily Moisturizing Lotion',benefit:'Hydration',reason:'For the saved concern.',imageUrl:'https://www.cerave.com/verified-image.jpg',sourceUrl:'https://www.cerave.ca/en-ca/skincare/moisturizers/daily-moisturizing-lotion',amazonUrl:'https://www.amazon.ca/s?k=CeraVe&tag=ascendusapp05-20'}],limitations:['Photo lighting limits assessment.']}
  const html=renderBreakdown({id:'local-scan',serverScanId:'fixture-scan',facePhotoUrl:'fixture-photo.jpg',aiScore:{appearanceAnalysis:analysis}})
- for(const text of ['Your Appearance Breakdown','Your Strongest Features','Holding You Back','Already Going Well','Your Glow-Up Opportunities','Saved side part','Keep the part','Recommended For You','View Product','Ask My AI Coach','CeraVe Daily Moisturizing Lotion','Photo lighting limits assessment.','affiliate links'])assert.ok(html.includes(text),text)
- assert.ok(html.includes('rel="noopener noreferrer sponsored"'))
- assert.ok(!html.includes('54vh'))
- assert.ok(!html.includes('$'))
+ for(const text of ['Pros','Cons','Saved side part','Ask AI Coach'])assert.ok(html.includes(text),text)
+})
+test('appearance results show every supported saved point and its next step',()=>{
+ const strengths=Array.from({length:6},(_,index)=>({title:`Supported strength ${index+1}`,observation:`Visible strength evidence ${index+1}.`,recommendation:`Practical strength step ${index+1}.`}))
+ const html=renderBreakdown({id:'local-scan',serverScanId:'fixture-scan',aiScore:{appearanceAnalysis:{version:10,scanId:'fixture-scan',strengths,improvementOpportunities:[{title:'Supported improvement',observation:'Distinct improvement evidence.'}],positiveObservations:[]}}})
+ for(const point of strengths){
+  assert.ok(html.includes(point.title),point.title)
+  assert.ok(html.includes(point.recommendation),point.recommendation)
+ }
+})
+test('appearance results render all six supported Cons without truncating the saved array',()=>{
+ const improvements=Array.from({length:6},(_,index)=>({title:`Supported improvement ${index+1}`,observation:`Visible improvement evidence ${index+1}.`,recommendation:`Practical improvement step ${index+1}.`}))
+ const html=renderBreakdown({id:'local-scan',serverScanId:'fixture-scan',aiScore:{appearanceAnalysis:{version:10,scanId:'fixture-scan',strengths:[{title:'One strength',observation:'Visible strength.'}],improvementOpportunities:improvements,positiveObservations:[]}}},'cons')
+ for(const point of improvements){assert.ok(html.includes(point.title),point.title);assert.ok(html.includes(point.recommendation),point.recommendation)}
+})
+test('legacy two-point analysis is rejected as stale instead of being presented as complete',()=>{
+ const html=renderBreakdown({id:'old-scan',serverScanId:'fixture-scan',aiScore:{appearanceAnalysis:{version:9,scanId:'fixture-scan',strengths:[{title:'Old pro one',observation:'Old observation.'},{title:'Old pro two',observation:'Old observation.'}],improvementOpportunities:[{title:'Old con one',observation:'Old observation.'},{title:'Old con two',observation:'Old observation.'}],positiveObservations:[]}}})
+ for(const oldPoint of ['Old pro one','Old pro two','Old con one','Old con two'])assert.ok(!html.includes(oldPoint),oldPoint)
 })
 test('a scan without saved structured feedback displays no invented findings or products',()=>{
  const html=renderBreakdown({id:'legacy-scan',facePhotoUrl:'legacy.jpg',aiScore:{}})
- assert.ok(html.includes('Your Appearance Breakdown'))
+ assert.ok(html.includes('Pros'))
  assert.ok(!html.includes('Your Strongest Features'))
  assert.ok(!html.includes('View Product'))
 })

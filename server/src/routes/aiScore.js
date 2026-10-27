@@ -1,6 +1,7 @@
 const express = require('express')
 const { createAIClient, getAIKey, cacheNamespace } = require('../lib/aiProvider')
 const aiSchemas = require('../lib/aiSchemas')
+const { normalizeAppearanceAnalysis, bindAppearanceScoreReferences, hasValidScoreReferences } = require('../lib/appearanceAnalysis')
 const coachScans = require('../lib/coachScanContext')
 const { EYE_GUIDANCE, GENERAL_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
@@ -33,7 +34,7 @@ function sampleB64(s) {
 
 function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(cacheNamespace() + '||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
+    .update(cacheNamespace() + '||v9_appearance_analysis_depth||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -49,8 +50,22 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
   h.update('||' + cacheNamespace())
-  h.update('||v5_physique_visual_scoring') // bust results created before body photos were part of the cache identity
+  h.update('||v9_appearance_analysis_depth') // invalidate cached responses with shallow or unlinked Pros/Cons
   return h.digest('hex') // 64-char hex string
+}
+
+function cachedResultForScan(value, scanId) {
+  if (!value?.appearanceAnalysis || Number(value.appearanceAnalysis.version) < 10) return null
+  try {
+    const appearanceAnalysis = normalizeAppearanceAnalysis(value.appearanceAnalysis, scanId)
+    if (!hasValidScoreReferences(appearanceAnalysis)) return null
+    return withPotentialScore({
+      ...value,
+      appearanceAnalysis,
+    })
+  } catch {
+    return null
+  }
 }
 
 function getClient() {
@@ -251,7 +266,7 @@ Include a "profile" object in your JSON response.` : ''
     // extended_metrics (30 more {score, descriptor} pairs) moved to its own
     // call (getExtendedMetrics) — this budget only needs to cover the core
     // fields + optional profile block now.
-    max_tokens: hasSide ? 1300 : 1100,
+    max_tokens: hasSide ? 4200 : 3800,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
@@ -375,7 +390,7 @@ Descriptor rules: describe what IS there, not what is missing. Max 10 words. No 
 ${profileSection}${evidenceNote}
 
 VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
-KEY STRENGTHS: return 2–4 scan-supported findings. Each should be a concise 3–8 word phrase naming a visible feature, not a sentence. Examples: "Balanced facial symmetry", "Clear skin texture". Do not pad or invent a finding.
+KEY STRENGTHS: return up to 6 distinct scan-supported findings, aiming for 4–6 when the photos support them. Each should be a concise 3–8 word phrase naming a visible feature, not a sentence. Examples: "Balanced facial symmetry", "Clear skin texture". Do not pad or invent a finding.
 
 ${GENERAL_GUIDANCE}
 
@@ -383,9 +398,13 @@ ${EYE_GUIDANCE}
 
 For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
 
-KEY WEAKNESSES: return up to 4 concise 3–8 word phrases supported by visible evidence. Preserve uncertainty in the phrase when needed (for example, "Skin texture in this lighting"). No diagnosis or unsupported structural claim.
+KEY WEAKNESSES: return up to 6 distinct concise 3–8 word phrases supported by visible evidence, aiming for 4–6 when the photos support them. Preserve uncertainty in the phrase when needed (for example, "Skin texture in this lighting"). No diagnosis or unsupported structural claim.
 
 TOP IMPROVEMENT: one short actionable sentence, maximum 14 words. Keep frequency or safety qualification only when needed. Do not repeat the weakness list.
+
+PROS AND CONS — return distinct, useful entries in appearance_analysis. Aim for 4–6 strengths and 4–6 improvement opportunities when the front/profile photos and scores support that many; return fewer when evidence is limited. Never invent or repeat a point to reach a count. Each point must name a specific visible feature, use a 3–8 word title, give one concise evidence-based observation, a short significance, and one practical recommendation. Keep observation and recommendation brief enough to display as two sentences when expanded. Do not restate one finding under different titles or repeat the same underlying feature across a tab. Use positive_observations as an empty array; include supported positives in strengths instead.
+
+SCORE CONSISTENCY — every finding must include 1–2 metric_keys that directly support that finding. Use only these exact keys: face_score, grooming_score, pillar_harmony, pillar_angularity, pillar_features, pillar_dimorphism, sub_symmetry, sub_jawline_definition, sub_skin_clarity, sub_facial_proportions, sub_eye_area, sub_facial_harmony, metric_jawline, metric_cheekbones, metric_symmetry, metric_skin_quality, metric_masculinity_femininity, metric_facial_thirds. Check those exact scores in this response before labeling a finding a strength or improvement. A higher score is relatively stronger on that metric; a lower score can support an improvement only when the photo also shows the specific concern. Do not call an average score a serious flaw or infer a visible condition from a score alone. Do not give a low-score metric a positive title or a high-score metric a negative title unless the written rubric explicitly explains the difference. The overall score and potential score are different: current appearance describes this photo; potential is a separate estimate, not a current strength. Evidence must still be visible in the supplied photo, not score-only.
 
 Return ONLY this JSON — no markdown, nothing else:
 {
@@ -407,9 +426,14 @@ Return ONLY this JSON — no markdown, nothing else:
     "eye_area": <number 1.0–10.0>,
     "facial_harmony": <number 1.0–10.0>
   },
-  "key_strengths": ["<strength 1>", "<strength 2>"],
-  "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
+  "key_strengths": ["<supported distinct strength 1>", "<supported distinct strength 2>", "<up to 6 total when supported>"],
+  "key_weaknesses": ["<supported distinct improvement 1>", "<supported distinct improvement 2>", "<up to 6 total when supported>"],
   "top_improvement": "<single most impactful improvement>",
+  "appearance_analysis": {
+    "strengths": [{ "title": "<short title>", "observation": "<one concise visible-evidence sentence>", "significance": "<brief context>", "recommendation": "<one concise practical step>", "metric_keys": ["<one or two directly supporting keys>"] }],
+    "improvement_opportunities": [{ "title": "<short title>", "observation": "<one concise visible-evidence sentence>", "significance": "<brief context>", "recommendation": "<one concise practical step>", "metric_keys": ["<one or two directly supporting keys>"] }],
+    "positive_observations": []
+  },
   "visual_observations": [
     { "id": "<allowed id>", "category": "<skin|hair|grooming>", "source": "visual_observation", "confidence": "<low|medium|high>", "images_supporting": ["<front|profile>"], "limitations": ["<relevant limitation>"] }
   ],
@@ -853,10 +877,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     // bone-structure-only prompt rewrite (temperature 0.1 + no celebrity name examples)
     const cacheKey = hashImages(faceBase64, bodyBase64, sideBase64)
     if (scoreCache.has(cacheKey)) {
-      console.log('[aiScore] L1 cache hit:', cacheKey)
-      const cached = withPotentialScore(scoreCache.get(cacheKey))
-      scoreCache.set(cacheKey, cached)
-      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      const cached = cachedResultForScan(scoreCache.get(cacheKey), completedScanId)
+      if (cached) {
+        console.log('[aiScore] L1 cache hit')
+        scoreCache.set(cacheKey, cached)
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      }
+      scoreCache.delete(cacheKey)
+      console.log('[aiScore] L1 cache entry missing current appearance analysis; rescoring')
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
@@ -865,15 +893,18 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const sbCached = await getScanCache(fullHash)
     console.log(`[aiScore:TIMING] L2 Supabase cache lookup took ${Date.now() - tL2Start}ms`)
     if (sbCached) {
-      console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
-      if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
-      const cached = withPotentialScore(sbCached)
-      scoreCache.set(cacheKey, cached)
-      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      const cached = cachedResultForScan(sbCached, completedScanId)
+      if (cached) {
+        console.log('[aiScore] L2 Supabase cache hit')
+        if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
+        scoreCache.set(cacheKey, cached)
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      }
+      console.log('[aiScore] L2 cache entry missing current appearance analysis; rescoring')
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
-    console.log('[aiScore] Inputs — gender:', gender, '| side:', sideBase64 ? 'YES' : 'NO', '| body:', bodyBase64 ? 'YES' : 'NO')
+    console.log('[aiScore] Inputs received | side:', !!sideBase64, '| body:', !!bodyBase64)
 
     const tRouteStart = Date.now()
 
@@ -902,7 +933,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         return result
       }).catch(faceErr => {
         console.log(`[aiScore:TIMING] STEP 1 (face) FAILED after ${Date.now() - tFaceStart}ms`)
-        console.error(`[aiScore] STEP 1 FAILED — face scoring threw: "${faceErr.message}" | userId=${req.userId} gender=${gender} hasSide=${!!sideBase64}`)
+        console.error(`[aiScore] STEP 1 FAILED | errorType=${faceErr.name || 'Error'} | hasSide=${!!sideBase64}`)
         throw faceErr  // only face failure escalates to a full error response
       })
 
@@ -917,7 +948,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
             })
             .catch(physiqueErr => {
               console.log(`[aiScore:TIMING] STEP 3 (physique) FAILED after ${Date.now() - tPhysiqueStart}ms`)
-              console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only: "${physiqueErr.message}" | userId=${req.userId} gender=${gender}`)
+              console.warn(`[aiScore] STEP 3 FAILED — physique non-fatal, falling back to face-only | errorType=${physiqueErr.name || 'Error'}`)
               return null
             })
         : (console.log('[aiScore] STEP 3 — no body photo, skipped'), Promise.resolve(null))
@@ -1013,6 +1044,10 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       keyStrengths:      faceResult.key_strengths,
       keyWeaknesses:     faceResult.key_weaknesses,
       topImprovement:    faceResult.top_improvement,
+      appearanceAnalysis: bindAppearanceScoreReferences(
+        normalizeAppearanceAnalysis(faceResult.appearance_analysis, completedScanId),
+        faceResult,
+      ),
       faceMetrics: (() => {
         const fm = faceResult.face_metrics
         if (!fm) return null
@@ -1082,7 +1117,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       lower.includes('too many')
 
     // Full error detail always logged to Railway — including retry-exhausted errors
-    console.error(`[aiScore] ROUTE ERROR — userId=${req.userId} status=${status} retryExhausted=${!!err.retryExhausted} msg="${msg.slice(0, 300)}"`)
+    console.error(`[aiScore] ROUTE ERROR — status=${status} retryExhausted=${!!err.retryExhausted} errorType=${err.name || 'Error'}`)
 
     if (isRateLimit) {
       // 'rate_limited' is the machine-readable code the client checks for countdown/auto-retry
@@ -1141,7 +1176,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       lower.includes('overloaded') || lower.includes('capacity') ||
       lower.includes('too many')
 
-    console.error(`[aiScore:physique-only] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
+    console.error(`[aiScore:physique-only] ROUTE ERROR — status=${status} errorType=${err.name || 'Error'}`)
 
     if (isRateLimit) {
       return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
@@ -1228,7 +1263,7 @@ router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, asy
       lower.includes('overloaded') || lower.includes('capacity') ||
       lower.includes('too many')
 
-    console.error(`[aiScore:extended] ROUTE ERROR — userId=${req.userId} status=${status} msg="${msg.slice(0, 300)}"`)
+    console.error(`[aiScore:extended] ROUTE ERROR — status=${status} errorType=${err.name || 'Error'}`)
 
     if (isRateLimit) {
       return res.status(429).json({ error: 'rate_limited', retryAfter: 60 })
@@ -1394,7 +1429,7 @@ Respond ONLY with valid JSON matching the required schema — no extra text:
 // Returns { valid, faceCount, issues: [{type, message}] }.
 // The image is NEVER stored, cached, logged, or used for model training.
 // Rate-limited separately from scoring (validations are cheap; haiku model).
-router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, async (req, res) => {
+router.post('/validate-scan', express.json({ limit: '8mb' }), verifyToken, resolvePro, claudeLimit, async (req, res) => {
   const { imageB64 } = req.body
   if (!imageB64 || typeof imageB64 !== 'string') {
     return res.status(400).json({ error: 'imageB64 is required' })

@@ -53,7 +53,17 @@ function ownedResult(id, userId) {
 // history when the local row is gone; never substitute another scan.
 async function ownedCoachScan(id, userId) {
   const local = ownedResult(id, userId)
-  if (local) return { scan: normalize(local.row), result: local.result }
+  if (local) return { scan: normalize(local.row), result: local.result, row: local.row }
+
+  // Legacy local rows predate the server_analysis_v1 envelope. Keep the
+  // owner-scoped row available for photo reanalysis without rewriting its
+  // original scores or history.
+  const legacyRow = db.prepare('SELECT * FROM scans WHERE id = ? AND user_id = ?').get(id, userId)
+  const legacyData = parse(legacyRow?.face_data)
+  if (legacyRow && legacyData && (legacyData.status == null || legacyData.status === 'completed')) {
+    const scan = normalize(legacyRow)
+    if (scan) return { scan, result: legacyData.result || legacyData, row: legacyRow }
+  }
 
   const supabase = getSupabase()
   if (!supabase) return null
@@ -62,7 +72,7 @@ async function ownedCoachScan(id, userId) {
   if (error) throw new Error('Selected scan lookup failed')
   if (!data || String(data.user_id) !== String(userId)) return null
   const scan = normalize(data)
-  return scan ? { scan, result: null } : null
+  return scan ? { scan, result: null, row: data } : null
 }
 
 function latestOwnedResult(userId) {
@@ -75,10 +85,11 @@ function latestOwnedResult(userId) {
 function normalize(row) {
   const data = parse(row.face_data)
   if (data?.kind === KIND && data.status !== 'completed') return null
-  const result = data?.kind === KIND ? data.result : null
+  const result = data?.kind === KIND ? data.result : (data?.result && typeof data.result === 'object' ? data.result : data)
+  const extendedMetrics = parse(row.extended_metrics)
   const score = result?.overallScore ?? row.overall_score ?? row.glow_score
   if (score == null || !Number.isFinite(Number(score))) return null
-  const legacyFace = data?.kind === KIND ? null : data
+  const legacyFace = data?.kind === KIND ? null : result
   const bodyData = parse(row.body_data)
   return {
     id: row.id, completedAt: row.analyzed_at || row.created_at || row.scan_date,
@@ -92,14 +103,14 @@ function normalize(row) {
     notAssessable: clean(result?.evidenceSummary?.notAssessable),
     measurementLimitations: clean(result?.evidenceSummary?.limitations),
     observations: clean(result?.visualObservations), faceMetrics: clean(result?.faceMetrics),
-    appearanceAnalysis: clean(result?.appearanceAnalysis),
+    appearanceAnalysis: clean(result?.appearanceAnalysis ?? extendedMetrics?.appearanceAnalysis ?? legacyFace?.appearanceAnalysis),
     strengths: clean(result?.keyStrengths), improvements: clean(result?.keyWeaknesses),
     recommendation: clean(result?.topImprovement),
     hairType: clean(result?.hairType ?? row.hair_type_detected),
     savedHairstyleRecommendations: clean([row.hairstyle_recommendation_1, row.hairstyle_recommendation_2, row.hairstyle_recommendation_3].filter(Boolean)),
     profile: clean(result?.profileData),
     physique: clean(result?.physiqueScore ?? bodyData?.physiqueScore ?? bodyData?.physique_score ?? bodyData?.physiqueResult ?? bodyData),
-    extendedMetrics: clean(result?.extendedMetrics ?? row.extended_metrics),
+    extendedMetrics: clean(result?.extendedMetrics ?? extendedMetrics),
     source: result ? 'saved_analysis' : 'legacy_saved_summary',
     // Kept internal, excluded from the prompt and response metadata.
     imagePath: row.face_image_url || row.face_photo_url || null,
@@ -141,7 +152,20 @@ function publicContext(context, isPro) {
   function view(scan) {
     if (!scan) return null
     const { imagePath, ...data } = scan
-    if (!isPro) { delete data.scores; delete data.faceMetrics; delete data.extendedMetrics; delete data.profile; delete data.physique }
+    if (!isPro) {
+      delete data.scores; delete data.faceMetrics; delete data.extendedMetrics; delete data.profile; delete data.physique
+      if (data.appearanceAnalysis) {
+        const stripReferences = findings => Array.isArray(findings)
+          ? findings.map(({ scoreReferences, ...finding }) => finding)
+          : findings
+        data.appearanceAnalysis = {
+          ...data.appearanceAnalysis,
+          strengths: stripReferences(data.appearanceAnalysis.strengths),
+          improvementOpportunities: stripReferences(data.appearanceAnalysis.improvementOpportunities),
+          positiveObservations: stripReferences(data.appearanceAnalysis.positiveObservations),
+        }
+      }
+    }
     return data
   }
   return { status: context.status, latest: view(context.latest), previous: context.previous.map(view), goals: context.profile }

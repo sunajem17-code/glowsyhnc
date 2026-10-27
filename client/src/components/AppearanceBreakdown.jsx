@@ -5,6 +5,7 @@ import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import useStore from '../store/useStore'
 import { conciseFinding } from '../utils/conciseFinding'
+import { isCurrentAppearanceAnalysis } from '../utils/appearanceAnalysis'
 import './AppearanceBreakdown.css'
 
 const pending = new Map()
@@ -33,28 +34,24 @@ function asFindings(items) {
 
 function savedAnalysisFor(scan, scanId) {
   const cached = scan?.aiScore?.appearanceAnalysis || scan?.appearanceAnalysis
-  if (cached?.scanId === scanId && Array.isArray(cached.strengths)) {
+  if (isCurrentAppearanceAnalysis(cached, scanId)) {
     return { ...cached, strengths: asFindings(cached.strengths), improvementOpportunities: asFindings(cached.improvementOpportunities), positiveObservations: asFindings(cached.positiveObservations) }
   }
-
-  // Older progress scans already saved these observations during scoring.
-  // Reuse those values directly and never call the AI just to display them.
-  const strengths = asFindings(scan?.aiScore?.keyStrengths || scan?.keyStrengths)
-  const improvements = asFindings(scan?.aiScore?.keyWeaknesses || scan?.keyWeaknesses)
-  if (!strengths.length && !improvements.length) return null
-  return { scanId, strengths, improvementOpportunities: improvements, positiveObservations: [], version: 0, source: 'saved_scan_findings' }
+  // Old or shallow findings are not complete analysis. Refresh them through
+  // the authenticated endpoint using the original private scan photo.
+  return null
 }
 
-export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
+export default function AppearanceBreakdown({ scan, coachPhotoUrl, initialPage = 'pros' }) {
   const navigate = useNavigate()
   const owner = useStore(state => state.user?.id)
-  const scanId = scan?.serverScanId || scan?.aiScore?.scanId
+  const scanId = scan?.serverScanId || scan?.aiScore?.scanId || scan?.id
   const cached = savedAnalysisFor(scan, scanId)
   const [analysis, setAnalysis] = useState(cached)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [retry, setRetry] = useState(0)
-  const [page, setPage] = useState('pros')
+  const [page, setPage] = useState(initialPage)
 
   useEffect(() => {
     let active = true
@@ -71,7 +68,7 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
     if (!pending.has(key)) pending.set(key, api.coach.appearance(scanId).finally(() => pending.delete(key)))
     pending.get(key).then(({ analysis: result }) => {
       if (!active) return
-      if (result?.scanId !== scanId || !Array.isArray(result.strengths)) throw new Error('The analysis did not match this scan. Please retry.')
+      if (!isCurrentAppearanceAnalysis(result, scanId)) throw new Error('Your saved scan needs a refreshed analysis. Please retry after the update is available.')
       saveAnalysis(scan, result)
       setAnalysis(result)
     }).catch(err => { if (active) setError(err.message || 'Your analysis could not load. Please retry.') })
@@ -81,7 +78,7 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
 
   const pros = uniquePoints(analysis?.strengths, analysis?.positiveObservations)
   const focusAreas = uniquePoints(analysis?.improvementOpportunities)
-  const points = (page === 'pros' ? pros : focusAreas).slice(0, 4)
+  const points = page === 'pros' ? pros : focusAreas
   const pageTitle = page === 'pros' ? 'Pros' : 'Cons'
   return <div className="appearance-dashboard">
     <div role="tablist" aria-label="Appearance points" className="appearance-page-switch">
@@ -95,7 +92,9 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
       {analysis && <ul className="appearance-points-list" tabIndex={0} aria-label={`${pageTitle} details`}>{points.length ? points.map((item, index) => {
         const fullTitle = item.title?.trim() || item.observation?.trim()
         const pointTitle = conciseFinding(fullTitle)
-        const explanation = item.observation?.trim() || item.significance?.trim()
+        const observation = item.observation?.trim() || item.significance?.trim()
+        const recommendation = item.recommendation?.trim()
+        const explanation = [observation, recommendation && recommendation !== observation ? recommendation : ''].filter(Boolean).join(' ')
         return <li key={`${pointTitle}-${index}`}>
           <span className="appearance-point-title">{pointTitle}</span>
           {(explanation || fullTitle !== pointTitle) && <details><summary>Details</summary><p>{explanation && explanation !== fullTitle ? explanation : fullTitle}</p></details>}

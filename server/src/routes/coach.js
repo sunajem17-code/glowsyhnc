@@ -6,7 +6,7 @@ const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
-const { loadContext, clean, ownedResult, ownedCoachScan, parseProvidedImage } = require('../lib/coachScanContext')
+const { loadContext, clean, ownedCoachScan, parseProvidedImage } = require('../lib/coachScanContext')
 const { answer } = require('../lib/coachIntelligence')
 
 router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) => {
@@ -22,10 +22,10 @@ async function serveSavedAppearance(req, res, next) {
   if (req.isDemo) return next()
   if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return next()
   try {
-    const saved = ownedResult(req.body.scanId, req.userId)
+    const saved = await ownedCoachScan(req.body.scanId, req.userId)
     if (!saved) return next()
     const { cachedBreakdown } = require('../lib/appearanceBreakdown')
-    const analysis = cachedBreakdown(saved.result, req.body.scanId)
+    const analysis = cachedBreakdown(saved.result || { appearanceAnalysis: saved.scan.appearanceAnalysis }, req.body.scanId)
     if (analysis) return res.json({ analysis })
     return next()
   } catch {
