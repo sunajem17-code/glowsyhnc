@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import useStore from '../store/useStore'
+import { getDisplayableAppearanceAnalysis, isCurrentAppearanceAnalysis } from '../utils/appearanceAnalysis'
 import './AppearanceBreakdown.css'
 
 const pending = new Map()
@@ -25,29 +26,14 @@ function uniquePoints(...groups) {
   })
 }
 
-function asFindings(items) {
-  return Array.isArray(items) ? items.map(item => typeof item === 'string' ? { title: item.trim(), observation: '' } : item)
-    .filter(item => item && (typeof item.title === 'string' || typeof item.observation === 'string')) : []
-}
-
 function savedAnalysisFor(scan, scanId) {
-  const cached = scan?.aiScore?.appearanceAnalysis || scan?.appearanceAnalysis
-  if (cached?.scanId === scanId && Array.isArray(cached.strengths)) {
-    return { ...cached, strengths: asFindings(cached.strengths), improvementOpportunities: asFindings(cached.improvementOpportunities), positiveObservations: asFindings(cached.positiveObservations) }
-  }
-
-  // Older progress scans already saved these observations during scoring.
-  // Reuse those values directly and never call the AI just to display them.
-  const strengths = asFindings(scan?.aiScore?.keyStrengths || scan?.keyStrengths)
-  const improvements = asFindings(scan?.aiScore?.keyWeaknesses || scan?.keyWeaknesses)
-  if (!strengths.length && !improvements.length) return null
-  return { scanId, strengths, improvementOpportunities: improvements, positiveObservations: [], version: 0, source: 'saved_scan_findings' }
+  return getDisplayableAppearanceAnalysis(scan, scanId)
 }
 
 export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
   const navigate = useNavigate()
   const owner = useStore(state => state.user?.id)
-  const scanId = scan?.serverScanId || scan?.aiScore?.scanId
+  const scanId = scan?.serverScanId || scan?.aiScore?.scanId || scan?.id
   const cached = savedAnalysisFor(scan, scanId)
   const [analysis, setAnalysis] = useState(cached)
   const [error, setError] = useState('')
@@ -60,7 +46,8 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
     const saved = savedAnalysisFor(scan, scanId)
     setAnalysis(saved)
     setError('')
-    if (saved) return
+    const source = scan?.aiScore?.appearanceAnalysis || scan?.appearanceAnalysis
+    if (isCurrentAppearanceAnalysis(source, scanId)) return
     if (!scanId) {
       setError('This older scan has no saved analysis reference. Take a new scan to get your personalized breakdown.')
       return
@@ -70,7 +57,7 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
     if (!pending.has(key)) pending.set(key, api.coach.appearance(scanId).finally(() => pending.delete(key)))
     pending.get(key).then(({ analysis: result }) => {
       if (!active) return
-      if (result?.scanId !== scanId || !Array.isArray(result.strengths)) throw new Error('The analysis did not match this scan. Please retry.')
+      if (!isCurrentAppearanceAnalysis(result, scanId)) throw new Error('The saved analysis could not be refreshed yet. Please retry.')
       saveAnalysis(scan, result)
       setAnalysis(result)
     }).catch(err => { if (active) setError(err.message || 'Your analysis could not load. Please retry.') })
@@ -82,6 +69,9 @@ export default function AppearanceBreakdown({ scan, coachPhotoUrl }) {
   const focusAreas = uniquePoints(analysis?.improvementOpportunities)
   const points = page === 'pros' ? pros : focusAreas
   const pageTitle = page === 'pros' ? 'Pros' : 'Cons'
+  useEffect(() => {
+    if (import.meta.env.DEV && analysis) console.info('[appearance-analysis]', { stage: 'findings_rendered', pros: pros.length, cons: focusAreas.length })
+  }, [analysis, pros.length, focusAreas.length])
   return <div className="appearance-dashboard">
     <div role="tablist" aria-label="Appearance points" className="appearance-page-switch">
       <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="appearance-points-panel" onClick={() => setPage('pros')}>Pros</button>
