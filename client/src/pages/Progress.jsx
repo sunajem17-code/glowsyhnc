@@ -1,3 +1,4 @@
+import useCoachScroll from '../hooks/useCoachScroll'
 import CoachAccessGate from '../components/CoachAccessGate'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
@@ -9,7 +10,7 @@ import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
-import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages, waitForMinimumCoachThinking } from '../utils/coachChat'
+import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages } from '../utils/coachChat'
 import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
 import { prepareCoachPhoto } from '../utils/coachPhoto'
 
@@ -171,15 +172,8 @@ export default function Progress() {
     } catch {}
   }, [messages, user?.id, messagesOwner])
 
-  useEffect(() => {
-    const container = bottomRef.current?.closest('[data-coach-scroll]')
-    if (container) {
-      container.scrollTop = container.scrollHeight
-      // Hidden app-shell ancestors must never scroll with a chat reply.
-      const shell = container.closest('main')
-      if (shell) shell.scrollTop = 0
-    }
-  }, [messages, loading, showTypewriter])
+  const followLatest = useCoachScroll(bottomRef, serverScan?.isPro === true, messages)
+
 
   async function send(text) {
     const txt = (text || input).trim()
@@ -187,6 +181,7 @@ export default function Progress() {
     if (sendState === 'ignore') return
 
     const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(txt))
+    followLatest()
     setInput('')
     setChipsVisible(false)
     const generation = requestGenerationRef.current
@@ -196,12 +191,10 @@ export default function Progress() {
       const [userMessage, assistantMessage] = getScanRequiredMessages(txt)
       setMessages(prev => [...prev, userMessage])
       setLoading(true)
-      const requestStartedAt = Date.now()
-      await waitForMinimumCoachThinking(requestStartedAt)
-      if (generation !== requestGenerationRef.current) return
+        if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, assistantMessage])
       setLoading(false)
-      inputRef.current?.focus()
+
       return
     }
 
@@ -210,7 +203,6 @@ export default function Progress() {
     setMessages(next)
     setCoachPhoto(null)
     setLoading(true)
-    const requestStartedAt = Date.now()
     try {
       const scanPhotoData = await prepareCoachPhoto(scanPhotoSource).catch(() => null)
       const data = await api.coach.message({
@@ -221,7 +213,6 @@ export default function Progress() {
         ...(scanPhotoData ? { scanPhotoData } : {}),
         preferences: { goal: userProfile?.goal, goal_type: userProfile?.goal_type, improvement_focus: userProfile?.improvement_focus },
       })
-      await waitForMinimumCoachThinking(requestStartedAt)
       if (generation !== requestGenerationRef.current) return
       conversationRef.current = data.conversationId
       setMessages(prev => [...prev, { role: 'assistant', content: data.message, reveal: true }])
@@ -234,7 +225,7 @@ export default function Progress() {
     } finally {
       if (generation !== requestGenerationRef.current) return
       setLoading(false)
-      inputRef.current?.focus()
+
     }
   }
 
@@ -243,7 +234,7 @@ export default function Progress() {
   const hasHistory = messages.length > 0
 
   return (
-    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+    <MotionPage baseClassName="" className="flex min-h-0 flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
 
       {/* Header */}
       <div
@@ -272,7 +263,7 @@ export default function Progress() {
       </div>
 
       {/* Messages */}
-      <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-5 pb-2">
+      <div data-coach-scroll className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 pt-5 pb-2">
 
         {/* Typewriter greeting on first load */}
         {showTypewriter && !hasHistory && (
@@ -321,7 +312,7 @@ export default function Progress() {
       </div>
 
       {/* Composer stays available; a scan is required before a message can be sent. */}
-      <div className="flex-shrink-0 px-4 pb-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      <div className="flex-shrink-0 px-4 pb-3" style={{ paddingBottom: 'calc(var(--coach-bottom-inset, env(safe-area-inset-bottom, 0px)) + 12px)' }}>
         <div
           className="flex items-center gap-3 px-4 rounded-2xl"
           style={{
@@ -341,14 +332,15 @@ export default function Progress() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
               placeholder={coachPhoto ? 'Scan photo attached' : 'Ask anything…'}
-              className="min-w-0 flex-1 bg-transparent text-[14px] font-body text-primary outline-none"
+              className="min-w-0 flex-1 bg-transparent text-[16px] font-body text-primary outline-none focus:outline-none focus:ring-0"
               style={{ color: 'rgba(255,255,255,0.9)' }}
             />
           </div>
           <motion.button
             whileTap={{ scale: 0.88 }}
             onClick={() => { triggerHaptic(); send() }}
-            aria-label="Send message"
+            aria-label={loading ? "Sending message" : "Send message"}
+            onPointerDown={event => event.preventDefault()}
             disabled={!input.trim() || loading}
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
             style={{

@@ -7,14 +7,21 @@ export function isNative() {
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
+let permissionRequest = null
+export function ensureNotificationPermission() {
+  if (!isNative()) return Promise.resolve('unavailable')
+  if (!permissionRequest) permissionRequest = (async () => {
+    let permission = await LocalNotifications.checkPermissions()
+    if (['prompt', 'prompt-with-rationale'].includes(permission.display)) permission = await LocalNotifications.requestPermissions()
+    return permission.display
+  })().finally(() => { permissionRequest = null })
+  return permissionRequest
+}
+
 export async function requestNotificationPermission() {
   if (!isNative()) return false
   try {
-    let perm = await LocalNotifications.checkPermissions()
-    if (['prompt', 'prompt-with-rationale'].includes(perm.display)) {
-      perm = await LocalNotifications.requestPermissions()
-    }
-    if (perm.display !== 'granted') return false
+    if (await ensureNotificationPermission() !== 'granted') return false
     return await scheduleStreakReminder()
   } catch {
     return false

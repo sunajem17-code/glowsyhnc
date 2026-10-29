@@ -6,7 +6,7 @@ const point = title => ({ title, observation: `Evidence for ${title}.` })
 
 test('accepts current structured findings from the matching scan', () => {
   assert.equal(isCurrentAppearanceAnalysis({
-    version: 11,
+    version: 12,
     scanId: 'scan-1',
     strengths: [point('Symmetry'), point('Proportions')],
     improvementOpportunities: [point('Skin texture'), point('Jaw definition')],
@@ -23,7 +23,7 @@ test('rejects production version-3 two-point analyses even when scan IDs match',
 })
 
 test('rejects incomplete findings and responses belonging to a different scan', () => {
-  const analysis = { version: 11, scanId: 'scan-1', strengths: [point('Symmetry')], improvementOpportunities: [point('Skin')] }
+  const analysis = { version: 12, scanId: 'scan-1', strengths: [point('Symmetry')], improvementOpportunities: [point('Skin')] }
   assert.equal(isCurrentAppearanceAnalysis(analysis, 'scan-2'), false)
   assert.equal(isCurrentAppearanceAnalysis({ ...analysis, improvementOpportunities: [{ title: 'No observation' }] }, 'scan-1'), false)
 })

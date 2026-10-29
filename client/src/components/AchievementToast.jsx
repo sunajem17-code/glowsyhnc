@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
@@ -13,8 +14,9 @@ export default function AchievementToast() {
     return () => clearTimeout(t)
   }, [ach, clearPendingAchievement])
 
-  return (
-    <AnimatePresence>
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0" style={{ zIndex: 20010 }}>
+    <AnimatePresence mode="wait">
       {ach && (
         <motion.div
           key={ach.key}
@@ -22,8 +24,11 @@ export default function AchievementToast() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -60, scale: 0.9 }}
           transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-3.5 rounded-2xl flex items-center gap-3"
+          role="status" aria-live="polite"
+          className="pointer-events-auto fixed left-1/2 -translate-x-1/2 px-5 py-3.5 rounded-2xl flex items-center gap-3"
           style={{
+            x: '-50%',
+            top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
             background: '#111',
             border: `1.5px solid ${ach.color}55`,
             boxShadow: `0 4px 24px rgba(0,0,0,0.6), 0 0 20px ${ach.color}22`,
@@ -44,8 +49,10 @@ export default function AchievementToast() {
             <p className="font-heading font-bold text-[12px] text-white truncate">{ach.title}</p>
             <p className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{ach.desc}</p>
           </div>
+          <button type="button" aria-label="Dismiss notification" onClick={clearPendingAchievement} className="self-start p-2 text-white/60">×</button>
         </motion.div>
       )}
     </AnimatePresence>
+    </div>, document.body
   )
 }

@@ -1,4 +1,4 @@
-const CURRENT_APPEARANCE_ANALYSIS_VERSION = 11
+const CURRENT_APPEARANCE_ANALYSIS_VERSION = 12
 
 function hasCompleteFindings(rows) {
   return Array.isArray(rows) && rows.length <= 6 && rows.every(item =>

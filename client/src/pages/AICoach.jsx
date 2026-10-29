@@ -1,3 +1,4 @@
+import useCoachScroll from '../hooks/useCoachScroll'
 import CoachAccessGate from '../components/CoachAccessGate'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
@@ -163,7 +164,7 @@ export default function AICoach() {
         setMessages(saved.messages.slice(-12).map(message => ({ ...message, reveal: false })))
       }
     } catch { /* private browsing/storage unavailable */ }
-    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => {})
+    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => { if (active) setServerScan({ status: 'unavailable' }) })
     return () => { active = false; requestGenerationRef.current += 1 }
   }, [user?.id, latestScan?.id])
 
@@ -178,15 +179,8 @@ export default function AICoach() {
   }, [messages, user?.id, messagesOwner])
 
   // Scroll to bottom on new message
-  useEffect(() => {
-    const container = messagesEndRef.current?.closest('[data-coach-scroll]')
-    if (container) {
-      container.scrollTop = container.scrollHeight
-      // Hidden app-shell ancestors must never scroll with a chat reply.
-      const shell = container.closest('main')
-      if (shell) shell.scrollTop = 0
-    }
-  }, [messages, loading])
+  const followLatest = useCoachScroll(messagesEndRef, serverScan?.isPro === true, messages)
+
 
   // Initial greeting on mount
   useEffect(() => {
@@ -208,6 +202,7 @@ export default function AICoach() {
     // Not premium → open paywall immediately
     if (!serverScan?.isPro) { navigate('/unlock?paywall=1'); return }
 
+    followLatest()
     setInput('')
     setError('')
 
@@ -246,7 +241,7 @@ export default function AICoach() {
     } finally {
       if (generation !== requestGenerationRef.current) return
       setLoading(false)
-      inputRef.current?.focus()
+
     }
   }
 
@@ -261,7 +256,7 @@ export default function AICoach() {
 
   // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
-    <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+    <MotionPage baseClassName="" className="flex min-h-0 flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -315,7 +310,7 @@ export default function AICoach() {
       </motion.div>
 
       {/* Messages */}
-      <div data-coach-scroll className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
+      <div data-coach-scroll className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 pt-4 pb-2">
         {messages.length === 0 && !loading && (
           <motion.div
             initial={{ opacity: 0 }}

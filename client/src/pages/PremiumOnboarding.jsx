@@ -2,7 +2,7 @@ import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
+import { Bell, ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -18,7 +18,7 @@ import { analyzeSideProfile } from '../utils/photoGeometry'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
-import { requestNotificationPermission } from '../utils/notifications'
+import { ensureNotificationPermission, requestNotificationPermission } from '../utils/notifications'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 
 // ── Animated processing overlay (bars + "Processing" label) ──────────────────
@@ -53,13 +53,13 @@ const DIM = 'var(--text-secondary)'
 //         8=locked-reveal, 9=phase, 10=transformation, 11=rating
 // Progress counter: only during data-collection steps (2–7)
 
-// Draft persistence: survives a refresh/backgrounding mid-quiz. Session-scoped
-// (not localStorage) and excludes password fields so nothing sensitive lingers.
+// Draft persistence survives app restarts and excludes authentication fields.
 const DRAFT_KEY = 'ascendus_onboarding_draft'
+let guestSessionFlight = null
 
 function loadDraft() {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY)
+    const raw = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY)
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -68,7 +68,7 @@ function loadDraft() {
 
 function saveDraft(draft) {
   try {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
   } catch {
     // storage unavailable (private browsing, quota) — fail silently, non-critical
   }
@@ -76,6 +76,7 @@ function saveDraft(draft) {
 
 function clearDraft() {
   try {
+    localStorage.removeItem(DRAFT_KEY)
     sessionStorage.removeItem(DRAFT_KEY)
   } catch {
     // ignore
@@ -1031,11 +1032,7 @@ function StepNotifications({ onNext }) {
     setLoading(true)
     setMessage('')
     try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
-      let status = await LocalNotifications.checkPermissions()
-      if (['prompt', 'prompt-with-rationale'].includes(status.display)) {
-        status = await LocalNotifications.requestPermissions()
-      }
+      const status = { display: await ensureNotificationPermission() }
       setPermission(status.display)
       if (status.display === 'granted') {
         const scheduled = await requestNotificationPermission()
@@ -1089,7 +1086,7 @@ function StepNotifications({ onNext }) {
             boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
           }}
         >
-          <span style={{ fontSize: 100 }}>🔔</span>
+          <Bell size={100} color="#C6A85C" strokeWidth={1.5} aria-hidden="true" />
         </motion.div>
       </div>
 
@@ -3171,8 +3168,13 @@ export default function PremiumOnboarding() {
   const guestReadyRef = useRef(null)
   useEffect(() => {
     if (isAuthenticated) { guestReadyRef.current = Promise.resolve(); return }
-    guestReadyRef.current = api.auth.guest()
-      .then(({ userId, token }) => { setGuestSession(userId, token) })
+    // Strict Mode and quick remounts share one request. A late guest response
+    // must never replace an account the user signed into while it was pending.
+    if (!guestSessionFlight) guestSessionFlight = api.auth.guest().finally(() => { guestSessionFlight = null })
+    guestReadyRef.current = guestSessionFlight
+      .then(({ userId, token }) => {
+        if (!useStore.getState().isAuthenticated) setGuestSession(userId, token)
+      })
       .catch(err => console.warn('[Onboarding] Guest session failed (non-fatal):', err?.message))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -3323,6 +3325,7 @@ export default function PremiumOnboarding() {
 
   // Called after StepNotifications — final unlock.
   function handleFinalDone() {
+    if (activeStepRef.current !== 6) return
     clearDraft()
     setGender(formData.gender || null)
     if (formData.primaryGoal) setPrimaryGoal(formData.primaryGoal)

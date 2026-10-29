@@ -149,7 +149,7 @@ export default function App() {
   }, [])
 
   // ── UNLOCK SLIDESHOW: absolute top-level, no portal needed ──────
-  if (showUnlockSlideshow && currentScan) {
+  if (hasOnboarded && showUnlockSlideshow && currentScan) {
     return (
       <UnlockRevealSlideshow
         scan={currentScan}
@@ -183,7 +183,7 @@ export default function App() {
   // synchronously before React commits the isPremium=true batch, so reading
   // it here during the same render correctly suppresses PremiumSplash when
   // the user just unlocked in-session (UnlockRevealSlideshow is their celebration).
-  if (isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
+  if (hasOnboarded && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
     return (
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
@@ -196,7 +196,7 @@ export default function App() {
       <UpdatePrompt />
       <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#F7F5F0] dark:bg-[#121212] text-[#121212] dark:text-white" role="status" aria-live="polite">
+        <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)', color: 'var(--text-primary)' }} role="status" aria-live="polite">
           <p className="font-body text-sm">Loading your next screen…</p>
         </div>
       }>

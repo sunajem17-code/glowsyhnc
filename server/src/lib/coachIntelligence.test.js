@@ -65,7 +65,7 @@ test('context contains real fields for improvement, feature, skincare and hairst
     assert.match(request.system, /5\.6/)
     assert.equal(request.messages.at(-1).content, question)
     assert.doesNotMatch(request.system, /https?:\/\//)
-    assert.equal(response.visualStatus, /hair|skin|jaw/i.test(question) ? 'not_authorized' : 'not_requested')
+    assert.equal(response.visualStatus, /hair|skin|jaw/i.test(question) ? 'unavailable' : 'not_requested')
   }
 })
 test('progress uses dated previous completed scans and fresh scan invalidates old context', async () => {
@@ -278,4 +278,16 @@ test('coach access requires a completed scan first, then Pro, and rejects forged
   database.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = 'bob'").run()
   result = await post(body, 'bob')
   assert.equal(result.status, 200)
+})
+
+
+test('coach generation asks for concise evidence-led actions without anatomy or weight-loss promises', async () => {
+ const context = await scans.loadContext('alice')
+ await intelligence.answer({ userId: 'alice', context, isPro: true, question: 'How should I improve my hair and routine?' })
+ const request = requests.at(-1)
+ assert.match(request.system, /Answer the actual question in the first sentence/)
+ assert.match(request.system, /2–4 relevant actions/)
+ assert.match(request.system, /never assume weight loss is needed/)
+ assert.match(request.system, /70–160 words/)
+ assert.match(request.system, /SERVER-RETRIEVED CONTEXT/)
 })

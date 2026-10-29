@@ -1590,7 +1590,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         </button>
       )}
       <div className={`flex flex-col px-5 ${isAppearanceView ? 'flex-1 min-h-0 overflow-hidden items-stretch pb-0' : 'items-center pb-10'}`}
-           style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 16px)`, ...(isAppearanceView ? { paddingBottom: 'max(0px, calc(100svh - 731px))' } : {}) }}>
+           style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 16px)` }}>
 
       {/* Header */}
       {isAppearanceView && <>
@@ -1699,6 +1699,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
         >
           {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
         </motion.button>}
+        {unlocked && savedProgressCard && activeView === 'photo' && <motion.button whileTap={{ scale: 0.97 }} onClick={saveToProgress} className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2" style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}>{progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}</motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => { triggerHaptic(); downloadResultsCard() }}

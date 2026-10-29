@@ -64,7 +64,7 @@ const useStore = create(
       logout: () => {
         // Clear session keys so a subsequent login on the same device doesn't
         // inherit stale onboarding state or the pro-splash suppression flag.
-        try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
+        try { localStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
         try { sessionStorage.removeItem('asc_pro_splash_shown') } catch { /* ignore */ }
         try { sessionStorage.removeItem('asc_reveal_shown') } catch { /* ignore */ }
         set({
@@ -89,6 +89,8 @@ const useStore = create(
           hairRecommendationCache: null,
           savedHairLookIds: [],
           hasOnboarded: false,
+          pendingAchievement: null,
+          achievementQueue: [],
           gender: null,
           userProfile: null,
           legalConsented: false,
@@ -109,10 +111,11 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
+        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
         }
-        return { scans: newScans, achievements: newAchievements, pendingAchievement }
+        return { scans: newScans, achievements: newAchievements, pendingAchievement, achievementQueue }
       }),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
@@ -184,10 +187,11 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
+        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
         }
-        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement }
+        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement, achievementQueue }
       }),
       setTodayCheckin: (checkin) => set({ todayCheckin: checkin }),
 
@@ -198,10 +202,11 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
+        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
         }
-        return { streak, achievements: newAchievements, pendingAchievement }
+        return { streak, achievements: newAchievements, pendingAchievement, achievementQueue }
       }),
 
       // Settings
@@ -400,12 +405,13 @@ const useStore = create(
 
       // Achievements
       achievements: [], // array of achievement keys that have been unlocked
+      achievementQueue: [],
       pendingAchievement: null, // key of achievement to celebrate (shown once then cleared)
       unlockAchievement: (key) => set(state => {
         if (state.achievements.includes(key)) return state
-        return { achievements: [...state.achievements, key], pendingAchievement: key }
+        return { achievements: [...state.achievements, key], pendingAchievement: state.pendingAchievement || key, achievementQueue: state.pendingAchievement ? [...state.achievementQueue, key] : state.achievementQueue }
       }),
-      clearPendingAchievement: () => set({ pendingAchievement: null }),
+      clearPendingAchievement: () => set(state => ({ pendingAchievement: state.achievementQueue[0] || null, achievementQueue: state.achievementQueue.slice(1) })),
 
       // Privacy Settings
       privacySettings: {
