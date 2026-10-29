@@ -1,3 +1,4 @@
+import CoachAccessGate from '../components/CoachAccessGate'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -236,6 +237,8 @@ export default function Progress() {
       inputRef.current?.focus()
     }
   }
+
+  if (!serverScan?.hasCompletedScan || serverScan?.isPro !== true) return <CoachAccessGate context={serverScan} />
 
   const hasHistory = messages.length > 0
 

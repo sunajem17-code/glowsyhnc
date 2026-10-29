@@ -234,15 +234,15 @@ test('duplicate in-flight conversation requests are blocked without losing the c
  assert.equal(scans.ownedImagePath('scan/alice/%2e%2e%2fbob.png','alice'),null)
 })
 
-test('HTTP local preview bypasses the guest cap only for the configured account, never production or another user', async () => {
+test('HTTP local preview does not bypass paid coach access', async () => {
   const oldMode = process.env.NODE_ENV, oldOwners = process.env.LOCAL_PRO_PREVIEW_USER_IDS
   database.prepare("UPDATE users SET subscription_tier = 'free', is_pro = 0, coach_messages_used = 3 WHERE id IN ('alice','bob')").run()
   try {
     process.env.NODE_ENV = 'development'; process.env.LOCAL_PRO_PREVIEW_USER_IDS = 'alice'
     const context = await fetch(`${base}/coach/context`, { headers: { Authorization: `Bearer ${signToken('alice')}` } })
     const state = await context.json()
-    assert.equal(state.isPro, true); assert.equal(state.access, 'local_preview')
-    assert.equal((await post({ messages: [{ role: 'user', content: 'What does my scan say?' }] })).status, 200)
+    assert.equal(state.isPro, false); assert.equal(state.access, 'local_preview')
+    assert.equal((await post({ messages: [{ role: 'user', content: 'What does my scan say?' }] })).status, 403)
     assert.equal((await post({ messages: [{ role: 'user', content: 'Hello' }] }, 'bob')).status, 403)
     process.env.NODE_ENV = 'production'
     assert.equal((await post({ messages: [{ role: 'user', content: 'Hello' }] })).status, 403)
@@ -262,4 +262,20 @@ test('eye-specific knowledge and structured affiliate recommendations reach the 
  assert.match(request.system,/separate features/)
  assert.match(request.system,/products/)
  assert.equal(request.responseSchema.properties.products.maxItems,2)
+})
+
+
+test('coach access requires a completed scan first, then Pro, and rejects forged premium flags', async () => {
+  const body = { isPro: true, isPremium: true, messages: [{ role: 'user', content: 'Hello coach' }] }
+  let result = await post(body, 'no-scan-user')
+  assert.equal(result.status, 403)
+  assert.equal(result.body.code, 'scan_required')
+  await completed('bob')
+  database.prepare("UPDATE users SET subscription_tier = 'free', is_pro = 0 WHERE id = 'bob'").run()
+  result = await post(body, 'bob')
+  assert.equal(result.status, 403)
+  assert.equal(result.body.code, 'pro_required')
+  database.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = 'bob'").run()
+  result = await post(body, 'bob')
+  assert.equal(result.status, 200)
 })

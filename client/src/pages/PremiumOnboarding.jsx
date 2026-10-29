@@ -18,6 +18,7 @@ import { analyzeSideProfile } from '../utils/photoGeometry'
 import { generatePlanTasks } from '../utils/content'
 import { assignPhase } from '../utils/phase'
 import { isNative } from '../utils/iap'
+import { requestNotificationPermission } from '../utils/notifications'
 // SignInWithApple loaded dynamically per-call (see handleAppleSignIn)
 
 // ── Animated processing overlay (bars + "Processing" label) ──────────────────
@@ -29,6 +30,7 @@ import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { normalizeOnboardingStep, nextOnboardingStep } from '../utils/onboardingProgress'
 import ProcessingOverlay from '../components/ProcessingOverlay'
+import { openAppStoreReview } from '../components/OnboardingFinalSteps'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -894,6 +896,19 @@ function StarRow({ n = 5 }) {
 }
 
 function StepTestimonials({ onNext }) {
+  const reviewRequested = useRef(false)
+
+  useEffect(() => {
+    if (!isNative()) return
+    // Let the slide settle before asking iOS to present its rating dialog.
+    const timer = setTimeout(() => {
+      if (reviewRequested.current) return
+      reviewRequested.current = true
+      void openAppStoreReview()
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
     <div style={{
       width: '100%', height: '100%', background: '#0a0a0a',
@@ -1006,21 +1021,51 @@ function StepTestimonials({ onNext }) {
 // ── STEP NOTIFICATIONS ───────────────────────────────────────────────────────
 function StepNotifications({ onNext }) {
   const [loading, setLoading] = useState(false)
+  const [permission, setPermission] = useState(null)
+  const [message, setMessage] = useState('')
+  const requesting = useRef(false)
 
-  async function handleEnable() {
-    triggerHaptic()
+  async function enableNotifications() {
+    if (requesting.current) return
+    requesting.current = true
     setLoading(true)
+    setMessage('')
     try {
-      const { PushNotifications } = await import('@capacitor/push-notifications')
-      const status = await PushNotifications.requestPermissions()
-      if (status.receive === 'granted') {
-        await PushNotifications.register()
+      const { LocalNotifications } = await import('@capacitor/local-notifications')
+      let status = await LocalNotifications.checkPermissions()
+      if (['prompt', 'prompt-with-rationale'].includes(status.display)) {
+        status = await LocalNotifications.requestPermissions()
+      }
+      setPermission(status.display)
+      if (status.display === 'granted') {
+        const scheduled = await requestNotificationPermission()
+        setMessage(scheduled
+          ? 'Notifications enabled. We’ll remind you to check in at 8 PM.'
+          : 'Notifications enabled. You can set up reminders later in Settings.')
+      } else {
+        setMessage('Notifications are off. To enable them, open iPhone Settings → Notifications → Ascendus → Allow Notifications.')
       }
     } catch (err) {
-      console.warn('[Notifications] requestPermissions failed (non-fatal):', err?.message)
+      console.warn('[Notifications] Permission request failed:', err?.message)
+      setMessage('Couldn’t request notification permission. Try again or continue for now.')
+    } finally {
+      requesting.current = false
+      setLoading(false)
     }
-    setLoading(false)
-    onNext()
+  }
+
+  useEffect(() => {
+    if (!isNative()) return
+    // Wait for the slide to render. Cleanup also avoids duplicate requests in Strict Mode.
+    const timer = setTimeout(() => { void enableNotifications() }, 400)
+    return () => clearTimeout(timer)
+  }, [])
+
+  function handleEnable() {
+    if (requesting.current) return
+    triggerHaptic()
+    if (!isNative() || permission !== null) onNext()
+    else void enableNotifications()
   }
 
   return (
@@ -1049,6 +1094,11 @@ function StepNotifications({ onNext }) {
       </div>
 
       <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
+        <p role="status" aria-live="polite" style={{ color: '#ccc', textAlign: 'center', fontSize: 14, marginBottom: 16 }}>
+          {!isNative()
+            ? 'Open Ascendus on your iPhone to allow notifications. This browser preview cannot show the iPhone permission popup.'
+            : loading ? 'Choose Allow in the notification popup.' : message}
+        </p>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleEnable}
@@ -1066,8 +1116,11 @@ function StepNotifications({ onNext }) {
         >
           {loading
             ? <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
-            : 'Continue'}
+            : isNative() && permission === null ? 'Allow notifications' : 'Continue'}
         </motion.button>
+        {isNative() && permission === null && !loading && (
+          <button onClick={onNext} style={{ width: '100%', padding: 12, color: '#ccc', background: 'none', border: 'none', cursor: 'pointer' }}>Not now</button>
+        )}
       </div>
     </div>
   )

@@ -19,7 +19,7 @@ const BG = '#080808'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.5)'
 const SURFACE = 'rgba(255,255,255,0.04)'
-async function openAppStoreReview() {
+export async function openAppStoreReview() {
   if (!Capacitor.isNativePlatform()) return
   try {
     await InAppReview.requestReview()

@@ -1,10 +1,10 @@
+import CoachAccessGate from '../components/CoachAccessGate'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Lock, ChevronRight, RotateCcw } from 'lucide-react'
 import useStore from '../store/useStore'
-import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
@@ -117,18 +117,15 @@ function MessageBubble({ msg, isNew }) {
   )
 }
 
-const FREE_COACH_LIMIT = 3
 
 export default function AICoach() {
   const navigate = useNavigate()
   const location = useLocation()
   const selectedScanId = location.state?.scanId
-  const { scans, isPremium: actualIsPremium, userProfile, freeCoachMessages, user } = useStore()
-  const isPremium = usePremiumUiAccess()
-  const freeMessagesLeft = Math.max(0, FREE_COACH_LIMIT - (freeCoachMessages || 0))
-  const freeCoachLocked = !isPremium && freeMessagesLeft === 0
+  const { scans, userProfile, user } = useStore()
   const latestScan = scans[0]
   const [serverScan, setServerScan] = useState(null)
+  const isPremium = serverScan?.isPro === true
   const hasScan = !!latestScan || !!serverScan?.hasCompletedScan
   const conversationRef = useRef(null)
   const requestGenerationRef = useRef(0)
@@ -209,7 +206,7 @@ export default function AICoach() {
     if (!hasScan) { navigate('/scan'); return }
 
     // Not premium → open paywall immediately
-    if (freeCoachLocked) { navigate('/unlock?paywall=1'); return }
+    if (!serverScan?.isPro) { navigate('/unlock?paywall=1'); return }
 
     setInput('')
     setError('')
@@ -260,6 +257,8 @@ export default function AICoach() {
     }
   }
 
+  if (!serverScan?.hasCompletedScan || serverScan?.isPro !== true) return <CoachAccessGate context={serverScan} />
+
   // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
     <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
@@ -288,7 +287,7 @@ export default function AICoach() {
             <h1 className="font-heading font-bold leading-tight text-primary" style={{ fontSize: `${scaleCoachHeaderSize(17)}px` }}>Adonis</h1>
           </div>
         </div>
-        {messages.length > 1 && !freeCoachLocked && (
+        {messages.length > 1 && (
           <button
             onClick={() => {
               triggerHaptic()
@@ -300,7 +299,7 @@ export default function AICoach() {
               if (hasScan) {
                 const greeting = isPremium
                   ? 'Your completed scan is available. Ask me what it found or what to work on.'
-                  : `Scan loaded. You have ${freeMessagesLeft} free question${freeMessagesLeft !== 1 ? 's' : ''}. Make them count. Ask me anything.`
+                  : 'Get Ascendus Max to unlock AI Coach.'
                 setMessages([{ role: 'assistant', content: greeting }])
               } else {
                 setMessages([])

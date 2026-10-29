@@ -1167,123 +1167,6 @@ const PAYWALL_CARDS = [
   { title: 'Daily To-Do',              content: () => <PaywallDailyTodoCard /> },
 ]
 
-// ── Example rating ticker ─────────────────────────────────────────────────────
-// These are generated examples, not recent activity from actual users.
-const SP_ENTRIES = [
-  { flag: '🇺🇸', country: 'USA', male: ['Tyler','Mason','Logan','Ethan','Jake','Chase','Ryan','Cole'], female: ['Emma','Olivia','Mia','Ava','Chloe','Sofia','Isabella','Harper'] },
-  { flag: '🇬🇧', country: 'UK', male: ['Oliver','Alfie','George','Harry','Archie','Jack','Charlie','Theo'], female: ['Amelia','Isla','Freya','Lily','Sophie','Ella','Grace','Poppy'] },
-  { flag: '🇦🇺', country: 'Australia', male: ['Lachlan','Cooper','Riley','Flynn','Angus','Hugo','Toby','Archer'], female: ['Matilda','Ruby','Mia','Charlotte','Isla','Evie','Sienna','Zara'] },
-  { flag: '🇨🇦', country: 'Canada', male: ['Ethan','Noah','Liam','Owen','Nathan','Caleb','Evan','Miles'], female: ['Emma','Charlotte','Maya','Abigail','Chloe','Nora','Amelia','Zoë'] },
-  { flag: '🇩🇪', country: 'Germany', male: ['Leon','Lukas','Jonas','Finn','Ben','Felix','Jan','Moritz'], female: ['Mia','Hannah','Lena','Emilia','Lea','Clara','Lina','Sophie'] },
-  { flag: '🇫🇷', country: 'France', male: ['Lucas','Hugo','Nathan','Mathis','Enzo','Théo','Axel','Antoine'], female: ['Chloé','Emma','Jade','Louise','Léa','Manon','Inès','Camille'] },
-  { flag: '🇮🇹', country: 'Italy', male: ['Matteo','Lorenzo','Francesco','Alessandro','Gabriele','Riccardo','Marco','Luca'], female: ['Sofia','Giulia','Aurora','Chiara','Alice','Ginevra','Beatrice','Martina'] },
-  { flag: '🇸🇪', country: 'Sweden', male: ['Elias','William','Oscar','Lucas','Alexander','Hugo','Axel','Erik'], female: ['Alice','Maja','Elsa','Astrid','Wilma','Freja','Alma','Ebba'] },
-  { flag: '🇳🇱', country: 'Netherlands', male: ['Daan','Sem','Finn','Levi','Noah','Jesse','Luuk','Bram'], female: ['Emma','Sophie','Julia','Mila','Tess','Nora','Evi','Lotte'] },
-  { flag: '🇳🇴', country: 'Norway', male: ['Emil','Mathias','Tobias','Sander','Jonas','Eirik','Markus','Henrik'], female: ['Nora','Emma','Ella','Sofie','Maja','Ingrid','Thea','Olivia'] },
-  { flag: '🇩🇰', country: 'Denmark', male: ['Mikkel','Frederik','Magnus','Rasmus','Oliver','Christian','Kasper','Mads'], female: ['Clara','Freja','Alma','Ida','Ella','Agnes','Sofia','Karla'] },
-  { flag: '🇦🇪', country: 'UAE', male: ['Omar','Khalid','Hamdan','Saif','Rashid','Zayed','Faisal','Yousef'], female: ['Mariam','Noor','Aisha','Fatima','Hana','Amira','Layla','Sara'] },
-  { flag: '🇸🇦', country: 'Saudi Arabia', male: ['Abdullah','Faisal','Khalid','Turki','Salman','Majed','Saud','Nasser'], female: ['Noura','Hala','Layan','Reem','Abeer','Jana','Maha','Sarah'] },
-  { flag: '🇸🇬', country: 'Singapore', male: ['Ethan','Marcus','Ryan','Darren','Ian','Leon','Wei','Jun'], female: ['Chloe','Jia','Aisha','Mei','Alyssa','Hannah','Sofia','Rachel'] },
-  { flag: '🇧🇷', country: 'Brazil', male: ['Gabriel','Lucas','Mateus','Pedro','Rafael','Felipe','Bruno','Vinicius'], female: ['Sofia','Isabela','Beatriz','Manuela','Laura','Helena','Luiza','Camila'] },
-  { flag: '🇲🇽', country: 'Mexico', male: ['Santiago','Mateo','Sebastián','Miguel','Alejandro','Diego','Emiliano','Carlos'], female: ['Sofía','Valentina','Camila','Isabella','Ximena','Regina','Mariana','Renata'] },
-  { flag: '🇳🇿', country: 'New Zealand', male: ['Liam','Oliver','Jack','Noah','James','Ethan','Henry','Charlie'], female: ['Isla','Charlotte','Amelia','Harper','Mila','Ella','Ruby','Aria'] },
-  { flag: '🇵🇱', country: 'Poland', male: ['Jakub','Mateusz','Kacper','Piotr','Michał','Bartosz','Filip','Dawid'], female: ['Zuzanna','Julia','Zofia','Hanna','Maja','Lena','Alicja','Oliwia'] },
-  { flag: '🇨🇭', country: 'Switzerland', male: ['Nils','Luca','Linus','Marco','Fabian','Simon','Florian','Tim'], female: ['Mia','Lina','Emma','Lea','Lara','Nina','Sofia','Elena'] },
-  { flag: '🇹🇷', country: 'Turkey', male: ['Mehmet','Ahmet','Mustafa','Emre','Burak','Kerem','Arda','Ozan'], female: ['Zeynep','Elif','Defne','Ece','Merve','Ada','Duru','Azra'] },
-  { flag: '🇿🇦', country: 'South Africa', male: ['Liam','Lethabo','Thabo','Sipho','Ethan','Aiden','Kabelo','Jayden'], female: ['Amara','Naledi','Thandeka','Zanele','Mia','Lerato','Ava','Imani'] },
-  { flag: '🇯🇵', country: 'Japan', male: ['Haruto','Ren','Yuto','Sota','Itsuki','Minato','Kaito','Riku'], female: ['Himari','Yui','Aoi','凛','陽菜','Sakura','Mei','Hana'] },
-  { flag: '🇮🇳', country: 'India', male: ['Aarav','Vihaan','Arjun','Reyansh','Ishaan','Kabir','Rohan','Aditya'], female: ['Aanya','Diya','Saanvi','Anaya','Isha','Mira','Myra','Kiara'] },
-  { flag: '🇳🇬', country: 'Nigeria', male: ['Chinedu','Tunde','Chukwuemeka','Oluwaseun','Ibrahim','Emeka','Dayo','Kelechi'], female: ['Adaeze','Chioma','Amara','Ngozi','Zainab','Ifeoma','Tomi','Amina'] },
-  { flag: '🇪🇬', country: 'Egypt', male: ['Omar','Youssef','Karim','Ziad','Adam','Mostafa','Amr','Hassan'], female: ['Nour','Mariam','Farida','Layla','Salma','Hana','Jana','Yasmin'] },
-  { flag: '🇰🇷', country: 'South Korea', male: ['Min-jun','Seo-jun','Do-yun','Ji-ho','Ha-jun','Jun-ho','Si-woo','Hyun-woo'], female: ['Seo-yeon','Ji-woo','Ha-eun','Min-seo','Soo-ah','Ye-eun','Yuna','Da-eun'] },
-  { flag: '🇪🇸', country: 'Spain', male: ['Hugo','Mateo','Martín','Leo','Daniel','Pablo','Alejandro','Lucas'], female: ['Lucía','Sofía','Martina','Valeria','Paula','Emma','Alba','Carmen'] },
-]
-
-const MALE_TIERS = ['Sub-5', 'Low-Tier Normie', 'Mid-Tier Normie', 'High-Tier Normie', 'Chad Lite', 'Chad', 'Adam']
-const FEMALE_TIERS = ['Sub-5', 'Low-Tier Normie', 'Mid-Tier Normie', 'High-Tier Normie', 'Becky', 'Stacy Lite', 'Stacy', 'Eve']
-
-function randomNotif(previous) {
-  const availableEntries = previous
-    ? SP_ENTRIES.filter(entry => entry.country !== previous.country)
-    : SP_ENTRIES
-  const entry = availableEntries[Math.floor(Math.random() * availableEntries.length)]
-  const isMale = Math.random() < 0.5
-  const names = isMale ? entry.male : entry.female
-  const tiers = isMale ? MALE_TIERS : FEMALE_TIERS
-  return {
-    flag: entry.flag,
-    country: entry.country,
-    name: names[Math.floor(Math.random() * names.length)],
-    tier: tiers[Math.floor(Math.random() * tiers.length)],
-  }
-}
-
-// Dwell: randomised 9–16s so it never feels mechanical. Fade: 900ms.
-const SP_FADE_MS = 900
-
-function _randomDwell() {
-  return 15000
-}
-
-function SocialProofTicker() {
-  const [notif, setNotif] = useState(() => randomNotif(null))
-  const [visible, setVisible] = useState(true)
-  const prevRef = useRef(notif)
-
-  useEffect(() => {
-    let dwellTimer, gapTimer
-    function cycle() {
-      const dwell = _randomDwell()
-      dwellTimer = setTimeout(() => {
-        setVisible(false)
-        // wait for exit fade to finish, then swap content and fade back in
-        gapTimer = setTimeout(() => {
-          const next = randomNotif(prevRef.current)
-          prevRef.current = next
-          setNotif(next)
-          setVisible(true)
-          cycle()
-        }, SP_FADE_MS + 80)   // +80ms buffer so content swap isn't visible
-      }, dwell)
-    }
-    cycle()
-    return () => { clearTimeout(dwellTimer); clearTimeout(gapTimer) }
-  }, [])
-
-  return (
-    <div
-      className="flex justify-center pointer-events-none"
-      style={{ paddingInline: 16 }}
-    >
-      <AnimatePresence mode="wait">
-        {visible && (
-          <motion.div
-            key={`${notif.country}-${notif.name}-${notif.tier}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: SP_FADE_MS / 1000, ease: [0.4, 0, 0.2, 1] }}
-            className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5"
-            style={{
-              background: 'rgba(14,14,14,0.86)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              border: '1px solid rgba(198,168,92,0.20)',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.45)',
-            }}
-          >
-            <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{notif.flag}</span>
-            <p className="font-body text-[12px] leading-[1.35]" style={{ color: 'rgba(255,255,255,0.70)', whiteSpace: 'normal' }}>
-              <span style={{ color: 'rgba(198,168,92,0.92)', fontWeight: 600 }}>{notif.name}</span>
-              {' from '}{notif.country}{' got rated '}{notif.tier}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
@@ -1432,10 +1315,7 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
-        <div className="mt-3 mb-3">
-          <SocialProofTicker />
-        </div>
-        <div className="flex items-center justify-center gap-5">
+        <div className="mt-3 flex items-center justify-center gap-5">
           {['Terms of Use', 'Restore Purchase', 'Privacy Policy'].map(label => (
             <button key={label} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</button>
           ))}
@@ -1859,16 +1739,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
             {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
           </motion.button>
 
-          {(import.meta.env.DEV || developerUnlockAvailable) && (
-            <button
-              onClick={onDeveloperUnlock}
-              disabled={developerUnlocking || isPurchasing}
-              className="w-full py-2 font-body text-[12px] text-center disabled:opacity-40"
-              style={{ color: 'rgba(198,168,92,0.7)' }}
-            >
-              {developerUnlocking ? 'Unlocking developer access…' : 'Developer unlock'}
-            </button>
-          )}
+
 
         </div>}
 

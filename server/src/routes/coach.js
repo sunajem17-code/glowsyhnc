@@ -2,7 +2,6 @@ const express = require('express')
 const { verifyToken, claudeLimit, resolvePro } = require('../middleware/claudeGate')
 const db = require('../db')
 
-const FREE_COACH_LIMIT = 3
 
 const router = express.Router()
 
@@ -13,7 +12,7 @@ router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) =>
   if (req.isDemo) return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   try {
     const context = await loadContext(req.userId)
-    res.json({ access: req.proSource || 'subscription', isPro: req.isPro, status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
+    res.json({ access: req.proSource || 'subscription', isPro: req.isPro && req.proSource !== 'local_preview', status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
   } catch { res.status(503).json({ error: 'Saved scan context is temporarily unavailable. Please retry.' }) }
 })
 
@@ -52,8 +51,21 @@ router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claude
   }
 })
 
+// Resolve access from owned saved scans and the server's subscription status.
+async function requireCoachAccess(req, res, next) {
+  try {
+    const context = req.isDemo ? { latest: null } : await loadContext(req.userId)
+    if (!context.latest) return res.status(403).json({ code: 'scan_required', error: 'Scan required — complete a scan to use AI Coach.' })
+    if (!req.isPro || req.proSource === 'local_preview') return res.status(403).json({ code: 'pro_required', error: 'Pro required — get Ascendus Max to unlock AI Coach.' })
+    req.coachContext = context
+    next()
+  } catch {
+    res.status(503).json({ error: 'Could not check coach access. Please retry.' })
+  }
+}
+
 // POST /api/coach/message
-router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+router.post('/message', verifyToken, resolvePro, requireCoachAccess, claudeLimit, async (req, res) => {
   const { messages, conversationId } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -64,25 +76,10 @@ router.post('/message', verifyToken, resolvePro, claudeLimit, async (req, res) =
     return res.status(400).json({ error: 'Invalid conversation messages' })
   }
 
-  // Free users: enforce 3-message lifetime limit (tracked server-side)
-  if (!req.isPro && !req.isDemo) {
-    const row = db.prepare('SELECT coach_messages_used FROM users WHERE id = ?').get(req.userId)
-    const used = row?.coach_messages_used ?? 0
-    if (used >= FREE_COACH_LIMIT) {
-      return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
-    }
-    db.prepare('UPDATE users SET coach_messages_used = coach_messages_used + 1 WHERE id = ?').run(req.userId)
-  }
-
-  // Demo users: block entirely
-  if (req.isDemo) {
-    return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
-  }
-
   try {
     // The last user message is new input; prior assistant turns come only from
     // this user's bounded server session, not client-forged conversation data.
-    const context = await loadContext(req.userId)
+    const context = req.coachContext
     if (typeof req.body.scanId === 'string') {
       const selected = await ownedCoachScan(req.body.scanId, req.userId)
       if (!selected) return res.status(404).json({ error: 'The selected scan is unavailable. Return to your results and retry.' })
