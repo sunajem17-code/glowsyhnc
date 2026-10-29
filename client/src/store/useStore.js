@@ -1,3 +1,4 @@
+import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner } from '../utils/onboardingStartup.js'
 import { API_BASE } from '../utils/backend'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -36,7 +37,8 @@ const useStore = create(
         }
       }),
 
-      setAuth: (user, token) => set({
+      setAuth: (user, token) => set(state => ({
+        hasOnboarded: hasCompletedOnboarding({ ...state, user }),
         user,
         token,
         upgradeWelcomePending: false,
@@ -50,8 +52,9 @@ const useStore = create(
           user?.subscription_tier === 'premium' ||
           user?.is_pro === true ||
           false,
-      }),
-      setGuestSession: (userId, token) => set({
+      })),
+      setGuestSession: (userId, token) => set(state => ({
+        hasOnboarded: hasCompletedOnboarding({ ...state, user: { id: userId } }),
         user: { id: userId },
         token,
         upgradeWelcomePending: false,
@@ -59,7 +62,7 @@ const useStore = create(
         isGuest: true,
         developerPreviewUnlocked: false,
         isPremium: get().isLocalProPreview && isLocalDeveloperPreview(),
-      }),
+      })),
       setPremium: (val) => set({ isPremium: val }),
       logout: () => {
         // Clear session keys so a subsequent login on the same device doesn't
@@ -217,8 +220,26 @@ const useStore = create(
 
       // Onboarding
       hasOnboarded: false,
-      setHasOnboarded: () => set({ hasOnboarded: true }),
-      resetOnboarding: () => set({ hasOnboarded: false }),
+      onboardingHydrated: false,
+      onboardingCompletedByUser: {},
+      finishOnboardingHydration: () => set({ onboardingHydrated: true }),
+      // Only the final onboarding screen can create a completion record.
+      // Legacy sign-in/payment callers with no final step cannot complete it.
+      setHasOnboarded: (completedStep) => {
+        if (completedStep !== FINAL_ONBOARDING_STEP) return false
+        set(state => ({ hasOnboarded: true,
+          onboardingCompletedByUser: { ...state.onboardingCompletedByUser, [onboardingOwner(state.user)]: true } }))
+        return true
+      },
+      resetOnboarding: () => {
+        try { localStorage.removeItem('ascendus_onboarding_draft'); sessionStorage.removeItem('ascendus_onboarding_draft') } catch {}
+        try { sessionStorage.removeItem('asc_post_onboard_dest') } catch {}
+        set(state => {
+          const records = { ...state.onboardingCompletedByUser }
+          delete records[onboardingOwner(state.user)]
+          return { hasOnboarded: false, onboardingCompletedByUser: records }
+        })
+      },
 
       // Legal consent (age gate + AI/biometric consent)
       legalConsented: false,
@@ -437,7 +458,7 @@ const useStore = create(
     {
       name: 'ascendus-storage',
       merge: (persistedState, currentState) => {
-        const merged = { ...currentState, ...persistedState }
+        const merged = { ...currentState, ...persistedState, ...normalizeOnboardingCompletion(persistedState || {}), onboardingHydrated: false }
         // First local-dev launch gets the requested preview automatically;
         // after that, the Settings toggle's saved choice is respected.
         if (isLocalDeveloperPreview() && !merged.isLocalProPreviewConfigured) {
@@ -460,10 +481,15 @@ const useStore = create(
       },
       // Normalize any glowScore stored in the old 0-100 scale back to 0-10
       onRehydrateStorage: () => (state) => {
-        if (!state) return
+        if (!state) {
+          // Corrupt/unavailable storage must finish checking and require onboarding.
+          queueMicrotask(() => useStore.setState({ onboardingHydrated: true, hasOnboarded: false, onboardingCompletedByUser: {} }))
+          return
+        }
         const fix = (s) => s && s.glowScore > 10 ? { ...s, glowScore: Math.round(s.glowScore) / 10 } : s
         if (state.scans) state.scans = state.scans.map(fix)
         if (state.currentScan) state.currentScan = fix(state.currentScan)
+        state.finishOnboardingHydration()
       },
       partialize: (state) => ({
         user: state.user,
@@ -485,7 +511,8 @@ const useStore = create(
         todayCheckin: state.todayCheckin,
         streak: state.streak,
         theme: state.theme,
-        hasOnboarded: state.hasOnboarded,
+        hasOnboarded: hasCompletedOnboarding(state),
+        onboardingCompletedByUser: state.onboardingCompletedByUser,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,
         ageConfirmedAt: state.ageConfirmedAt,

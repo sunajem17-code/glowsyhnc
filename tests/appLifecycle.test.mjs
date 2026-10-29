@@ -13,7 +13,7 @@ function boot() {const mod=new Module('lifecycle-fixture');mod._compile(source.o
 test('fresh and interrupted sessions stay in onboarding; completed sessions survive restart',()=>{
  memory.clear();let store=boot();assert.equal(store.getState().hasOnboarded,false)
  store.getState().setGuestSession('fixture-user','fixture-token');store=boot();assert.equal(store.getState().hasOnboarded,false)
- store.getState().setHasOnboarded();store=boot();assert.equal(store.getState().hasOnboarded,true)
+ store.getState().setHasOnboarded(6);store=boot();assert.equal(store.getState().hasOnboarded,true)
  store.getState().logout();assert.equal(store.getState().hasOnboarded,false)
 })
 test('rapid genuine achievements queue without duplicates and dismiss in order',()=>{

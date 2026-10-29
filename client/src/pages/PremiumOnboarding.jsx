@@ -1,3 +1,4 @@
+import { FINAL_ONBOARDING_STEP } from '../utils/onboardingStartup.js'
 import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -478,7 +479,6 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const setAuth           = useStore(s => s.setAuth)
-  const setHasOnboarded   = useStore(s => s.setHasOnboarded)
   const setLegalConsented = useStore(s => s.setLegalConsented)
   const setAgeConfirmed   = useStore(s => s.setAgeConfirmed)
   const setReferralCode   = useStore(s => s.setReferralCode)
@@ -494,7 +494,6 @@ function SignInView({ onBack, onSuccess, onAppleSignIn }) {
       setLegalConsented()
       setAgeConfirmed()
       clearDraft()
-      setHasOnboarded()
       onSuccess()
     } catch (err) {
       setError(err.message || 'Invalid email or password')
@@ -1091,11 +1090,9 @@ function StepNotifications({ onNext }) {
       </div>
 
       <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <p role="status" aria-live="polite" style={{ color: '#ccc', textAlign: 'center', fontSize: 14, marginBottom: 16 }}>
-          {!isNative()
-            ? 'Open Ascendus on your iPhone to allow notifications. This browser preview cannot show the iPhone permission popup.'
-            : loading ? 'Choose Allow in the notification popup.' : message}
-        </p>
+        {isNative() && (loading || message) && <p role="status" aria-live="polite" style={{ color: '#ccc', textAlign: 'center', fontSize: 14, marginBottom: 16 }}>
+          {loading ? 'Choose Allow in the notification popup.' : message}
+        </p>}
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleEnable}
@@ -3135,7 +3132,7 @@ function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
   )
 }
 
-export default function PremiumOnboarding() {
+export default function PremiumOnboarding({ initialSignIn = false }) {
   const navigate = useNavigate()
   const isAuthenticated    = useStore(s => s.isAuthenticated)
   const isGuest            = useStore(s => s.isGuest)
@@ -3167,6 +3164,7 @@ export default function PremiumOnboarding() {
   // Store the promise so StepScanCapture can await it before firing the score API.
   const guestReadyRef = useRef(null)
   useEffect(() => {
+    if (initialSignIn) return
     if (isAuthenticated) { guestReadyRef.current = Promise.resolve(); return }
     // Strict Mode and quick remounts share one request. A late guest response
     // must never replace an account the user signed into while it was pending.
@@ -3203,7 +3201,7 @@ export default function PremiumOnboarding() {
   const activeStepRef = useRef(step)
   activeStepRef.current = step
   const [dir, setDir] = useState(1)
-  const [signingIn, setSigningIn] = useState(false)
+  const [signingIn, setSigningIn] = useState(initialSignIn)
 
   const [formData, setFormData] = useState({
     gender: '', goal: '', primaryGoal: '',
@@ -3325,7 +3323,7 @@ export default function PremiumOnboarding() {
 
   // Called after StepNotifications — final unlock.
   function handleFinalDone() {
-    if (activeStepRef.current !== 6) return
+    if (activeStepRef.current !== FINAL_ONBOARDING_STEP) return
     clearDraft()
     setGender(formData.gender || null)
     if (formData.primaryGoal) setPrimaryGoal(formData.primaryGoal)
@@ -3336,7 +3334,7 @@ export default function PremiumOnboarding() {
     if (!token) {
       useStore.getState().setAuth({ id: 'guest', name: 'Guest', email: '' }, 'demo-token')
     }
-    setHasOnboarded()
+    setHasOnboarded(FINAL_ONBOARDING_STEP)
   }
 
 
@@ -3363,7 +3361,6 @@ export default function PremiumOnboarding() {
     if (!res.ok) throw new Error(data.error || 'Authentication failed')
     setAuth(data.user, data.token)
     clearDraft()
-    setHasOnboarded()
     navigate('/')
   }
 
@@ -3431,7 +3428,6 @@ export default function PremiumOnboarding() {
 
       setAuth(data.user, data.token)
       clearDraft()
-      setHasOnboarded()
       setSigningIn(false)
     } catch (err) {
       if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return

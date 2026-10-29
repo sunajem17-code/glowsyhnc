@@ -1,3 +1,5 @@
+import { hasCompletedOnboarding, onboardingStartup } from './utils/onboardingStartup.js'
+import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
 import NotificationPrompt from './components/NotificationPrompt'
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
@@ -62,6 +64,10 @@ function ReferralRedirect() {
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
+  const startup = useStore(onboardingStartup)
+  if (startup === 'checking') return <StartupCheck />
+  if (startup === 'signin') return <Navigate to="/auth" replace />
+  if (startup === 'onboarding') return <Navigate to="/onboarding" replace />
   return isAuthenticated ? children : <Navigate to="/auth" replace />
 }
 
@@ -83,7 +89,8 @@ function PostAuthLanding() {
 
 export default function App() {
   const theme               = useStore(s => s.theme)
-  const hasOnboarded        = useStore(s => s.hasOnboarded)
+  const hasOnboarded        = useStore(hasCompletedOnboarding)
+  const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
@@ -148,8 +155,13 @@ export default function App() {
     setProSplashDone(true)
   }, [])
 
+  // No route, redirect, premium overlay or splash can bypass this decision.
+  if (startupDecision === 'checking') return <StartupCheck />
+  if (startupDecision === 'signin') return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
+  const resetRoute = import.meta.env.DEV && window.location.pathname === '/dev/reset-onboarding'
+
   // ── UNLOCK SLIDESHOW: absolute top-level, no portal needed ──────
-  if (hasOnboarded && showUnlockSlideshow && currentScan) {
+  if (!resetRoute && hasOnboarded && showUnlockSlideshow && currentScan) {
     return (
       <UnlockRevealSlideshow
         scan={currentScan}
@@ -164,7 +176,7 @@ export default function App() {
   // ── GATE 0: Cinematic intro — plays once per session for everyone ──
   const startupSplash = getStartupSplash({ cinematicDone, splashDone })
 
-  if (startupSplash === 'cinematic') {
+  if (!resetRoute && hasOnboarded && startupSplash === 'cinematic') {
     return (
       <CinematicIntro onDone={() => {
         sessionStorage.setItem('asc_cinematic_shown', '1')
@@ -174,7 +186,7 @@ export default function App() {
   }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (startupSplash === 'welcome') {
+  if (!resetRoute && hasOnboarded && startupSplash === 'welcome') {
     return <Splash onDone={handleSplashDone} />
   }
 
@@ -183,7 +195,7 @@ export default function App() {
   // synchronously before React commits the isPremium=true batch, so reading
   // it here during the same render correctly suppresses PremiumSplash when
   // the user just unlocked in-session (UnlockRevealSlideshow is their celebration).
-  if (hasOnboarded && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
+  if (!resetRoute && hasOnboarded && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
     return (
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
@@ -214,9 +226,11 @@ export default function App() {
 
           {/* /auth no longer used — redirect everything to root (onboarding or app) */}
           <Route path="/auth" element={<Navigate to="/" replace />} />
+          <Route path="/onboarding" element={hasOnboarded ? <Navigate to="/" replace /> : <PremiumOnboarding />} />
+          {import.meta.env.DEV && <Route path="/dev/reset-onboarding" element={<DevelopmentOnboardingReset />} />}
 
           {!hasOnboarded ? (
-            <Route path="*" element={<PremiumOnboarding />} />
+            <Route path="*" element={<Navigate to="/onboarding" replace />} />
           ) : (
             <>
               {/* Full-screen reveal must not wait for the outgoing scan outlet's
