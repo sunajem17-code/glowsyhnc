@@ -34,7 +34,7 @@ test('partial onboarding survives restart without gaining main app access',()=>{
 })
 test('only the final step can complete onboarding; sign-in and payment-style callers cannot',()=>{
  const store=boot({user:{id:'new-user'},isAuthenticated:true,token:'fixture-token'})
- for(const step of [undefined,null,0,1,5,'6']){assert.equal(store.getState().setHasOnboarded(step),false);assert.equal(decide(store),'onboarding')}
+ for(const step of [undefined,null,0,1,5,7,'6']){assert.equal(store.getState().setHasOnboarded(step),false);assert.equal(decide(store),'onboarding')}
  assert.equal(store.getState().setHasOnboarded(FINAL_ONBOARDING_STEP),true)
  assert.equal(decide(store),'app');assert.equal(decide(boot()),'app')
 })

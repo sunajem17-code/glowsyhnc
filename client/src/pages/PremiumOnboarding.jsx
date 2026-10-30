@@ -29,7 +29,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/th
 import { ONBOARDING_GOLD } from '../utils/onboardingGold'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
-import { normalizeOnboardingStep, nextOnboardingStep } from '../utils/onboardingProgress'
+import { nextOnboardingStep } from '../utils/onboardingProgress'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { openAppStoreReview } from '../components/OnboardingFinalSteps'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
@@ -396,7 +396,7 @@ function StepWelcome({ onCreateAccount, onSignIn, onDemo }) {
           className="font-heading font-bold text-[22px] mb-2"
           style={{ color: TEXT, letterSpacing: '-0.02em' }}
         >
-          Brutally honest Built to improve you
+          Welcome to Ascendus
         </motion.p>
 
         <motion.p
@@ -3176,28 +3176,11 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
       .catch(err => console.warn('[Onboarding] Guest session failed (non-fatal):', err?.message))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Restore an in-progress draft so a refresh/backgrounding mid-quiz doesn't
-  // silently discard answers already entered. Authenticated users clamp to
-  // step ≥ 3 so they never see Welcome/SignUp again.
+  // Keep answers, but never restore a saved screen index on a new mount.
+  // Old drafts can point at the cinematic/end of a different onboarding flow.
   const [draft] = useState(loadDraft)
-  useEffect(() => {
-    if (draft?.step != null && normalizeOnboardingStep(draft.step) !== draft.step) {
-      console.warn('[Onboarding] Recovered an invalid saved step; existing answers were preserved.')
-    }
-  }, [draft])
-
-  // Intro slides play first for new users on every fresh app launch.
   const [introDone, setIntroDone] = useState(true)
-  // StepIntro (index 0, "First Impressions Are Fast") is skipped for the
-  // same reason — new unauthenticated sessions start straight at Welcome(1).
-  // If already authenticated, skip Intro(0), Welcome(1), SignUp(2) — start at Consent(3)
-  // Unauthenticated users start at Welcome (step 1). With the new flow, auth
-  // happens at the paywall, so users are always unauthenticated during onboarding.
-  // Interrupted sessions (isAuthenticated=true but hasOnboarded=false) resume at gender (step 2).
-  // Gender (step 2) is the first screen on a fresh launch. Welcome/Intro are
-  // still in the steps array but skipped by default — start at 2 for everyone.
-  // Flow simplified: gender is now step 0. Always start at 0.
-  const [step, setStep] = useState(() => normalizeOnboardingStep(draft?.step))
+  const [step, setStep] = useState(0)
   const activeStepRef = useRef(step)
   activeStepRef.current = step
   const [dir, setDir] = useState(1)
@@ -3211,7 +3194,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
 
   // Persist a draft on every step/field change.
   useEffect(() => {
-    saveDraft({ step, formData })
+    saveDraft({ formData })
   }, [step, formData, isAuthenticated])
 
 
@@ -3381,7 +3364,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
       <div className="relative flex flex-col h-full overflow-hidden" style={{ background: BG }}>
         <SignInView
           onBack={() => setSigningIn(false)}
-          onSuccess={() => navigate('/')}
+          onSuccess={() => { setSigningIn(false); setStep(0); navigate('/') }}
           onAppleSignIn={handleAppleSignIn}
         />
       </div>
@@ -3394,7 +3377,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
     setAuth({ id: 'demo', name: 'Demo User', email: 'demo@ascendus.app' }, 'demo-token')
     setLegalConsented(true)
     setAgeConfirmed(true)
-    setStep(2) // skip straight to gender (index 2 in new flow)
+    setStep(0) // Start at gender.
   }
 
   // Used only by the Sign In modal (returning users). New-user auth now happens
@@ -3436,7 +3419,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
     }
   }
 
-  // Flow: 0=gender, 1=haloEffect, 2=whyAppearance, 3=primaryGoal, 4=notifications, 5=testimonials, 6=cinematic
+  // Start directly with the existing gender question.
   const steps = [
     <StepGender key="gender" data={formData} onChange={updateField} onNext={goNext} />,
     <StepHaloEffect key="haloEffect" onNext={goNext} onBack={goBack} />,

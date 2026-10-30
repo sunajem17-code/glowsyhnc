@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 // This helper has no browser/native dependencies.
 import {normalizeOnboardingStep,nextOnboardingStep,ONBOARDING_STEP_COUNT} from '../client/src/utils/onboardingProgress.js'
-test('valid saved steps resume the same screen',()=>{
+test('valid in-session steps resolve to the same screen',()=>{
  for(let i=0;i<ONBOARDING_STEP_COUNT;i++) assert.equal(normalizeOnboardingStep(i),i)
 })
 test('stale, corrupt and out-of-range saved steps always resolve to a rendered screen',()=>{
