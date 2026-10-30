@@ -1,4 +1,4 @@
-const CURRENT_APPEARANCE_ANALYSIS_VERSION = 12
+const CURRENT_APPEARANCE_ANALYSIS_VERSION = 13
 
 function hasCompleteFindings(rows) {
   return Array.isArray(rows) && rows.length <= 6 && rows.every(item =>
@@ -8,7 +8,7 @@ function hasCompleteFindings(rows) {
 
 export function isCurrentAppearanceAnalysis(analysis, scanId) {
   return Boolean(analysis && Number(analysis.version) >= CURRENT_APPEARANCE_ANALYSIS_VERSION &&
-    analysis.scanId === scanId && hasCompleteFindings(analysis.strengths) &&
+    analysis.scanId === scanId && ['clear', 'limited', 'retake'].includes(analysis.photoQuality?.status) && hasCompleteFindings(analysis.strengths) &&
     hasCompleteFindings(analysis.improvementOpportunities))
 }
 
@@ -58,29 +58,17 @@ function displayFindings(rows) {
     .filter(item => item && ((typeof item.title === 'string' && item.title.trim()) || (typeof item.observation === 'string' && item.observation.trim())))
 }
 
-function mergeUnique(...groups) {
-  const seen = new Set()
-  return groups.flat().filter(item => {
-    const title = typeof item?.title === 'string' ? item.title.trim() : ''
-    const observation = typeof item?.observation === 'string' ? item.observation.trim() : ''
-    const key = `${title.toLowerCase()}|${observation.toLowerCase()}`
-    if (!key.replace('|', '') || seen.has(key)) return false
-    seen.add(key)
-    return true
-  }).slice(0, 6)
-}
-
-// Keep scan-local findings visible even when they're too old to be current.
-// The saved score bullets are useful fallback titles and remain attached to
-// the same owned scan; they are never treated as fresh AI analysis.
+// Older structured notes may be shown explicitly as previous notes. Raw score
+// bullets are not a substitute for a completed, photo-grounded action plan.
 export function getDisplayableAppearanceAnalysis(scan, scanId) {
   const candidate = scan?.aiScore?.appearanceAnalysis || scan?.appearanceAnalysis
   const linked = candidate && (!candidate.scanId || candidate.scanId === scanId)
   const cached = linked ? candidate : null
+  if (isCurrentAppearanceAnalysis(cached, scanId)) return cached
   const cachedPros = displayFindings(cached?.strengths)
   const cachedCons = displayFindings(cached?.improvementOpportunities)
-  const pros = mergeUnique(cachedPros, displayFindings(scan?.aiScore?.keyStrengths || scan?.keyStrengths))
-  const cons = mergeUnique(cachedCons, displayFindings(scan?.aiScore?.keyWeaknesses || scan?.keyWeaknesses))
+  const pros = cachedPros
+  const cons = cachedCons
   if (!pros.length && !cons.length) return null
   return {
     ...(cached || {}),

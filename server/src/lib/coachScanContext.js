@@ -176,13 +176,17 @@ function ownedImagePath(path, userId) {
 }
 
 // No remote URL fetch: only a private bucket path owned by this JWT user.
-// Supabase Storage transforms keep vision input small; unsupported transforms
-// fail into structured-only coaching rather than sending the original image.
+// Prefer resized private images; fall back to the same owned original if transforms
+// are unavailable. Both paths enforce image type and a 2 MB bound.
 async function imageForScan(context, userId, providedImage = null, explicitlyRequested = false) {
   if (providedImage) return providedImage
   const path = context.latest?.imagePath
   if ((!context.imageConsent && !explicitlyRequested) || !context.supabase || !ownedImagePath(path, userId)) return null
-  const { data, error } = await timeout(context.supabase.storage.from('scan-images').download(path, { transform: { width: 768, height: 768, resize: 'contain' } }))
+  const bucket = context.supabase.storage.from('scan-images')
+  let result
+  try { result = await timeout(bucket.download(path, { transform: { width: 768, height: 768, resize: 'contain' } })) } catch { result = null }
+  if (!result?.data || result.error) result = await timeout(bucket.download(path))
+  const { data, error } = result
   if (error || !data || data.size > 2 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(data.type)) throw new Error('Scan image unavailable')
   return { type: 'image', source: { type: 'base64', media_type: data.type, data: Buffer.from(await data.arrayBuffer()).toString('base64') } }
 }

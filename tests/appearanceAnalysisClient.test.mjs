@@ -6,7 +6,7 @@ const point = title => ({ title, observation: `Evidence for ${title}.` })
 
 test('accepts current structured findings from the matching scan', () => {
   assert.equal(isCurrentAppearanceAnalysis({
-    version: 12,
+    version: 13, photoQuality: { status: 'clear', reason: '', retakeSteps: [] },
     scanId: 'scan-1',
     strengths: [point('Symmetry'), point('Proportions')],
     improvementOpportunities: [point('Skin texture'), point('Jaw definition')],
@@ -23,7 +23,7 @@ test('rejects production version-3 two-point analyses even when scan IDs match',
 })
 
 test('rejects incomplete findings and responses belonging to a different scan', () => {
-  const analysis = { version: 12, scanId: 'scan-1', strengths: [point('Symmetry')], improvementOpportunities: [point('Skin')] }
+  const analysis = { version: 13, photoQuality: { status: 'clear', reason: '', retakeSteps: [] }, scanId: 'scan-1', strengths: [point('Symmetry')], improvementOpportunities: [point('Skin')] }
   assert.equal(isCurrentAppearanceAnalysis(analysis, 'scan-2'), false)
   assert.equal(isCurrentAppearanceAnalysis({ ...analysis, improvementOpportunities: [{ title: 'No observation' }] }, 'scan-1'), false)
 })
@@ -36,12 +36,16 @@ test('keeps older saved findings visible while refresh is pending or unavailable
   assert.equal(isCurrentAppearanceAnalysis(saved, 'scan-1'), false)
 })
 
-test('uses scan-local legacy score bullets when a saved scan has no structured analysis', () => {
+test('does not present raw legacy score bullets as completed analysis', () => {
   const visible = getDisplayableAppearanceAnalysis({ id: 'scan-1', aiScore: {
     keyStrengths: ['Balanced symmetry', 'Clear cheekbones'],
     keyWeaknesses: ['Soft jawline', 'Uneven skin texture'],
   } }, 'scan-1')
-  assert.deepEqual(visible.strengths.map(row => row.title), ['Balanced symmetry', 'Clear cheekbones'])
-  assert.deepEqual(visible.improvementOpportunities.map(row => row.title), ['Soft jawline', 'Uneven skin texture'])
-  assert.ok(visible.strengths.every(row => row.legacy))
+  assert.equal(visible, null)
+})
+
+test('current retake advice remains visible and does not merge in stale score bullets',()=>{
+ const analysis={version:13,scanId:'scan-1',photoQuality:{status:'retake',reason:'Too dark.',retakeSteps:['Face a window.']},strengths:[],improvementOpportunities:[]}
+ const displayed=getDisplayableAppearanceAnalysis({aiScore:{appearanceAnalysis:analysis,keyWeaknesses:['Soft jawline']}},'scan-1')
+ assert.equal(displayed,analysis);assert.deepEqual(displayed.improvementOpportunities,[])
 })

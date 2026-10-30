@@ -13,9 +13,9 @@ const { getBreakdown, evidenceFor, CATALOG, cachedBreakdown } = require('./appea
 global.setInterval = originalSetInterval
 const { ownedResult, normalize, publicContext } = require('./coachScanContext')
 const original = { overallScore: 6.2, faceScore: 6.2, keyStrengths: ['A visible side part frames the face.'], faceSubScores: { symmetry: 6.8, jawlineDefinition: 5.4 }, visualObservations: [{ id: 'visible_dullness', category: 'skin', confidence: 'medium', limitations: ['Uneven light'] }] }
-const finding = { title: 'Balanced symmetry', observation: 'The eyes and facial midline appear balanced.', significance: 'This supports a cohesive front view.', recommendation: 'Keep future photos straight-on for comparison.', confidence: 'high', basedOn: ['photo:front', 'score:faceSubScores.symmetry'] }
-const improvement = { title: 'Soft jaw definition', observation: 'The jaw edge is less distinct in this photo.', significance: 'The lower face reads softer from the front.', recommendation: 'Use consistent side lighting to track definition.', confidence: 'medium', basedOn: ['photo:front', 'score:faceSubScores.jawlineDefinition'] }
-function result() { return { strengths: [finding], improvementOpportunities: [improvement], positiveObservations: [], recommendedActions: [{ title: 'Use consistent photos', reason: 'The saved scan uses mixed lighting.', steps: ['Use the same angle and lighting.'], frequency: 'Each scan', timeframe: '', basedOn: ['photo:front'] }], products: [], limitations: ['Lighting can affect appearance.'] } }
+const finding = { title: 'Balanced symmetry', observation: 'The eyes and facial midline appear balanced.', significance: 'This supports a cohesive front view.', recommendation: 'Keep future photos straight-on for comparison.', guideId: 'none', confidence: 'high', basedOn: ['photo:front', 'score:faceSubScores.symmetry'] }
+const improvement = { guideId: 'jaw_expectations', title: 'Soft jaw definition', observation: 'The jaw edge is less distinct in this photo.', significance: 'The lower face reads softer from the front.', recommendation: 'Use consistent side lighting to track definition.', confidence: 'medium', basedOn: ['photo:front', 'score:faceSubScores.jawlineDefinition'] }
+function result() { return { photoQuality: { status: 'clear', reason: 'Face visible in even light.', retakeSteps: [] }, strengths: [finding], improvementOpportunities: [improvement], positiveObservations: [], recommendedActions: [{ title: 'Use consistent photos', reason: 'The saved scan uses mixed lighting.', steps: ['Use the same angle and lighting.'], frequency: 'Each scan', timeframe: '', basedOn: ['photo:front'] }], products: [], limitations: ['Lighting can affect appearance.'] } }
 const image = { type:'image', source:{type:'base64',media_type:'image/jpeg',data:'isolated-photo-bytes'} }
 const analyze = (userId, id, options = {}) => getBreakdown(userId, id, { loadImage: async () => image, ...options })
 let serial = 0
@@ -33,7 +33,7 @@ test('personalized analysis persists with the same scan, retains scores, and rea
   assert.equal(prompt.responseName, 'appearance_breakdown')
   assert.ok(prompt.messages[0].content.some(block => block.type === 'image'))
   assert.ok(prompt.messages[0].content.find(block => block.type === 'text').text.includes('savedScores'))
-  assert.equal(analysis.version, 12)
+  assert.equal(analysis.version, 13)
   assert.equal(analysis.strengths.length, 1)
   assert.equal(analysis.improvementOpportunities.length, 1)
   const context = publicContext({ status:'completed',latest:normalize(saved.row),previous:[],profile:null },true)
@@ -77,7 +77,7 @@ test('production version-3 two-point analysis is refreshed from its owner-scoped
   assert.ok(!analysis.improvementOpportunities.some(point => point.title === 'Old concern one'))
   assert.equal(saved.result.overallScore, original.overallScore)
   assert.equal(saved.row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(saved.result.appearanceAnalysis.version, 12)
+  assert.equal(saved.result.appearanceAnalysis.version, 13)
   assert.equal(cachedBreakdown({ appearanceAnalysis: old.appearanceAnalysis }, id), null)
 })
 test('legacy local scan history is reanalyzed and its old score data stays intact', async () => {
@@ -88,9 +88,9 @@ test('legacy local scan history is reanalyzed and its old score data stays intac
   assert.equal(analysis.scanId, id)
   assert.equal(saved.overallScore, original.overallScore)
   assert.equal(saved.keyStrengths[0], original.keyStrengths[0])
-  assert.equal(saved.appearanceAnalysis.version, 12)
+  assert.equal(saved.appearanceAnalysis.version, 13)
   assert.equal(row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(normalize(row).appearanceAnalysis.version, 12)
+  assert.equal(normalize(row).appearanceAnalysis.version, 13)
 })
 test('another owner cannot read, generate or overwrite a scan', async () => {
   const id=seed('bob')
@@ -129,4 +129,21 @@ test('catalogue product links keep the existing affiliate tag and have no invent
   assert.equal(url.hostname,'www.amazon.ca');assert.equal(url.searchParams.get('tag'),'ascendusapp05-20')
   assert.equal(product.imageUrl,CATALOG.daily_lotion.imageUrl);assert.equal(product.price,undefined);assert.equal(product.rating,undefined)
   assert.equal(new URL(product.sourceUrl).hostname,'www.cerave.ca')
+})
+
+test('an owned scan recovers from cloud download failure using its device photo without changing scores', async()=>{
+ const id=seed();const analysis=await analyze('alice',id,{loadImage:async()=>{throw new Error('storage resize unavailable')},providedPhoto:image,client:{generate:async request=>{assert.deepEqual(request.messages[0].content[0],image);return response(result())}}})
+ assert.equal(analysis.version,13);assert.equal(ownedResult(id,'alice').result.overallScore,original.overallScore)
+})
+test('retake-quality photos suppress unsupported flaws and products, and remain cacheable',async()=>{
+ const id=seed();const data=result();data.photoQuality={status:'retake',reason:'The face is too dark to assess.',retakeSteps:['Face a window and keep the camera level.']}
+ const analysis=await analyze('alice',id,{client:{generate:async()=>response(data)}})
+ assert.deepEqual(analysis.strengths,[]);assert.deepEqual(analysis.improvementOpportunities,[]);assert.deepEqual(analysis.recommendedActions,[]);assert.deepEqual(analysis.products,[])
+ assert.equal(cachedBreakdown(ownedResult(id,'alice').result,id).photoQuality.status,'retake')
+})
+test('selected guidance supplies practical steps, realistic limits and verified source URLs',async()=>{
+ const id=seed();const data=result();data.improvementOpportunities=[{...improvement,title:'Under-eye shading',guideId:'under_eye_shadows'}]
+ const analysis=await analyze('alice',id,{client:{generate:async()=>response(data)}})
+ const guide=analysis.improvementOpportunities[0].guide
+ assert.ok(guide.steps.length>=3);assert.ok(guide.timeframe);assert.match(guide.limits,/not universal cures/);assert.equal(new URL(guide.sources[0].url).hostname,'dermnetnz.org')
 })

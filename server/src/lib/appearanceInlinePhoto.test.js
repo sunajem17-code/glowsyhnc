@@ -22,10 +22,11 @@ stub('./appearanceDiagnostics', { recordAppearanceCounts: () => {} })
 const { getBreakdown } = require('./appearanceBreakdown')
 const photo = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'private-test-photo' } }
 const finding = (title, observation) => ({
-  title, observation, significance: 'Supports a clearer scan review.', recommendation: 'Use the same photo setup next time.',
+  guideId: 'none', title, observation, significance: 'Supports a clearer scan review.', recommendation: 'Use the same photo setup next time.',
   confidence: 'medium', basedOn: ['photo:front'],
 })
 const response = {
+  photoQuality: { status: 'clear', reason: 'Even light.', retakeSteps: [] },
   strengths: [finding('Balanced symmetry', 'The visible facial midline appears balanced.')],
   improvementOpportunities: [finding('Soft jaw definition', 'The jaw edge is not clearly defined in this view.')],
   positiveObservations: [], recommendedActions: [], products: [], limitations: [],
@@ -40,11 +41,7 @@ test('authenticated device-only scan can refresh from its inline photo without i
     client: { generate: async request => {
       sentPhoto = request.messages[0].content[0]
       const prompt = JSON.parse(request.messages[0].content[1].text)
-      assert.equal(prompt.savedScores.subScores.jawlineDefinition, 4.7)
-      assert.equal(prompt.savedScores.subScores.symmetry, 5.8)
-      assert.equal(prompt.savedScores.pillars.harmony, 7.2)
-      assert.equal(prompt.savedScores.subScores.unrelated, undefined)
-      assert.equal(prompt.savedScores.pillars.unrelated, undefined)
+      assert.deepEqual(prompt.savedScores, {}) // No device score is authoritative.
       return { content: [{ type: 'text', text: JSON.stringify(response) }] }
     } },
   })

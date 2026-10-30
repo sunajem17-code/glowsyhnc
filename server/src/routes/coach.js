@@ -31,6 +31,7 @@ async function serveSavedAppearance(req, res, next) {
     }
     return next()
   } catch {
+    if (parseProvidedImage(req.body.scanPhotoData)) return next()
     return res.status(503).json({ error: 'Your saved scan could not be loaded. Please retry.' })
   }
 }
@@ -42,12 +43,17 @@ router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claude
   if (req.body.scanPhotoData && !providedPhoto) return res.status(400).json({ error: 'The attached scan photo must be a supported image under 1 MB.' })
   try {
     const { getBreakdown } = require('../lib/appearanceBreakdown')
-    res.json({ analysis: await getBreakdown(req.userId, req.body.scanId, { providedPhoto, scanScores: req.body.scanScores }) })
+    res.json({ analysis: await getBreakdown(req.userId, req.body.scanId, { providedPhoto }) })
   } catch (err) {
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
       return res.status(err.status || 503).json({ error: err.code })
     }
-    res.status([404, 422].includes(err.status) ? err.status : 503).json({ error: [404, 422].includes(err.status) ? err.message : 'Your appearance analysis could not be completed. Please retry. Your scan is safe.' })
+    // Log classification only: never photos, tokens, user IDs or provider payloads.
+    console.error('[appearance-analysis]', { stage: 'request_failed', code: err.code || 'appearance_refresh_failed', status: err.status || 503 })
+    res.status([404, 422].includes(err.status) ? err.status : 503).json({
+      errorCode: err.code || 'appearance_refresh_failed',
+      error: [404, 422].includes(err.status) ? err.message : 'The detailed feedback did not finish. Your saved scan is safe. Try again in a moment.',
+    })
   }
 })
 
