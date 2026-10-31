@@ -1273,7 +1273,7 @@ router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, asy
 // Uses haiku for speed + cost. Falls back to 500 so the client can show a
 // generic plan rather than an error screen.
 router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, res) => {
-  const { physiqueScores, gender, trainingLevel } = req.body
+  const { physiqueScores, gender, trainingLevel, gymAccess, daysPerWeek } = req.body
   if (!physiqueScores || typeof physiqueScores !== 'object') {
     return res.status(400).json({ error: 'physiqueScores object required' })
   }
@@ -1285,6 +1285,9 @@ router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, r
     const client = getClient()
     const level = trainingLevel || 'beginner'
     const isFemale = gender === 'female'
+    const hasTrainingPreferences = typeof gymAccess === 'boolean'
+    const requestedDays = Number(daysPerWeek)
+    const sessionsPerWeek = gymAccess === true && Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 7 ? requestedDays : 3
 
     const scored = [
       { name: 'proportions', score: physiqueScores.proportions ?? 5 },
@@ -1297,16 +1300,23 @@ router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, r
     const weakAreas   = scored.slice(0, 2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
     const strongAreas = scored.slice(-2).map(s => `${s.name} (${s.score.toFixed(1)}/10)`).join(', ')
 
-    const splitRule = level === 'advanced' ? '6-day PPL (Push/Pull/Legs)'
-      : level === 'intermediate' ? '4-day Upper/Lower'
-      : '3-day Full Body'
+    const splitRule = hasTrainingPreferences
+      ? `${sessionsPerWeek}-day ${gymAccess ? 'gym' : 'at-home'} plan`
+      : level === 'advanced' ? '6-day PPL (Push/Pull/Legs)'
+        : level === 'intermediate' ? '4-day Upper/Lower'
+          : '3-day Full Body'
 
+    const trainingSetup = hasTrainingPreferences
+      ? `Training environment: ${gymAccess ? 'The user has access to a gym and gym equipment.' : 'The user does not have gym access. Use bodyweight and common household items only; do not prescribe gym machines or barbells.'}
+Available training days: ${sessionsPerWeek} per week. Create exactly ${sessionsPerWeek} scheduled sessions. If all 7 days are available, make at least one session an easy active-recovery or mobility session.`
+      : ''
     const prompt = `You are an elite physique coach. Generate a personalized weekly workout plan for a ${level} ${isFemale ? 'female' : 'male'}.
 
 Physique scores (1–10 scale): ${JSON.stringify(physiqueScores)}
 Priority weak areas: ${weakAreas}
 Current strengths: ${strongAreas}
 Training split: ${splitRule}
+${trainingSetup}
 
 Requirements:
 - Each day: 4–6 exercises

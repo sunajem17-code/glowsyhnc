@@ -461,6 +461,12 @@ input:focus-visible, button:focus-visible {
   outline-offset: 2px;
 }
 
+.product-name-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: rgba(198, 168, 92, 0.55);
+}
+
 .community-like-button:focus-visible {
   outline: none;
 }
