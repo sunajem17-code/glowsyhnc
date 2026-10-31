@@ -10,6 +10,12 @@ const enumeration = values => ({ type: 'string', enum: values })
 const scores = keys => object(Object.fromEntries(keys.map(key => [key, score])))
 const metric = object({ score, descriptor: string })
 const metrics = keys => object(Object.fromEntries(keys.map(key => [key, metric])))
+const appearanceFinding = object({ title: string, observation: string, significance: string, recommendation: string })
+const appearanceAnalysis = object({
+  strengths: array(appearanceFinding, { minItems: 1, maxItems: 4 }),
+  improvement_opportunities: array(appearanceFinding, { minItems: 5 }),
+  positive_observations: array(appearanceFinding, { maxItems: 0 }),
+})
 
 function core(hasSide) {
   const properties = {
@@ -20,6 +26,7 @@ function core(hasSide) {
     sub_scores: scores(['symmetry', 'jawline_definition', 'skin_clarity', 'facial_proportions', 'eye_area', 'facial_harmony']),
     key_strengths: array(string, { minItems: 2, maxItems: 2 }), key_weaknesses: strings,
     top_improvement: string,
+    appearance_analysis: appearanceAnalysis,
     visual_observations: array(object({
       id: enumeration(['visible_acne', 'visible_scarring', 'visible_oiliness', 'visible_dark_circles', 'visible_dullness', 'visible_temporal_recession', 'visible_crown_thinning', 'visible_diffuse_thinning', 'hairline_asymmetry', 'facial_hair', 'grooming_issue']),
       category: enumeration(['skin', 'hair', 'grooming']), source: enumeration(['visual_observation']),

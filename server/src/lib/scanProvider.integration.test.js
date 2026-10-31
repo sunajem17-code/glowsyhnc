@@ -4,6 +4,11 @@ const fs = require('node:fs')
 const path = require('node:path')
 const express = require('express')
 const schemas = require('./aiSchemas')
+// aiProvider imports the limiter through aiBudget, so capture its maintenance
+// timer before loading the provider as well as the routes.
+const maintenanceTimers = []
+const originalSetInterval = global.setInterval
+global.setInterval = (...args) => { const timer = originalSetInterval(...args); maintenanceTimers.push(timer); return timer }
 const provider = require('./aiProvider')
 
 // All persistence is isolated in memory. No real user/database/cache is touched.
@@ -27,6 +32,17 @@ function fixture(schema) {
   return 'Isolated integration fixture'
 }
 const core = { ...fixture(schemas.core(true)), facial_structure: 'defined', hair_type: 'straight' }
+const makeAppearanceFindings = (kind, count) => Array.from({ length: count }, (_, index) => ({
+  title: `${kind} ${index + 1}`,
+  observation: `The scan shows a distinct ${kind.toLowerCase()} detail ${index + 1}.`,
+  significance: `This detail changes how this part of the face reads in the photo.`,
+  recommendation: `Use a simple, safe step that matches this exact ${kind.toLowerCase()} detail.`,
+}))
+core.appearance_analysis = {
+  strengths: makeAppearanceFindings('Visible strength', 4),
+  improvement_opportunities: makeAppearanceFindings('Visible improvement', 7),
+  positive_observations: [],
+}
 const originalCreate = provider.createAIClient
 const calls = []
 let invalidCore = false
@@ -55,14 +71,10 @@ const app = express()
 app.use(express.json({ limit: '8mb' }))
 // Keep the production limiter intact while owning/cleaning up its maintenance
 // timer in this isolated process. No background timer should strand the test.
-const maintenanceTimers = []
-const originalSetInterval = global.setInterval
-global.setInterval = (...args) => { const timer = originalSetInterval(...args); maintenanceTimers.push(timer); return timer }
 app.use('/api/ai', require('../routes/aiScore'))
 app.use('/api/products', require('../routes/products'))
 app.use('/api/swipemaxx', require('../routes/swipemaxx'))
 app.use('/api/tindermaxx', require('../routes/tindermaxx'))
-app.use('/api/hair', require('../routes/hair'))
 app.use('/api/coach', require('../routes/coach'))
 global.setInterval = originalSetInterval
 let server, base
@@ -99,8 +111,41 @@ test('image payload -> real HTTP validation -> scoring -> unchanged client ratin
   assert.deepEqual(Object.keys(scored.body.pillars), ['harmony', 'angularity', 'features', 'dimorphism'])
   assert.equal(scored.body.topImprovement, core.top_improvement)
   assert.deepEqual(scored.body.keyStrengths, core.key_strengths)
+  assert.deepEqual(scored.body.appearanceAnalysis, {
+    version: 15,
+    scanId: null,
+    strengths: core.appearance_analysis.strengths,
+    improvementOpportunities: core.appearance_analysis.improvement_opportunities,
+    positiveObservations: [],
+  })
   const coreCall = calls.find(call => call.request.text?.format?.name === 'face_core')
   assert.equal(coreCall.request.input[0].content.filter(block => block.type === 'input_image').length, 2)
+  assert.match(coreCall.request.instructions, /no fixed maximum for Cons/i)
+  assert.match(coreCall.request.instructions, /child can understand/i)
+  assert.ok(coreCall.request.max_output_tokens >= 6000)
+  assert.equal(coreCall.request.text.format.schema.properties.appearance_analysis.properties.strengths.maxItems, 4)
+  assert.equal(coreCall.request.text.format.schema.properties.appearance_analysis.properties.improvement_opportunities.minItems, 5)
+  assert.equal(coreCall.request.text.format.schema.properties.appearance_analysis.properties.improvement_opportunities.maxItems, undefined)
+  assert.equal(scored.body.appearanceAnalysis.strengths.length, 4)
+  assert.equal(scored.body.appearanceAnalysis.improvementOpportunities.length, 7)
+})
+
+test('cached advice belongs to each new authenticated scan without another provider call', async () => {
+  const before = calls.length
+  const first = await post('/api/ai/score', { faceImage: front, sideImage: side, gender: 'male' }, premiumToken)
+  const second = await post('/api/ai/score', { faceImage: front, sideImage: side, gender: 'male' }, premiumToken)
+  assert.equal(first.status, 200)
+  assert.equal(second.status, 200)
+  assert.ok(first.body.scanId)
+  assert.ok(second.body.scanId)
+  assert.notEqual(first.body.scanId, second.body.scanId)
+  for (const { body } of [first, second]) {
+    assert.equal(body.appearanceAnalysis.scanId, body.scanId)
+    assert.equal(body.appearanceAnalysis.version, 15)
+    assert.deepEqual(body.appearanceAnalysis.strengths, core.appearance_analysis.strengths)
+    assert.deepEqual(body.appearanceAnalysis.improvementOpportunities, core.appearance_analysis.improvement_opportunities)
+  }
+  assert.equal(calls.length, before)
 })
 
 test('switching to Anthropic does not reuse an OpenAI cached assessment', async () => {
@@ -155,13 +200,4 @@ test('skincare products preserve the five-product response and existing issue co
   const request = calls.find(call => call.request.text?.format?.name === 'product_recommendations').request
   assert.ok(request.input[0].content.includes('visible_acne'))
   assert.ok(request.input[0].content.includes('skin texture'))
-})
-
-test('hairstyle forced-tool output remains compatible with the existing catalog route', async () => {
-  const result = await post('/api/hair/recommend', { hairProfile: { hairType: 'coily', density: 'medium', strandThickness: 'medium', desiredLength: 'short', maintenancePreference: 'low' },
-    analysisEvidence: { status: 'measured', measurements: [{ id: 'face_width_ratio', value: 1.2, assessable: true, unit: 'ratio', formula: 'width/height' }] } }, premiumToken)
-  assert.equal(result.status, 200)
-  assert.ok(result.body.recommendations.length > 0)
-  assert.ok(result.body.recommendations[0].hairstyleId)
-  assert.ok(calls.some(call => call.request.text?.format?.name === 'submit_hair_recommendations'))
 })

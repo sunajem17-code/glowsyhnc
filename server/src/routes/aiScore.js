@@ -2,7 +2,7 @@ const express = require('express')
 const { createAIClient, getAIKey, cacheNamespace } = require('../lib/aiProvider')
 const aiSchemas = require('../lib/aiSchemas')
 const coachScans = require('../lib/coachScanContext')
-const { EYE_GUIDANCE, GENERAL_GUIDANCE } = require('../lib/appearanceKnowledge')
+const { EYE_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache } = require('../supabase')
@@ -10,6 +10,8 @@ const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
 const { calculatePotentialScore, withPotentialScore } = require('../utils/potentialScore')
 const { normalizePhysiqueScores } = require('../utils/physiqueScore')
+const { normalizeAppearanceAnalysis } = require('../lib/appearanceAnalysis')
+const { APPEARANCE_ADVICE_GUIDANCE } = require('../lib/appearanceAdviceGuidance')
 
 const router = express.Router()
 
@@ -32,7 +34,7 @@ function sampleB64(s) {
 
 function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(cacheNamespace() + '||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
+    .update(cacheNamespace() + '||v11_five_direct_personal_cons||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -48,8 +50,24 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
   h.update('||' + cacheNamespace())
-  h.update('||v5_physique_visual_scoring') // bust results created before body photos were part of the cache identity
+  h.update('||v11_five_direct_personal_cons') // refresh findings after the minimum-five Cons policy change
   return h.digest('hex') // 64-char hex string
+}
+
+function cachedResultForScan(value, scanId) {
+  try {
+    if (!value || typeof value !== 'object' || !value.appearanceAnalysis) return null
+    const embedded = value.appearanceAnalysis
+    const normalized = normalizeAppearanceAnalysis({
+      strengths: embedded.strengths,
+      improvement_opportunities: embedded.improvementOpportunities,
+      positive_observations: embedded.positiveObservations,
+    }, scanId)
+    if (embedded.version !== 15) return null
+    return { ...value, appearanceAnalysis: normalized }
+  } catch {
+    return null
+  }
 }
 
 function getClient() {
@@ -250,11 +268,13 @@ Include a "profile" object in your JSON response.` : ''
     // extended_metrics (30 more {score, descriptor} pairs) moved to its own
     // call (getExtendedMetrics) — this budget only needs to cover the core
     // fields + optional profile block now.
-    max_tokens: hasSide ? 1300 : 1100,
+    max_tokens: 8192,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
 Score face and grooming on a 1.0–10.0 scale.
+
+PROS AND CONS: Follow the shared appearance guidance below exactly. It controls the wording and content of the two result lists.
 
 SCORE DISTRIBUTION — READ FIRST, applies to every 1.0–10.0 score in this prompt (face_score, pillars, sub_scores, face_metrics):
 Think of scores as a bell curve across the general population, not a curve of dating-app profile photos or influencers:
@@ -373,14 +393,13 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
 ${profileSection}${evidenceNote}
 
-VISUAL OBSERVATIONS — report only characteristics actually visible in the supplied image. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit anything unsupported. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
-KEY STRENGTHS — MANDATORY: return EXACTLY 2 items in key_strengths. Each item MUST name a specific observable facial feature from this face (e.g. jawline, cheekbones, symmetry, skin, eye area, facial thirds, brow ridge). Write a complete sentence explaining WHY that feature scores well — the exact structural or visual trait that makes it attractive and what it contributes to the overall look. Generic or vague observations ("good overall appearance", "balanced features") are not allowed — name the specific feature and describe what you actually see. Example: "Your jawline shows strong gonial angle definition and visible lower-face edge clarity — this creates facial shadow and the angular frame that drives high attractiveness ratings."
+VISUAL OBSERVATIONS — report only characteristics actually visible. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit unsupported items. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
 
-${GENERAL_GUIDANCE}
+KEY STRENGTHS — return EXACTLY 2 short summary sentences in key_strengths. These legacy bullets do not limit appearance_analysis. Do not mention a photo in the reader-facing wording.
 
-${EYE_GUIDANCE}
-
-For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
+APPEARANCE ANALYSIS — inspect the front and side views when both are supplied. Return appearance_analysis with strengths, improvement_opportunities, and positive_observations. Apply these rules to every title, explanation, and Try step:
+${APPEARANCE_ADVICE_GUIDANCE}
+Positive observations can be empty. For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
 
@@ -407,6 +426,11 @@ Return ONLY this JSON — no markdown, nothing else:
   "key_strengths": ["<strength 1>", "<strength 2>"],
   "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
   "top_improvement": "<single most impactful improvement>",
+  "appearance_analysis": {
+    "strengths": [{"title":"<simple title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
+    "improvement_opportunities": [{"title":"<simple title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
+    "positive_observations": []
+  },
   "visual_observations": [
     { "id": "<allowed id>", "category": "<skin|hair|grooming>", "source": "visual_observation", "confidence": "<low|medium|high>", "images_supporting": ["<front|profile>"], "limitations": ["<relevant limitation>"] }
   ],
@@ -851,9 +875,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     const cacheKey = hashImages(faceBase64, bodyBase64, sideBase64)
     if (scoreCache.has(cacheKey)) {
       console.log('[aiScore] L1 cache hit:', cacheKey)
-      const cached = withPotentialScore(scoreCache.get(cacheKey))
-      scoreCache.set(cacheKey, cached)
-      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      const cached = cachedResultForScan(scoreCache.get(cacheKey), completedScanId)
+      if (cached) {
+        const hydrated = withPotentialScore(cached)
+        scoreCache.set(cacheKey, hydrated)
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, hydrated))
+      }
+      scoreCache.delete(cacheKey)
+      console.log('[aiScore] L1 entry missing valid appearance analysis — rescoring')
     }
 
     // ── L2: Supabase persistent cache ─────────────────────────────────────────
@@ -863,10 +892,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     console.log(`[aiScore:TIMING] L2 Supabase cache lookup took ${Date.now() - tL2Start}ms`)
     if (sbCached) {
       console.log('[aiScore] L2 Supabase cache hit:', fullHash.slice(0, 16))
-      if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
-      const cached = withPotentialScore(sbCached)
-      scoreCache.set(cacheKey, cached)
-      return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      const rebound = cachedResultForScan(sbCached, completedScanId)
+      if (rebound) {
+        if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
+        const cached = withPotentialScore(rebound)
+        scoreCache.set(cacheKey, cached)
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+      }
+      console.log('[aiScore] L2 entry missing valid appearance analysis — rescoring')
     }
 
     console.log('[aiScore] Cache miss — acquiring slot for Claude scoring...')
@@ -1010,6 +1043,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       keyStrengths:      faceResult.key_strengths,
       keyWeaknesses:     faceResult.key_weaknesses,
       topImprovement:    faceResult.top_improvement,
+      appearanceAnalysis: normalizeAppearanceAnalysis(faceResult.appearance_analysis, completedScanId),
       faceMetrics: (() => {
         const fm = faceResult.face_metrics
         if (!fm) return null

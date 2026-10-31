@@ -8,6 +8,12 @@ const timeout = (promise, ms = 8000) => {
   return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Scan data request timed out')), ms) })]).finally(() => clearTimeout(timer))
 }
 const parse = value => { try { return typeof value === 'string' ? JSON.parse(value) : value } catch { return null } }
+const completeAppearanceRows = rows => Array.isArray(rows) && rows.length > 0 && rows.every(item =>
+  item && ['title', 'observation', 'significance', 'recommendation'].every(key =>
+    typeof item[key] === 'string' && item[key].trim()))
+const isCurrentAppearanceAnalysis = (analysis, scanId) => Boolean(analysis &&
+  analysis.scanId === scanId && Number(analysis.version) >= 13 &&
+  completeAppearanceRows(analysis.strengths) && completeAppearanceRows(analysis.improvementOpportunities))
 const clean = value => {
   if (typeof value === 'string') return value.slice(0, 1200)
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
@@ -89,6 +95,11 @@ function normalize(row) {
   const score = result?.overallScore ?? row.overall_score ?? row.glow_score
   if (score == null || !Number.isFinite(Number(score))) return null
   const legacyFace = data?.kind === KIND ? null : result
+  // The same scan may have several persisted copies of its detailed findings.
+  // Prefer the first complete, versioned copy tied to this scan so a stale
+  // result envelope cannot hide the valid extended_metrics copy.
+  const appearanceAnalysis = [result?.appearanceAnalysis, extendedMetrics?.appearanceAnalysis, legacyFace?.appearanceAnalysis]
+    .find(candidate => isCurrentAppearanceAnalysis(candidate, row.id))
   return {
     id: row.id, completedAt: row.analyzed_at || row.created_at || row.scan_date,
     scores: clean({ overall: Number(score), face: result?.faceScore ?? row.face_score ?? row.face_total_score,
@@ -101,11 +112,10 @@ function normalize(row) {
     notAssessable: clean(result?.evidenceSummary?.notAssessable),
     measurementLimitations: clean(result?.evidenceSummary?.limitations),
     observations: clean(result?.visualObservations), faceMetrics: clean(result?.faceMetrics),
-    appearanceAnalysis: clean(result?.appearanceAnalysis ?? extendedMetrics?.appearanceAnalysis ?? legacyFace?.appearanceAnalysis),
+    appearanceAnalysis: clean(appearanceAnalysis),
     strengths: clean(result?.keyStrengths), improvements: clean(result?.keyWeaknesses),
     recommendation: clean(result?.topImprovement),
     hairType: clean(result?.hairType ?? row.hair_type_detected),
-    savedHairstyleRecommendations: clean([row.hairstyle_recommendation_1, row.hairstyle_recommendation_2, row.hairstyle_recommendation_3].filter(Boolean)),
     profile: clean(result?.profileData),
     physique: clean(result?.physiqueScore),
     extendedMetrics: clean(result?.extendedMetrics ?? extendedMetrics),

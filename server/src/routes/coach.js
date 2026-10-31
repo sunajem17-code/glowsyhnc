@@ -24,7 +24,7 @@ async function serveSavedAppearance(req, res, next) {
     const saved = await ownedCoachScan(req.body.scanId, req.userId)
     if (!saved) return next()
     const { cachedBreakdown } = require('../lib/appearanceBreakdown')
-    const analysis = cachedBreakdown(saved.result || { appearanceAnalysis: saved.scan.appearanceAnalysis }, req.body.scanId)
+    const analysis = cachedBreakdown(saved.result, req.body.scanId, saved.scan.appearanceAnalysis)
     if (analysis) {
       require('../lib/appearanceDiagnostics').recordAppearanceCounts('saved_analysis_loaded', analysis.strengths, analysis.improvementOpportunities)
       return res.json({ analysis })
