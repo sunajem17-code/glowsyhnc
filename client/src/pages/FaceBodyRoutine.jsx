@@ -97,7 +97,7 @@ function loadProgress(key, day, week) {
 }
 
 const DAILY_STEPS = [
-  { id: 'morning', group: 'Morning', icon: Sun, title: 'Morning routine', steps: ['Rinse or use a gentle cleanser.', 'Apply moisturizer.', 'Apply sunscreen SPF 30 or higher.'] },
+  { id: 'morning', group: 'Morning', icon: Sun, title: 'Morning routine', steps: ['Rinse or use a gentle cleanser.', 'Ice face (wrapped ice or cold roller)', 'Apply moisturizer.', 'Apply sunscreen SPF 30 or higher.'], stepKeys: ['morning-0', 'face-ice', 'morning-1', 'morning-2'] },
   { id: 'walk', group: 'Daily', icon: Footprints, title: 'Get some movement', detail: 'Aim for a 20–30 minute walk or another comfortable activity. Break it into shorter walks if that fits your day better.' },
   { id: 'recovery', group: 'Daily', icon: BedDouble, title: 'Protect your recovery', detail: 'Keep a consistent wind-down and bedtime. Choose a sleep duration appropriate for your age and schedule.' },
   { id: 'evening', group: 'Evening', icon: Moon, title: 'Night routine', steps: ['Rinse or use a gentle cleanser.', 'Apply moisturizer.'] },
@@ -119,6 +119,17 @@ const PRODUCT_TYPES = [
 ]
 
 const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const HEAVY_CARDIO_EXAMPLES = [
+  'Sprinting — 8–10 rounds of 20–30-second sprints',
+  'Fast running — challenging pace for 20–30 minutes',
+  'Intense cycling — high resistance or sprint intervals',
+  'Fast swimming — repeated fast laps with short breaks',
+  'HIIT — burpees, mountain climbers, or jumping jacks',
+  'Jump rope — fast skipping intervals for 15–20 minutes',
+  'StairMaster — high-speed or high-resistance climbing',
+  'Rowing machine — hard intervals or sustained vigorous rowing',
+  'Sports — intense basketball, soccer, or competitive games',
+]
 
 function getProductDays(product, weekKey) {
   const weekIndex = Math.floor(Date.parse(`${weekKey}T12:00:00`) / (7 * 24 * 60 * 60 * 1000))
@@ -422,6 +433,7 @@ export default function FaceBodyRoutine() {
   const gymPreferencesKey = userId ? `ascendus-body-routine-preferences-${userId}` : `${progressKey}-body-routine-preferences-v1`
   const [gymPreferences, setGymPreferences] = useState(() => loadGymPreferences(gymPreferencesKey))
   const [showGymQuestionnaire, setShowGymQuestionnaire] = useState(false)
+  const [showPlanReview, setShowPlanReview] = useState(false)
   const [gymAccess, setGymAccess] = useState(null)
   const [gymDaysPerWeek, setGymDaysPerWeek] = useState(3)
   const [progress, setProgress] = useState(() => loadProgress(progressKey, day, week))
@@ -432,9 +444,14 @@ export default function FaceBodyRoutine() {
   const [faceRoutineChecks, setFaceRoutineChecks] = useState(() => loadFaceRoutineChecks(faceRoutineChecksKey, day, progress.daily))
   const [facePlan, setFacePlan] = useState(() => loadFacePlan(facePlanKey, week))
   const activeFaceWeek = getFacePlanWeekNumber(week, facePlan.startWeek)
-  const selectedFaceWeekday = todayWeekday
-  const selectedFaceWeekKey = week
-  const selectedFaceDate = getDateForWeekday(selectedFaceWeekKey, selectedFaceWeekday)
+  const activeFaceDay = Math.min(84, Math.max(1, (activeFaceWeek - 1) * 7 + todayWeekday + 1))
+  const [selectedFacePlanDay, setSelectedFacePlanDay] = useState(activeFaceDay)
+  const displayedFacePlanDay = Math.min(84, Math.max(1, selectedFacePlanDay))
+  const selectedFaceWeek = Math.ceil(displayedFacePlanDay / 7)
+  const selectedFaceWeekday = (displayedFacePlanDay - 1) % 7
+  const viewingCurrentFaceDay = displayedFacePlanDay === activeFaceDay
+  const selectedFaceDate = getDateForWeekday(facePlan.startWeek, displayedFacePlanDay - 1)
+  const selectedFaceWeekKey = getWeekKey(new Date(`${selectedFaceDate}T12:00:00`))
   const [products, setProducts] = useState(() => loadProducts(productsKey, legacyProductsKey))
   const [productName, setProductName] = useState('')
   const [showProducts, setShowProducts] = useState(false)
@@ -473,6 +490,10 @@ export default function FaceBodyRoutine() {
   }, [productsKey, legacyProductsKey, facePlanKey, faceRoutineChecksKey, week, day, progress.daily])
 
   useEffect(() => {
+    setSelectedFacePlanDay(activeFaceDay)
+  }, [facePlanKey, activeFaceDay])
+
+  useEffect(() => {
     if (progress.day !== day || faceRoutineChecks[day]) return
     const next = { ...faceRoutineChecks, [day]: progress.daily }
     setFaceRoutineChecks(next)
@@ -501,6 +522,20 @@ export default function FaceBodyRoutine() {
   }, [showGymQuestionnaire])
 
   useEffect(() => {
+    if (!showPlanReview) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setShowPlanReview(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showPlanReview])
+
+  useEffect(() => {
     try { setPlan(JSON.parse(localStorage.getItem(planKey) || 'null')) } catch { setPlan(null) }
     setPlanProgress(getPlanProgress(`${planKey}-progress`, day))
   }, [planKey, day])
@@ -523,10 +558,17 @@ export default function FaceBodyRoutine() {
         const timeMatches = product.time === period || product.time === 'Morning and night' || (product.time === 'Follow product label' && step.id === 'morning')
         return timeMatches && getProductDays(product, selectedFaceWeekKey).includes(selectedFaceWeekday)
       })
-      if (!scheduledProducts.length) return step
-      const steps = [...step.steps, ...scheduledProducts.map(product => product.time === 'Follow product label' ? `Check the label for when to use ${product.name}.` : `Apply ${product.name}.`)]
-      const stepKeys = [...step.steps.map((_, index) => `${step.id}-${index}`), ...scheduledProducts.map(product => `product-${product.id}`)]
-      return { ...step, steps, stepKeys }
+      const neckExerciseSteps = step.id === 'evening' && selectedFaceWeekday < 5
+        ? [
+          { key: 'face-neck-chin-tucks', title: 'Chin tucks — 3 × 10', description: 'Pull your chin straight backward without tilting your head. Hold for 5 seconds, then relax.' },
+          { key: 'face-neck-extensions', title: 'Neck extensions — 2 × 10', description: "Slowly look upward within a comfortable range, then return to neutral. Don't force your neck backward." },
+        ]
+        : []
+      if (!scheduledProducts.length && !neckExerciseSteps.length) return step
+      const steps = [...step.steps, ...scheduledProducts.map(product => product.time === 'Follow product label' ? `Check the label for when to use ${product.name}.` : `Apply ${product.name}.`), ...neckExerciseSteps.map(exercise => exercise.title)]
+      const stepKeys = [...step.steps.map((_, index) => step.stepKeys?.[index] ?? `${step.id}-${index}`), ...scheduledProducts.map(product => `product-${product.id}`), ...neckExerciseSteps.map(exercise => exercise.key)]
+      const stepDetails = Object.fromEntries(neckExerciseSteps.map(exercise => [exercise.key, exercise.description]))
+      return { ...step, steps, stepKeys, stepDetails }
     })
   const completedToday = sectionSteps.filter(step => step.steps ? step.steps.every((_, index) => isRoutineStepChecked(step, index)) : progress.daily[step.id]).length
   const activeWeekNumber = Math.ceil(planProgress.activeDay / 7)
@@ -540,8 +582,10 @@ export default function FaceBodyRoutine() {
   const viewingCurrentDay = selectedPlanDay === planProgress.activeDay
   const viewedWeekday = (selectedPlanDay - 1) % 7
   const currentPhase = activeWeekNumber <= 4 ? 'Foundation' : activeWeekNumber <= 8 ? 'Build' : activeWeekNumber <= 11 ? 'Progress' : 'Deload & review'
-  const scheduledWorkoutIndexes = viewedWeek?.sessions?.length
-    ? viewedWeek.sessions.map((_, index) => Math.round(index * 6 / viewedWeek.sessions.length))
+  const scheduledWorkoutIndexes = viewedWeek?.sessions?.length === 7
+    ? viewedWeek.sessions.map((_, index) => index)
+    : viewedWeek?.sessions?.length
+      ? viewedWeek.sessions.map((_, index) => Math.round(index * 6 / viewedWeek.sessions.length))
     : []
   const todaysSessionIndex = scheduledWorkoutIndexes.indexOf(viewedWeekday)
   const todaysSession = todaysSessionIndex >= 0 ? viewedWeek.sessions[todaysSessionIndex] : null
@@ -553,8 +597,9 @@ export default function FaceBodyRoutine() {
       const deload = activeWeekNumber === 4 || activeWeekNumber === 8 || activeWeekNumber === 12
       const progressionSet = (activeWeekNumber >= 5 && activeWeekNumber <= 7 && index < 2) || (activeWeekNumber >= 9 && activeWeekNumber <= 11 && index < 3)
       const sets = Math.max(1, Number(exercise.sets) - (deload ? 1 : 0) + (progressionSet ? 1 : 0))
-      return { title: `${exercise.name} · ${sets} × ${exercise.reps}` }
-    }) ?? [{ title: viewedWeekday === 6 ? 'Rest and recover' : 'Easy walk or gentle mobility' }]),
+      const isHomeCardioDay = plan?.gymAccess === false && /cardio day/i.test(todaysSession?.name || '') && /heavy cardio/i.test(exercise.name || '')
+      return { title: `${exercise.name} · ${sets} × ${exercise.reps}`, details: isHomeCardioDay ? HEAVY_CARDIO_EXAMPLES : null }
+    }) ?? [{ title: 'Light cardio (15–30 minutes)' }, { title: 'Stretching and mobility (5–15 minutes)' }]),
   ]
   const planDayDone = viewingCurrentDay && planProgress.completedDays.includes(planProgress.activeDay)
   const checkedPlanSteps = activeMissionSteps.filter((_, index) => planProgress.checked[`${planProgress.activeDay}-${index}`]).length
@@ -595,7 +640,10 @@ export default function FaceBodyRoutine() {
     const preferences = { gymAccess, daysPerWeek: gymAccess ? gymDaysPerWeek : null }
     try { localStorage.setItem(gymPreferencesKey, JSON.stringify(preferences)) } catch { /* keep the routine usable for this session */ }
     setGymPreferences(preferences)
-    if (plan) await generatePlan(preferences, { preserveProgress: true })
+    if (plan) {
+      await generatePlan(preferences, { preserveProgress: true, showPlanReview: true })
+      return
+    }
     setShowGymQuestionnaire(false)
   }
 
@@ -615,6 +663,7 @@ export default function FaceBodyRoutine() {
   }
 
   function toggleRoutineStep(step, index) {
+    if (!viewingCurrentFaceDay) return
     triggerHaptic()
     const daily = { ...(faceRoutineChecks[selectedFaceDate] ?? (selectedFaceDate === day ? progress.daily : {})) }
     // Expand a previously completed whole routine before changing one step.
@@ -630,8 +679,8 @@ export default function FaceBodyRoutine() {
     if (selectedFaceDate === day) saveProgress({ ...progress, day, daily: { ...progress.daily, ...daily } })
   }
 
-  async function generatePlan(preferences = gymPreferences, { preserveProgress = false } = {}) {
-    if (!bothScansReady || planLoading) return
+  async function generatePlan(preferences = gymPreferences, { preserveProgress = false, showPlanReview: reviewUpdatedPlan = false } = {}) {
+    if (!bothScansReady || planLoading) return false
     triggerHaptic()
     setPlanLoading(true)
     setPlanError('')
@@ -651,12 +700,28 @@ export default function FaceBodyRoutine() {
       const weeklyPlan = await api.ai.workoutPlan({ physiqueScores, gender: userGender === 'female' ? 'female' : 'male', trainingLevel: 'beginner', gymAccess: preferences?.gymAccess, daysPerWeek: preferences?.daysPerWeek })
       const expectedSessions = preferences ? (preferences.gymAccess ? preferences.daysPerWeek : 3) : 2
       if (!Array.isArray(weeklyPlan?.days) || (preferences ? weeklyPlan.days.length !== expectedSessions : weeklyPlan.days.length < expectedSessions)) throw new Error('The AI workout plan was incomplete. Try again.')
+      const atHomeSessions = preferences?.gymAccess === false
+        ? weeklyPlan.days.map(session => ({
+          ...session,
+          exercises: [
+            ...session.exercises,
+            { name: 'Light cardio', sets: 1, reps: '15–30 minutes', why: 'Keep this at a comfortable, conversational pace.' },
+          ],
+        }))
+        : weeklyPlan.days
+      const plannedSessions = preferences?.gymAccess === false
+        ? [
+          ...atHomeSessions,
+          { name: 'Cardio day', focus: 'Higher-intensity cardio', exercises: [{ name: 'Heavy cardio', sets: 1, reps: '20–30 minutes', why: 'Choose one: running intervals, cycling, jump rope, or uphill walking. Make it the hardest cardio session of the week at an intensity appropriate for your fitness.' }] },
+          ...atHomeSessions,
+        ]
+        : weeklyPlan.days
       const savedPlan = {
         version: 1,
         split: weeklyPlan.split,
         trainingLevel: weeklyPlan.trainingLevel || 'beginner',
         startDate: day,
-        weeks: Array.from({ length: 12 }, (_, index) => ({ week: index + 1, phase: index < 4 ? 'Foundation' : index < 8 ? 'Build' : index < 11 ? 'Progress' : 'Deload & review', sessions: weeklyPlan.days })),
+        weeks: Array.from({ length: 12 }, (_, index) => ({ week: index + 1, phase: index < 4 ? 'Foundation' : index < 8 ? 'Build' : index < 11 ? 'Progress' : 'Deload & review', sessions: plannedSessions })),
         gymAccess: preferences?.gymAccess ?? null,
         daysPerWeek: preferences?.daysPerWeek ?? null,
         faceFocus: focus.faceFocus?.label ?? 'Daily basics',
@@ -670,11 +735,45 @@ export default function FaceBodyRoutine() {
       setPlanProgress(newProgress)
       localStorage.setItem(planKey, JSON.stringify(savedPlan))
       localStorage.setItem(`${planKey}-progress`, JSON.stringify(newProgress))
+      if (reviewUpdatedPlan) {
+        setShowGymQuestionnaire(false)
+        setShowPlanReview(true)
+      }
+      return true
     } catch (error) {
       setPlanError(error?.message || 'Could not create the routine right now. Try again.')
+      return false
     } finally {
       setPlanLoading(false)
     }
+  }
+
+  function updatePlanSession(sessionIndex, update) {
+    if (!plan) return
+    const next = {
+      ...plan,
+      weeks: plan.weeks.map(item => ({
+        ...item,
+        sessions: item.sessions.map((session, index) => index === sessionIndex ? update(session) : session),
+      })),
+    }
+    setPlan(next)
+    try { localStorage.setItem(planKey, JSON.stringify(next)) } catch { /* keep edits available for this session */ }
+  }
+
+  function updatePlanExercise(sessionIndex, exerciseIndex, field, value) {
+    updatePlanSession(sessionIndex, session => ({
+      ...session,
+      exercises: session.exercises.map((exercise, index) => index === exerciseIndex ? { ...exercise, [field]: value } : exercise),
+    }))
+  }
+
+  function removePlanExercise(sessionIndex, exerciseIndex) {
+    updatePlanSession(sessionIndex, session => ({ ...session, exercises: session.exercises.filter((_, index) => index !== exerciseIndex) }))
+  }
+
+  function addPlanExercise(sessionIndex) {
+    updatePlanSession(sessionIndex, session => ({ ...session, exercises: [...session.exercises, { name: '', sets: 3, reps: '8-12', why: '' }] }))
   }
 
   function togglePlanStep(index) {
@@ -737,12 +836,44 @@ export default function FaceBodyRoutine() {
             <button type="button" disabled={gymAccess === null || planLoading} onClick={saveGymRoutinePreferences} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-heading text-sm font-bold text-black transition-opacity disabled:opacity-40" style={{ background: GOLD }}>{planLoading && <LoaderCircle size={16} className="animate-spin" />}{planLoading ? 'Updating your plan…' : plan ? 'Save and update plan' : 'Save and continue'}</button>
           </section>
         </div>, document.body)}
+        {showPlanReview && plan && createPortal(<div className="fixed inset-0 z-[110] flex h-[100dvh] w-screen items-center justify-center overflow-y-auto bg-black/75 p-3">
+          <section role="dialog" aria-modal="true" aria-labelledby="updated-plan-title" className="my-auto max-h-[92dvh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-white/10 bg-[#111] p-4 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="updated-plan-title" className="font-heading text-xl font-bold text-primary">Your updated plan</h2><p className="mt-1 font-body text-sm leading-relaxed text-white/55">Edit any workout or exercise. Your changes save automatically.</p></div><button type="button" aria-label="Close updated plan" onClick={() => setShowPlanReview(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-white/65"><X size={20} /></button></div>
+            <div className="space-y-2">{(plan.weeks?.[0]?.sessions || []).map((session, sessionIndex) => <details key={`edit-session-${sessionIndex}`} open={sessionIndex === 0} className="rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3"><Dumbbell size={17} style={{ color: GOLD }} /><span className="min-w-0 flex-1"><span className="block truncate font-heading text-sm font-semibold text-primary">{session.name || `Workout ${sessionIndex + 1}`}</span><span className="block truncate font-body text-xs text-white/45">{session.focus || `${session.exercises?.length || 0} exercises`}</span></span><ChevronDown size={17} className="shrink-0 text-white/45" /></summary>
+              <div className="border-t border-white/[0.07] p-3 sm:p-4">
+                <div className="grid grid-cols-2 gap-2"><label className="font-body text-[11px] text-white/50">Workout name<input value={session.name || ''} onChange={event => updatePlanSession(sessionIndex, current => ({ ...current, name: event.target.value }))} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 font-body text-sm text-primary outline-none focus:border-[#C6A85C]/50" /></label><label className="font-body text-[11px] text-white/50">Focus<input value={session.focus || ''} onChange={event => updatePlanSession(sessionIndex, current => ({ ...current, focus: event.target.value }))} className="mt-1 min-h-10 w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 font-body text-sm text-primary outline-none focus:border-[#C6A85C]/50" /></label></div>
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_3.25rem_4rem_2rem] items-center gap-2 px-1 font-body text-[10px] uppercase tracking-wide text-white/40"><span>Exercise</span><span>Sets</span><span>Reps</span><span /></div>
+                <div className="mt-1 space-y-2">{(session.exercises || []).map((exercise, exerciseIndex) => <div key={`edit-exercise-${sessionIndex}-${exerciseIndex}`} className="rounded-xl bg-black/20 p-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_3.25rem_4rem_2rem] items-center gap-2"><input aria-label={`Workout ${sessionIndex + 1} exercise ${exerciseIndex + 1} name`} value={exercise.name || ''} onChange={event => updatePlanExercise(sessionIndex, exerciseIndex, 'name', event.target.value)} className="min-h-10 min-w-0 rounded-lg border border-white/10 bg-white/[0.04] px-2 font-body text-xs text-primary outline-none focus:border-[#C6A85C]/50" /><input aria-label={`Workout ${sessionIndex + 1} exercise ${exerciseIndex + 1} sets`} type="number" min="1" max="20" value={exercise.sets ?? ''} onChange={event => updatePlanExercise(sessionIndex, exerciseIndex, 'sets', event.target.value === '' ? '' : Number(event.target.value))} className="min-h-10 w-full rounded-lg border border-white/10 bg-white/[0.04] px-1.5 text-center font-body text-xs text-primary outline-none focus:border-[#C6A85C]/50" /><input aria-label={`Workout ${sessionIndex + 1} exercise ${exerciseIndex + 1} reps`} value={exercise.reps || ''} onChange={event => updatePlanExercise(sessionIndex, exerciseIndex, 'reps', event.target.value)} className="min-h-10 w-full rounded-lg border border-white/10 bg-white/[0.04] px-1.5 text-center font-body text-xs text-primary outline-none focus:border-[#C6A85C]/50" /><button type="button" aria-label={`Remove ${exercise.name || `exercise ${exerciseIndex + 1}`}`} onClick={() => removePlanExercise(sessionIndex, exerciseIndex)} className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-red-300"><Trash2 size={14} /></button></div>
+                  <details className="ml-1 mt-1.5"><summary className="w-fit cursor-pointer list-none font-body text-[11px] text-white/45">Edit notes</summary><textarea aria-label={`Workout ${sessionIndex + 1} exercise ${exerciseIndex + 1} notes`} rows="2" value={exercise.why || ''} onChange={event => updatePlanExercise(sessionIndex, exerciseIndex, 'why', event.target.value)} className="mt-1.5 w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2 font-body text-xs leading-relaxed text-primary outline-none focus:border-[#C6A85C]/50" /></details>
+                </div>)}</div>
+                <button type="button" onClick={() => addPlanExercise(sessionIndex)} className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 font-heading text-xs font-semibold" style={{ color: GOLD }}><Plus size={13} /> Add exercise</button>
+              </div>
+            </details>)}</div>
+            <button type="button" onClick={() => setShowPlanReview(false)} className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl px-4 py-3 font-heading text-sm font-bold text-black" style={{ background: GOLD }}>Done editing</button>
+          </section>
+        </div>, document.body)}
         <div role="tabpanel" id={`routine-panel-${routineSection}`} aria-labelledby={`routine-tab-${routineSection}`} className="space-y-3">
         {routineSection === 'face' && <section className="rounded-2xl border border-white/10 bg-[#111] p-5">
           <div className="mb-4">
             <p className="font-body text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: GOLD }}>12-week face plan</p>
-            <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1"><h2 className="font-heading text-lg font-bold text-primary">Week {activeFaceWeek} of 12 - {WEEKDAY_NAMES[todayWeekday]}</h2><span className="font-body text-sm text-white/55">{activeFaceWeek <= 2 ? 'Foundation' : activeFaceWeek <= 4 ? 'Build habits' : activeFaceWeek <= 8 ? 'Stay consistent' : 'Maintain'}</span></div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-all" style={{ width: `${activeFaceWeek / 12 * 100}%`, background: GOLD }} /></div>
+            <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1"><h2 className="font-heading text-lg font-bold text-primary">Week {selectedFaceWeek} of 12 · {WEEKDAY_NAMES[selectedFaceWeekday]}</h2><span className="font-body text-sm text-white/55">{viewingCurrentFaceDay ? 'Today' : 'Preview'} · {selectedFaceWeek <= 2 ? 'Foundation' : selectedFaceWeek <= 4 ? 'Build habits' : selectedFaceWeek <= 8 ? 'Stay consistent' : 'Maintain'}</span></div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full transition-all" style={{ width: `${selectedFaceWeek / 12 * 100}%`, background: GOLD }} /></div>
+            <details className="mt-3 rounded-xl border border-white/[0.07] bg-white/[0.025]">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2"><span className="font-body text-xs text-white/65">Week {selectedFaceWeek}</span><span className="font-heading text-[11px] font-semibold" style={{ color: GOLD }}>Choose week <ArrowRight size={12} className="ml-1 inline rotate-90" /></span></summary>
+              <div className="flex gap-1.5 overflow-x-auto px-3 pb-3" aria-label="Choose a face routine week">
+                {Array.from({ length: 12 }, (_, index) => index + 1).map(faceWeek => <button key={`face-week-${faceWeek}`} type="button" aria-pressed={faceWeek === selectedFaceWeek} onClick={() => setSelectedFacePlanDay((faceWeek - 1) * 7 + 1)} className="flex h-9 min-w-10 items-center justify-center rounded-full border px-3 font-heading text-xs font-bold" style={{ borderColor: faceWeek === selectedFaceWeek ? GOLD : 'rgba(255,255,255,0.1)', color: faceWeek === selectedFaceWeek ? GOLD : 'rgba(255,255,255,0.65)', background: faceWeek === selectedFaceWeek ? 'rgba(198,168,92,0.12)' : '#171717' }}>{faceWeek}</button>)}
+              </div>
+            </details>
+            <div className="mt-3 grid grid-cols-7 gap-1.5" role="group" aria-label={`Choose a day in face routine week ${selectedFaceWeek}`}>
+              {WEEKDAY_NAMES.map((weekday, index) => {
+                const faceDay = (selectedFaceWeek - 1) * 7 + index + 1
+                const selected = faceDay === displayedFacePlanDay
+                const isToday = faceDay === activeFaceDay
+                return <button key={`face-day-${faceDay}`} type="button" aria-pressed={selected} aria-label={`${weekday}${isToday ? ', today' : ''}`} onClick={() => setSelectedFacePlanDay(faceDay)} className="min-h-10 rounded-lg border font-heading text-xs font-semibold transition-colors" style={{ borderColor: selected ? GOLD : 'rgba(255,255,255,0.08)', color: selected ? GOLD : 'rgba(255,255,255,0.65)', background: selected ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.025)' }}>{weekday}</button>
+              })}
+            </div>
             <p className="mt-3 font-body text-sm leading-relaxed text-white/55">Keep your daily basics steady. Your added products appear on their scheduled days.</p>
           </div>
         </section>}
@@ -751,7 +882,7 @@ export default function FaceBodyRoutine() {
           <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-3 gap-y-0.5">
             <h2 className="col-start-1 row-start-1 font-heading text-lg font-bold text-primary">Face Routine</h2>
             <button type="button" onClick={() => { triggerHaptic(); setShowProducts(true) }} className="col-start-2 row-start-1 min-h-9 rounded-lg border border-white/10 px-3 font-heading text-sm font-semibold leading-5 transition-colors hover:border-[#C6A85C]/50" style={{ color: GOLD }}>Edit</button>
-            <p className="col-start-1 row-start-2 font-body text-sm text-white/65">{completedToday} of {sectionSteps.length} routines checked off today</p>
+            <p className="col-start-1 row-start-2 font-body text-sm text-white/65">{completedToday} of {sectionSteps.length} routines checked off {viewingCurrentFaceDay ? 'today' : `${WEEKDAY_NAMES[selectedFaceWeekday]} (preview)`}</p>
             <span className="col-start-2 row-start-2 text-right font-heading text-sm font-bold leading-5" style={{ color: GOLD }}>{Math.round(completedToday / sectionSteps.length * 100)}%</span>
           </div>
           <div className="mb-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-all" style={{ width: `${completedToday / sectionSteps.length * 100}%`, background: GOLD }} /></div>
@@ -769,9 +900,11 @@ export default function FaceBodyRoutine() {
                   </div>
                   <div className="space-y-2">{step.steps.map((instruction, index) => {
                     const itemChecked = isRoutineStepChecked(step, index)
-                    return <button key={step.stepKeys?.[index] ?? instruction} type="button" aria-pressed={itemChecked} onClick={() => toggleRoutineStep(step, index)} className="flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors" style={{ background: itemChecked ? 'rgba(198,168,92,0.1)' : 'rgba(255,255,255,0.035)' }}>
+                    const stepKey = routineStepKey(step, index)
+                    const detail = step.stepDetails?.[stepKey]
+                    return <button key={step.stepKeys?.[index] ?? instruction} type="button" disabled={!viewingCurrentFaceDay} aria-pressed={itemChecked} onClick={() => toggleRoutineStep(step, index)} className="flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors disabled:cursor-default disabled:opacity-75" style={{ background: itemChecked ? 'rgba(198,168,92,0.1)' : 'rgba(255,255,255,0.035)' }}>
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: itemChecked ? GOLD : 'rgba(255,255,255,0.25)', background: itemChecked ? GOLD : 'transparent', color: '#090909' }}>{itemChecked && <Check size={13} />}</span>
-                      <span className={`font-body text-sm leading-relaxed ${itemChecked ? 'text-white/45 line-through' : 'text-white/80'}`}>{instruction}</span>
+                      <span className={`flex min-w-0 flex-col gap-1 ${itemChecked ? 'text-white/45' : 'text-white/80'}`}><span className={`${detail ? 'font-heading font-semibold' : 'font-body'} text-sm leading-relaxed ${itemChecked ? 'line-through' : ''}`}>{instruction}</span>{detail && <span className="font-body text-xs leading-relaxed text-white/55">{detail}</span>}</span>
                     </button>
                   })}</div>
                 </section>
@@ -853,10 +986,10 @@ export default function FaceBodyRoutine() {
                 </div>
               </div>
               <div className="rounded-xl bg-white/[0.035] p-3">
-                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-body text-[10px] font-semibold uppercase tracking-wider" style={{ color: GOLD }}>{viewingCurrentDay ? `TODAY · DAY ${planProgress.activeDay}` : `WEEK ${selectedPlanWeek} · DAY ${viewedWeekday + 1} · ${viewedWeek?.phase || currentPhase}`}</p><h3 className="mt-1 font-heading text-base font-bold text-primary">{todaysSession?.name || (viewedWeekday === 6 ? 'Rest & recover' : 'Recovery day')}</h3></div><span className="shrink-0 rounded-full bg-white/[0.07] px-2.5 py-1 font-body text-[10px] text-white/60">{viewingCurrentDay ? (planDayDone ? activeMissionSteps.length : checkedPlanSteps) : 'Preview'}</span></div>
+                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-body text-[10px] font-semibold uppercase tracking-wider" style={{ color: GOLD }}>{viewingCurrentDay ? `TODAY · DAY ${planProgress.activeDay}` : `WEEK ${selectedPlanWeek} · DAY ${viewedWeekday + 1} · ${viewedWeek?.phase || currentPhase}`}</p><h3 className="mt-1 font-heading text-base font-bold text-primary">{todaysSession?.name || 'Recovery day'}</h3></div><span className="shrink-0 rounded-full bg-white/[0.07] px-2.5 py-1 font-body text-[10px] text-white/60">{viewingCurrentDay ? (planDayDone ? activeMissionSteps.length : checkedPlanSteps) : 'Preview'}</span></div>
                 {!planDayDone && activeMissionSteps.length > 0 && <div className="space-y-1.5">{activeMissionSteps.map((step, index) => {
                   const checked = viewingCurrentDay && Boolean(planProgress.checked[`${planProgress.activeDay}-${index}`])
-                  return <button key={`step-${index}`} type="button" disabled={!viewingCurrentDay || planDayDone} onClick={() => togglePlanStep(index)} aria-pressed={checked} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:cursor-default disabled:opacity-75" style={{ background: checked ? 'rgba(198,168,92,0.08)' : 'rgba(255,255,255,0.025)' }}><span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.22)', background: checked ? GOLD : 'transparent', color: '#090909' }}>{checked && <Check size={12} />}</span><span className="min-w-0 font-body text-[13px] text-primary">{step.title}</span></button>
+                  return <div key={`step-${index}`}><button type="button" disabled={!viewingCurrentDay || planDayDone} onClick={() => togglePlanStep(index)} aria-pressed={checked} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:cursor-default disabled:opacity-75" style={{ background: checked ? 'rgba(198,168,92,0.08)' : 'rgba(255,255,255,0.025)' }}><span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.22)', background: checked ? GOLD : 'transparent', color: '#090909' }}>{checked && <Check size={12} />}</span><span className="min-w-0 font-body text-[13px] text-primary">{step.title}</span></button>{step.details && <ul aria-label="Heavy cardio examples" className="space-y-1 px-3 py-2.5 font-body text-xs leading-relaxed text-white/60">{step.details.map(example => <li key={example} className="flex gap-2"><span aria-hidden="true" style={{ color: GOLD }}>•</span><span>{example}</span></li>)}</ul>}</div>
                 })}</div>}
                 {planDayDone ? <div className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-[rgba(198,168,92,0.08)] p-3 font-heading text-sm font-semibold text-primary"><Check size={16} style={{ color: GOLD }} /> {planProgress.completedDays.length >= 84 ? '12 weeks complete!' : 'Today complete · next day opens tomorrow'}</div> : viewingCurrentDay && <button type="button" onClick={completePlanDay} disabled={!activeWeek || checkedPlanSteps !== activeMissionSteps.length} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-heading text-sm font-bold transition-colors disabled:cursor-not-allowed" style={{ background: checkedPlanSteps === activeMissionSteps.length ? GOLD : '#292929', color: checkedPlanSteps === activeMissionSteps.length ? '#090909' : 'rgba(255,255,255,0.48)' }}>Complete today <ArrowRight size={16} /></button>}
               </div>
