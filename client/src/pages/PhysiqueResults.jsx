@@ -512,7 +512,6 @@ export default function PhysiqueResults() {
                 scan={currentScan}
                 coachPhotoUrl={photo}
                 showCoach={savedProgressCard}
-                navigation={<PhysiqueResultsNavigation activeView={activeView} showView={showView} />}
               />
             </div>
           )}
@@ -549,7 +548,7 @@ export default function PhysiqueResults() {
         )}
         {activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: '#FF453A' }}>{downloadError}</p>}
 
-        {activeView !== 'analysis' && <PhysiqueResultsNavigation activeView={activeView} showView={showView} />}
+        <PhysiqueResultsNavigation activeView={activeView} showView={showView} />
       </div>
     </div>
   )
