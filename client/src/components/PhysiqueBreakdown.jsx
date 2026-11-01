@@ -1,3 +1,4 @@
+import { balancedPhysiqueAreas } from '../utils/physiqueBalance'
 import { withoutRatings } from '../utils/prosConsText'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -25,7 +26,7 @@ function scoreBasedFinding(metric, score, page) {
   if (page === 'cons') {
     const findings = {
       muscle_mass: {
-        title: `Muscle development needs work`,
+        title: `Opportunity to develop muscle`,
         explanation: 'Building your chest, shoulders, back, and arms can make your upper body look more muscular and balanced.',
         advice: 'Try three full-body strength workouts each week. Include a press, a row, and a leg exercise; when you can do the reps easily, add a little weight or a few reps.',
       },
@@ -36,7 +37,7 @@ function scoreBasedFinding(metric, score, page) {
       },
       v_taper: {
         title: `Shoulder-to-waist shape can improve`,
-        explanation: 'The shoulder-to-waist contrast is below the app’s strong range. More shoulder and back muscle can make the upper body look more V-shaped.',
+        explanation: 'Building shoulder and back muscle can further develop your shoulder-to-waist contrast.',
         advice: 'Train your back and shoulders twice a week. Use rows or pulldowns for your back and lateral raises for your shoulders, adding reps slowly.',
       },
       frame_width: {
@@ -50,24 +51,24 @@ function scoreBasedFinding(metric, score, page) {
 
   const findings = {
     muscle_mass: {
-      title: `Muscle development stands out`,
-      explanation: 'Continued strength training can help you keep building your chest, shoulders, back, and arms.',
-      advice: 'Keep a regular strength routine and increase reps or weight gradually as exercises get easier.',
+      title: `Muscle development is a relative strength`,
+      explanation: 'Muscle development is one of the stronger areas in your current physique. It gives you a foundation to build on across your chest, shoulders, back, and arms.',
+      advice: 'Keep a consistent strength routine with pressing and rowing movements. Build gradually by adding a few reps or a little weight when your technique stays controlled.',
     },
     body_fat_score: {
-      title: `Visible leanness stands out`,
-      explanation: 'Visible definition is a strength. Keep the habits that support strength and a steady, healthy routine.',
-      advice: 'Keep moving most days, eat regular balanced meals, and avoid extreme diet changes.',
+      title: `Visible definition is a relative strength`,
+      explanation: 'Visible muscle definition is one of your relative strengths. Maintaining it while building muscle can help your existing shape look more developed; a photo does not measure your body-fat percentage.',
+      advice: 'Keep strength training, regular meals, and a sustainable activity routine consistent. Build on the definition you have rather than chasing extreme leanness or rapid weight changes.',
     },
     v_taper: {
-      title: `Shoulder-to-waist shape stands out`,
-      explanation: 'Your shoulder-to-waist contrast helps create a more V-shaped upper body.',
-      advice: 'Keep training your back and shoulders with rows or pulldowns and lateral raises.',
+      title: `Shoulder-to-waist shape is a relative strength`,
+      explanation: 'Shoulder-to-waist balance is one of the stronger parts of your current physique. That contrast provides a foundation for a more defined V-shaped upper body.',
+      advice: 'Keep rows or pulldowns and lateral raises in your weekly routine. Develop your back and shoulders gradually while keeping your core training balanced.',
     },
     frame_width: {
-      title: `Upper-body width stands out`,
-      explanation: 'Your upper-body width stands out. Building shoulder and back muscle can help maintain this shape.',
-      advice: 'Keep rows or pulldowns and shoulder exercises in your regular strength routine.',
+      title: `Upper-body frame is a relative strength`,
+      explanation: 'Upper-body frame proportions are one of your relative strengths. Developing the muscle around your shoulders and back can build on those proportions without trying to change your bone structure.',
+      advice: 'Train your shoulders and upper back consistently with controlled lateral raises and rows. Track progress over time instead of making large changes to your routine after one scan.',
     },
   }
   return { ...findings[metric.key], metric, source: 'score' }
@@ -129,10 +130,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
   const [page, setPage] = useState('pros')
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? (analysis.physique_strengths ?? analysis.strengths ?? analysis.keyStrengths) : (analysis.physique_improvements ?? analysis.improvements ?? analysis.keyWeaknesses)
-  const metricPoints = ACTIONABLE_METRICS
-    .map(metric => ({ ...metric, score: getPhysiqueMetricScore(scan, metric.key) }))
-    .filter(metric => metric.score != null && (page === 'pros' ? metric.score >= 8 : metric.score < 8))
-    .sort((a, b) => page === 'pros' ? b.score - a.score : a.score - b.score)
+  const metricPoints = balancedPhysiqueAreas(scan)[page]
   const savedFindings = getSavedFindings(allPoints, page, scan, new Set())
   const pointsByMetric = new Map()
   const additionalFindings = []
@@ -143,11 +141,13 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
     }
     if (!pointsByMetric.has(finding.metric.key)) pointsByMetric.set(finding.metric.key, finding)
   }
-  const points = [
-    ...pointsByMetric.values(),
-    ...metricPoints.filter(metric => !pointsByMetric.has(metric.key)).map(metric => scoreBasedFinding(metric, metric.score, page)),
-    ...additionalFindings,
-  ]
+  const points = metricPoints.length ? metricPoints.map(metric => {
+    const fallback = scoreBasedFinding(metric, metric.score, page)
+    const saved = pointsByMetric.get(metric.key)
+    if (!saved) return fallback
+    if (page !== 'pros') return saved
+    return { ...fallback, ...saved, explanation: saved.explanation || fallback.explanation, advice: saved.advice || fallback.advice }
+  }) : [...pointsByMetric.values(), ...additionalFindings].slice(0, 2)
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
@@ -170,7 +170,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
               </div>
             </li>
           })
-          : <li className="physique-analysis-item appearance-points-empty">{page === 'pros' ? 'This scan did not identify a clear strength. View Cons for areas to work on.' : 'This scan did not identify a specific area to improve.'}</li>}
+          : <li className="physique-analysis-item appearance-points-empty">{page === 'pros' ? 'The saved scan is missing the details needed to show your strengths. Take a new scan to refresh this breakdown.' : 'This scan did not identify a specific area to improve.'}</li>}
       </ul>
     </section>
     {navigation}

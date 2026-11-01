@@ -16,3 +16,9 @@ test('partial native scan preserves legacy findings instead of hiding them',()=>
  const html=mod.exports.render({physiqueScore:{},aiScore:{physiqueResult:{physique_strengths:['Balanced torso proportions — Your torso proportions look balanced.']}}})
  assert.match(html,/Balanced torso proportions/)
 })
+test('six-range saved scan renders two positive findings without requiring elite ratings',()=>{
+ const html=mod.exports.render({physiqueScore:{muscle_mass:6,body_fat_score:5.8,v_taper:6.3,frame_width:6.2}})
+ assert.equal((html.match(/class="physique-analysis-item"/g)||[]).length,2)
+ assert.match(html,/relative strength/)
+ assert.doesNotMatch(html,/did not identify|\/10|6\.3/)
+})
