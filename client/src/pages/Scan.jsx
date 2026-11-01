@@ -1,3 +1,4 @@
+import { createAlignmentHapticGate } from '../utils/alignmentHaptic'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { preserveCapture } from '../utils/capturePhoto'
 import { createPortal } from 'react-dom'
@@ -23,7 +24,7 @@ import { Camera as CapacitorCamera } from '@capacitor/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerAlignmentHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { createLiveFaceAlignment, getAlignment, shouldBlockPhotoCapture } from '../utils/liveFaceAlignment'
 import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
@@ -255,6 +256,12 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const [trackingAvailable, setTrackingAvailable] = useState(false)
   const alignment = getAlignment(alignmentFrame, stepNum === 2)
 
+  const alignmentHapticRef = useRef(createAlignmentHapticGate())
+  useEffect(() => {
+    const aligned = ready && !capturedUrl && trackingAvailable && alignment.aligned
+    if (alignmentHapticRef.current(aligned)) void triggerAlignmentHaptic()
+  }, [ready, capturedUrl, trackingAvailable, alignment.aligned])
+
   // ── Native: CameraPreview live viewfinder ─────────────────────────────────
   const startNativePreview = useCallback((position) => {
     previewOpRef.current = previewOpRef.current.then(async () => {
@@ -351,13 +358,9 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   }, [facingMode, startCamera, stopNativePreview])
 
   useEffect(() => {
-    // Alignment tracking samples frames off the web <video> element, which
-    // doesn't exist on native (CameraPreview is a native layer, not a DOM
-    // video) — trackingAvailable would flip true on init regardless, but
-    // .check() would never actually run, leaving alignment.aligned stuck
-    // false forever and permanently dimming the capture button. Skip it
-    // entirely on native rather than let it fake-disable a working camera.
-    if (!ready || capturedUrl || isNative()) return
+    if (!ready || capturedUrl) return
+    setTrackingAvailable(false)
+    setAlignmentFrame(null)
     let cancelled = false
     let timer
     let tracker
@@ -372,11 +375,34 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
       setTrackingAvailable(true)
       const tick = async () => {
         if (cancelled) return
-        const video = videoRef.current
-        if (video?.readyState >= 2 && !video.paused) {
-          sample.getContext('2d').drawImage(video, 0, 0, 320, 320)
-          try { await tracker.check(sample) } catch { setTrackingAvailable(false) }
-        }
+        try {
+          if (isNative()) {
+            const { value } = await CameraPreview.captureSample({quality: 35})
+            if (cancelled) return
+            const image = new Image()
+            await new Promise((resolve, reject) => {
+              image.onload = resolve; image.onerror = reject
+              image.src = `data:image/jpeg;base64,${value}`
+            })
+            if (!cancelled) {
+              // Match the visible preview card, not the full native sensor.
+              const rect = cardRef.current?.getBoundingClientRect()
+              const scale = Math.max(window.innerWidth/image.width, window.innerHeight/image.height)
+              const originX = (window.innerWidth-image.width*scale)/2
+              const originY = (window.innerHeight-image.height*scale)/2
+              const area = rect || {left:0,top:0,width:window.innerWidth,height:window.innerHeight}
+              sample.getContext('2d').drawImage(image,(area.left-originX)/scale,(area.top-originY)/scale,area.width/scale,area.height/scale,0,0,320,320)
+              await tracker.check(sample)
+            }
+          } else {
+            const video = videoRef.current
+            if (video?.readyState >= 2 && !video.paused) {
+              sample.getContext('2d').drawImage(video, 0, 0, 320, 320)
+              await tracker.check(sample)
+            }
+          }
+          if (!cancelled) setTrackingAvailable(true)
+        } catch { if (!cancelled) setTrackingAvailable(false) }
         if (!cancelled) timer = setTimeout(tick, 600)
       }
       tick()
@@ -521,7 +547,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   {ready && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                       {stepNum !== 2 && (
-                        <div style={{ width: '70%', height: '67%', border: `1.5px solid ${GOLD}`, borderRadius: '48% 48% 42% 42%', boxShadow: `0 0 16px ${GOLD}55` }} />
+                        <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none' }} />
                       )}
                       {stepNum === 2 && (
                         <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: GOLD, fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>

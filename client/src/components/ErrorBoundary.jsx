@@ -68,7 +68,7 @@ export default class ErrorBoundary extends Component {
         )}
 
         <button
-          onClick={() => window.location.replace('/')}
+          onClick={() => window.location.reload()}
           style={{
             marginTop: 24,
             padding: '12px 28px',

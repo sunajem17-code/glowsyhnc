@@ -21,3 +21,9 @@ export async function triggerPageHaptic() {
     // haptics unavailable — not fatal, ignore
   }
 }
+
+// A single confirmation tap when the live face enters the alignment oval.
+export async function triggerAlignmentHaptic() {
+  if (!Capacitor.isNativePlatform()) return
+  try { await Haptics.notification({ type: NotificationType.Success }) } catch {}
+}

@@ -1,3 +1,5 @@
+import ScreenLoading from './components/ScreenLoading'
+import { loadScreen } from './utils/screenLoader'
 import { hasCompletedOnboarding, onboardingStartup } from './utils/onboardingStartup.js'
 import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
 import NotificationPrompt from './components/NotificationPrompt'
@@ -16,38 +18,40 @@ import PremiumSplash from './pages/PremiumSplash'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
 import { getStartupSplash } from './utils/splashFlow'
 
+const lazyScreen = loader => lazy(() => loadScreen(loader))
+
 // Heavy routes — lazy loaded so the initial bundle only ships what's needed
-const Dashboard      = lazy(() => import('./pages/Dashboard'))
-const Extras         = lazy(() => import('./pages/Extras'))
-const ScanHome       = lazy(() => import('./pages/ScanHome'))
-const Scan           = lazy(() => import('./pages/Scan'))
-const Results        = lazy(() => import('./pages/Results'))
-const ActionPlan     = lazy(() => import('./pages/ActionPlan'))
-const Progress       = lazy(() => import('./pages/Progress'))
-const Streak         = lazy(() => import('./pages/Streak'))
-const Profile        = lazy(() => import('./pages/Profile'))
-const Premium        = lazy(() => import('./pages/Premium'))
-const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
-const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'))
-const Terms          = lazy(() => import('./pages/Terms'))
-const Compare        = lazy(() => import('./pages/Compare'))
-const AICoach        = lazy(() => import('./pages/AICoach'))
-const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
-const Landing        = lazy(() => import('./pages/Landing'))
-const SwipeMaxx      = lazy(() => import('./pages/SwipeMaxx'))
-const TinderMaxx     = lazy(() => import('./pages/TinderMaxx'))
-const Community      = lazy(() => import('./pages/Community'))
-const SettingsScreen = lazy(() => import('./pages/Settings'))
-const ScanUnlockGate = lazy(() => import('./pages/ScanUnlockGate'))
-const ScanReady      = lazy(() => import('./pages/ScanReady'))
-const ScanQualityFail = lazy(() => import('./pages/ScanQualityFail'))
-const WorkoutPlan    = lazy(() => import('./pages/WorkoutPlan'))
-const FaceBodyRoutine = lazy(() => import('./pages/FaceBodyRoutine'))
-const PhysiqueScan      = lazy(() => import('./pages/PhysiqueScan'))
-const PhysiqueResults   = lazy(() => import('./pages/PhysiqueResults'))
-const ScanHistory    = lazy(() => import('./pages/ScanHistory'))
-const ScanTimeline   = lazy(() => import('./pages/ScanTimeline'))
-const AnalysisInspector = import.meta.env.DEV ? lazy(() => import('./pages/AnalysisInspector')) : null
+const Dashboard      = lazyScreen(() => import('./pages/Dashboard'))
+const Extras         = lazyScreen(() => import('./pages/Extras'))
+const ScanHome       = lazyScreen(() => import('./pages/ScanHome'))
+const Scan           = lazyScreen(() => import('./pages/Scan'))
+const Results        = lazyScreen(() => import('./pages/Results'))
+const ActionPlan     = lazyScreen(() => import('./pages/ActionPlan'))
+const Progress       = lazyScreen(() => import('./pages/Progress'))
+const Streak         = lazyScreen(() => import('./pages/Streak'))
+const Profile        = lazyScreen(() => import('./pages/Profile'))
+const Premium        = lazyScreen(() => import('./pages/Premium'))
+const Leaderboard    = lazyScreen(() => import('./pages/Leaderboard'))
+const PrivacyPolicy  = lazyScreen(() => import('./pages/PrivacyPolicy'))
+const Terms          = lazyScreen(() => import('./pages/Terms'))
+const Compare        = lazyScreen(() => import('./pages/Compare'))
+const AICoach        = lazyScreen(() => import('./pages/AICoach'))
+const PaymentSuccess = lazyScreen(() => import('./pages/PaymentSuccess'))
+const Landing        = lazyScreen(() => import('./pages/Landing'))
+const SwipeMaxx      = lazyScreen(() => import('./pages/SwipeMaxx'))
+const TinderMaxx     = lazyScreen(() => import('./pages/TinderMaxx'))
+const Community      = lazyScreen(() => import('./pages/Community'))
+const SettingsScreen = lazyScreen(() => import('./pages/Settings'))
+const ScanUnlockGate = lazyScreen(() => import('./pages/ScanUnlockGate'))
+const ScanReady      = lazyScreen(() => import('./pages/ScanReady'))
+const ScanQualityFail = lazyScreen(() => import('./pages/ScanQualityFail'))
+const WorkoutPlan    = lazyScreen(() => import('./pages/WorkoutPlan'))
+const FaceBodyRoutine = lazyScreen(() => import('./pages/FaceBodyRoutine'))
+const PhysiqueScan      = lazyScreen(() => import('./pages/PhysiqueScan'))
+const PhysiqueResults   = lazyScreen(() => import('./pages/PhysiqueResults'))
+const ScanHistory    = lazyScreen(() => import('./pages/ScanHistory'))
+const ScanTimeline   = lazyScreen(() => import('./pages/ScanTimeline'))
+const AnalysisInspector = import.meta.env.DEV ? lazyScreen(() => import('./pages/AnalysisInspector')) : null
 
 const SESSION_KEY = 'asc_pro_splash_shown'
 
@@ -205,11 +209,7 @@ export default function App() {
     <BrowserRouter>
       <UpdatePrompt />
       <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
-      <Suspense fallback={
-        <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)', color: 'var(--text-primary)' }} role="status" aria-live="polite">
-          <p className="font-body text-sm">Loading your next screen…</p>
-        </div>
-      }>
+      <Suspense fallback={<ScreenLoading />}>
       <AnimatePresence mode="wait">
         <Routes>
           {/* Legal pages + payment return — always accessible */}
