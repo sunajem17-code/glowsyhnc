@@ -180,7 +180,8 @@ export default function PhysiqueBreakdown({ scan }) {
     </div>
     <section id="physique-points-panel" role="tabpanel" aria-label={title} className="appearance-points">
       <h2>{title}</h2>
-      <ul className="appearance-points-list" tabIndex={0} aria-label={`${title} details`}>
+      <ul className="appearance-points-list"
+        onPointerDown={event => event.stopPropagation()} tabIndex={0} aria-label={`${title} details`}>
         {points.length
           ? points.map(({ title: pointTitle, explanation, advice }, index) => {
             return <li className="physique-analysis-item" key={`${pointTitle}-${index}`}>

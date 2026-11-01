@@ -96,6 +96,7 @@ export default function AppearanceBreakdown({
       {error && <div className="appearance-state appearance-error" role="alert"><p>{error}</p>{scanId ? <button type="button" onClick={() => setRetry(value => value + 1)}>Try Again</button> : <button type="button" onClick={() => navigate('/scan')}>Take a New Scan<ChevronRight size={15} /></button>}</div>}
       {analysis && <ul
         className="appearance-points-list"
+        onPointerDown={event => event.stopPropagation()}
         tabIndex={isPremium ? 0 : -1}
         aria-label={`${pageTitle} details`}
         aria-hidden={!isPremium}

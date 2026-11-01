@@ -72,9 +72,11 @@
   padding-right:8px;
   list-style:disc;
   overflow-y:auto;
-  overscroll-behavior:contain;
+  /* Let iOS handle finger movement and momentum; no JS drag recognizer. */
+  overscroll-behavior-y:auto;
   -webkit-overflow-scrolling:touch;
-  touch-action:pan-y;
+  touch-action:pan-y pinch-zoom;
+  scroll-behavior:auto;
   scrollbar-width:thin;
   scrollbar-color:#4a4a4a transparent
 }

@@ -499,7 +499,7 @@ export default function PhysiqueResults() {
           transformOrigin: '50% 50%',
           touchAction: 'pan-y',
         }}
-        drag={activeView !== 'compare' ? 'x' : false}
+        drag={activeView !== 'compare' && activeView !== 'analysis' ? 'x' : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.15}
         onDragEnd={(_, info) => {

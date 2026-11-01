@@ -1542,7 +1542,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
       </>}
         {/* Face circle + card */}
         <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
-          drag={unlocked && activeView !== 'compare' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
+          drag={unlocked && activeView !== 'compare' && activeView !== 'photo' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
           onDragEnd={(_, info) => {
             const index = RESULT_VIEWS.indexOf(activeView)
             if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
