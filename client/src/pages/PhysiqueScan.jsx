@@ -1,3 +1,5 @@
+import { presentationGate } from '../utils/scanPresentation'
+import '../components/scanReference.css'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
@@ -1198,169 +1200,62 @@ function buildPhysiqueDiagLines(scanResult) {
   ]
 }
 
-function PhysiqueAnalyzingScreen({ currentStep, slow, photo, morphing = false, scanResult = null }) {
-  const stepIndex  = Math.min(currentStep, 4)
-  const progressPct = [5, 20, 50, 80, 95][stepIndex]
+const BODY_ANALYSIS_STAGES = ['V-Taper', 'Shoulders', 'Frame', 'Muscle Definition', 'Body Proportions']
 
-  const diagLines = useMemo(() => buildPhysiqueDiagLines(scanResult), [scanResult])
-  const [feedIdx, setFeedIdx] = useState(0)
-  useEffect(() => {
-    if (!diagLines.length) return
-    setFeedIdx(0)
-    const id = setInterval(() => setFeedIdx(i => (i + 1) % diagLines.length), 1300)
-    return () => clearInterval(id)
-  }, [diagLines])
-
-  const targetScore = scanResult?.physiqueScore?.overallPhysique ?? null
-  const [displayScore, setDisplayScore] = useState(null)
-  useEffect(() => {
-    if (targetScore == null) return
-    let current = 0
-    const steps = 28
-    const increment = targetScore / steps
-    const intervalMs = 1200 / steps
-    setDisplayScore(0)
-    let count = 0
-    const id = setInterval(() => {
-      count++
-      if (count >= steps) { setDisplayScore(targetScore); clearInterval(id) }
-      else { current += increment; setDisplayScore(Math.round(current * 10) / 10) }
-    }, intervalMs)
-    return () => clearInterval(id)
-  }, [targetScore])
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-      {/* Photo with scan overlay */}
-      <div className="relative w-full rounded-3xl overflow-hidden mb-5" style={{ background: '#0a0a0a', ...(photo ? {} : { aspectRatio: '3/4' }) }}>
-        {photo && (
-          <img src={photo} alt="" className="block w-full h-auto" style={{ filter: 'brightness(0.5) saturate(0.85)' }} />
-        )}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.65) 100%)' }} />
-        {/* Grid overlay */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: `linear-gradient(rgba(198,168,92,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(198,168,92,0.05) 1px, transparent 1px)`,
-          backgroundSize: '20% 12.5%',
-        }} />
-        {/* Scan measurement lines — horizontal thirds guides */}
-        {!morphing && (
-          <>
-            {[33, 66].map(pct => (
-              <div key={pct} className="absolute left-0 right-0 pointer-events-none" style={{
-                top: `${pct}%`, height: 1,
-                background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}44 20%, ${LANDMARK_GOLD}44 80%, transparent)`,
-              }} />
-            ))}
-            {/* Vertical center line */}
-            <div className="absolute top-0 bottom-0 pointer-events-none" style={{
-              left: '50%', width: 1,
-              background: `linear-gradient(180deg, transparent, ${LANDMARK_GOLD}33 20%, ${LANDMARK_GOLD}33 80%, transparent)`,
-            }} />
-            {/* Shoulder width bracket */}
-            <motion.div
-              className="absolute pointer-events-none"
-              initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0 }}
-              transition={{ duration: 0.5 }}
-              style={{ top: '35%', left: '15%', right: '15%', height: 2, background: `${LANDMARK_GOLD}88` }}
-            >
-              <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
-              <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
-            </motion.div>
-            {/* Waist bracket */}
-            <motion.div
-              className="absolute pointer-events-none"
-              initial={{ opacity: 0 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0 }}
-              transition={{ duration: 0.5 }}
-              style={{ top: '62%', left: '28%', right: '28%', height: 2, background: `${LANDMARK_GOLD}88` }}
-            >
-              <div style={{ position: 'absolute', left: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
-              <div style={{ position: 'absolute', right: 0, top: -6, width: 2, height: 14, background: LANDMARK_GOLD }} />
-            </motion.div>
-            {/* Callout labels */}
-            <motion.div
-              initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 1 ? 1 : 0, x: stepIndex >= 1 ? 0 : -8 }}
-              transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '32%', left: '4%', textAlign: 'left' }}
-            >
-              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>SHOULDERS</p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: -8 }} animate={{ opacity: stepIndex >= 2 ? 1 : 0, x: stepIndex >= 2 ? 0 : -8 }}
-              transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '59%', left: '4%', textAlign: 'left' }}
-            >
-              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>WAIST</p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 8 }} animate={{ opacity: stepIndex >= 3 ? 1 : 0, x: stepIndex >= 3 ? 0 : 8 }}
-              transition={{ duration: 0.4 }}
-              style={{ position: 'absolute', top: '45%', right: '4%', textAlign: 'right' }}
-            >
-              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: LANDMARK_GOLD, textShadow: `0 0 8px ${LANDMARK_GOLD}88` }}>V-TAPER</p>
-            </motion.div>
-            {/* Score readout once result arrives */}
-            {displayScore != null && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-                style={{ position: 'absolute', bottom: '8%', right: '5%', textAlign: 'right' }}
-              >
-                <p style={{ fontSize: 22, fontWeight: 900, color: LANDMARK_GOLD, textShadow: `0 0 20px ${LANDMARK_GOLD}99`, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                  {displayScore.toFixed(1)}
-                </p>
-                <p style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.14em', color: `${LANDMARK_GOLD}bb` }}>PHYSIQUE</p>
-              </motion.div>
-            )}
-            {/* Continuous ping-pong scan laser */}
-            <motion.div
-              className="absolute left-0 right-0 pointer-events-none"
-              style={{
-                height: 1,
-                background: `linear-gradient(90deg, transparent, ${LANDMARK_GOLD}cc 30%, ${LANDMARK_GOLD} 50%, ${LANDMARK_GOLD}cc 70%, transparent)`,
-                boxShadow: `0 0 8px 2px ${LANDMARK_GOLD}55`,
-              }}
-              animate={{ top: ['2%', '98%'] }}
-              transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
-            />
-          </>
-        )}
-      </div>
-
-      {/* Status text */}
-      <p className="font-mono text-center mb-1" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: `${GOLD}99`, textTransform: 'uppercase' }}>
-        SCANNING PHYSIQUE MATRIX
-      </p>
-      <div className="h-5 mb-2 flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.p key={stepIndex} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.3 }}
-            className="text-xs font-body" style={{ color: slow ? GOLD : 'var(--text-secondary)' }}>
-            {PHYSIQUE_STEP_LABELS[stepIndex]}
-          </motion.p>
-        </AnimatePresence>
-      </div>
-
-      {/* Diagnostic feed */}
-      <div className="h-4 mb-3 flex items-center justify-center overflow-hidden">
-        <AnimatePresence mode="wait">
-          {diagLines.length > 0 && (
-            <motion.p key={feedIdx} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: 0.25 }}
-              className="font-mono text-center" style={{ fontSize: 9, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.45)' }}>
-              {'> '}{diagLines[feedIdx]}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full" style={{ height: 36, borderRadius: 999, border: `2px solid ${GOLD}`, padding: 4, background: 'transparent', boxSizing: 'border-box' }}>
-        <motion.div
-          style={{ height: '100%', borderRadius: 999, background: GOLD, originX: 0 }}
-          initial={{ width: '5%' }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
-        />
+function PhysiqueAnalyzingScreen({ photo, slow, onComplete }) {
+  const [stage, setStage] = useState(0)
+  const sweepCount = useRef(0)
+  return <div className="physique-analysis-screen">
+    <style>{`
+      .physique-analysis-screen {
+        box-sizing: border-box;
+        width: 100%; height: 100%; min-height: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: clamp(12px, 3dvh, 24px); text-align: center; overflow: hidden;
+        padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+      }
+      .physique-analysis-screen > [role="status"] { flex-shrink: 0; max-width: 100%; }
+      .physique-analysis-photo {
+        position: relative; flex-shrink: 1; min-height: 0;
+        width: min(100%, 398px); overflow: hidden; border-radius: 24px; background: #0a0a0a;
+      }
+      .physique-analysis-photo img {
+        display: block; width: 100%; height: auto; object-fit: contain;
+        max-height: max(120px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 130px));
+        filter: brightness(.75);
+      }
+      @media (max-height: 500px) and (orientation: landscape) {
+        .physique-analysis-screen { flex-direction: row; gap: 16px; }
+        .physique-analysis-photo { width: min(52%, 398px); }
+      }
+      @keyframes physique-laser-sweep {
+        from { transform: translateY(0); }
+        to { transform: translateY(calc(100% - 2px)); }
+      }
+      .physique-laser-track { animation: physique-laser-sweep 1.8s linear infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .physique-laser-track { animation-duration: 6s; }
+      }
+    `}</style>
+    <div className="flex flex-col items-center" role="status" aria-live="polite">
+      <div className="reference-status"><span className="reference-status-dot" aria-hidden="true"/>ANALYZING · {stage + 1}/5</div>
+      <div className="reference-segments" aria-hidden="true">{BODY_ANALYSIS_STAGES.map((name, i) => <i key={name} className={i <= stage ? 'is-active' : ''}/>)}</div>
+    </div>
+    <div className="physique-analysis-photo">
+      <img src={photo} alt="Body photo being analyzed"/>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="physique-laser-track absolute inset-0"
+          onAnimationIteration={event => {
+            if (event.target !== event.currentTarget || event.animationName !== 'physique-laser-sweep') return
+            sweepCount.current += 1
+            if (sweepCount.current >= BODY_ANALYSIS_STAGES.length) onComplete?.()
+            setStage(previous => Math.min(previous + 1, BODY_ANALYSIS_STAGES.length - 1))
+          }}>
+          <div style={{height:2,background:`linear-gradient(90deg,transparent,${GOLD} 20%,#fff2c5 50%,${GOLD} 80%,transparent)`,boxShadow:`0 0 15px 4px ${GOLD}88`}}/>
+        </div>
       </div>
     </div>
-  )
+  </div>
 }
 
 // ─── Main Scan Page ───────────────────────────────────────────────────────────
@@ -1443,6 +1338,9 @@ export default function PhysiqueScan() {
   const startAnalysisRef  = useRef(null)
   const physiqueUploadInputRef = useRef(null)
   const autoAnalyzedPhotoRef = useRef(null)
+  const analysisInFlightRef = useRef(false)
+  const bodyPresentationRef = useRef(null)
+  useEffect(() => () => { bodyPresentationRef.current?.finish(false) }, [])
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
 
@@ -1514,8 +1412,6 @@ export default function PhysiqueScan() {
       return
     }
     if (autoAnalyzedPhotoRef.current === facePhoto) return
-    autoAnalyzedPhotoRef.current = facePhoto
-    setStep(3)
     const timer = setTimeout(() => startAnalysisRef.current?.(), 50)
     return () => clearTimeout(timer)
   }, [step, facePhoto, savedPhysiqueStats])
@@ -1523,6 +1419,11 @@ export default function PhysiqueScan() {
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
+    if (analysisInFlightRef.current) return
+    analysisInFlightRef.current = true
+    bodyPresentationRef.current?.finish(false)
+    const presentation = presentationGate()
+    bodyPresentationRef.current = presentation
 
     // Mark this photo as already intentionally submitted. Saving the first
     // stats profile below must not make the current photo auto-submit twice.
@@ -1559,22 +1460,7 @@ export default function PhysiqueScan() {
     // MediaPipe's cold-start model load on the very first scan of a session.
     // Body photo — no face landmark detection needed for physique scan
 
-    // 5-step, 1s-per-step choreography for FacialAnalysisOverlay — ticks
-    // forward on a fixed cadence regardless of API speed and parks at step 4
-    // (pulsing) once it gets there. minDisplayPromise is the real completion
-    // gate: below, we always await BOTH the real API result AND this timer,
-    // so a fast response still plays the full animation, and a slow one just
-    // holds on the step-4 visual until the real result actually exists —
-    // there is no path where we proceed on the timer alone.
-    const stageTimer = setInterval(() => {
-      setAnalysisStep(prev => {
-        if (prev >= 4) return prev
-        triggerHaptic()
-        return prev + 1
-      })
-    }, 800)
     const slowTimer = setTimeout(() => setSlowAnalysis(true), 12000)
-    const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 4000))
 
     try {
       const faceB64    = await toBase64(facePhoto)
@@ -1654,10 +1540,8 @@ export default function PhysiqueScan() {
         }
       }
 
-      // Real result is in hand — but never finish before the minimum 5-step
-      // choreography has fully played out (a fast response just waits here;
-      // a slow one already has the ticker parked, pulsing, at step 4).
-      await minDisplayPromise
+      // Both the real rating and all five full laser passes must finish.
+      if (!await presentation.promise) return
       setAnalysisStep(4)
 
       // The body-only scoring endpoint returns { physiqueScore }, whereas
@@ -1768,14 +1652,6 @@ export default function PhysiqueScan() {
       // Schedule rescan notification (14 days for free, 0 = cancelled for Pro)
       scheduleRescanNotification(isPremium ? 0 : 14).catch(() => {})
 
-      // Play the morph-warp flourish over the finished photo before handing
-      // off — MorphWarpOverlay's own keyframes run ~900ms; 950ms gives it a
-      // hair of buffer so navigate() never cuts it off mid-play.
-      setMorphing(true)
-      await new Promise(r => setTimeout(r, 950))
-
-      // Transition through the scan-ready screen (progress bar + affirming
-      // messages) before landing on results or the unlock gate.
       navigate('/physique-results')
     } catch (err) {
       console.error('[Scan] startAnalysis error:', err?.message, err?.stack)
@@ -1817,7 +1693,8 @@ export default function PhysiqueScan() {
         setStep(2)
       }
     } finally {
-      clearInterval(stageTimer)
+      presentation.finish(false)
+      analysisInFlightRef.current = false
       clearTimeout(slowTimer)
       setSlowAnalysis(false)
       setMorphing(false)
@@ -1877,7 +1754,7 @@ export default function PhysiqueScan() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 min-h-0 ${isAnalyzing ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {/* Reset presence bookkeeping with the step, matching the face scan
             so an outgoing capture view cannot linger over the next screen. */}
         <AnimatePresence key={`scan-step-${step}`} mode="wait">
@@ -2019,7 +1896,7 @@ export default function PhysiqueScan() {
           )}
           {isAnalyzing && (
             <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <PhysiqueAnalyzingScreen currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} scanResult={analysisResult} />
+              <PhysiqueAnalyzingScreen onComplete={() => bodyPresentationRef.current?.finish()} currentStep={analysisStep} slow={slowAnalysis} photo={facePhoto} morphing={morphing} scanResult={analysisResult} />
             </motion.div>
           )}
         </AnimatePresence>

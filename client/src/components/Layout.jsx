@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
-import AchievementToast from './AchievementToast'
 import ScanCelebration from './ScanCelebration'
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { useLocation, useNavigationType, useOutlet } from 'react-router-dom'
@@ -8,7 +7,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav, { TAB_ROOT_PATHS } from './BottomNav'
 import ProcessingOverlay from './ProcessingOverlay'
 import useStore from '../store/useStore'
-import { checkAchievements } from '../utils/achievements'
 import { useSwipeBack } from '../hooks/useSwipeBack'
 import { EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 
@@ -44,12 +42,6 @@ export default function Layout() {
   const location           = useLocation()
   const navigationType     = useNavigationType()
   const outlet             = useOutlet()
-  const scans              = useStore(s => s.scans)
-  const currentPlan        = useStore(s => s.currentPlan)
-  const streak             = useStore(s => s.streak)
-  const referralCount      = useStore(s => s.referralCount)
-  const achievements       = useStore(s => s.achievements)
-  const unlockAchievement  = useStore(s => s.unlockAchievement)
   const scanLaunching      = useStore(s => s.scanLaunching)
   const setScanLaunching   = useStore(s => s.setScanLaunching)
   const isCoach = ['/progress', '/coach'].includes(location.pathname)
@@ -81,12 +73,6 @@ export default function Layout() {
     if (!isScanCapture) setScanLaunching(false)
   }, [isScanCapture, location.key, setScanLaunching])
 
-  // Check for new achievements whenever key state changes
-  useEffect(() => {
-    const toUnlock = checkAchievements({ scans, currentPlan, streak, referralCount, achievements })
-    toUnlock.forEach(key => unlockAchievement(key))
-  }, [scans?.length, currentPlan, streak?.current, referralCount, achievements?.length])
-
   // Edge-swipe-back is only meaningful on a pushed detail screen with real
   // history behind it — not on a tab root (nowhere in-app to "go back" to)
   // and not on the very first location of the session (nothing behind it).
@@ -112,7 +98,6 @@ export default function Layout() {
       <AnimatePresence>
         {scanLaunching && isScanCapture && <ProcessingOverlay key="scan-launch" label="Processing" />}
       </AnimatePresence>
-      <AchievementToast />
       {location.state?.scanCelebration && ['/results', '/unlock'].includes(location.pathname) && <ScanCelebration key={location.key} />}
       <main className="min-h-0 flex-1 overflow-hidden relative">
         {/* Thin left-edge hit zone for the interruptible swipe-back gesture.

@@ -15,7 +15,6 @@ test('developer refresh clears local scan flow while preserving onboarding and a
   assert.equal(reset.currentScan, null)
   assert.equal(reset.currentPlan, null)
   assert.equal(reset.scanCount, 0)
-  assert.equal(reset.pendingAchievement, null)
   assert.equal('hasOnboarded' in reset, false)
   assert.equal('isPremium' in reset, false)
   assert.equal('token' in reset, false)

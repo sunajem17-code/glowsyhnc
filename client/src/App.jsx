@@ -94,7 +94,7 @@ export default function App() {
   const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
-  const logout                  = useStore(s => s.logout)
+  const expireSession           = useStore(s => s.expireSession)
   const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
   const setShowUnlockSlideshow  = useStore(s => s.setShowUnlockSlideshow)
   const currentScan             = useStore(s => s.currentScan)
@@ -140,12 +140,12 @@ export default function App() {
     return () => window.removeEventListener('offline', handleOffline)
   }, [])
 
-  // Auto-logout when any API call gets a 401 (expired token)
+  // Expired credentials require sign-in without discarding completed setup.
   useEffect(() => {
-    const handle = () => { logout?.(); window.location.replace('/auth') }
+    const handle = () => { expireSession() }
     window.addEventListener('auth:session-expired', handle)
     return () => window.removeEventListener('auth:session-expired', handle)
-  }, [])
+  }, [expireSession])
 
   const handleSplashDone = useCallback(() => { setSplashDone(true) }, [])
 
@@ -223,8 +223,8 @@ export default function App() {
 
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
-          {/* /auth no longer used — redirect everything to root (onboarding or app) */}
-          <Route path="/auth" element={<Navigate to="/" replace />} />
+          {/* Returning users can sign in directly without restarting setup. */}
+          <Route path="/auth" element={isAuthenticated && hasOnboarded ? <Navigate to="/" replace /> : <PremiumOnboarding initialSignIn />} />
           <Route path="/onboarding" element={hasOnboarded ? <Navigate to="/" replace /> : <PremiumOnboarding />} />
           {import.meta.env.DEV && <Route path="/dev/reset-onboarding" element={<DevelopmentOnboardingReset />} />}
 

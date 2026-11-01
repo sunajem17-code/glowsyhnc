@@ -29,8 +29,6 @@ export function getDeveloperRefreshState() {
     proScanCount: 0,
     proScanDate: null,
     proScanFirstAt: null,
-    achievements: [],
-    pendingAchievement: null,
     assignedPhase: null,
   }
 }

@@ -3,7 +3,6 @@ import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompl
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
-import { checkAchievements } from '../utils/achievements'
 import { canApplyNegativePremiumRefresh } from '../utils/premiumStatus'
 import { isLocalProPreviewAvailable } from '../utils/developerUnlockPreview.js'
 
@@ -84,6 +83,11 @@ const useStore = create(
         premiumStateRevision += 1
         set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || val }))
       },
+      expireSession: () => {
+        premiumStateRevision += 1
+        // Keep the owner and completed setup so reauthentication opens sign-in.
+        set({ token: null, isAuthenticated: false, isPremium: false, isLocalProPreview: false })
+      },
       logout: () => {
         premiumStateRevision += 1
         // Clear session keys so a subsequent login on the same device doesn't
@@ -124,17 +128,9 @@ const useStore = create(
 
       // Capped at 100 to bound localStorage growth over time — history beyond
       // that lives server-side (the `scans` table in Supabase) if it's ever needed.
-      addScan: (scan) => set(state => {
-        const newScans = [scan, ...state.scans].slice(0, 100)
-        const newState = { ...state, scans: newScans }
-        const toUnlock = checkAchievements(newState)
-        const newAchievements = [...state.achievements]
-        let pendingAchievement = state.pendingAchievement
-        for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
-        }
-        return { scans: newScans, achievements: newAchievements, pendingAchievement }
-      }),
+      addScan: (scan) => set(state => ({
+        scans: [scan, ...state.scans].slice(0, 100),
+      })),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
 
@@ -199,31 +195,15 @@ const useStore = create(
       // Daily Check-in
       checkins: [],
       todayCheckin: null,
-      addCheckin: (checkin) => set(state => {
-        const newCheckins = [checkin, ...state.checkins]
-        const newState = { ...state, checkins: newCheckins }
-        const toUnlock = checkAchievements(newState)
-        const newAchievements = [...state.achievements]
-        let pendingAchievement = state.pendingAchievement
-        for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
-        }
-        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement }
-      }),
+      addCheckin: (checkin) => set(state => ({
+        checkins: [checkin, ...state.checkins],
+        todayCheckin: checkin,
+      })),
       setTodayCheckin: (checkin) => set({ todayCheckin: checkin }),
 
       // Streaks
       streak: { current: 0, longest: 0, lastDate: null },
-      updateStreak: (streak) => set(state => {
-        const newState = { ...state, streak }
-        const toUnlock = checkAchievements(newState)
-        const newAchievements = [...state.achievements]
-        let pendingAchievement = state.pendingAchievement
-        for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
-        }
-        return { streak, achievements: newAchievements, pendingAchievement }
-      }),
+      updateStreak: (streak) => set({ streak }),
 
       // Settings
       theme: 'dark',
@@ -446,15 +426,6 @@ const useStore = create(
       freeCoachMessages: 0,
       incrementFreeCoachMessages: () => set(state => ({ freeCoachMessages: state.freeCoachMessages + 1 })),
 
-      // Achievements
-      achievements: [], // array of achievement keys that have been unlocked
-      pendingAchievement: null, // key of achievement to celebrate (shown once then cleared)
-      unlockAchievement: (key) => set(state => {
-        if (state.achievements.includes(key)) return state
-        return { achievements: [...state.achievements, key], pendingAchievement: key }
-      }),
-      clearPendingAchievement: () => set({ pendingAchievement: null }),
-
       // Privacy Settings
       privacySettings: {
         savePhotos: true,
@@ -509,6 +480,10 @@ const useStore = create(
           merged.isLocalProPreviewConfigured = false
           merged._premiumBeforeLocalPreview = false
         }
+        // Discard retired achievement data from existing installations.
+        delete merged.achievements
+        delete merged.pendingAchievement
+        delete merged.achievementQueue
         delete merged.developerPreviewUnlocked
         return merged
       },
@@ -580,7 +555,6 @@ const useStore = create(
             ? (({ capturedImage, landmarks2D, ...rest }) => rest)(state.currentScan.faceMetrics)
             : state.currentScan.faceMetrics,
         } : state.currentScan,
-        achievements: state.achievements,
         freeCoachMessages: state.freeCoachMessages,
       }),
     }
