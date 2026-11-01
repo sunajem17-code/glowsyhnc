@@ -1,4 +1,3 @@
-const { persistCompletedScan } = require('./durableScan')
 const crypto = require('node:crypto')
 const db = require('../db')
 const { getSupabase } = require('../supabase')
