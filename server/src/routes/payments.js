@@ -370,15 +370,20 @@ router.post('/sync-rc', authMiddleware, async (req, res) => {
     return res.status(503).json({ error: 'Server configuration error — contact support.' })
   }
 
-  // Verified — grant Pro
+  // Do not report success until the same store used by coach access confirms it.
   try {
-    await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true })
+    if (isConfigured()) {
+      await updateUserById(req.userId, { subscription_tier: 'premium', is_pro: true })
+      const saved = await getUserById(req.userId)
+      if (!saved || (saved.subscription_tier !== 'premium' && saved.is_pro !== true)) throw new Error('Subscription was not saved')
+    } else {
+      const result = db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId)
+      if (!result.changes) throw new Error('Account not found')
+    }
+    res.json({ ok: true })
   } catch {
-    try {
-      db.prepare("UPDATE users SET subscription_tier = 'premium', is_pro = 1 WHERE id = ?").run(req.userId)
-    } catch {}
+    res.status(503).json({error:'Your purchase is verified, but account access could not be saved. Please retry.'})
   }
-  res.json({ ok: true })
 })
 
 router.handleWebhook = handleWebhook

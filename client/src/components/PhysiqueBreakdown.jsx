@@ -6,7 +6,7 @@ import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 import './AppearanceBreakdown.css'
 
 function getPhysiqueAnalysis(scan) {
-  return scan?.physiqueScore ?? scan?.aiScore?.physiqueScore ?? scan?.aiScore?.physiqueResult ?? scan?.aiScore ?? {}
+  return { ...scan?.aiScore, ...scan?.aiScore?.physiqueResult, ...scan?.aiScore?.physiqueScore, ...scan?.physiqueScore }
 }
 
 const ACTIONABLE_METRICS = [
@@ -16,7 +16,7 @@ const ACTIONABLE_METRICS = [
   { key: 'frame_width', label: 'Frame Width' },
 ]
 
-const OUT_OF_SCOPE_LANGUAGE = /\b(?:photo|picture|image|lighting|light(?:ing)?|camera|crop(?:ped)?|pose|angle|clothing|shirt|outfit|framing|shot|facial?|face|presentation|in this frame|in this scan)\b/i
+const OUT_OF_SCOPE_LANGUAGE = /\b(?:lighting|light(?:ing)?|camera|crop(?:ped)?|pose|angle|clothing|shirt|outfit|framing|shot|facial?|face|presentation)\b/i
 const PHYSIQUE_FOCUS_LANGUAGE = /\b(?:muscle|chest|shoulders?|back|arms?|legs?|abs?|abdomen|waist|taper|lean(?:ness)?|body fat|frame|width|clavicles?|torso|posture|proportions?)\b/i
 const POSITIVE_LANGUAGE = /\b(?:strong|well[- ]developed|balanced|good|clear|proportionate|broad|wide|lean|muscular|above average|stands out)\b/i
 const NEGATIVE_LANGUAGE = /\b(?:weak|soft|limited|needs? work|can improve|room to improve|low|poor|below(?: average)?|underdeveloped|less|lacks?|narrow|uneven|not enough|not strongly|little|mild|can be improved)\b/i
@@ -114,9 +114,7 @@ function getSavedFindings(points, page, scan, usedMetrics) {
 
       const metric = relatedMetric(content, scan)
       if (metric) {
-        const score = getPhysiqueMetricScore(scan, metric.key)
-        const isExpectedSide = page === 'pros' ? score >= 8 : score < 8
-        return isExpectedSide && !usedMetrics.has(metric.key)
+        return !usedMetrics.has(metric.key)
       }
       return true
     })
@@ -130,7 +128,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
   const navigate = useNavigate()
   const [page, setPage] = useState('pros')
   const analysis = getPhysiqueAnalysis(scan)
-  const allPoints = page === 'pros' ? analysis.physique_strengths : analysis.physique_improvements
+  const allPoints = page === 'pros' ? (analysis.physique_strengths ?? analysis.strengths ?? analysis.keyStrengths) : (analysis.physique_improvements ?? analysis.improvements ?? analysis.keyWeaknesses)
   const metricPoints = ACTIONABLE_METRICS
     .map(metric => ({ ...metric, score: getPhysiqueMetricScore(scan, metric.key) }))
     .filter(metric => metric.score != null && (page === 'pros' ? metric.score >= 8 : metric.score < 8))
@@ -146,7 +144,8 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
     if (!pointsByMetric.has(finding.metric.key)) pointsByMetric.set(finding.metric.key, finding)
   }
   const points = [
-    ...metricPoints.map(metric => pointsByMetric.get(metric.key) || scoreBasedFinding(metric, metric.score, page)),
+    ...pointsByMetric.values(),
+    ...metricPoints.filter(metric => !pointsByMetric.has(metric.key)).map(metric => scoreBasedFinding(metric, metric.score, page)),
     ...additionalFindings,
   ]
   const title = page === 'pros' ? 'Pros' : 'Cons'
@@ -171,7 +170,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
               </div>
             </li>
           })
-          : <li className="physique-analysis-item appearance-points-empty">No saved {page === 'pros' ? 'strengths' : 'improvement areas'} are available for this scan.</li>}
+          : <li className="physique-analysis-item appearance-points-empty">{page === 'pros' ? 'This scan did not identify a clear strength. View Cons for areas to work on.' : 'This scan did not identify a specific area to improve.'}</li>}
       </ul>
     </section>
     {navigation}

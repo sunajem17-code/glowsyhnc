@@ -319,7 +319,15 @@ export default function Progress() {
     const txt = (text || input).trim()
     if (serverScan === null) return
     if (serverScan.status === 'unavailable') {
-      setMessages(previous => [...previous, {role:'assistant',content:serverScan.accessError || 'Could not verify coach access. Reopen this tab to retry.'}])
+      setLoading(true)
+      try {
+        const refreshed = await loadCoachAccess({native:isNative(),userId:user?.id,claimedPremium:accountPremium,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
+        setServerScan(refreshed)
+        setMessages(previous => previous.filter(message => message.content !== serverScan.accessError))
+      } catch(error) {
+        setServerScan({...serverScan,accessError:error.message})
+        setMessages(previous => [...previous.filter(message => message.content !== serverScan.accessError),{role:'assistant',content:error.message}])
+      } finally { setLoading(false) }
       return
     }
     const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
