@@ -1,3 +1,4 @@
+import { withoutRatings } from '../utils/prosConsText'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { triggerHaptic } from '../utils/haptics'
@@ -21,27 +22,26 @@ const POSITIVE_LANGUAGE = /\b(?:strong|well[- ]developed|balanced|good|clear|pro
 const NEGATIVE_LANGUAGE = /\b(?:weak|soft|limited|needs? work|can improve|room to improve|low|poor|below(?: average)?|underdeveloped|less|lacks?|narrow|uneven|not enough|not strongly|little|mild|can be improved)\b/i
 
 function scoreBasedFinding(metric, score, page) {
-  const value = `${score.toFixed(1)}/10`
   if (page === 'cons') {
     const findings = {
       muscle_mass: {
-        title: `Muscle development needs work (${value})`,
-        explanation: 'This is below the app’s strong range. Building your chest, shoulders, back, and arms can make your upper body look more muscular and balanced.',
+        title: `Muscle development needs work`,
+        explanation: 'Building your chest, shoulders, back, and arms can make your upper body look more muscular and balanced.',
         advice: 'Try three full-body strength workouts each week. Include a press, a row, and a leg exercise; when you can do the reps easily, add a little weight or a few reps.',
       },
       body_fat_score: {
-        title: `Visible leanness can improve (${value})`,
-        explanation: 'This score leaves room for more muscle definition. It is a visual rating, not a measurement of your body-fat percentage or health.',
+        title: `Visible leanness can improve`,
+        explanation: 'There is room to build more visible muscle definition. A photo does not measure body-fat percentage or health.',
         advice: 'If losing fat is appropriate for you, use small, steady changes: keep strength training, walk regularly, and eat balanced meals. Avoid crash diets.',
       },
       v_taper: {
-        title: `Shoulder-to-waist shape can improve (${value})`,
+        title: `Shoulder-to-waist shape can improve`,
         explanation: 'The shoulder-to-waist contrast is below the app’s strong range. More shoulder and back muscle can make the upper body look more V-shaped.',
         advice: 'Train your back and shoulders twice a week. Use rows or pulldowns for your back and lateral raises for your shoulders, adding reps slowly.',
       },
       frame_width: {
-        title: `Upper-body width can improve (${value})`,
-        explanation: 'This score says your upper-body width is an area to build. You cannot change bone width with exercise, but stronger shoulders and back can add visible width.',
+        title: `Upper-body width can improve`,
+        explanation: 'Upper-body width is an area to build. You cannot change bone width with exercise, but stronger shoulders and back can add visible width.',
         advice: 'Add rows or pulldowns and lateral raises to strength workouts twice a week. Start with a weight you can lift with steady control.',
       },
     }
@@ -50,23 +50,23 @@ function scoreBasedFinding(metric, score, page) {
 
   const findings = {
     muscle_mass: {
-      title: `Muscle development stands out (${value})`,
-      explanation: 'This is one of your stronger physique scores. Continued strength training can help you keep building your chest, shoulders, back, and arms.',
+      title: `Muscle development stands out`,
+      explanation: 'Continued strength training can help you keep building your chest, shoulders, back, and arms.',
       advice: 'Keep a regular strength routine and increase reps or weight gradually as exercises get easier.',
     },
     body_fat_score: {
-      title: `Visible leanness stands out (${value})`,
-      explanation: 'This is one of your stronger physique scores for visible definition. Keep the habits that support strength and a steady, healthy routine.',
+      title: `Visible leanness stands out`,
+      explanation: 'Visible definition is a strength. Keep the habits that support strength and a steady, healthy routine.',
       advice: 'Keep moving most days, eat regular balanced meals, and avoid extreme diet changes.',
     },
     v_taper: {
-      title: `Shoulder-to-waist shape stands out (${value})`,
-      explanation: 'Your shoulder-to-waist contrast is one of your stronger physique scores and helps create a more V-shaped upper body.',
+      title: `Shoulder-to-waist shape stands out`,
+      explanation: 'Your shoulder-to-waist contrast helps create a more V-shaped upper body.',
       advice: 'Keep training your back and shoulders with rows or pulldowns and lateral raises.',
     },
     frame_width: {
-      title: `Upper-body width stands out (${value})`,
-      explanation: 'Your upper-body width is one of your stronger physique scores. Building shoulder and back muscle can help maintain this shape.',
+      title: `Upper-body width stands out`,
+      explanation: 'Your upper-body width stands out. Building shoulder and back muscle can help maintain this shape.',
       advice: 'Keep rows or pulldowns and shoulder exercises in your regular strength routine.',
     },
   }
@@ -165,9 +165,9 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
             return <li className="physique-analysis-item" key={`${pointTitle}-${index}`}>
               <span className="physique-analysis-bullet" aria-hidden="true">•</span>
               <div className="physique-analysis-copy">
-                <span className="appearance-point-title">{pointTitle}</span>
-                <p>{explanation}</p>
-                {advice && <p className="appearance-point-advice"><span>Try</span> {advice}</p>}
+                <span className="appearance-point-title">{withoutRatings(pointTitle)}</span>
+                <p>{withoutRatings(explanation)}</p>
+                {advice && <p className="appearance-point-advice"><span>Try</span> {withoutRatings(advice)}</p>}
               </div>
             </li>
           })

@@ -1,3 +1,4 @@
+import { withoutRatings } from '../utils/prosConsText'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
@@ -104,9 +105,9 @@ export default function AppearanceBreakdown({
         const explanationParts = [item.observation?.trim(), item.significance?.trim()]
           .filter((text, partIndex, all) => text && text !== pointTitle && all.indexOf(text) === partIndex)
         return <li key={`${pointTitle}-${index}`}>
-          <span className="appearance-point-title">{pointTitle}</span>
-          {explanationParts.length > 0 && <p>{explanationParts.join(' ')}</p>}
-          {item.recommendation?.trim() && <p className="appearance-point-advice"><span>Try</span> {item.recommendation.trim()}</p>}
+          <span className="appearance-point-title">{withoutRatings(pointTitle)}</span>
+          {explanationParts.length > 0 && <p>{withoutRatings(explanationParts.join(' '))}</p>}
+          {item.recommendation?.trim() && <p className="appearance-point-advice"><span>Try</span> {withoutRatings(item.recommendation)}</p>}
         </li>
       }) : <li className="appearance-points-empty">{page === 'pros' ? 'No clear pros were identified in this scan.' : 'No specific cons were identified in this scan.'}</li>}</ul>}
     </section>
