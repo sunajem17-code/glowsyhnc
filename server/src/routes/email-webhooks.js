@@ -14,7 +14,7 @@ const { sendUpgradeNudge, sendWeeklyRecap, trackAffiliateClick } = require('../.
 const clickLimiter = createLimiter('track-click', 20, '1 h', 60 * 60 * 1000)
 const { createClient } = require('@supabase/supabase-js')
 
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
 const supabase = supabaseKey
   ? createClient(process.env.SUPABASE_URL, supabaseKey)
   : null

@@ -14,14 +14,15 @@ import PageHeader from '../components/PageHeader'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import sideProfileGuide from '../assets/physique-lower-male.jpg'
 import sideProfileGuideFemale from '../assets/physique-lower-male.jpg'
-import faceGuidePhoto from '../assets/physique-upper-male.jpg'
-import faceGuidePhotoFemale from '../assets/physique-upper-male.jpg'
+import faceGuidePhoto from '../assets/physique-upper-guide.png'
+import faceGuidePhotoFemale from '../assets/physique-upper-guide.png'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { isNative } from '../utils/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 
 // Temporary convenience for physique scans; keep isolated so this control can
@@ -1537,6 +1538,8 @@ export default function PhysiqueScan() {
             setTimeout(() => reject(new Error('Analysis timed out. Please try again')), 120_000)
           )
           aiResult = await Promise.race([scoreCall, timeoutCall])
+          if (aiResult?.streak) syncScanStreak(aiResult.streak)
+          else recordLocalScanStreak('physique')
           setAnalysisResult(aiResult)
 
         } finally {

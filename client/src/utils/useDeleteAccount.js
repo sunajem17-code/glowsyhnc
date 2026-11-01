@@ -26,9 +26,10 @@ import useStore from '../store/useStore'
  */
 export function useDeleteAccount() {
   const navigate = useNavigate()
-  const { isPremium, logout } = useStore(s => ({
+  const { isPremium, logout, resetOnboardingForDeletedAccount } = useStore(s => ({
     isPremium: s.isPremium,
     logout:    s.logout,
+    resetOnboardingForDeletedAccount: s.resetOnboardingForDeletedAccount,
   }))
 
   const [step, setStep] = useState('idle')
@@ -69,6 +70,7 @@ export function useDeleteAccount() {
       await clearAllScanMedia().catch(err =>
         console.warn('[deleteAccount] clearAllScanMedia failed:', err)
       )
+      resetOnboardingForDeletedAccount()
       logout()
       // navigate to '/' — App.jsx renders PremiumOnboarding because
       // hasOnboarded is now false, exactly like a fresh install.

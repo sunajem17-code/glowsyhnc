@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { TrendingUp, Trophy, Camera, Flame, ChevronRight, ChevronDown, LockKeyhole } from 'lucide-react'
+import { TrendingUp, Trophy, Camera, Flame, ChevronDown, LockKeyhole } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
@@ -11,7 +11,6 @@ import { triggerHaptic } from '../utils/haptics'
 import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory, mergeScanAiScore } from '../utils/progressHistory'
 import { ScanHistoryContent, TrendChart } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
-import StreakFlame from '../components/StreakFlame'
 import { loadScanMedia } from '../utils/scanPhotoDb'
 import { getProgressStatPresentation, getProgressTrendPresentation, shouldShowProgressData } from '../utils/scanHistoryPresentation'
 
@@ -46,9 +45,12 @@ export default function ScanTimeline() {
   const [loading, setLoading]     = useState(true)
   const [historyError, setHistoryError] = useState(false)
   const [flameFlight, setFlameFlight] = useState(null)
+  const [streakCelebration, setStreakCelebration] = useState(false)
+  const [entryScanId] = useState(() => location.state?.savedScanId ?? null)
   const streakIconRef = useRef(null)
   const isDemo = !token || token === 'demo-token'
   const streakFlameFlight = location.state?.streakFlameFlight === true
+  const streakCelebrationRequested = location.state?.streakCelebration === true
   const flameOrigin = location.state?.flameOrigin ?? null
   const streakCompletedToday = streak.current > 0
     && Boolean(streak.lastDate)
@@ -62,12 +64,22 @@ export default function ScanTimeline() {
   }, [refreshProStatus, token])
 
   useEffect(() => {
+    if (streakCelebrationRequested && (reduceMotion || !streakFlameFlight)) {
+      setStreakCelebration(true)
+      navigate('/timeline', { replace: true, state: null })
+      return undefined
+    }
     if (!streakFlameFlight) return undefined
     let finishTimer
+    const finishFlight = () => {
+      setFlameFlight(null)
+      setStreakCelebration(true)
+      navigate('/timeline', { replace: true, state: null })
+    }
     const startTimer = setTimeout(() => {
       const target = streakIconRef.current?.getBoundingClientRect()
       if (!flameOrigin || !target) {
-        navigate('/timeline', { replace: true, state: null })
+        finishFlight()
         return
       }
 
@@ -83,16 +95,19 @@ export default function ScanTimeline() {
       })
       // Keep a cleanup fallback in case the motion completion event is
       // interrupted by a resize or the page being backgrounded mid-flight.
-      finishTimer = setTimeout(() => {
-        setFlameFlight(null)
-        navigate('/timeline', { replace: true, state: null })
-      }, 1500)
+      finishTimer = setTimeout(finishFlight, 1500)
     }, 450)
     return () => {
       clearTimeout(startTimer)
       if (finishTimer) clearTimeout(finishTimer)
     }
-  }, [flameOrigin, streakFlameFlight, navigate])
+  }, [flameOrigin, streakFlameFlight, streakCelebrationRequested, reduceMotion, navigate])
+
+  useEffect(() => {
+    if (!streakCelebration) return undefined
+    const timer = setTimeout(() => setStreakCelebration(false), 1000)
+    return () => clearTimeout(timer)
+  }, [streakCelebration])
 
   useEffect(() => {
     let cancelled = false
@@ -201,37 +216,47 @@ export default function ScanTimeline() {
             </div>
           )
         })}
-        <button
-          type="button"
-          onClick={() => { triggerHaptic(); navigate(canAccessProUi ? '/streak' : '/premium') }}
-          aria-label={canAccessProUi ? `Open current streak details, ${streak.current} days` : 'Current streak locked'}
-          className="card relative text-center py-3 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ outlineColor: GOLD }}
+        <motion.div
+          className="card relative text-center py-3"
+          style={{ border: '1px solid rgba(255,255,255,0.08)' }}
         >
-          <ChevronRight size={14} className="absolute right-2 top-2 text-secondary" aria-hidden="true" />
+          {streakCelebration && !reduceMotion && (
+            <motion.span
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.16, 0] }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+              className="pointer-events-none absolute inset-0 rounded-[inherit]"
+              style={{ background: 'radial-gradient(ellipse at center, rgba(244,217,137,0.45), transparent 72%)' }}
+            />
+          )}
           <div className="relative flex items-center justify-center mb-0.5 w-full h-6">
-            <Flame
+            <motion.span
+              animate={streakCelebration && !reduceMotion ? { scale: [1, 1.35, 1], rotate: [0, -7, 5, 0] } : undefined}
+              transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+              style={{ display: 'inline-flex' }}
+            >
+              <Flame
               ref={streakIconRef}
               size={20}
-              className={streakCompletedToday && !streakFlameFlight ? 'fire-icon' : ''}
+              className={streakCompletedToday && !streakFlameFlight && !streakCelebration ? 'fire-icon' : ''}
               style={canAccessProUi && streakCompletedToday && !streakFlameFlight
-                ? { color: GOLD, fill: GOLD, filter: 'drop-shadow(0 0 4px rgba(198,168,92,0.42))' }
+                ? { color: GOLD, fill: GOLD }
                 : { color: canAccessProUi ? 'rgba(255,255,255,0.32)' : GOLD }}
-            />
+              />
+            </motion.span>
           </div>
           {canAccessProUi
-            ? <p className="font-mono font-bold text-lg text-white">{streak.current > 0 ? `${streak.current}d` : 'N/A'}</p>
+            ? <motion.p
+                className="font-mono font-bold text-lg text-white"
+                animate={streakCelebration && !reduceMotion ? { scale: [1, 1.2, 1] } : undefined}
+                transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+              >{streak.current > 0 ? `${streak.current}d` : 'N/A'}</motion.p>
             : <LockKeyhole size={19} className="mx-auto my-[3px]" style={{ color: GOLD }} aria-hidden="true" />}
           <p className="text-[10px] text-white font-body">Current Streak</p>
-        </button>
+        </motion.div>
       </div>
 
-      {/* History refresh never blocks saved results or page navigation. */}
-      {loading && history.length === 0 && (
-        <p role="status" className="text-xs text-secondary font-body mb-4">
-          Loading scan history…
-        </p>
-      )}
       {showProgressData && <div className="card mb-4 overflow-hidden">
         <button
           type="button"
@@ -278,6 +303,7 @@ export default function ScanTimeline() {
           <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
           <ScanHistoryContent
             embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading} canAccessProUi={canAccessProUi}
+            entryScanId={entryScanId}
             error={null}
             onViewScan={viewHistoryScan}
             emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
@@ -290,9 +316,10 @@ export default function ScanTimeline() {
         <motion.div
           initial={{ x: 0, y: 0, scale: 1 }}
           animate={{ x: flameFlight.deltaX, y: flameFlight.deltaY, scale: flameFlight.scale }}
-          transition={{ duration: 1.05, ease: [0.22, 0.8, 0.3, 1] }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
           onAnimationComplete={() => {
             setFlameFlight(null)
+            setStreakCelebration(true)
             navigate('/timeline', { replace: true, state: null })
           }}
           aria-hidden="true"
@@ -308,7 +335,7 @@ export default function ScanTimeline() {
             willChange: 'transform',
           }}
         >
-          <StreakFlame size={flameFlight.origin.width} />
+          <Flame size={24} strokeWidth={2.5} fill="#D4B96A" color="#F4D989" />
         </motion.div>,
         document.body,
       )}

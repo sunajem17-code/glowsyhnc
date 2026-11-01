@@ -16,7 +16,7 @@ const router = express.Router()
 // Helper: 503 if Supabase not configured
 function requireSupabase(res) {
   if (!isConfigured()) {
-    res.status(503).json({ error: 'Supabase not configured — add SUPABASE_URL and SUPABASE_SERVICE_KEY to server/.env' })
+    res.status(503).json({ error: 'Supabase not configured — add SUPABASE_URL and SUPABASE_SECRET_KEY to the server environment' })
     return false
   }
   return true
@@ -338,7 +338,7 @@ router.post('/upload-image', auth, async (req, res) => {
 // Health check: is Supabase configured and reachable? Auth required.
 router.get('/status', auth, async (req, res) => {
   if (!isConfigured()) {
-    return res.json({ configured: false, message: 'Add SUPABASE_URL and SUPABASE_SERVICE_KEY to server/.env' })
+    return res.json({ configured: false, message: 'Add SUPABASE_URL and SUPABASE_SECRET_KEY to the server environment' })
   }
   try {
     const sb = getSupabase()

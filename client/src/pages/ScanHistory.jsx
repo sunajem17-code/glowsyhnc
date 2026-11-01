@@ -170,14 +170,16 @@ export default function ScanHistory() {
   )
 }
 
-export function ScanHistoryContent({ scans, loading, error, onViewScan, embedded = false, canAccessProUi = true, emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
+export function ScanHistoryContent({ scans, loading, error, onViewScan, embedded = false, canAccessProUi = true, entryScanId = null, emptyMessage = 'No scans yet. Complete your first scan to see your history here.' }) {
   const viewState = getScanHistoryViewState({ scanCount: scans.length, loading, error })
   return (<>
       {/* Body */}
       {viewState === 'loading' ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading…</p>
-        </div>
+        embedded ? null : (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading…</p>
+          </div>
+        )
       ) : viewState === 'error' ? (
         <div className="flex-1 flex items-center justify-center px-8 text-center">
           <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{error}</p>
@@ -198,7 +200,15 @@ export function ScanHistoryContent({ scans, loading, error, onViewScan, embedded
             {scans.length} SCAN{scans.length !== 1 ? 'S' : ''}
           </p>}
           {scans.map((scan, i) => (
-            <ScanHistoryRow key={scan.id} scan={scan} index={i} onTap={onViewScan} canAccessProUi={canAccessProUi} />
+            <ScanHistoryRow
+              key={scan.id}
+              scan={scan}
+              index={i}
+              onTap={onViewScan}
+              canAccessProUi={canAccessProUi}
+              animateEntry={!embedded || (entryScanId != null && String(scan.id) === String(entryScanId))}
+              hidePhotoPlaceholder={embedded}
+            />
           ))}
         </div>
       )}

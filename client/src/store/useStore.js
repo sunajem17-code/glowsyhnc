@@ -1,5 +1,5 @@
 import { API_BASE } from '../utils/backend'
-import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner } from '../utils/onboardingStartup.js'
+import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner, startingPointCompletionKey } from '../utils/onboardingStartup.js'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
@@ -105,8 +105,7 @@ const useStore = create(
           currentPlan: null,
           currentScan: null,
           checkins: [],
-          todayCheckin: null,
-          streak: { current: 0, longest: 0, lastDate: null },
+          streak: { current: 0, longest: 0, lastDate: null, face: { current: 0, longest: 0, lastDate: null }, physique: { current: 0, longest: 0, lastDate: null } },
           isPremium: false,
           isLocalProPreview: false,
           isLocalProPreviewConfigured: false,
@@ -192,17 +191,11 @@ const useStore = create(
         return { currentPlan: { ...state.currentPlan, tasks: updatedTasks } }
       }),
 
-      // Daily Check-in
+      // Legacy activity dates are retained for the streak calendar.
       checkins: [],
-      todayCheckin: null,
-      addCheckin: (checkin) => set(state => ({
-        checkins: [checkin, ...state.checkins],
-        todayCheckin: checkin,
-      })),
-      setTodayCheckin: (checkin) => set({ todayCheckin: checkin }),
 
       // Streaks
-      streak: { current: 0, longest: 0, lastDate: null },
+      streak: { current: 0, longest: 0, lastDate: null, face: { current: 0, longest: 0, lastDate: null }, physique: { current: 0, longest: 0, lastDate: null } },
       updateStreak: (streak) => set({ streak }),
 
       // Settings
@@ -212,6 +205,21 @@ const useStore = create(
       hasOnboarded: false,
       onboardingHydrated: false,
       onboardingCompletedByUser: {},
+      startingPointCompletedByUser: {},
+      completeStartingPoint: () => set(state => ({
+        startingPointCompletedByUser: {
+          ...state.startingPointCompletedByUser,
+          [startingPointCompletionKey(state.user)]: true,
+        },
+      })),
+      resetOnboardingForDeletedAccount: () => set(state => {
+        const owner = onboardingOwner(state.user)
+        const onboardingCompletedByUser = { ...state.onboardingCompletedByUser }
+        const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
+        delete onboardingCompletedByUser[owner]
+        delete startingPointCompletedByUser[owner]
+        return { hasOnboarded: false, onboardingCompletedByUser, startingPointCompletedByUser }
+      }),
       setHasOnboarded: (completedStep) => {
         // The onboarding flow passes its final step. PaymentSuccess can also
         // finish that same flow after a hard redirect, where no step survives.
@@ -402,6 +410,16 @@ const useStore = create(
                 lastDate: serverStreak.last_checkin_date
                   ? new Date(serverStreak.last_checkin_date + 'T12:00:00').toDateString()
                   : state.streak.lastDate,
+                face: serverStreak.face_current_streak != null ? {
+                  current: serverStreak.face_current_streak,
+                  longest: serverStreak.face_longest_streak ?? 0,
+                  lastDate: serverStreak.face_last_scan_date || null,
+                } : state.streak.face,
+                physique: serverStreak.physique_current_streak != null ? {
+                  current: serverStreak.physique_current_streak,
+                  longest: serverStreak.physique_longest_streak ?? 0,
+                  lastDate: serverStreak.physique_last_scan_date || null,
+                } : state.streak.physique,
               } : state.streak,
             }))
           }
@@ -441,8 +459,7 @@ const useStore = create(
         currentScan: null,
         currentPlan: null,
         checkins: [],
-        todayCheckin: null,
-        streak: { current: 0, longest: 0, lastDate: null },
+        streak: { current: 0, longest: 0, lastDate: null, face: { current: 0, longest: 0, lastDate: null }, physique: { current: 0, longest: 0, lastDate: null } },
         pendingFacePhoto: null,
         pendingBodyPhoto: null,
       }),
@@ -522,10 +539,10 @@ const useStore = create(
         scans: state.scans.map(({ facePhotoUrl, sidePhotoUrl, ...rest }) => rest),
         currentPlan: state.currentPlan,
         checkins: state.checkins,
-        todayCheckin: state.todayCheckin,
         streak: state.streak,
         hasOnboarded: hasCompletedOnboarding(state),
         onboardingCompletedByUser: state.onboardingCompletedByUser,
+        startingPointCompletedByUser: state.startingPointCompletedByUser,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,
         ageConfirmedAt: state.ageConfirmedAt,

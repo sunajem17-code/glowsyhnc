@@ -32,6 +32,9 @@ import ScanPortrait from '../components/ScanPortrait'
 import ScanUnlockGate from './ScanUnlockGate'
 import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresentation'
 import { validationFailure } from '../utils/validationFailure'
+import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
+
+const SHOW_TEMPORARY_FACE_UPLOAD = true
 
 async function uploadScanPhoto(imageData) {
   const commaIdx = imageData.indexOf(',')
@@ -520,9 +523,11 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                       {stepNum !== 2 && (
                         <div style={{ width: '70%', height: '67%', border: `1.5px solid ${GOLD}`, borderRadius: '48% 48% 42% 42%', boxShadow: `0 0 16px ${GOLD}55` }} />
                       )}
-                      <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: GOLD, fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
-                        {stepNum === 2 ? 'Align your side profile' : 'Position your face in the oval'}
-                      </div>
+                      {stepNum === 2 && (
+                        <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: GOLD, fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
+                          Align your side profile
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -539,9 +544,11 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   {stepNum !== 2 && (
                     <div style={{ width: '70%', height: '67%', border: `1.5px solid ${alignment.aligned ? GOLD : 'rgba(255,255,255,0.6)'}`, borderRadius: '48% 48% 42% 42%', boxShadow: alignment.aligned ? `0 0 16px ${GOLD}55` : 'none', transition: 'border-color .3s, box-shadow .3s' }} />
                   )}
-                  <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: alignment.aligned ? GOLD : '#fff', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
-                    {trackingAvailable ? alignment.label : (stepNum === 2 ? 'Align your side profile' : 'Position your face')}
-                  </div>
+                  {stepNum === 2 && (
+                    <div style={{ position: 'absolute', bottom: 22, padding: '9px 16px', borderRadius: 99, background: 'rgba(0,0,0,0.72)', color: alignment.aligned ? GOLD : '#fff', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
+                      {trackingAvailable ? alignment.label : 'Align your side profile'}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1741,13 +1748,13 @@ function buildDiagnosticLines(scanResult) {
   ]
 }
 
-function PresentationAnalyzingOverlay({ photo, points, meshPathD, onSequenceComplete, previewElapsed, captureFrame }) {
+function PresentationAnalyzingOverlay({ photo, points, meshPathD, onSequenceComplete, previewElapsed, captureFrame, visualOnly = false }) {
   const [elapsed, setElapsed] = useState(0)
   const [imageReady, setImageReady] = useState(false)
   const finishRef = useRef(onSequenceComplete)
   finishRef.current = onSequenceComplete
   const markImageReady = useCallback(() => setImageReady(true), [])
-  const ready = Boolean(points) && imageReady
+  const ready = imageReady && (visualOnly || Boolean(points))
 
   useEffect(() => {
     if (!ready || previewElapsed != null) return
@@ -1793,14 +1800,14 @@ function PresentationAnalyzingOverlay({ photo, points, meshPathD, onSequenceComp
   </div>
   return <div className="reference-scan">
     {captureFrame?createPortal(header,document.body):header}
-    <ScanPortrait photo={photo} points={points} meshPathD={meshPathD} frame={frame} onImageReady={markImageReady} captureFrame={captureFrame} />
-    {!ready && <p className="reference-wait">Locating facial landmarks…</p>}
+    <ScanPortrait photo={photo} points={visualOnly ? null : points} meshPathD={visualOnly ? null : meshPathD} frame={frame} onImageReady={markImageReady} captureFrame={captureFrame} visualOnly={visualOnly} />
+    {!ready && <p className="reference-wait">{visualOnly ? 'Loading scan photo…' : 'Locating facial landmarks…'}</p>}
   </div>
 }
 
-export function AnalyzingScreen({ currentStep = 0, photo, points = null, meshPathD = null, onSequenceComplete, previewElapsed, captureFrame }) {
+export function AnalyzingScreen({ currentStep = 0, photo, points = null, meshPathD = null, onSequenceComplete, previewElapsed, captureFrame, visualOnly = false }) {
   return <div className="h-full w-full">
-    <PresentationAnalyzingOverlay photo={photo} points={points} meshPathD={meshPathD} onSequenceComplete={onSequenceComplete} previewElapsed={previewElapsed} captureFrame={captureFrame} />
+    <PresentationAnalyzingOverlay photo={photo} points={points} meshPathD={meshPathD} onSequenceComplete={onSequenceComplete} previewElapsed={previewElapsed} captureFrame={captureFrame} visualOnly={visualOnly} />
     <span className="sr-only" aria-live="polite">{REAL_SCAN_STAGES[Math.min(currentStep, 4)]}</span>
   </div>
 }
@@ -1919,6 +1926,7 @@ export default function Scan() {
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
+  const faceUploadInputRef = useRef(null)
   const frontLandmarksRef = useRef(null)
   const validatedFrontRef = useRef(recoveredFrontPhoto)
   const animationGateRef = useRef(null)
@@ -2252,6 +2260,8 @@ export default function Scan() {
       }
 
       if (!aiResult.analysisEvidence) aiResult.analysisEvidence = analysisEvidence
+      if (aiResult.streak) syncScanStreak(aiResult.streak)
+      else recordLocalScanStreak('face')
       if (!aiResult.scoreClassification) aiResult.scoreClassification = {
         overall: 'legacy_subjective_visual_assessment',
         objectiveReplacementStatus: 'not_validated',
@@ -2877,9 +2887,37 @@ export default function Scan() {
 
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {/* Reserve the former upload control's footprint so Begin Scan and
-              the capture guide remain in their established positions. */}
-          <div aria-hidden="true" className="w-full mt-3 h-[46px]" />
+          {step === 1 && SHOW_TEMPORARY_FACE_UPLOAD ? (
+            <>
+              <input
+                ref={faceUploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (!file) return
+                  if (!file.type.startsWith('image/')) {
+                    setError('Choose an image file to continue.')
+                    return
+                  }
+                  setError('')
+                  setPreviewPhoto({ url: URL.createObjectURL(file), blob: file, forStep: 1 })
+                }}
+              />
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { triggerHaptic(); faceUploadInputRef.current?.click() }}
+                className="w-full mt-3 h-[46px] rounded-2xl font-heading font-semibold text-[15px] flex items-center justify-center gap-2"
+                style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
+              >
+                <Upload size={17} /> Upload a Picture
+              </motion.button>
+            </>
+          ) : (
+            <div aria-hidden="true" className="w-full mt-3 h-[46px]" />
+          )}
         </div>
       )}
     </div>

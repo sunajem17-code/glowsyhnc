@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, ChevronLeft, ChevronRight, Zap, ClipboardList, Target, Dumbbell, Sparkles, Salad, Scissors, Ruler, Shirt, Gift, Trophy } from 'lucide-react'
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, Clock, Lock, Camera, ChevronLeft, ChevronRight, Zap, ClipboardList, Target, Dumbbell, Sparkles, Salad, Scissors, Ruler, Shirt, Gift } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import MotionPage from '../components/MotionPage'

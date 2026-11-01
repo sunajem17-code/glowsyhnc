@@ -151,7 +151,6 @@ export const api = {
     complete: (taskId) => request(`/tasks/${taskId}/complete`, { method: 'POST' }),
   },
   checkin: {
-    create: (data) => request('/checkin', { method: 'POST', body: JSON.stringify(data) }),
     history: () => request('/checkin/history'),
   },
   progress: {

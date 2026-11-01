@@ -70,10 +70,12 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
               <div key={key} style={{ paddingBottom: idx < PHYSIQUE_METRICS.length - 2 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: REVEAL_RATINGS_LAYOUT.labelMarginBottom, height: REVEAL_RATINGS_LAYOUT.labelHeight }}>
                   <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
-                  <motion.span aria-hidden="true" initial={animation.lock.initial} animate={animation.lock.animate} transition={animation.lock.transition}
-                    style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
-                  </motion.span>
+                  {!unlocked && (
+                    <motion.span aria-hidden="true" initial={animation.lock.initial} animate={animation.lock.animate} transition={animation.lock.transition}
+                      style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
+                    </motion.span>
+                  )}
                 </div>
                 {unlocked ? (
                   <motion.div aria-label={`${label}: ${validValue == null ? 'Unavailable' : `${validValue.toFixed(1)} out of 10`}`}
@@ -239,8 +241,10 @@ export default function PhysiqueResults() {
   const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [rescoring, setRescoring] = useState(false)
   const [rescoreError, setRescoreError] = useState('')
+  const [progressAdded, setProgressAdded] = useState(false)
   const purchaseLockRef = useRef(false)
   const downloadCardRef = useRef(null)
+  const saveProgressButtonRef = useRef(null)
 
   const photo = currentScan?.facePhotoUrl ?? storedPhoto ?? null
 
@@ -305,7 +309,7 @@ export default function PhysiqueResults() {
   }
 
   function handleAddToProgress() {
-    if (!currentScan?.id) return
+    if (!currentScan?.id || progressAdded) return
     try {
       useStore.setState(state => {
         const latest = state.currentScan?.id === currentScan.id ? state.currentScan : currentScan
@@ -319,7 +323,24 @@ export default function PhysiqueResults() {
         }
       })
       triggerHaptic()
-      navigate('/timeline', { replace: true, state: { savedScanId: currentScan.id } })
+      setProgressAdded(true)
+      const rect = saveProgressButtonRef.current?.getBoundingClientRect()
+      const flameOrigin = rect ? {
+        left: rect.left + rect.width / 2 - 14,
+        top: rect.top + rect.height / 2 - 14,
+        width: 28,
+        height: 28,
+      } : null
+      window.setTimeout(() => {
+        navigate('/timeline', {
+          replace: true,
+          state: {
+            savedScanId: currentScan.id,
+            streakCelebration: true,
+            ...(flameOrigin && !reduceMotion ? { streakFlameFlight: true, flameOrigin } : {}),
+          },
+        })
+      }, reduceMotion ? 0 : 360)
     } catch (error) {
       console.error('[PhysiqueResults] Could not save scan to Progress:', error)
       setDownloadError('Could not save this scan. Please try again.')
@@ -452,14 +473,14 @@ export default function PhysiqueResults() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <div className="flex flex-col h-full overflow-y-auto px-5" style={{ background: '#0A0A0A' }}>
       {savedProgressCard && <ShareCard scan={currentScan} facePhotoUrl={downloadPhoto.source === photo && downloadPhoto.status === 'ready' ? downloadPhoto.url : null} cardRef={downloadCardRef} metrics={physiqueCardMetrics} />}
-      <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 56px)` }}>
+      <div className="relative flex-shrink-0 w-full" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button
           onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
           aria-label="Go back"
-          className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform z-10"
-          style={{ top: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 20px)`, background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+          className="fixed left-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
         >
           <ChevronLeft size={18} className="text-primary" />
         </button>
@@ -472,7 +493,7 @@ export default function PhysiqueResults() {
       </div>
 
       <motion.div
-        className="relative w-full px-5"
+        className="relative w-full"
         style={{
           marginTop: activeView === 'results' ? 102 : activeView === 'analysis' ? 0 : 20,
           transformOrigin: '50% 50%',
@@ -510,8 +531,6 @@ export default function PhysiqueResults() {
             <div>
               <PhysiqueBreakdown
                 scan={currentScan}
-                coachPhotoUrl={photo}
-                showCoach={savedProgressCard}
               />
             </div>
           )}
@@ -523,15 +542,35 @@ export default function PhysiqueResults() {
         </motion.div>
       </motion.div>
 
-      <div className="w-full px-5" style={{paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))'}}>
-        {!savedProgressCard && (
+      <div className="w-full" style={{paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))'}}>
+        {activeView === 'analysis' && savedProgressCard && (
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={handleAddToProgress}
-            className="w-full mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 flex items-center justify-center gap-2"
-            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+            onClick={() => {
+              triggerHaptic()
+              navigate('/coach', { state: {
+                scanId: currentScan?.serverScanId || currentScan?.aiScore?.scanId || null,
+                coachPhotoUrl: photo || currentScan?.bodyPhotoUrl || currentScan?.facePhotoUrl || null,
+                coachPrompt: 'Please help me understand my physique scan and suggest practical next steps based on the visible results.',
+              } })
+            }}
+            className="scan-results-coach-button font-heading font-bold text-[17px]"
           >
-            <Check size={19} /> Add to Progress
+            Ask AI Coach
+          </motion.button>
+        )}
+        {!savedProgressCard && (
+          <motion.button
+            ref={saveProgressButtonRef}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleAddToProgress}
+            disabled={progressAdded}
+            animate={progressAdded && !reduceMotion ? { scale: [1, 1.025, 1] } : undefined}
+            transition={{ duration: 0.34, ease: 'easeOut' }}
+            className="w-full mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 flex items-center justify-center gap-2"
+            style={{ background: progressAdded ? 'linear-gradient(135deg,#f4d989 0%,#c6a85c 100%)' : GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          >
+            {progressAdded ? <><motion.span initial={reduceMotion ? false : { scale: 0.4, rotate: -25 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }}><Check size={19} /></motion.span> Added to Progress</> : <><Check size={19} /> Add to Progress</>}
           </motion.button>
         )}
         {activeView === 'results' && savedProgressCard && (

@@ -24,7 +24,6 @@ const Scan           = lazy(() => import('./pages/Scan'))
 const Results        = lazy(() => import('./pages/Results'))
 const ActionPlan     = lazy(() => import('./pages/ActionPlan'))
 const Progress       = lazy(() => import('./pages/Progress'))
-const DailyCheckin   = lazy(() => import('./pages/DailyCheckin'))
 const Streak         = lazy(() => import('./pages/Streak'))
 const Profile        = lazy(() => import('./pages/Profile'))
 const Premium        = lazy(() => import('./pages/Premium'))
@@ -247,7 +246,7 @@ export default function App() {
                 <Route path="extras" element={<Extras />} />
                 <Route path="plan" element={<ActionPlan />} />
                 <Route path="progress" element={<Progress />} />
-                <Route path="checkin" element={<DailyCheckin />} />
+                <Route path="checkin" element={<Navigate to="/face-body-routine" replace />} />
                 <Route path="streak" element={<Streak />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="premium" element={<Navigate to="/unlock?paywall=1" replace />} />

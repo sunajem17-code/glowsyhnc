@@ -9,9 +9,9 @@ import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
 import hypergamyChart from '../assets/hypergamy-chart.png'
 import haloEffectImg from '../assets/halo-effect-gold.png'
-import marcovFitAvatar from '../assets/marcov-fit.jpg'
-import kyleJordanAvatar from '../assets/kyle-jordan.png'
-import samHakimiAvatar from '../assets/sam-hakimi.png'
+import marcovFitAvatar from '../assets/marcov-fit-avatar.png'
+import yusufAliAvatar from '../assets/yusuf-ali-avatar.png'
+import samHakimiAvatar from '../assets/sam-hakimii-avatar.png'
 import { PhotoUploadStep, AnalyzingScreen, extractScanOverlayPoints, buildMeshPathD } from './Scan'
 import { ANALYSIS_STEPS } from '../utils/analysisSteps'
 import { profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
@@ -862,7 +862,7 @@ const TESTIMONIALS = [
   {
     handle:  '@samhakimii',
     rating:  5,
-    quote:   'My face looks so different after only 2 weeks Almost have hollow cheeks now',
+    quote:   'I used to be unhappy with my looks and genuinely didn\'t even know where to start, but each scan would point out all my weaknesses and I slowly fixed them and ascended.',
     initials:'SH',
     color:   '#C6A85C',
     avatar:  samHakimiAvatar,
@@ -870,15 +870,15 @@ const TESTIMONIALS = [
   {
     handle:  '@yusufali_',
     rating:  5,
-    quote:   'Went from a 6.1 to a 7.4 after my 12 week plan',
+    quote:   'I used to get bullied for being overweight and decided to finally lock in. After literally just following the 12 week plan, I looked unrecognizable.',
     initials:'KJ',
     color:   '#60A5FA',
-    avatar:  kyleJordanAvatar,
+    avatar:  yusufAliAvatar,
   },
   {
     handle:  '@marcov.fit',
     rating:  5,
-    quote:   'The only app that helps me take action instead of just pointing out flaws',
+    quote:   'It helped me understand what to focus on and gave me a plan that helped me get hollow cheeks in 3 weeks.',
     initials:'MV',
     color:   '#C6A85C',
     avatar:  marcovFitAvatar,
@@ -964,7 +964,7 @@ function StepTestimonials({ onNext }) {
               overflow: 'hidden',
             }}>
               {t.avatar
-                ? <img src={t.avatar} alt={`${t.handle} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }} />
+                ? <img src={t.avatar} alt={`${t.handle} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: ['@marcov.fit', '@yusufali_'].includes(t.handle) ? 'center 75%' : 'center 30%' }} />
                 : <span style={{ fontSize: 14, fontWeight: 700, color: t.color, fontFamily: 'inherit' }}>{t.initials}</span>}
             </div>
 
@@ -1036,7 +1036,7 @@ function StepNotifications({ onNext }) {
       if (status.display === 'granted') {
         const scheduled = await requestNotificationPermission()
         setMessage(scheduled
-          ? 'Notifications enabled. We’ll remind you to check in at 8 PM.'
+          ? 'Notifications enabled. We’ll remind you to scan at 8 PM.'
           : 'Notifications enabled. You can set up reminders later in Settings.')
       } else {
         setMessage('Notifications are off. To enable them, open iPhone Settings → Notifications → Ascendus → Allow Notifications.')

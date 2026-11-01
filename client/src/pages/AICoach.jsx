@@ -1,4 +1,4 @@
-import { loadCoachAccess } from '../utils/coachAccess'
+import { getCoachAccessMode, loadCoachAccess, LOCAL_PRO_PREVIEW_COACH_NOTICE } from '../utils/coachAccess'
 import { checkProStatus, isNative } from '../utils/iap'
 import useCoachScroll from '../hooks/useCoachScroll'
 import CoachMessage from '../components/CoachMessage'
@@ -129,10 +129,11 @@ export default function AICoach() {
   const navigate = useNavigate()
   const location = useLocation()
   const selectedScanId = location.state?.scanId
-  const { scans, userProfile, user, isPremium: accountPremium } = useStore()
+  const { scans, userProfile, user, isLocalProPreview, isPremium: accountPremium } = useStore()
   const latestScan = scans[0]
   const [serverScan, setServerScan] = useState(null)
   const isPremium = serverScan?.isPro === true
+  const coachAccessMode = getCoachAccessMode({ isPremium })
   // Only server-confirmed scan state may unlock the coach route.
   const hasScan = serverScan?.hasCompletedScan === true
   const conversationRef = useRef(null)
@@ -165,7 +166,7 @@ export default function AICoach() {
     setMessages([{ role: 'assistant', content: 'Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?' }])
     conversationRef.current = null
     loadCoachAccess({
-      native: isNative(), userId: user?.id, claimedPremium: accountPremium,
+      native: isNative(), userId: user?.id, claimedPremium: accountPremium && !isLocalProPreview,
       checkPurchase: checkProStatus,
       syncPurchase: id => api.payments.syncRc(id),
       loadContext: () => api.coach.context(),
@@ -185,7 +186,7 @@ export default function AICoach() {
       }
     }).catch(error => { if (active) { setServerScan({ status: 'unavailable' }); setError(error?.message || 'Could not verify coach access. Please retry.') } })
     return () => { active = false; requestGenerationRef.current += 1 }
-  }, [user?.id, latestScan?.id, accountPremium])
+  }, [user?.id, latestScan?.id, isLocalProPreview, accountPremium])
 
   useEffect(() => {
     if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
@@ -220,7 +221,7 @@ export default function AICoach() {
     if (serverScan.status === 'unavailable') {
       setLoading(true)
       try {
-        const refreshed = await loadCoachAccess({native:isNative(),userId:user?.id,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
+        const refreshed = await loadCoachAccess({native:isNative(),userId:user?.id,claimedPremium:accountPremium && !isLocalProPreview,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
         setServerScan(refreshed)
         setError('Access checked. Tap send again to submit your question.')
       } catch(error) { setError(error?.message || 'Could not verify coach access. Please retry.') }
@@ -232,9 +233,18 @@ export default function AICoach() {
     // No scan → redirect to scan
     if (!hasScan) { navigate('/scan'); return }
 
+    // Local Pro Preview changes premium UI only; it never unlocks live Coach replies.
+    if (isLocalProPreview && serverScan?.isPro !== true) {
+      const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
+      setMessages(prev => [...prev, userMsg, { role: 'assistant', content: LOCAL_PRO_PREVIEW_COACH_NOTICE }])
+      setCoachPhoto(null)
+      setInput('')
+      return
+    }
+
     // Show the submitted question first, then offer Max. The protected AI
     // endpoint remains premium-only and is never called for non-members.
-    if (!isPremium) {
+    if (coachAccessMode === 'paywall') {
       if (messages.some(message => message.paywall)) return
       const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
       setMessages(prev => [...prev, userMsg, {

@@ -28,7 +28,6 @@ const FEATURES = [
   { name: 'Progress Timeline', free: 'Last 4 scans', premium: 'Full history' },
   { name: 'Before & After Comparison', free: false, premium: true },
   { name: 'Product Recommendations', free: 'Generic', premium: 'Personalized' },
-  { name: 'Daily Check-In (full)', free: 'Posture only', premium: true },
   { name: 'Priority Support', free: false, premium: true },
 ]
 

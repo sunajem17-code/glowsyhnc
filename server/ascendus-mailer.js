@@ -14,7 +14,7 @@ const crypto          = require('crypto')
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
 const supabase = supabaseKey
   ? createClient(process.env.SUPABASE_URL, supabaseKey)
   : null

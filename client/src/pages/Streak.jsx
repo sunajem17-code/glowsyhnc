@@ -174,6 +174,8 @@ export default function Streak() {
   }, [checkins, serverCheckins, streak.lastDate, monthPrefix])
 
   const current = Math.max(0, Number(streak.current) || 0)
+  const faceCurrent = Math.max(0, Number(streak.face?.current) || 0)
+  const physiqueCurrent = Math.max(0, Number(streak.physique?.current) || 0)
 
   return (
     <MotionPage className="px-4 pb-8" style={{ background: PAGE_BG, color: TEXT }}>
@@ -198,8 +200,21 @@ export default function Streak() {
         <p className="font-mono font-bold leading-none mt-1" style={{ fontSize: 54, color: '#F4D989', textShadow: '0 0 20px rgba(198,168,92,0.45)' }}>{current}</p>
         <p className="font-heading font-bold text-lg mt-1" style={{ color: TEXT }}>{current === 1 ? 'day in a row' : 'days in a row'}</p>
         <p className="font-body text-sm mt-2 max-w-[260px]" style={{ color: TEXT_DIM }}>
-          {current > 0 ? 'You’re building a habit. Keep showing up tomorrow.' : 'Complete your daily check-in to start your streak.'}
+          {current > 0 ? 'You’re building a habit. Come back tomorrow after your scan to keep it going.' : 'Complete a scan to start your streak.'}
         </p>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 mb-4" aria-label="Scan streaks">
+        {[
+          { label: 'Face scans', value: faceCurrent, longest: Number(streak.face?.longest) || 0 },
+          { label: 'Physique scans', value: physiqueCurrent, longest: Number(streak.physique?.longest) || 0 },
+        ].map(item => (
+          <div key={item.label} className="rounded-2xl p-4" style={{ background: '#101010', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p className="font-body text-xs" style={{ color: TEXT_DIM }}>{item.label}</p>
+            <p className="font-mono font-bold text-2xl mt-1" style={{ color: '#F4D989' }}>{item.value} <span className="font-body text-sm font-medium" style={{ color: TEXT_DIM }}>day streak</span></p>
+            <p className="font-body text-[11px] mt-1" style={{ color: TEXT_DIM }}>Best: {item.longest} days</p>
+          </div>
+        ))}
       </section>
 
       <div className="space-y-4">

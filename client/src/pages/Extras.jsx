@@ -1,23 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CheckSquare, CalendarCheck, Settings, ChevronRight } from 'lucide-react'
+import { CalendarCheck, Settings, ChevronRight } from 'lucide-react'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
-const CARDS = [
-  {
-    to: '/checkin',
-    icon: CheckSquare,
-    title: 'Daily To-Do',
-    subtitle: 'Track habits and tasks',
-  },
-  {
+const CARDS = [{
     to: '/face-body-routine',
     icon: CalendarCheck,
     title: 'Face & Body Routine',
     subtitle: 'Build your glow-up plan',
-  },
-]
+  }]
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -56,7 +48,7 @@ export default function Extras() {
     >
       <div
         className="flex flex-col px-5 pb-10"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 100px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
       >
         {/* Header */}
         <motion.div

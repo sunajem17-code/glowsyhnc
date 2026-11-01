@@ -29,7 +29,7 @@ export async function requestNotificationPermission() {
 }
 
 // ── Streak reminder — fires daily at 8pm ─────────────────────────────────────
-// Call this once after login and after each successful check-in.
+// Call this once after login to remind users to complete their daily scan.
 // We schedule one notification per day — if one already exists, cancel and reschedule.
 
 const STREAK_NOTIF_ID = 1001
@@ -50,7 +50,7 @@ export async function scheduleStreakReminder() {
         {
           id: STREAK_NOTIF_ID,
           title: "Don't break your streak 🔥",
-          body: "Check in today to keep your progress alive. 30 seconds is all it takes.",
+          body: 'Complete a scan today to keep your progress streak alive.',
           schedule: { on: { hour: 20, minute: 0 }, repeats: true },
           sound: 'default',
         },

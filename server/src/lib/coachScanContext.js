@@ -2,6 +2,7 @@ const { persistCompletedScan } = require('./durableScan')
 const crypto = require('node:crypto')
 const db = require('../db')
 const { getSupabase } = require('../supabase')
+const { persistCompletedScan } = require('./durableScan')
 
 const KIND = 'server_analysis_v1'
 const timeout = (promise, ms = 8000) => {

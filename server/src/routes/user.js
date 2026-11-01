@@ -15,10 +15,25 @@ router.get('/profile', authMiddleware, async (req, res) => {
     ? null
     : db.prepare('SELECT id, email, name, avatar_url, subscription_tier, created_at FROM users WHERE id = ?').get(req.userId)
 
-  // Streak: Supabase in production, SQLite in local dev
+  // The existing aggregate streak comes from Supabase in production. Per-scan
+  // type counters are maintained by the scoring routes in SQLite, so merge
+  // those columns when available to keep the face/physique streaks visible
+  // after profile refreshes without changing subscription/profile authority.
+  const localStreak = db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.userId)
   const streak = isConfigured()
     ? await getStreakByUserId(req.userId)
-    : db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.userId)
+    : localStreak
+  const streakWithScanTypes = streak && localStreak
+    ? {
+        ...streak,
+        face_current_streak: localStreak.face_current_streak,
+        face_longest_streak: localStreak.face_longest_streak,
+        face_last_scan_date: localStreak.face_last_scan_date,
+        physique_current_streak: localStreak.physique_current_streak,
+        physique_longest_streak: localStreak.physique_longest_streak,
+        physique_last_scan_date: localStreak.physique_last_scan_date,
+      }
+    : streak || localStreak
 
   if (!sbUser && !localUser) return res.status(404).json({ error: 'User not found' })
 
@@ -37,7 +52,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     promoRedeemed: sbUser?.promo_redeemed === true || sbUser?.promo_redeemed === 1 || false,
   }
 
-  res.json({ user, streak })
+  res.json({ user, streak: streakWithScanTypes })
 })
 
 router.put('/profile', authMiddleware, async (req, res) => {

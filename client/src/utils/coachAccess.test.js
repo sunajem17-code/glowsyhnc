@@ -6,8 +6,8 @@ test('local preview settings do not bypass server-authoritative premium access',
   assert.equal(getCoachAccessMode({ isPremium: true, localPreviewEnabled: true }, true, 'localhost'), 'server')
 })
 
-test('local Pro Preview routes messages to the server for real AI replies', () => {
-  assert.equal(getCoachAccessMode({ isPremium: false, localPreviewEnabled: true }, true, 'localhost'), 'server')
+test('local Pro Preview changes UI only and does not grant Coach API access', () => {
+  assert.equal(getCoachAccessMode({ isPremium: false, localPreviewEnabled: true }, true, 'localhost'), 'paywall')
 })
 
 test('paid accounts continue to use the server coach', () => {

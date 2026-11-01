@@ -1,13 +1,29 @@
 import { balancedPhysiqueAreas } from '../utils/physiqueBalance'
 import { withoutRatings } from '../utils/prosConsText'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { triggerHaptic } from '../utils/haptics'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 import './AppearanceBreakdown.css'
 
 function getPhysiqueAnalysis(scan) {
   return { ...scan?.aiScore, ...scan?.aiScore?.physiqueResult, ...scan?.aiScore?.physiqueScore, ...scan?.physiqueScore }
+}
+
+function cleanFindingCopy(value = '') {
+  return String(value)
+    .replace(/\s*\(?\d+(?:\.\d+)?\s*\/\s*10\)?/g, '')
+    .split(/(?<=[.!?])\s+/)
+    .filter(sentence => !/\b(?:score|rating)\b|app[’']s strong range|measurement of your body-fat percentage or health/i.test(sentence))
+    .join(' ')
+    .trim()
+}
+
+function cleanFinding(finding) {
+  return {
+    ...finding,
+    title: cleanFindingCopy(finding.title),
+    explanation: cleanFindingCopy(finding.explanation),
+    advice: cleanFindingCopy(finding.advice),
+  }
 }
 
 const ACTIONABLE_METRICS = [
@@ -17,7 +33,7 @@ const ACTIONABLE_METRICS = [
   { key: 'frame_width', label: 'Frame Width' },
 ]
 
-const OUT_OF_SCOPE_LANGUAGE = /\b(?:lighting|light(?:ing)?|camera|crop(?:ped)?|pose|angle|clothing|shirt|outfit|framing|shot|facial?|face|presentation)\b/i
+const OUT_OF_SCOPE_LANGUAGE = /\b(?:photo|picture|image|lighting|light(?:ing)?|camera|crop(?:ped)?|pose|angle|clothing|shirt|outfit|framing|shot|facial?|face|presentation|in this frame|in this scan)\b/i
 const PHYSIQUE_FOCUS_LANGUAGE = /\b(?:muscle|chest|shoulders?|back|arms?|legs?|abs?|abdomen|waist|taper|lean(?:ness)?|body fat|frame|width|clavicles?|torso|posture|proportions?)\b/i
 const POSITIVE_LANGUAGE = /\b(?:strong|well[- ]developed|balanced|good|clear|proportionate|broad|wide|lean|muscular|above average|stands out)\b/i
 const NEGATIVE_LANGUAGE = /\b(?:weak|soft|limited|needs? work|can improve|room to improve|low|poor|below(?: average)?|underdeveloped|less|lacks?|narrow|uneven|not enough|not strongly|little|mild|can be improved)\b/i
@@ -125,8 +141,7 @@ function getSavedFindings(points, page, scan, usedMetrics) {
     })
 }
 
-export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = true, navigation = null }) {
-  const navigate = useNavigate()
+export default function PhysiqueBreakdown({ scan }) {
   const [page, setPage] = useState('pros')
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? (analysis.physique_strengths ?? analysis.strengths ?? analysis.keyStrengths) : (analysis.physique_improvements ?? analysis.improvements ?? analysis.keyWeaknesses)
@@ -141,13 +156,20 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
     }
     if (!pointsByMetric.has(finding.metric.key)) pointsByMetric.set(finding.metric.key, finding)
   }
-  const points = metricPoints.length ? metricPoints.map(metric => {
+  const points = metricPoints.length ? [
+    ...metricPoints.map(metric => {
     const fallback = scoreBasedFinding(metric, metric.score, page)
-    const saved = pointsByMetric.get(metric.key)
-    if (!saved) return fallback
-    if (page !== 'pros') return saved
-    return { ...fallback, ...saved, explanation: saved.explanation || fallback.explanation, advice: saved.advice || fallback.advice }
-  }) : [...pointsByMetric.values(), ...additionalFindings].slice(0, 2)
+      const saved = pointsByMetric.get(metric.key)
+      if (!saved) return fallback
+      const cleanedSaved = cleanFinding(saved)
+      if (!cleanedSaved.title || (!cleanedSaved.explanation && !cleanedSaved.advice)) return fallback
+      if (page !== 'pros') return cleanedSaved
+      return { ...fallback, ...cleanedSaved, explanation: cleanedSaved.explanation || fallback.explanation, advice: cleanedSaved.advice || fallback.advice }
+    }),
+    ...additionalFindings
+      .map(cleanFinding)
+      .filter(finding => finding.title && (finding.explanation || finding.advice)),
+  ] : [...pointsByMetric.values(), ...additionalFindings].map(cleanFinding).slice(0, 2)
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
@@ -165,7 +187,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
               <span className="physique-analysis-bullet" aria-hidden="true">•</span>
               <div className="physique-analysis-copy">
                 <span className="appearance-point-title">{withoutRatings(pointTitle)}</span>
-                <p>{withoutRatings(explanation)}</p>
+                {explanation && <p>{withoutRatings(explanation)}</p>}
                 {advice && <p className="appearance-point-advice"><span>Try</span> {withoutRatings(advice)}</p>}
               </div>
             </li>
@@ -173,14 +195,5 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
           : <li className="physique-analysis-item appearance-points-empty">{page === 'pros' ? 'The saved scan is missing the details needed to show your strengths. Take a new scan to refresh this breakdown.' : 'This scan did not identify a specific area to improve.'}</li>}
       </ul>
     </section>
-    {navigation}
-    {showCoach && <button type="button" className="appearance-coach-button" onClick={() => {
-      triggerHaptic()
-      navigate('/coach', { state: {
-        scanId,
-        coachPhotoUrl: coachPhotoUrl || scan?.bodyPhotoUrl || scan?.facePhotoUrl || null,
-        coachPrompt: 'Please help me understand my physique scan and suggest practical next steps based on the visible results.',
-      } })
-    }}>Ask AI Coach</button>}
   </div>
 }

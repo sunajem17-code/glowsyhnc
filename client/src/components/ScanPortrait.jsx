@@ -158,12 +158,12 @@ const Callout = memo(function Callout({ feature, badge, point, rect, complete, p
   </div>
 })
 
-export default function ScanPortrait({ photo, points, meshPathD, frame, onImageReady, captureFrame }) {
+export default function ScanPortrait({ photo, points, meshPathD, frame, onImageReady, captureFrame, visualOnly = false }) {
   const [size,setSize]=useState(null)
   const ref=useRef(null)
   const rect=usePortraitRect(ref)
   const uid=useId().replace(/:/g,'')
-  const features=useMemo(()=>referenceFeatures(points,size?size.width/size.height:1),[points,size])
+  const features=useMemo(()=>visualOnly?[]:referenceFeatures(points,size?size.width/size.height:1),[points,size,visualOnly])
   const t=useMemo(()=>size?(captureFrame?coverTransform(size.width,size.height,captureFrame.width,captureFrame.height):portraitTransform(size.width,size.height,points)):{sx:1,sy:1,tx:0,ty:0},[size,points,captureFrame])
   const projected=useMemo(()=>features.map(f=>projectPoint(f.point,t)),[features,t])
   const transform=`translate(${t.tx} ${t.ty}) scale(${t.sx} ${t.sy})`
@@ -178,7 +178,7 @@ export default function ScanPortrait({ photo, points, meshPathD, frame, onImageR
           style={{width:t.sx*100+'%',height:t.sy*100+'%',left:t.tx+'%',top:t.ty+'%',opacity:size?1:0}}/>
         {size && <FaceMesh path={meshPathD} transform={transform}/>}
         {size && <FocusGeometry feature={features[active]} transform={transform} uid={uid} active={active} compiling={frame.compiling}/>}
-        {size && points && active<0 && <div className="reference-intro-sweep"/>}
+        {size && (points || visualOnly) && active<0 && <div className="reference-intro-sweep"/>}
       </div>
     </div>
   return <>

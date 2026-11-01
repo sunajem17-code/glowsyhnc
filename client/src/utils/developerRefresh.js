@@ -17,7 +17,6 @@ export function getDeveloperRefreshState() {
     currentScan: null,
     currentPlan: null,
     checkins: [],
-    todayCheckin: null,
     streak: { current: 0, longest: 0, lastDate: null },
     pendingFacePhoto: null,
     pendingBodyPhoto: null,

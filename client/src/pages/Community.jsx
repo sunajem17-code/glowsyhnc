@@ -663,7 +663,8 @@ function PostShareSheet({ post, onClose }) {
 const RateMeScorer = memo(function RateMeScorer({ post, onRate }) {
   const [score, setScore] = useState(() => Number(post.user_rating ?? 5))
   const [submitting, setSubmitting] = useState(false)
-  const [justVoted, setJustVoted] = useState(false)
+  const [ratingMode, setRatingMode] = useState(() => post.user_rating != null ? 'average' : 'your')
+  const [savedAverage, setSavedAverage] = useState(() => post.avg_rating)
   const [voteError, setVoteError] = useState('')
   const scoreRef = useRef(Number(post.user_rating ?? 5))
   const submittingRef = useRef(false)
@@ -682,10 +683,11 @@ const RateMeScorer = memo(function RateMeScorer({ post, onRate }) {
     setSubmitting(true)
     setVoteError('')
     try {
-      await onRate(post.id, score)
-      setJustVoted(true)
+      const result = await onRate(post.id, score)
+      const average = Number(result?.avg_rating ?? post.avg_rating ?? score)
+      setSavedAverage(average)
+      setRatingMode('average')
       triggerHaptic()
-      window.setTimeout(() => setJustVoted(false), 2200)
     } catch { setVoteError('Could not save your rating. Try again.') }
     finally {
       submittingRef.current = false
@@ -697,26 +699,24 @@ const RateMeScorer = memo(function RateMeScorer({ post, onRate }) {
     <div className="px-4 pb-4" onClick={event => event.stopPropagation()}>
       <div>
           <div className="relative mb-2 min-h-7">
-            <span className="absolute right-0 top-1/2 -translate-y-1/2 font-heading font-bold text-[22px]" style={{ color: GOLD, letterSpacing: '-0.02em' }}>
-              {score.toFixed(1)} <span className="text-sm text-secondary">/ 10</span>
+            <span className="flex min-h-7 items-center justify-between gap-2 font-heading font-bold" style={{ color: GOLD, letterSpacing: '-0.02em' }} aria-live="polite">
+              <span className="text-sm text-secondary">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span key={ratingMode} initial={{ opacity: 0, y: 5, filter: 'blur(2px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, y: -5, filter: 'blur(2px)' }} transition={{ duration: 0.18, ease: EASE_STANDARD }} className="inline-block">
+                    {ratingMode === 'average' ? 'Average Rating:' : 'Your Rating:'}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+              <span className="text-[22px] inline-flex items-baseline">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span key={ratingMode} initial={{ opacity: 0, y: 5, filter: 'blur(2px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, y: -5, filter: 'blur(2px)' }} transition={{ duration: 0.18, ease: EASE_STANDARD }} className="inline-block">
+                    {(ratingMode === 'average' ? Number(savedAverage ?? post.avg_rating ?? score) : score).toFixed(1)}
+                  </motion.span>
+                </AnimatePresence>
+                <span className="text-sm text-secondary">/ 10</span>
+              </span>
             </span>
             {submitting && <span className="absolute left-0 top-1/2 -translate-y-1/2 font-body text-[11px] text-secondary">Saving…</span>}
-            <AnimatePresence>
-              {justVoted && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.6, x: -10, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 0.85, x: 8 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-                  className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-1.5 font-heading text-xs font-semibold whitespace-nowrap"
-                  style={{ color: GOLD }}
-                  aria-live="polite"
-                >
-                  <motion.span initial={{ rotate: -35, scale: 0 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 16 }}><Check size={15} /></motion.span>
-                  Saved
-                </motion.span>
-              )}
-            </AnimatePresence>
           </div>
           <div className="relative flex h-7 items-center">
             <input
@@ -740,24 +740,10 @@ const RateMeScorer = memo(function RateMeScorer({ post, onRate }) {
                 const nextScore = Number(event.target.value)
                 scoreRef.current = nextScore
                 setScore(nextScore)
-                setJustVoted(false)
               }}
               className="community-rating-slider block w-full touch-pan-x disabled:opacity-50"
               style={{ background: `linear-gradient(to right, ${GOLD} ${((score - 1) / 9) * 100}%, rgba(255,255,255,0.16) ${((score - 1) / 9) * 100}%)` }}
             />
-            <AnimatePresence>
-              {justVoted && (
-                <motion.span
-                  initial={{ opacity: 0.8, scale: 0.25 }}
-                  animate={{ opacity: 0, scale: 2.4 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.65, ease: 'easeOut' }}
-                  className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border"
-                  style={{ left: `${((score - 1) / 9) * 100}%`, borderColor: 'rgba(198,168,92,0.9)', boxShadow: '0 0 14px rgba(198,168,92,0.35)' }}
-                  aria-hidden="true"
-                />
-              )}
-            </AnimatePresence>
           </div>
           {voteError && <p className="mt-2 font-body text-xs" style={{ color: '#F87171' }} role="alert">{voteError}</p>}
       </div>
@@ -1139,7 +1125,7 @@ export default function Community() {
         rating_count: data.rating_count,
         user_rating: data.user_rating,
       } : current)
-      return true
+      return data
     } catch (error) {
       throw error
     }
@@ -1159,7 +1145,7 @@ export default function Community() {
           <Loader2 size={24} className="animate-spin" style={{ color: GOLD }} />
         </div>
       ) : posts.length === 0 ? (
-        <div aria-hidden="true" className="min-h-[calc(100vh-160px)]" style={{ background: '#000' }} />
+        <div aria-hidden="true" className="min-h-[calc(100vh-160px)]" />
       ) : (
         <>
         {posts.map(post => (

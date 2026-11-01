@@ -2,6 +2,7 @@ const express = require('express')
 const { createAIClient, getAIKey, cacheNamespace } = require('../lib/aiProvider')
 const aiSchemas = require('../lib/aiSchemas')
 const coachScans = require('../lib/coachScanContext')
+const recordSuccessfulScanStreak = require('../lib/recordScanStreak')
 const { EYE_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
 const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
@@ -38,6 +39,12 @@ function hashImages(faceB64, bodyB64, sideB64 = null) {
     .update(cacheNamespace() + '||v17_expanded_face_catalog||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
+}
+
+async function finishScanWithStreak(scanId, userId, result, scanType = 'face') {
+  const completed = await coachScans.finishScan(scanId, userId, result)
+  const streak = recordSuccessfulScanStreak(userId, scanType)
+  return streak ? { ...completed, streak } : completed
 }
 
 // Full SHA256 over complete image content — used for the persistent Supabase cache.
@@ -921,7 +928,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       if (cached) {
         const hydrated = withPotentialScore(cached)
         scoreCache.set(cacheKey, hydrated)
-        return res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(hydrated, previousResult, scanBenchmark, completedScanId)))
+        return res.json(await finishScanWithStreak(completedScanId, req.userId, retainStableFindingLanguage(hydrated, previousResult, scanBenchmark, completedScanId)))
       }
       scoreCache.delete(cacheKey)
       console.log('[aiScore] L1 entry missing valid appearance analysis — rescoring')
@@ -939,7 +946,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
         const cached = withPotentialScore(rebound)
         scoreCache.set(cacheKey, cached)
-        return res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(cached, previousResult, scanBenchmark, completedScanId)))
+        return res.json(await finishScanWithStreak(completedScanId, req.userId, retainStableFindingLanguage(cached, previousResult, scanBenchmark, completedScanId)))
       }
       console.log('[aiScore] L2 entry missing valid appearance analysis — rescoring')
     }
@@ -1137,7 +1144,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       }
     }
 
-    res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(result, previousResult, scanBenchmark, completedScanId)))
+    res.json(await finishScanWithStreak(completedScanId, req.userId, retainStableFindingLanguage(result, previousResult, scanBenchmark, completedScanId)))
   } catch (err) {
     try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
@@ -1198,7 +1205,7 @@ router.post('/score/physique', verifyToken, resolvePro, claudeLimit, async (req,
       releaseSlot()
     }
 
-    res.json({ physiqueScore: physiqueResult })
+    res.json({ physiqueScore: physiqueResult, streak: recordSuccessfulScanStreak(req.userId, 'physique') })
   } catch (err) {
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
       return res.status(err.status || 503).json({ error: err.code })

@@ -3,7 +3,6 @@ import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
-import { createPortal } from 'react-dom'
 import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
@@ -21,7 +20,6 @@ import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getLockedResultsHeadingStyle, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
-import { getProgressSaveFlight } from '../utils/progressSaveAnimation'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
@@ -1068,49 +1066,6 @@ function PaywallPhysiqueCard() {
   )
 }
 
-// Daily To-Do preview — checklist style matching the Daily Check-In screenshot
-function PaywallDailyTodoCard() {
-  const sections = [
-    {
-      icon: '💧', label: 'Hydration',
-      items: ['Glass of water on wake', 'Hit 8 glasses today', 'Electrolytes after workout'],
-      done: [true, false, false],
-    },
-    {
-      icon: '✨', label: 'Skincare',
-      items: ['AM Routine', 'PM Routine'],
-      done: [false, false],
-    },
-    {
-      icon: '💪', label: 'Exercise',
-      items: ['Mark today\'s gym routine', 'Today\'s jaw exercises'],
-      done: [false],
-    },
-  ]
-  return (
-    <div className="flex flex-col gap-2">
-      {sections.map(({ icon, label, items, done }) => (
-        <div key={label} className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="flex items-center gap-2 mb-2">
-            <span style={{ fontSize: 14 }}>{icon}</span>
-            <p className="font-heading font-bold text-[13px]" style={{ color: '#fff' }}>{label}</p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {items.map((item, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, border: `1.5px solid ${done[i] ? G : 'rgba(255,255,255,0.25)'}`, background: done[i] ? G : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {done[i] && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </div>
-                <p className="font-body text-[11px]" style={{ color: done[i] ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)' }}>{item}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // AI Coach chat preview card
 function PaywallCoachCard() {
   return (
@@ -1132,7 +1087,6 @@ const PAYWALL_CARDS = [
   { title: 'Get your face ratings',    content: () => <PaywallRatingsCard /> },
   { title: 'Get your physique ratings', content: () => <PaywallPhysiqueCard /> },
   { title: 'AI Coach',                 content: () => <PaywallCoachCard /> },
-  { title: 'Daily To-Do',              content: () => <PaywallDailyTodoCard /> },
 ]
 
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
@@ -1394,11 +1348,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const [isDownloadingCard, setIsDownloadingCard] = useState(false)
   const [downloadError, setDownloadError] = useState('')
   const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
-  const [saveFlight, setSaveFlight] = useState(null)
-  const saveFlightIdRef = useRef(0)
   const resultsCardRef = useRef(null)
-  const progressButtonRef = useRef(null)
   const downloadCardRef = useRef(null)
+  const saveProgressButtonRef = useRef(null)
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
@@ -1441,24 +1393,27 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   }
 
   function saveToProgress() {
+    if (progressAdded) return
     if (!saveResult()) return
     triggerHaptic()
     setProgressAdded(true)
-    const openProgress = () => navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
-    if (reduceMotion) {
-      openProgress()
-      return
-    }
-
-    const source = activeView === 'results'
-      ? resultsCardRef.current
-      : document.getElementById(`scan-${activeView}-panel`)
-    const flight = getProgressSaveFlight(
-      source?.getBoundingClientRect(),
-      progressButtonRef.current?.getBoundingClientRect(),
-    )
-    if (flight) setSaveFlight({ ...flight, id: ++saveFlightIdRef.current })
-    else openProgress()
+    const rect = saveProgressButtonRef.current?.getBoundingClientRect()
+    const flameOrigin = rect ? {
+      left: rect.left + rect.width / 2 - 14,
+      top: rect.top + rect.height / 2 - 14,
+      width: 28,
+      height: 28,
+    } : null
+    window.setTimeout(() => {
+      navigate('/timeline', {
+        replace: true,
+        state: {
+          savedScanId: scan?.id,
+          streakCelebration: true,
+          ...(flameOrigin && !reduceMotion ? { streakFlameFlight: true, flameOrigin } : {}),
+        },
+      })
+    }, reduceMotion ? 0 : 360)
   }
 
   async function downloadResultsCard() {
@@ -1550,7 +1505,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const isAppearanceView = unlocked && activeView === 'photo'
 
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="mx-auto flex h-full w-full max-w-[430px] flex-col overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
       {unlocked && (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
@@ -1660,7 +1615,19 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         </motion.div>
 
         {/* CTAs */}
-        {unlocked && activeView === 'photo' && <motion.button
+        {unlocked && activeView !== 'compare' && !savedProgressCard && <motion.button
+          ref={saveProgressButtonRef}
+          whileTap={{ scale: 0.97 }}
+          onClick={saveToProgress}
+          disabled={progressAdded}
+          animate={progressAdded && !reduceMotion ? { scale: [1, 1.025, 1] } : undefined}
+          transition={{ duration: 0.34, ease: 'easeOut' }}
+          className="scan-results-coach-button font-heading font-bold text-[17px]"
+          style={progressAdded ? { background: 'linear-gradient(135deg,#f4d989 0%,#c6a85c 100%)' } : undefined}
+        >
+          {progressAdded ? <><motion.span initial={reduceMotion ? false : { scale: 0.4, rotate: -25 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }}><Check size={19} /></motion.span> Added to Progress</> : 'Add to Progress'}
+        </motion.button>}
+        {unlocked && activeView === 'photo' && savedProgressCard && <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => {
             triggerHaptic()
@@ -1670,19 +1637,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
               coachPrompt: 'Use my face scan and its scores and findings to tell me what to improve first, with specific steps.',
             } })
           }}
-          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
-          style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          className="scan-results-coach-button font-heading font-bold text-[17px]"
         >
           Ask AI Coach
-        </motion.button>}
-        {unlocked && !savedProgressCard && activeView !== 'compare' && <motion.button
-          ref={progressButtonRef}
-          whileTap={{ scale: 0.97 }}
-          onClick={saveToProgress}
-          className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
-          style={{ marginTop: 16, background: GRAD, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-        >
-          {progressAdded ? <><Check size={19} /> Added to Progress</> : 'Add to Progress'}
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && <motion.button
           whileTap={{ scale: 0.97 }}
@@ -1739,40 +1696,6 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
       </div>
-      {saveFlight && typeof document !== 'undefined' && createPortal(
-        <motion.div
-          aria-hidden="true"
-          initial={{ ...saveFlight.from, borderRadius: 30, opacity: 1, rotateZ: 0 }}
-          animate={{ ...saveFlight.to, borderRadius: 18, opacity: 1, rotateZ: -3 }}
-          transition={{ duration: 0.82, ease: [0.2, 0.75, 0.25, 1] }}
-          onAnimationComplete={() => {
-            if (saveFlightIdRef.current !== saveFlight.id) return
-            setSaveFlight(null)
-            navigate('/timeline', { replace: true, state: { savedScanId: scan?.id } })
-          }}
-          style={{ position: 'fixed', zIndex: 10000, overflow: 'hidden', background: '#171717', border: '1px solid rgba(198,168,92,0.75)', boxShadow: '0 12px 36px rgba(0,0,0,0.5), 0 0 22px rgba(198,168,92,0.24)', pointerEvents: 'none', transformOrigin: 'center center' }}
-        >
-          <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 0, scale: 0.28 }}
-            transition={{ delay: 0.22, duration: 0.34, ease: 'easeIn' }}
-            style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(180deg, transparent 38%, rgba(0,0,0,0.86) 100%)' }}
-          >
-            {facePhoto && <img src={facePhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />}
-            <div style={{ position: 'relative', color: '#D1B76D', font: '800 12px "Plus Jakarta Sans", sans-serif', letterSpacing: '0.16em' }}>ASCENDUS</div>
-            <div style={{ position: 'relative', color: '#fff', font: '800 42px "Plus Jakarta Sans", sans-serif' }}>{metrics[0]?.value?.toFixed(1) ?? '—'}</div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.45 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.24, type: 'spring', stiffness: 420, damping: 22 }}
-            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1B76D' }}
-          >
-            <Check size={23} strokeWidth={3} />
-          </motion.div>
-        </motion.div>,
-        document.body,
-      )}
     </motion.div>
   )
 }
@@ -1816,7 +1739,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
       .catch(() => {})
   }, [])
 
-  // When arriving from paywall=1 (e.g. daily check-in tap), show the paywall
+  // When arriving from paywall=1, show the paywall
   // even without a scan. Without this guard, the component returns null and the
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'

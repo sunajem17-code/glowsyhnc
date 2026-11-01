@@ -96,6 +96,12 @@ db.exec(`
     current_streak INTEGER DEFAULT 0,
     longest_streak INTEGER DEFAULT 0,
     last_checkin_date TEXT,
+    face_current_streak INTEGER DEFAULT 0,
+    face_longest_streak INTEGER DEFAULT 0,
+    face_last_scan_date TEXT,
+    physique_current_streak INTEGER DEFAULT 0,
+    physique_longest_streak INTEGER DEFAULT 0,
+    physique_last_scan_date TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
@@ -185,6 +191,12 @@ const migrations = [
   // that only existed on Supabase, never SQLite, so the local fallback
   // path silently never persisted an unsubscribe at all.
   "ALTER TABLE users ADD COLUMN email_unsubscribed INTEGER DEFAULT 0",
+  "ALTER TABLE streaks ADD COLUMN face_current_streak INTEGER DEFAULT 0",
+  "ALTER TABLE streaks ADD COLUMN face_longest_streak INTEGER DEFAULT 0",
+  "ALTER TABLE streaks ADD COLUMN face_last_scan_date TEXT",
+  "ALTER TABLE streaks ADD COLUMN physique_current_streak INTEGER DEFAULT 0",
+  "ALTER TABLE streaks ADD COLUMN physique_longest_streak INTEGER DEFAULT 0",
+  "ALTER TABLE streaks ADD COLUMN physique_last_scan_date TEXT",
 ]
 for (const sql of migrations) {
   try { db.exec(sql) } catch { /* column already exists */ }

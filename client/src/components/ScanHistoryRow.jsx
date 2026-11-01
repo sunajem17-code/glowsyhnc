@@ -22,7 +22,7 @@ function fmt(dateStr) {
 }
 
 // ── Single scan row ───────────────────────────────────────────────────────────
-export default function ScanHistoryRow({ scan, onTap, index, showChevron = true, canAccessProUi = true }) {
+export default function ScanHistoryRow({ scan, onTap, index, showChevron = true, canAccessProUi = true, animateEntry = true, hidePhotoPlaceholder = false }) {
   const assessment = isCurrentAssessment(scan) ? scan.aiScore.assessment : null
   const scorePresentation = assessment ? assessmentPresentation(assessment) : null
   const profileGender = useStore(state => state.gender || state.userProfile?.gender || state.user?.gender)
@@ -48,9 +48,9 @@ export default function ScanHistoryRow({ scan, onTap, index, showChevron = true,
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 12 }}
+      initial={animateEntry ? { opacity: 0, y: 12 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.25 }}
+      transition={animateEntry ? { delay: index * 0.04, duration: 0.32, ease: [0.22, 1, 0.36, 1] } : { duration: 0 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => { triggerHaptic(); onTap(scan) }}
       className="w-full text-left flex items-center gap-4"
@@ -63,16 +63,16 @@ export default function ScanHistoryRow({ scan, onTap, index, showChevron = true,
       {/* Thumbnail */}
       <div style={{
         width: 58, height: 58, borderRadius: 14, overflow: 'hidden',
-        background: '#222', flexShrink: 0,
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: !thumb && hidePhotoPlaceholder ? 'transparent' : '#222', flexShrink: 0,
+        border: !thumb && hidePhotoPlaceholder ? '1px solid transparent' : '1px solid rgba(255,255,255,0.08)',
       }}>
         {thumb ? (
           <img src={thumb} alt="Scan" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
+        ) : !hidePhotoPlaceholder ? (
           <div className="w-full h-full flex items-center justify-center">
             <Camera size={20} style={{ color: 'rgba(255,255,255,0.2)' }} />
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Info */}

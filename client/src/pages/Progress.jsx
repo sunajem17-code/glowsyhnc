@@ -13,62 +13,13 @@ import { triggerHaptic } from '../utils/haptics'
 import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages } from '../utils/coachChat'
 import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
 import { prepareCoachPhoto } from '../utils/coachPhoto'
-import { getCoachAccessMode, loadCoachAccess } from '../utils/coachAccess'
+import { getCoachAccessMode, loadCoachAccess, LOCAL_PRO_PREVIEW_COACH_NOTICE } from '../utils/coachAccess'
 
 const STARTER_PROMPTS = [
   "What's holding my score back the most?",
   'Give me a daily routine to look better',
   'What should I fix first to attract more?',
 ]
-
-function coachIntroKey(userId) {
-  return `adonis-intro-seen:${userId}`
-}
-
-function persistCoachIntroSeen(userId) {
-  if (!userId) return
-  try {
-    const key = coachIntroKey(userId)
-    localStorage.setItem(key, 'true')
-    sessionStorage.setItem(key, 'true')
-  } catch {}
-}
-
-function getCoachIntroMode(userId) {
-  if (!userId) return 'pending'
-
-  const key = coachIntroKey(userId)
-  try {
-    const alreadySeen = localStorage.getItem(key) === 'true' || sessionStorage.getItem(key) === 'true'
-    const savedConversation = JSON.parse(
-      localStorage.getItem(`adonis-chat:${userId}`)
-      || sessionStorage.getItem(`adonis-chat:${userId}`)
-      || 'null',
-    )
-    const hasSavedMessages = Boolean(
-      savedConversation?.conversationId
-      && Array.isArray(savedConversation.messages)
-      && savedConversation.messages.length,
-    )
-
-    // A saved thread is still being restored after the coach entitlement
-    // check. Keep the welcome screen hidden during that gap so it cannot flash
-    // over the returning conversation.
-    if (hasSavedMessages) {
-      return 'pending'
-    }
-
-    if (alreadySeen) {
-      return 'seen'
-    }
-
-    return 'first'
-  } catch {
-    // If browser storage is unavailable, prefer a stable, non-replaying coach
-    // over showing the intro again on every remount.
-    return 'seen'
-  }
-}
 
 function persistCoachMessages(userId, storageId, serverConversationId, accessMode, messages) {
   if (!userId || !storageId || !messages.length) return
@@ -120,25 +71,24 @@ function TypingIndicator() {
   )
 }
 
-
-// Animated typing bubble — streams the text character by character
 function TypewriterBubble({ text, onDone }) {
   const [displayed, setDisplayed] = useState('')
-  const [showCursor, setShowCursor] = useState(true)
-  const idx = useRef(0)
+  const [isTyping, setIsTyping] = useState(true)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (idx.current < text.length) {
-        setDisplayed(text.slice(0, idx.current + 1))
-        idx.current++
-      } else {
-        clearInterval(interval)
-        setShowCursor(false)
-        onDone?.()
+    let index = 0
+    const interval = window.setInterval(() => {
+      index += 1
+      setDisplayed(text.slice(0, index))
+      if (index >= text.length) {
+        window.clearInterval(interval)
+        setIsTyping(false)
+        onDoneRef.current?.()
       }
     }, 22)
-    return () => clearInterval(interval)
+    return () => window.clearInterval(interval)
   }, [text])
 
   return (
@@ -151,17 +101,12 @@ function TypewriterBubble({ text, onDone }) {
       <div className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
         style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.95)', borderRadius: '18px 18px 18px 4px' }}>
         {displayed}
-        {showCursor && (
-          <motion.span
-            animate={{ opacity: [1, 0] }}
-            transition={{ duration: 0.5, repeat: Infinity }}
-            style={{ color: GOLD, marginLeft: 1 }}
-          >|</motion.span>
-        )}
+        {isTyping && <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.5, repeat: Infinity }} style={{ color: GOLD, marginLeft: 1 }}>|</motion.span>}
       </div>
     </motion.div>
   )
 }
+
 
 function MessageBubble({ msg, onGetMax, scans }) {
   const isAI = msg.role === 'assistant'
@@ -218,8 +163,6 @@ export default function Progress() {
     ? scans?.find(scan => [scan.id, scan.serverScanId, scan.aiScore?.scanId].some(id => id != null && String(id) === String(selectedScanId)))
     : null
   const coachScan = selectedScan || latestScan
-  const [introMode, setIntroMode] = useState(() => getCoachIntroMode(user?.id))
-  const introOwnerRef = useRef(user?.id ?? null)
   const [serverScan, setServerScan] = useState(null)
   const conversationRef = useRef(null)
   const storageConversationRef = useRef(null)
@@ -227,7 +170,6 @@ export default function Progress() {
   const [messagesOwner, setMessagesOwner] = useState(null)
 
   const [messages, setMessages] = useState([])
-  const [showTypewriter, setShowTypewriter] = useState(() => introMode === 'first')
   const [chipsVisible, setChipsVisible] = useState(false)
   const [input, setInput] = useState(location.state?.coachPrompt || '')
   const [coachPhoto, setCoachPhoto] = useState(location.state?.coachPhotoUrl || null)
@@ -236,24 +178,7 @@ export default function Progress() {
   const inputRef = useRef(null)
   const coachAccessMode = getCoachAccessMode({
     isPremium: serverScan?.isPro === true,
-    localPreviewEnabled: false,
   })
-
-  useEffect(() => {
-    if (!user?.id) return
-    if (introOwnerRef.current === user.id) {
-      // Keep render initializers pure; React Strict Mode may call them twice.
-      // Persist the first visit after mount so remounts do not replay it.
-      persistCoachIntroSeen(user.id)
-      return
-    }
-    introOwnerRef.current = user.id
-    const nextIntroMode = getCoachIntroMode(user.id)
-    persistCoachIntroSeen(user.id)
-    setIntroMode(nextIntroMode)
-    setShowTypewriter(nextIntroMode === 'first')
-    setChipsVisible(false)
-  }, [user?.id])
 
   useEffect(() => {
     if (location.state?.coachPrompt) setInput(location.state.coachPrompt)
@@ -284,7 +209,7 @@ export default function Progress() {
     setServerScan(null)
     conversationRef.current = null
     storageConversationRef.current = null
-    loadCoachAccess({native:isNative(),userId:user?.id,claimedPremium:accountPremium,
+    loadCoachAccess({native:isNative(),userId:user?.id,claimedPremium:accountPremium && !isLocalProPreview,
       checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context(),
     }).then(data => {
       if (!active) return
@@ -292,16 +217,21 @@ export default function Progress() {
       // Server-backed replies require server entitlement. Local Pro Preview is
       // device-only and may restore its own locally generated conversation.
       if (data?.isPro === true) {
-        const restored = restoreConversation(data?.isPro === true)
-        if (!restored) setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
-      } else {
-        setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
+        restoreConversation(data?.isPro === true)
       }
     }).catch(error => {
       if (active) {
-        setServerScan({ status: 'unavailable', accessError: error?.message || 'Could not verify your subscription. Please retry.' })
-        setMessages([{role:'assistant',content:error?.message || 'Could not verify your subscription. Please retry.'}])
-        setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
+        const purchaseNotFound = error?.status === 402 && /No active subscription found/i.test(error?.message || '')
+        if (purchaseNotFound) {
+          // A confirmed no-subscription response is a purchase gate, not a
+          // verification outage. Let the next submitted question use the
+          // normal paywall reply and its Get Ascendus Max button.
+          setServerScan({ isPro: false, status: latestScan ? 'no_subscription' : 'no_scan', hasCompletedScan: Boolean(latestScan) })
+          setMessages([])
+        } else {
+          setServerScan({ status: 'unavailable', accessError: error?.message || 'Could not verify your subscription. Please retry.' })
+          setMessages([{ role: 'assistant', content: error?.message || 'Could not verify your subscription. Please retry.' }])
+        }
       }
     })
     return () => { active = false; requestGenerationRef.current += 1 }
@@ -340,11 +270,9 @@ export default function Progress() {
     const selectedScanPhotoId = selectedScanId || coachScan?.serverScanId || coachScan?.aiScore?.scanId || coachScan?.id || null
     followLatest()
     setInput('')
-    setChipsVisible(false)
     const generation = requestGenerationRef.current
 
     if (sendState === 'needs-scan') {
-      setShowTypewriter(false)
       const [userMessage, assistantMessage] = getScanRequiredMessages(txt)
       setMessages(prev => [...prev, userMessage])
       persistCoachMessages(user?.id, storageConversationRef.current, conversationRef.current, coachAccessMode, [...messages, userMessage])
@@ -356,9 +284,22 @@ export default function Progress() {
       return
     }
 
+    // Local Pro Preview changes premium UI only; it never unlocks live Coach replies.
+    if (isLocalProPreview && serverScan?.isPro !== true) {
+      const userMessage = { role: 'user', content: txt }
+      const assistantMessage = {
+        role: 'assistant',
+        content: LOCAL_PRO_PREVIEW_COACH_NOTICE,
+      }
+      const next = [...messages, userMessage, assistantMessage]
+      setMessages(next)
+      persistCoachMessages(user?.id, storageConversationRef.current, null, 'local-preview-unavailable', next)
+      setCoachPhoto(null)
+      return
+    }
+
     // Server-backed replies remain protected by the server's entitlement check.
     if (coachAccessMode === 'paywall') {
-      setShowTypewriter(false)
       const userMessage = { role: 'user', content: txt, ...(coachPhoto ? { image: coachPhoto, ...(selectedScanPhotoId ? { scanPhotoId: selectedScanPhotoId } : {}) } : {}) }
       setMessages(prev => [...prev, userMessage])
       persistCoachMessages(user?.id, storageConversationRef.current, null, coachAccessMode, [...messages, userMessage])
@@ -444,25 +385,13 @@ export default function Progress() {
       {/* Messages */}
       <div data-coach-scroll className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 pt-5 pb-2">
 
-        {/* Animate the greeting only on the first visit. Returning to an empty
-            chat keeps the same welcome content without replaying the intro. */}
-        {!hasHistory && introMode === 'first' && showTypewriter && (
+        {!hasHistory && (
           <TypewriterBubble text={ADONIS_GREETING} onDone={() => setChipsVisible(true)} />
-        )}
-        {!hasHistory && introMode === 'seen' && (
-          <div className="flex items-end mb-4">
-            <div
-              className="max-w-[80%] px-4 py-3 text-[14px] font-body leading-relaxed"
-              style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.95)', borderRadius: '18px 18px 18px 4px' }}
-            >
-              {ADONIS_GREETING}
-            </div>
-          </div>
         )}
 
         {/* Starter prompts sit directly beneath Adonis's opening message. */}
         <AnimatePresence>
-          {(introMode === 'first' && chipsVisible || introMode === 'seen') && !loading && !hasHistory && (
+          {chipsVisible && !loading && !hasHistory && (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -470,12 +399,12 @@ export default function Progress() {
               transition={{ duration: 0.25 }}
               className="flex flex-wrap gap-2 mt-1 pb-4"
             >
-              {STARTER_PROMPTS.map((chip, i) => (
+              {STARTER_PROMPTS.map((chip, index) => (
                 <motion.button
                   key={chip}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.07 }}
+                  transition={{ delay: index * 0.07 }}
                   onClick={() => { triggerHaptic(); send(chip) }}
                   disabled={serverScan === null}
                   className="text-[13px] font-body px-4 py-2 rounded-2xl"

@@ -133,7 +133,7 @@ export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi =
           <MoveHorizontal size={20} strokeWidth={2.5} />
         </button>
       </div>
-      {!candidates.length && scan && <p role="status" className="mt-3 text-center font-body text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
+      {!candidates.length && scan && comparisonType !== 'physique' && <p role="status" className="mt-3 text-center font-body text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
       {pickerOpen && <div className="fixed inset-0 z-[100] flex flex-col bg-black" role="dialog" aria-modal="true" aria-labelledby="scan-picker-title">
         <header className="flex shrink-0 items-center justify-between px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
             <div>
@@ -144,7 +144,7 @@ export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi =
         </header>
         <div aria-label="Saved Progress scans" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" style={{ touchAction: 'pan-y' }}>
           {candidates.length ? candidates.map((candidate, index) => <ScanHistoryRow key={candidate.id} scan={candidate} index={index} showChevron={false} canAccessProUi={canAccessProUi} onTap={() => { setSelectedScanId(candidate.id); setPickerOpen(false); setPosition(50) }} />)
-            : <p role="status" className="py-12 text-center font-body text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
+            : comparisonType !== 'physique' ? <p role="status" className="py-12 text-center font-body text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p> : null}
         </div>
       </div>}
     </section>

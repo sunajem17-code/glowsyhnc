@@ -173,13 +173,19 @@
   font:400 14px/1.5 Inter,sans-serif;
   overflow-wrap:anywhere
 }
-.appearance-coach-button {
+.appearance-coach-button,
+.scan-results-coach-button {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
   flex-shrink:0;
   width:100%;
-  min-height:66px;
+  min-height:64px;
   margin-top:16px;
+  padding:20px;
   border:0;
-  border-radius:22px;
+  border-radius:16px;
   background:linear-gradient(135deg,#d4b96a 0%,#c6a85c 100%);
   color:#0a0a0a;
   box-shadow:0 4px 24px rgba(198,168,92,.35);
@@ -201,10 +207,10 @@
 
 /* Physique results fit phone viewports without reserving an empty fixed card. */
 .physique-dashboard .appearance-points {
-  flex: 0 1 auto;
-  height: auto;
-  min-height: 160px;
-  max-height: min(470px, 48dvh);
+  flex: 0 0 470px;
+  height: 470px;
+  min-height: 470px;
+  max-height: none;
   width: 100%;
 }
-.physique-dashboard .appearance-points-list { flex: 0 1 auto; }
+.physique-dashboard .appearance-points-list { flex: 1 1 auto; }

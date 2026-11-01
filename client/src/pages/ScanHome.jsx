@@ -8,6 +8,7 @@ import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
 import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { hasCompletedStartingPoint, startingPointCompletionKey } from '../utils/onboardingStartup.js'
 
 const DAILY_SCAN_LIMIT = 3
 
@@ -124,18 +125,32 @@ export default function ScanHome() {
   const proScanCount = useStore(s => s.proScanCount)
   const proScanFirstAt = useStore(s => s.proScanFirstAt)
   const setScanLaunching = useStore(setScanLaunchingSelector)
+  const user = useStore(s => s.user)
+  const startingPointCompletedByUser = useStore(s => s.startingPointCompletedByUser)
+  const completeStartingPoint = useStore(s => s.completeStartingPoint)
   const [cardIdx, setCardIdx] = useState(0)
   const [direction, setDirection] = useState(1)
   const [showHint, setShowHint] = useState(() => {
-    try { return !sessionStorage.getItem('asc_scan_hint_shown') } catch { return false }
+    try {
+      const saved = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
+      return !hasCompletedStartingPoint({
+        user,
+        startingPointCompletedByUser: saved.state?.startingPointCompletedByUser,
+      })
+    } catch { return true }
   })
 
   function dismissHint() {
-    try { sessionStorage.setItem('asc_scan_hint_shown', '1') } catch {}
+    completeStartingPoint()
     setShowHint(false)
   }
 
-  // Hide permanently once the user has completed their first scan
+  useEffect(() => {
+    const key = startingPointCompletionKey(user)
+    setShowHint(!hasCompletedStartingPoint({ user, startingPointCompletedByUser }))
+  }, [user?.id, startingPointCompletedByUser])
+
+  // Hide permanently once the user has completed their first scan.
   useEffect(() => {
     if (scans?.length > 0) dismissHint()
   }, [scans?.length])

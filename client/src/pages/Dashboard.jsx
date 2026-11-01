@@ -2,7 +2,7 @@ import { isCurrentAssessment, assessmentPresentation, formatAssessmentRange } fr
 import { useState, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Zap, Activity, Droplets, Flame, ChevronRight, TrendingUp, X, Gift, Clock, ArrowLeftRight, Sparkles } from 'lucide-react'
+import { Camera, Activity, Droplets, Flame, ChevronRight, TrendingUp, X, Gift, Clock, ArrowLeftRight, Sparkles } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
@@ -33,7 +33,6 @@ export default function Dashboard() {
   const scans         = useStore(s => s.scans)
   const currentPlan   = useStore(s => s.currentPlan)
   const streak        = useStore(s => s.streak)
-  const todayCheckin  = useStore(s => s.todayCheckin)
   const isPremium     = usePremiumUiAccess()
   const referralCount = useStore(s => s.referralCount)
   const [bannerDismissed, setBannerDismissed] = useState(false)
@@ -493,20 +492,7 @@ export default function Dashboard() {
       </motion.button>
 
       {/* CTA Buttons */}
-      <motion.div {...fadeUp(0.27)} className="grid grid-cols-2 gap-3 mb-8">
-        <button
-          onClick={() => { triggerHaptic(); navigate('/checkin') }}
-          className="py-3.5 rounded-2xl font-heading font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-          style={{
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-primary)',
-            boxShadow: 'var(--shadow-card)',
-          }}
-        >
-          <Zap size={15} style={{ color: '#E8A000' }} />
-          Check-In
-        </button>
+      <motion.div {...fadeUp(0.27)} className="mb-8">
         <button
           onClick={() => { triggerHaptic(); navigate('/scan/capture') }}
           className="btn-primary py-3.5 flex items-center justify-center gap-2"

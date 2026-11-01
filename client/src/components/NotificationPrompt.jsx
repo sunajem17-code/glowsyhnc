@@ -38,7 +38,7 @@ export default function NotificationPrompt({ enabled, userId }) {
   return createPortal(<div className="fixed inset-0 z-[20020] flex items-center justify-center bg-black/70 px-6">
     <section role="dialog" aria-modal="true" aria-labelledby="notification-title" className="w-full max-w-sm rounded-3xl border border-[#C6A85C]/40 bg-[#111] p-6 text-white shadow-2xl">
       <h2 id="notification-title" className="text-2xl font-bold">Keep your progress going</h2>
-      <p className="mt-3 text-sm text-white/70">Get a daily reminder at 8 PM to check in, plus a reminder when your next scan is ready.</p>
+      <p className="mt-3 text-sm text-white/70">Get a daily reminder at 8 PM to complete a scan, plus a reminder when your next scan is ready.</p>
       {error && <p role="alert" className="mt-3 text-sm text-amber-200">{error}</p>}
       <button autoFocus disabled={busy} onClick={enable} className="mt-6 w-full rounded-2xl bg-[#C6A85C] py-4 font-bold text-black disabled:opacity-60">{busy ? 'Enabling…' : 'Enable notifications'}</button>
       <button disabled={busy} onClick={dismiss} className="mt-2 w-full py-3 text-sm text-white/60">Not now</button>
