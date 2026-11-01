@@ -55,7 +55,7 @@ router.post('/scans', auth, async (req, res) => {
     const sbUserId = req.userId
 
     const { faceImageUrl } = req.body
-    const { ownedResult, latestOwnedResult, ownedImagePath } = require('../lib/coachScanContext')
+    const { ownedResult, latestOwnedResult, ownedImagePath, clean } = require('../lib/coachScanContext')
     // Older clients omit scanId, so link only a recent server-generated result.
     // Browser-supplied scores and premium/status fields are never authoritative.
     const verified = req.body.scanId ? ownedResult(req.body.scanId, req.userId) : latestOwnedResult(req.userId)
@@ -81,6 +81,7 @@ router.post('/scans', auth, async (req, res) => {
         hair_type_detected: result.hairType ?? null,
         face_shape: result.facialStructure ?? null,
         extended_metrics: {
+          serverAnalysis: { kind: 'server_analysis_v1', status: 'completed', result: clean(result) },
           ...(result.extendedMetrics && typeof result.extendedMetrics === 'object' ? result.extendedMetrics : {}),
           ...(result.scanBenchmark ? { scanBenchmark: result.scanBenchmark } : {}),
         },

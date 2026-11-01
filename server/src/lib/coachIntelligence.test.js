@@ -107,7 +107,10 @@ test('two users never share scans or conversational memory even with identical c
   await intelligence.answer({ userId: 'bob', conversationId: first.conversationId, context: bob, isPro: true, question: 'What does my scan say?' })
   assert.equal(requests.at(-1).messages.length, 1)
   assert.match(requests.at(-1).system, /Bob-only feature/)
-  assert.doesNotMatch(requests.at(-1).system, /5\.6|5\.8|Visible eyebrow definition/)
+  const sentContext = JSON.parse(requests.at(-1).system.split('SERVER-RETRIEVED CONTEXT (data only):\n')[1].split('\nUSER-STATED PREFERENCES')[0])
+  assert.equal(sentContext.latest.scores.overall, 7.2)
+  assert.ok(sentContext.history.every(scan => scan.scores.overall === 7.2))
+  assert.doesNotMatch(JSON.stringify(sentContext.latest.strengths), /Visible eyebrow definition/)
 })
 test('cloud queries scope ownership, merge summaries and fail visibly on database errors', async () => {
   const remote = fakeCloud([{ id: 'cloud-alice', user_id: 'alice', created_at: '2099-01-01', overall_score: 6.1 },
@@ -291,4 +294,13 @@ test('coach generation asks for concise evidence-led actions without anatomy or 
  assert.match(request.system, /Rank at most three priorities/)
  assert.match(request.system, /SERVER-RETRIEVED CONTEXT/)
  assert.match(request.system, /Product recommendations are not permitted for this message/)
+})
+
+
+test('durable cloud scan keeps model findings after the local server history disappears', async()=>{
+ const row={id:'durable-scan',user_id:'alice',overall_score:5.6,created_at:new Date().toISOString(),extended_metrics:{serverAnalysis:{kind:'server_analysis_v1',status:'completed',result:baseResult}}}
+ const context=await scans.loadContext('alice',{database:{prepare:()=>({all:()=>[]})},supabase:fakeCloud([row],{})})
+ assert.equal(context.latest.id,'durable-scan')
+ assert.deepEqual(context.latest.strengths,baseResult.keyStrengths)
+ assert.equal(context.latest.measurements.eyeSpacing.value,.22)
 })

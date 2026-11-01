@@ -63,6 +63,13 @@ router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claude
 async function requireCoachAccess(req, res, next) {
   try {
     const context = req.isDemo ? { latest: null } : await loadContext(req.userId)
+    if (typeof req.body?.scanId === 'string') {
+      const selected = await ownedCoachScan(req.body.scanId, req.userId)
+      if (!selected) return res.status(404).json({code:'scan_unavailable',error:'This saved scan is no longer available on the server. Start a new scan to restore coach context.'})
+      context.previous = [context.latest, ...context.previous].filter(scan => scan && scan.id !== selected.scan.id).slice(0,2)
+      context.latest = selected.scan
+      context.status = 'completed'
+    }
     if (!context.latest) return res.status(403).json({ code: 'scan_required', error: 'Scan required — complete a scan to use AI Coach.' })
     // Local preview is already authorized server-side by resolvePro; do not
     // reject it here or the UI can appear unlocked while every chat is blocked.
@@ -90,14 +97,6 @@ router.post('/message', verifyToken, resolvePro, requireCoachAccess, claudeLimit
     // The last user message is new input; prior assistant turns come only from
     // this user's bounded server session, not client-forged conversation data.
     const context = req.coachContext
-    if (typeof req.body.scanId === 'string') {
-      const selected = await ownedCoachScan(req.body.scanId, req.userId)
-      if (!selected) return res.status(404).json({ error: 'The selected scan is unavailable. Return to your results and retry.' })
-      const scan = selected.scan
-      context.previous = [context.latest, ...context.previous].filter(row => row && row.id !== scan.id).slice(0, 2)
-      context.latest = scan
-      context.status = 'completed'
-    }
     const providedImage = parseProvidedImage(req.body.scanPhotoData)
     if (req.body.scanPhotoData && !providedImage) return res.status(400).json({ error: 'The attached scan photo must be a supported image under 1 MB.' })
     const preferences = {}

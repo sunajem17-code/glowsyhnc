@@ -1,3 +1,4 @@
+const { persistCompletedScan } = require('./durableScan')
 const crypto = require('node:crypto')
 const db = require('../db')
 const { getSupabase } = require('../supabase')
@@ -40,8 +41,9 @@ async function finishScan(id, userId, result) {
     .run(JSON.stringify({ kind: KIND, status: 'completed', result }), result.overallScore, result.faceScore, result.groomingScore,
       JSON.stringify({ strengths: result.keyStrengths, improvements: result.keyWeaknesses, recommendation: result.topImprovement }), completedAt, id, userId)
   if (updated.changes !== 1) throw new Error('Completed scan could not be saved')
-  // Cloud summary persistence is handled by the existing save route. Local
-  // server history is available immediately, before its asynchronous upload.
+  // Commit server-owned results before returning them to the phone. A later
+  // photo upload must not be the only thing keeping Coach history durable.
+  await persistCompletedScan(getSupabase(), { id, userId, result, completedAt, clean })
   return { ...result, scanId: id }
 }
 function failScan(id, userId) {
@@ -147,8 +149,9 @@ async function firstCompletedBenchmark(userId) {
 function normalize(row) {
   const data = parse(row.face_data)
   if (data?.kind === KIND && data.status !== 'completed') return null
-  const result = data?.kind === KIND ? data.result : (data?.result && typeof data.result === 'object' ? data.result : data)
   const extendedMetrics = parse(row.extended_metrics)
+  const durable = extendedMetrics?.serverAnalysis
+  const result = data?.kind === KIND ? data.result : (durable?.kind === KIND && durable.status === 'completed' ? durable.result : (data?.result && typeof data.result === 'object' ? data.result : data))
   const score = result?.overallScore ?? row.overall_score ?? row.glow_score
   if (score == null || !Number.isFinite(Number(score))) return null
   const legacyFace = data?.kind === KIND ? null : result
