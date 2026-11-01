@@ -21,3 +21,22 @@ test('free accounts without local preview remain gated', () => {
 test('local preview cannot enable the coach outside local development', () => {
   assert.equal(getCoachAccessMode({ isPremium: false, localPreviewEnabled: true }, true, 'ascendus.store'), 'paywall')
 })
+
+import { loadCoachAccess } from './coachAccess.js'
+test('existing App Store membership is synced before rechecking coach access', async () => {
+  const calls=[];let reads=0
+  const result=await loadCoachAccess({native:true,userId:'member',loadContext:async()=>{calls.push('context');return {isPro:++reads>1}},checkPurchase:async id=>{assert.equal(id,'member');calls.push('purchase');return true},syncPurchase:async()=>calls.push('sync')})
+  assert.equal(result.isPro,true)
+  assert.deepEqual(calls,['context','purchase','sync','context'])
+})
+test('server members do not need an App Store subscription', async()=>{
+  const result=await loadCoachAccess({native:true,userId:'web-member',loadContext:async()=>({isPro:true}),checkPurchase:()=>assert.fail('unexpected purchase lookup')})
+  assert.equal(result.isPro,true)
+})
+test('failed verification never grants access or becomes a non-member response', async()=>{
+  await assert.rejects(loadCoachAccess({native:true,userId:'member',loadContext:async()=>({isPro:false}),checkPurchase:async()=>true,syncPurchase:async()=>{throw new Error('Verification unavailable')}}),/Verification unavailable/)
+})
+test('non-members keep the server access decision', async()=>{
+  const result=await loadCoachAccess({native:true,userId:'free',loadContext:async()=>({isPro:false}),checkPurchase:async()=>false,syncPurchase:()=>assert.fail('unexpected sync')})
+  assert.equal(result.isPro,false)
+})

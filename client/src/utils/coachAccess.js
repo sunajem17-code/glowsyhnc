@@ -12,3 +12,14 @@ export function getCoachAccessMode(
   if (localPreviewEnabled && isLocalProPreviewAvailable(isDevelopment, hostname)) return 'server'
   return 'paywall'
 }
+
+// Keep coach access server-authorized while reconciling existing App Store purchases.
+export async function loadCoachAccess({ native, userId, checkPurchase, syncPurchase, loadContext }) {
+  const context = await loadContext()
+  if (context?.isPro === true || !native || !userId) return context
+  if (!await checkPurchase(userId)) return context
+  await syncPurchase(userId)
+  const refreshed = await loadContext()
+  if (refreshed?.isPro !== true) throw new Error('Your subscription is active, but coach access has not synced yet. Please retry in a moment.')
+  return refreshed
+}

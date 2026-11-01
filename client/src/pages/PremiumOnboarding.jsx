@@ -1050,17 +1050,11 @@ function StepNotifications({ onNext }) {
     }
   }
 
-  useEffect(() => {
-    if (!isNative()) return
-    // Wait for the slide to render. Cleanup also avoids duplicate requests in Strict Mode.
-    const timer = setTimeout(() => { void enableNotifications() }, 400)
-    return () => clearTimeout(timer)
-  }, [])
 
   function handleEnable() {
     if (requesting.current) return
     triggerHaptic()
-    if (!isNative() || permission !== null) onNext()
+    if (!isNative() || permission === 'granted' || permission === 'denied') onNext()
     else void enableNotifications()
   }
 
@@ -1110,7 +1104,7 @@ function StepNotifications({ onNext }) {
         >
           {loading
             ? <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
-            : isNative() && permission === null ? 'Allow notifications' : 'Continue'}
+            : isNative() && permission !== 'granted' && permission !== 'denied' ? 'Allow notifications' : 'Continue'}
         </motion.button>
         {isNative() && permission === null && !loading && (
           <button onClick={onNext} style={{ width: '100%', padding: 12, color: '#ccc', background: 'none', border: 'none', cursor: 'pointer' }}>Not now</button>

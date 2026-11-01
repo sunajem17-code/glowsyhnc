@@ -1,3 +1,5 @@
+import { loadCoachAccess } from '../utils/coachAccess'
+import { checkProStatus, isNative } from '../utils/iap'
 import useCoachScroll from '../hooks/useCoachScroll'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
@@ -127,7 +129,7 @@ export default function AICoach() {
   const navigate = useNavigate()
   const location = useLocation()
   const selectedScanId = location.state?.scanId
-  const { scans, userProfile, user } = useStore()
+  const { scans, userProfile, user, isPremium: accountPremium } = useStore()
   const latestScan = scans[0]
   const [serverScan, setServerScan] = useState(null)
   const isPremium = serverScan?.isPro === true
@@ -162,7 +164,12 @@ export default function AICoach() {
     setServerScan(null)
     setMessages([{ role: 'assistant', content: 'Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?' }])
     conversationRef.current = null
-    api.coach.context().then(data => {
+    loadCoachAccess({
+      native: isNative(), userId: user?.id,
+      checkPurchase: checkProStatus,
+      syncPurchase: id => api.payments.syncRc(id),
+      loadContext: () => api.coach.context(),
+    }).then(data => {
       if (!active) return
       setServerScan(data)
       // Do not expose locally cached paid coach replies to a non-member.
@@ -172,13 +179,13 @@ export default function AICoach() {
           const saved = JSON.parse(localStorage.getItem(key) || sessionStorage.getItem(key) || 'null')
           if (saved?.conversationId && Array.isArray(saved.messages)) {
             conversationRef.current = saved.serverConversationId || (/^(?:local-preview:|adonis:)/.test(String(saved.conversationId)) ? null : saved.conversationId)
-            setMessages(saved.messages.map(message => ({ ...message, reveal: false })))
+            setMessages(saved.messages.filter(message => !message.paywall && !message.locked).map(message => ({ ...message, reveal: false })))
           }
         } catch { /* private browsing/storage unavailable */ }
       }
-    }).catch(() => { if (active) setServerScan({ status: 'unavailable' }) })
+    }).catch(error => { if (active) { setServerScan({ status: 'unavailable' }); setError(error?.message || 'Could not verify coach access. Please retry.') } })
     return () => { active = false; requestGenerationRef.current += 1 }
-  }, [user?.id, latestScan?.id])
+  }, [user?.id, latestScan?.id, accountPremium])
 
   useEffect(() => {
     if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
@@ -210,6 +217,16 @@ export default function AICoach() {
     const msgText = (text || input).trim()
     if (!msgText || loading) return
     if (serverScan === null) return
+    if (serverScan.status === 'unavailable') {
+      setLoading(true)
+      try {
+        const refreshed = await loadCoachAccess({native:isNative(),userId:user?.id,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
+        setServerScan(refreshed)
+        setError('Access checked. Tap send again to submit your question.')
+      } catch(error) { setError(error?.message || 'Could not verify coach access. Please retry.') }
+      finally { setLoading(false) }
+      return
+    }
 
     const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(msgText))
     // No scan → redirect to scan
