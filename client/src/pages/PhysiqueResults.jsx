@@ -109,7 +109,7 @@ function PhysiquePaywall({ photo, scan, onClose, onAscend, onInvite, isPurchasin
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       <div className="flex flex-col items-center px-5 pb-10"
-           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+           style={{ paddingTop: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 56px)` }}>
 
         {/* Close button */}
         <div className="w-full flex justify-end mb-3">
@@ -454,12 +454,12 @@ export default function PhysiqueResults() {
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
       {savedProgressCard && <ShareCard scan={currentScan} facePhotoUrl={downloadPhoto.source === photo && downloadPhoto.status === 'ready' ? downloadPhoto.url : null} cardRef={downloadCardRef} metrics={physiqueCardMetrics} />}
-      <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+      <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 56px)` }}>
         <button
           onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
           aria-label="Go back"
-          className="absolute left-4 top-3 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform z-10"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+          className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform z-10"
+          style={{ top: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 20px)`, background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
         >
           <ChevronLeft size={18} className="text-primary" />
         </button>
@@ -524,7 +524,7 @@ export default function PhysiqueResults() {
         </motion.div>
       </motion.div>
 
-      <div className="w-full px-5 pb-10">
+      <div className="w-full px-5" style={{paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))'}}>
         {!savedProgressCard && (
           <motion.button
             whileTap={{ scale: 0.97 }}

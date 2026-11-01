@@ -152,7 +152,7 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = tru
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
-  return <div className="appearance-dashboard">
+  return <div className="appearance-dashboard physique-dashboard">
     <div role="tablist" aria-label="Physique points" className="appearance-page-switch">
       <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => setPage('pros')}>Pros</button>
       <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => setPage('cons')}>Cons</button>

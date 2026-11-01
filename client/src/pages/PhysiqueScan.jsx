@@ -1205,14 +1205,14 @@ const BODY_ANALYSIS_STAGES = ['V-Taper', 'Shoulders', 'Frame', 'Muscle Definitio
 function PhysiqueAnalyzingScreen({ photo, slow, onComplete }) {
   const [stage, setStage] = useState(0)
   const sweepCount = useRef(0)
-  return <div className="physique-analysis-screen">
+  return <div className="physique-analysis-screen" style={{'--physique-safe-top': isNative() ? '48px' : '16px', '--physique-safe-bottom': isNative() ? '34px' : '16px'}}>
     <style>{`
       .physique-analysis-screen {
         box-sizing: border-box;
         width: 100%; height: 100%; min-height: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: clamp(12px, 3dvh, 24px); text-align: center; overflow: hidden;
-        padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+        padding: max(var(--physique-safe-top), env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(var(--physique-safe-bottom), env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
       }
       .physique-analysis-screen > [role="status"] { flex-shrink: 0; max-width: 100%; }
       .physique-analysis-photo {
@@ -1229,10 +1229,15 @@ function PhysiqueAnalyzingScreen({ photo, slow, onComplete }) {
         .physique-analysis-photo { width: min(52%, 398px); }
       }
       @keyframes physique-laser-sweep {
-        from { transform: translateY(0); }
-        to { transform: translateY(calc(100% - 2px)); }
+        from { top: 0; }
+        to { top: calc(100% - 3px); }
       }
-      .physique-laser-track { animation: physique-laser-sweep 1.8s linear infinite; }
+      .physique-laser-track {
+        position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 3;
+        pointer-events: none; background: linear-gradient(90deg, transparent, #c6a85c 15%, #fff6d5 50%, #c6a85c 85%, transparent);
+        box-shadow: 0 0 10px 2px #c6a85cbb; will-change: top;
+        animation: physique-laser-sweep 1.8s linear infinite;
+      }
       @media (prefers-reduced-motion: reduce) {
         .physique-laser-track { animation-duration: 6s; }
       }
@@ -1244,14 +1249,13 @@ function PhysiqueAnalyzingScreen({ photo, slow, onComplete }) {
     <div className="physique-analysis-photo">
       <img src={photo} alt="Body photo being analyzed"/>
       <div className="absolute inset-0 pointer-events-none">
-        <div className="physique-laser-track absolute inset-0"
+        <div className="physique-laser-track"
           onAnimationIteration={event => {
             if (event.target !== event.currentTarget || event.animationName !== 'physique-laser-sweep') return
             sweepCount.current += 1
             if (sweepCount.current >= BODY_ANALYSIS_STAGES.length) onComplete?.()
             setStage(previous => Math.min(previous + 1, BODY_ANALYSIS_STAGES.length - 1))
           }}>
-          <div style={{height:2,background:`linear-gradient(90deg,transparent,${GOLD} 20%,#fff2c5 50%,${GOLD} 80%,transparent)`,boxShadow:`0 0 15px 4px ${GOLD}88`}}/>
         </div>
       </div>
     </div>
