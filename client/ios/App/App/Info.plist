@@ -2,26 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>localhost</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-			<!-- Live-reload dev server (see capacitor.config.ts) — plain HTTP
-			     to the Mac's LAN IP, so iOS's default ATS block needs this
-			     scoped exception. Update the IP here if it changes; remove
-			     this whole block before any real App Store build. -->
-			<key>10.103.66.52</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-		</dict>
-	</dict>
 	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -49,11 +29,11 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Ascendus uses your camera to capture photos for AI-powered facial analysis and to run a live TrueDepth face scan that measures facial geometry.</string>
+	<string>Ascendus uses your camera to capture photos for AI-powered face and physique analysis and to run a live TrueDepth face scan that measures facial geometry.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Ascendus uses Face ID for secure account authentication.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ascendus accesses your photo library so you can upload a photo for facial analysis and looksmax scoring.</string>
+	<string>Ascendus accesses your photo library so you can choose a photo for face or physique analysis.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Ascendus saves your scan photos to your photo library.</string>
 	<key>UILaunchStoryboardName</key>

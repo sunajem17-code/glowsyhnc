@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Check, X, ChevronLeft, Lock, Users, Share2, CheckCircle, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
-import PromoModal from '../components/PromoModal'
 import { isNative, purchasePro, restorePurchases, initRevenueCat } from '../utils/iap'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -28,7 +27,6 @@ const FEATURES = [
   { name: 'Full 12-Week Action Plan', free: 'First only', premium: true },
   { name: 'Progress Timeline', free: 'Last 4 scans', premium: 'Full history' },
   { name: 'Before & After Comparison', free: false, premium: true },
-  { name: 'HairMaxx AI Simulator', free: false, premium: true },
   { name: 'Product Recommendations', free: 'Generic', premium: 'Personalized' },
   { name: 'Daily Check-In (full)', free: 'Posture only', premium: true },
   { name: 'Priority Support', free: false, premium: true },
@@ -42,12 +40,11 @@ const TESTIMONIALS = [
 
 export default function Premium() {
   const navigate = useNavigate()
-  const { setIsPremium, isPremium, logout, updateUser } = useStore()
+  const { setIsPremium, isPremium, logout } = useStore()
   const [subscribingNow, setSubscribingNow] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
-  const [showPromo, setShowPromo] = useState(false)
   const [referralCount, setReferralCount] = useState(0)
   const [referralCode, setReferralCode]   = useState(null)
   const [unlocking, setUnlocking]         = useState(false)
@@ -303,17 +300,6 @@ export default function Premium() {
           <p className="text-center text-[11px] font-body mb-2" style={{ color: RED }}>{checkoutError}</p>
         )}
 
-        {/* Promo code link — web only (Apple IAP does not support external promo codes) */}
-        {!isNative() && (
-          <button
-            onClick={() => setShowPromo(true)}
-            className="w-full mb-4 font-body text-[12px] text-center transition-opacity hover:opacity-70"
-            style={{ color: 'rgba(198,168,92,0.5)' }}
-          >
-            Have a promo code?
-          </button>
-        )}
-
         {/* ── Referral unlock section ──────────────────────────────────── */}
         <div
           className="rounded-2xl p-4 mb-5"
@@ -566,22 +552,6 @@ export default function Premium() {
         </p>
       </div>
 
-      {/* Promo modal */}
-      <AnimatePresence>
-        {showPromo && (
-          <PromoModal
-            onClose={() => setShowPromo(false)}
-            onSuccess={() => {
-              // Same fix as Results.jsx's PaywallSheet and OnboardingFinalSteps —
-              // PromoModal doesn't touch the store itself, the caller has to.
-              setIsPremium(true)
-              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
-              setShowPromo(false)
-              navigate(-1)
-            }}
-          />
-        )}
-      </AnimatePresence>
     </MotionPage>
   )
 }

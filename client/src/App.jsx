@@ -28,7 +28,6 @@ const DailyCheckin   = lazy(() => import('./pages/DailyCheckin'))
 const Streak         = lazy(() => import('./pages/Streak'))
 const Profile        = lazy(() => import('./pages/Profile'))
 const Premium        = lazy(() => import('./pages/Premium'))
-const HairMaxx       = lazy(() => import('./pages/HairMaxx'))
 const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
 const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'))
 const Terms          = lazy(() => import('./pages/Terms'))
@@ -71,8 +70,8 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/auth" replace />
 }
 
-// Where to land right after onboarding finishes. finishOnboarding() and
-// handlePromoSuccess() in PremiumOnboarding.jsx set this flag synchronously
+// Where to land right after onboarding finishes. finishOnboarding() sets this
+// flag synchronously
 // BEFORE flipping hasOnboarded (which swaps this whole <Routes> tree in from
 // the onboarding catch-all below), so this route reads it on the very first
 // render of the real app tree — deterministic, no race against an async
@@ -252,7 +251,6 @@ export default function App() {
                 <Route path="streak" element={<Streak />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="premium" element={<Navigate to="/unlock?paywall=1" replace />} />
-                <Route path="hairmaxx" element={<HairMaxx />} />
                 <Route path="leaderboard" element={<Leaderboard />} />
                 <Route path="compare" element={<Compare />} />
                 <Route path="history" element={<ScanHistory />} />

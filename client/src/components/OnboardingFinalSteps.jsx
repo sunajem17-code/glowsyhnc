@@ -11,7 +11,6 @@ import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from './CategoryCard'
-import PromoModal from './PromoModal'
 
 const G = GOLD
 const GOLD_GRAD = GOLD_GRADIENT
@@ -236,15 +235,14 @@ function OverallCard({ scan }) {
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
-// ── Exit-intent: seven-day free trial, preserving the original offer shell ──
+// ── Exit-intent: three-day free trial, preserving the original offer shell ──
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
 // is deliberately no "only show once, skip straight through afterward" path.
 // An earlier version gated this behind a persisted flag so only the first-
 // ever tap saw the offer and every tap after that skipped straight to a
 // free/limited-access exit; that was a real bypass and has been removed.
-// Same modal-shell pattern as PromoModal.jsx (backdrop + centered
-// gold-bordered card) for visual consistency with the other overlay already
-// used on this exact screen.
+// Same backdrop and gold-bordered card style as the other overlay on this
+// screen.
 //
 // Apple eligibility and the store product determine availability and renewal
 // terms. Never fall back to a paid discount under free-trial wording.
@@ -289,7 +287,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-[80] flex items-center justify-center px-6"
+      className="fixed inset-0 z-[80] flex items-center justify-center px-4"
       style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}
       onClick={(e) => { if (!busy && e.target === e.currentTarget) onDecline() }}
     >
@@ -298,7 +296,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         animate={{ opacity: 1, scale: 1,    y: 0  }}
         exit={{    opacity: 0, scale: 0.94, y: 12 }}
         transition={{ duration: 0.22, ease: EASE_STANDARD }}
-        className="w-full max-w-[320px] rounded-2xl p-6 text-center"
+        className="w-full max-w-[400px] rounded-3xl p-8 text-center"
         style={{
           background: '#111111',
           border: '1px solid rgba(198,168,92,0.22)',
@@ -309,7 +307,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           <button
             onClick={onDecline}
             disabled={busy}
-            className="w-7 h-7 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
             style={{ background: 'rgba(255,255,255,0.07)' }}
             aria-label="Close"
           >
@@ -318,25 +316,25 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </div>
 
         <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
           style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.25)' }}
         >
-          <Tag size={35} style={{ color: G }} />
+          <Tag size={40} style={{ color: G }} />
         </div>
 
-        <p className="font-heading font-bold text-[20px] text-white leading-tight mb-2">
-          Wait, before you go
+        <p className="font-heading font-bold text-[20px] text-white leading-tight tracking-[-0.025em] whitespace-nowrap mb-2.5">
+          Try It First, We'll Impress You
         </p>
-        <p className="font-body text-[11px] font-semibold tracking-[0.16em] mb-3"
+        <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trial ? '7 DAYS FREE · MONTHLY PLAN' : 'MONTHLY FREE TRIAL'}
+          3 DAYS FREE
         </p>
-        <p className="font-body text-[13px] leading-relaxed mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking your trial eligibility…' : trial ? 'Your first 7 days are completely free' : 'This trial is not available for your account on this device'}
+        <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
+          {checking ? 'Checking your trial eligibility…' : '3 days on us • No payment today • Cancel anytime'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-heading font-bold text-[26px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
+          <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
         </div>}
 
         {trial && <p className="font-body text-[11px] leading-relaxed mb-3" style={{ color: DIM }}>
@@ -349,18 +347,18 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         <button
           onClick={startTrial}
           disabled={busy || checking || !trial}
-          className="w-full py-3.5 rounded-2xl font-heading font-bold text-[14px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 7 days free' : 'Trial unavailable'}
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : 'Start 3 days free'}
         </button>
       </motion.div>
     </motion.div>
   )
 }
 
-export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing = false, error = '' }) {
+export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchasing = false, error = '' }) {
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -388,16 +386,14 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
     snapTo(cardIdx)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardIdx, containerW])
-  const [showPromo, setShowPromo] = useState(false)
   const [showDiscountOffer, setShowDiscountOffer] = useState(false)
   const [claimError, setClaimError] = useState('')
   const setIsPremium = useStore(s => s.setIsPremium)
-  const updateUser   = useStore(s => s.updateUser)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
   // it, skip straight through" state. There is intentionally no way to exit
   // this screen into any free/limited-access view; the only forward paths
-  // are purchase, referral, or a promo code.
+  // are purchase or referral.
   function handleCloseAttempt() {
     triggerHaptic()
     setClaimError('')
@@ -412,11 +408,12 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
   }
 
   async function handleClaimOffer(result) {
-    await api.payments.syncRc(result.customerInfo?.originalAppUserId)
     useStore.getState().setUpgradeWelcomePending(true)
     setIsPremium(true)
     setShowDiscountOffer(false)
-    onPromoSuccess?.()
+    onUpgradeComplete?.()
+    api.payments.syncRc(result.customerInfo?.originalAppUserId)
+      .catch(err => console.error('[purchase] RevenueCat sync failed after verified purchase:', err?.message))
   }
 
   const cards = [
@@ -562,40 +559,7 @@ export function StepScoresWaiting({ onAscend, onPromoSuccess, scan, isPurchasing
           <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'underline' }}>Terms of Use</a>
         </p>
 
-        {/* Promo code entry — web only, same as Premium.jsx/ScanUnlockGate.jsx/
-            Results.jsx (Apple IAP doesn't support external promo codes, so this
-            must never appear in a native build). Reuses the existing
-            PromoModal/redeem endpoint rather than a new one-off input. */}
-        {!isNative() && (
-          <button
-            onClick={() => setShowPromo(true)}
-            disabled={isPurchasing}
-            className="w-full mt-2 py-2 font-body text-[12px] text-center transition-opacity hover:opacity-70 disabled:opacity-30"
-            style={{ color: 'rgba(198,168,92,0.5)' }}
-          >
-            Have a promo code?
-          </button>
-        )}
       </div>
-
-      <AnimatePresence>
-        {showPromo && (
-          <PromoModal
-            onClose={() => setShowPromo(false)}
-            onSuccess={() => {
-              // PromoModal stopped mutating the store itself a while back —
-              // every caller owns its own setIsPremium now (see Results.jsx's
-              // PaywallSheet for the same fix). This one was still missing
-              // it, so redeeming here showed the success animation and then
-              // just navigated on with isPremium still false.
-              setIsPremium(true)
-              updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
-              setShowPromo(false)
-              onPromoSuccess?.()
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showDiscountOffer && (

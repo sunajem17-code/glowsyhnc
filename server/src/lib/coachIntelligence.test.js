@@ -234,15 +234,15 @@ test('duplicate in-flight conversation requests are blocked without losing the c
  assert.equal(scans.ownedImagePath('scan/alice/%2e%2e%2fbob.png','alice'),null)
 })
 
-test('HTTP local preview does not bypass paid coach access', async () => {
+test('HTTP local preview grants coach access only to the configured localhost owner', async () => {
   const oldMode = process.env.NODE_ENV, oldOwners = process.env.LOCAL_PRO_PREVIEW_USER_IDS
   database.prepare("UPDATE users SET subscription_tier = 'free', is_pro = 0, coach_messages_used = 3 WHERE id IN ('alice','bob')").run()
   try {
     process.env.NODE_ENV = 'development'; process.env.LOCAL_PRO_PREVIEW_USER_IDS = 'alice'
     const context = await fetch(`${base}/coach/context`, { headers: { Authorization: `Bearer ${signToken('alice')}` } })
     const state = await context.json()
-    assert.equal(state.isPro, false); assert.equal(state.access, 'local_preview')
-    assert.equal((await post({ messages: [{ role: 'user', content: 'What does my scan say?' }] })).status, 403)
+    assert.equal(state.isPro, true); assert.equal(state.access, 'local_preview')
+    assert.equal((await post({ messages: [{ role: 'user', content: 'What does my scan say?' }] })).status, 200)
     assert.equal((await post({ messages: [{ role: 'user', content: 'Hello' }] }, 'bob')).status, 403)
     process.env.NODE_ENV = 'production'
     assert.equal((await post({ messages: [{ role: 'user', content: 'Hello' }] })).status, 403)

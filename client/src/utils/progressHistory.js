@@ -66,6 +66,33 @@ export function getProgressTrendAxisTicks(locked = false) {
   return locked ? [0, 2, 4, 6, 8, 10] : undefined
 }
 
+function hasItems(value) {
+  return Array.isArray(value) && value.length > 0
+}
+
+// Keep detailed findings when combining a cloud history row with its
+// device-saved scan. The cloud row remains authoritative for overlapping
+// scalar fields, while absent/empty detail arrays fall back to the device copy.
+export function mergeScanAiScore(primary, fallback) {
+  if (!primary && !fallback) return null
+  const merged = { ...(fallback || {}), ...(primary || {}) }
+  for (const key of ['appearanceAnalysis', 'keyStrengths', 'keyWeaknesses', 'faceMetrics', 'faceSubScores']) {
+    const first = primary?.[key]
+    const second = fallback?.[key]
+    if (first == null || (Array.isArray(first) && first.length === 0)) {
+      if (second != null) merged[key] = second
+    } else if (key === 'appearanceAnalysis' && first && second) {
+      // Keep any richer cached content from either copy without allowing an
+      // incomplete remote object to erase the device's saved breakdown.
+      merged[key] = { ...second, ...first }
+      for (const listKey of ['strengths', 'improvementOpportunities', 'positiveObservations', 'recommendedActions', 'products']) {
+        if (!hasItems(first[listKey]) && hasItems(second[listKey])) merged[key][listKey] = second[listKey]
+      }
+    }
+  }
+  return merged
+}
+
 export function formatProgressTrendLabels(series) {
   const dateParts = series.map(point => {
     const date = new Date(point.timestamp)
@@ -83,7 +110,14 @@ export function formatProgressTrendLabels(series) {
 }
 
 export function mergeProgressHistory(remoteScans, localScans, currentScan) {
-  const rows = [...remoteScans]
+  // Rows returned by the authenticated scan-history endpoint are server-owned
+  // records. Their database id is therefore also the id accepted by the
+  // appearance-analysis endpoint, even if older clients did not store a
+  // separate `serverScanId` field locally.
+  const rows = remoteScans.map(row => ({
+    ...row,
+    serverScanId: row.serverScanId ?? row.aiScore?.scanId ?? row.id,
+  }))
   for (const local of localScans) {
     const scan = currentScan?.id === local.id ? currentScan : local
     const overall = isPhysiqueProgressScan(scan)
@@ -106,17 +140,22 @@ export function mergeProgressHistory(remoteScans, localScans, currentScan) {
         facePhotoUrl: match.facePhotoUrl ?? match.face_photo_url ?? match.face_image_url ?? localPhoto,
         face_image_url: match.face_image_url ?? match.face_photo_url ?? localPhoto,
         localMediaScanId: scan.id,
+        serverScanId: match.serverScanId ?? match.aiScore?.scanId ?? match.id ?? scan.serverScanId ?? scan.aiScore?.scanId,
         gender: match.gender ?? scan.gender ?? null,
         tier: match.tier ?? scan.tier ?? scan.aiScore?.tier ?? null,
-        aiScore: match.aiScore ?? scan.aiScore ?? null,
+        aiScore: mergeScanAiScore(match.aiScore, scan.aiScore),
+        appearanceAnalysis: match.appearanceAnalysis ?? scan.appearanceAnalysis ?? scan.aiScore?.appearanceAnalysis,
+        keyStrengths: hasItems(match.keyStrengths) ? match.keyStrengths : (scan.keyStrengths ?? scan.aiScore?.keyStrengths),
+        keyWeaknesses: hasItems(match.keyWeaknesses) ? match.keyWeaknesses : (scan.keyWeaknesses ?? scan.aiScore?.keyWeaknesses),
       })
       continue
     }
     // Unselected local scans should not be published into Progress, but they
     // can still carry the IndexedDB photo key for a matching cloud history row.
-    if (!local.progressSavedAt && !isPhysiqueProgressScan(local)) continue
+    if (!local.progressSavedAt) continue
     rows.push({
       id: scan.id,
+      serverScanId: scan.serverScanId ?? scan.aiScore?.scanId ?? null,
       scanType: isPhysiqueProgressScan(scan) ? 'physique' : 'face',
       created_at: date,
       overall_score: overall,
@@ -124,7 +163,10 @@ export function mergeProgressHistory(remoteScans, localScans, currentScan) {
       face_score: scan.aiScore?.faceScore,
       grooming_score: scan.aiScore?.groomingScore,
       physiqueScore: scan.physiqueScore ?? scan.aiScore?.physiqueScore ?? null,
-      aiScore: scan.aiScore ?? null,
+      aiScore: mergeScanAiScore(scan.aiScore, null),
+      appearanceAnalysis: scan.appearanceAnalysis ?? scan.aiScore?.appearanceAnalysis,
+      keyStrengths: scan.keyStrengths ?? scan.aiScore?.keyStrengths,
+      keyWeaknesses: scan.keyWeaknesses ?? scan.aiScore?.keyWeaknesses,
       facePhotoUrl: scan.facePhotoUrl ?? scan.bodyPhotoUrl ?? scan.face_photo_url ?? scan.body_photo_url ?? null,
       faceSubScores: scan.aiScore?.faceSubScores ?? null,
       faceData: scan.faceData ?? null,

@@ -4,8 +4,8 @@ import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
-  User, Crown, Ruler, Bell, Palette, Trash2, LogOut,
-  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square, RefreshCw,
+  User, Crown, Bell, Trash2, LogOut,
+  ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
@@ -15,8 +15,7 @@ import { triggerHaptic } from '../utils/haptics'
 import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
 import { useDeleteAccount } from '../utils/useDeleteAccount'
-import { isDeveloperRefreshAvailable, getDeveloperRefreshState } from '../utils/developerRefresh'
-import { isLocalDeveloperPreview } from '../utils/developerUnlock'
+import { isLocalProPreviewAvailable } from '../utils/developerUnlockPreview.js'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -73,6 +72,10 @@ function SettingsRow({ icon: Icon, label, value, onPress, danger, disabled, righ
 function Toggle({ value, onChange }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label="Local Pro Preview"
       onClick={() => { triggerHaptic(); onChange(!value) }}
       className="relative flex-shrink-0 transition-all"
       style={{
@@ -82,7 +85,7 @@ function Toggle({ value, onChange }) {
         transition: 'background 0.2s',
       }}
     >
-      <div
+      <span
         style={{
           position: 'absolute',
           top: 3, left: value ? 21 : 3,
@@ -103,9 +106,7 @@ export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout, setIsPremium, isLocalProPreview, setLocalProPreview,
-    theme, toggleTheme,
-    units, setUnits,
+    user, isGuest, isPremium, logout, isLocalProPreview, setLocalProPreview,
     clearAllScanData,
   } = useStore()
 
@@ -125,7 +126,7 @@ export default function Settings() {
   const [signOutConfirm, setSignOutConfirm] = useState(false)
 
   useEffect(() => {
-    if (!isNative()) { setAppVersion('web'); return }
+    if (!isNative()) return
     CapApp.getInfo()
       .then(info => setAppVersion(`v${info.version} (${info.build})`))
       .catch(() => setAppVersion(''))
@@ -169,21 +170,6 @@ export default function Settings() {
     setClearConfirm(false)
   }
 
-  async function handleDeveloperRefresh() {
-    const confirmed = window.confirm(
-      'Clear local scans, progress, check-ins, and scan photos, then reopen the app after onboarding? Your sign-in, premium status, and onboarding answers will be kept. Cloud data will not be changed.'
-    )
-    if (!confirmed) return
-
-    useStore.setState(getDeveloperRefreshState())
-    await clearAllScanMedia().catch(err => console.warn('[Settings] dev refresh media cleanup failed:', err))
-    for (const key of ['asc_pro_splash_shown', 'asc_reveal_shown', 'asc_post_onboard_dest', 'ascendus_onboarding_draft']) {
-      try { sessionStorage.removeItem(key) } catch {}
-    }
-    window.location.replace(`${window.location.origin}/scan`)
-  }
-
-
   async function openLink(url) {
     if (Capacitor.isNativePlatform()) {
       await Browser.open({ url }).catch(() => {})
@@ -192,9 +178,10 @@ export default function Settings() {
     }
   }
 
-  const isDark = theme === 'dark'
-  const displayName = user?.name ?? (isGuest ? 'Guest' : 'Ascendus User')
-  const displayEmail = user?.email ?? (isGuest ? 'Guest session' : null)
+  const displayName = isGuest ? 'Guest' : (user?.name ?? 'Ascendus User')
+  const displayEmail = isGuest
+    ? 'Temporary session'
+    : (user?.email?.endsWith('@ascendus.internal') ? null : user?.email ?? null)
 
   // ── Delete account — subscription gate ────────────────────────────────────
   if (del.step === 'sub-gate') {
@@ -403,65 +390,32 @@ export default function Settings() {
         <div className="flex flex-col gap-2">
           <SettingsRow
             icon={User}
-            label={displayName}
-            value={displayEmail}
-            onPress={() => navigate('/profile')}
-          />
-          <SettingsRow
-            icon={Crown}
-            label={isLocalProPreview ? 'Local Pro Preview' : isPremium ? 'Ascendus Premium' : 'Free Plan'}
-            value={isLocalProPreview ? 'Pro screens previewed on this development device' : isPremium ? 'Tap to manage or cancel' : 'Tap to upgrade'}
-            onPress={isLocalProPreview ? undefined : handleManageSubscription}
-            rightElement={
-              isLocalProPreview
-                ? <span className="font-heading font-bold text-[10px] px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>LOCAL PREVIEW</span>
-                : isPremium
-                ? <span className="font-heading font-bold text-[11px] px-2 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>✦ PREMIUM</span>
-                : <ChevronRight size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            label={
+              <span className="inline-flex items-center gap-2">
+                {displayName}
+                {isPremium && <span className="font-heading font-bold text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>✦ MAX</span>}
+              </span>
             }
+            value={displayEmail}
+            onPress={isGuest || displayName === 'Guest' ? undefined : () => navigate('/profile')}
           />
-          {isLocalDeveloperPreview() && <SettingsRow
+          {isLocalProPreviewAvailable() && <SettingsRow
             icon={Crown}
             label="Local Pro Preview"
-            value="Unlock Pro screens on this development device only"
             rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
+          />}
+          {isPremium && !isLocalProPreview && <SettingsRow
+            icon={Crown}
+            label="Manage Ascendus Max"
+            value="Manage or cancel membership"
+            onPress={handleManageSubscription}
           />}
         </div>
 
-        {/* ── Preferences ── */}
-        <SectionHeader title="PREFERENCES" />
-        <div className="flex flex-col gap-2">
-          <SettingsRow
-            icon={Palette}
-            label="Dark Mode"
-            value={isDark ? 'On' : 'Off'}
-            rightElement={<Toggle value={isDark} onChange={() => toggleTheme()} />}
-          />
-          <SettingsRow
-            icon={Ruler}
-            label="Units"
-            value={units === 'metric' ? 'Metric (cm)' : 'Imperial (in)'}
-            rightElement={
-              <div className="flex rounded-lg overflow-hidden flex-shrink-0"
-                   style={{ border: '1px solid var(--border)' }}>
-                {['metric', 'imperial'].map(u => (
-                  <button
-                    key={u}
-                    onClick={() => { triggerHaptic(); setUnits(u) }}
-                    className="px-3 py-1.5 font-body font-medium text-[12px] transition-colors"
-                    style={{
-                      background: units === u ? GOLD : 'transparent',
-                      color: units === u ? '#0A0A0A' : 'var(--text-secondary)',
-                    }}
-                  >
-                    {u === 'metric' ? 'cm' : 'in'}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-          {isNative() && (
+        {/* ── Native notification preferences ── */}
+        {isNative() && <>
+          <SectionHeader title="PREFERENCES" />
+          <div className="flex flex-col gap-2">
             <SettingsRow
               icon={Bell}
               label="Notifications"
@@ -474,45 +428,17 @@ export default function Settings() {
               onPress={notifPermission === 'prompt' && !notifRequesting ? handleRequestNotifications : undefined}
               disabled={notifRequesting || notifPermission === 'denied' || notifPermission === 'granted'}
             />
-          )}
-        </div>
+          </div>
+        </>}
 
         {/* ── Data & Privacy ── */}
         <SectionHeader title="DATA & PRIVACY" />
         <div className="flex flex-col gap-2">
           <SettingsRow
-            icon={Trash2}
-            label="Clear Scan History"
-            value="Remove all scans from this device"
-            onPress={() => setClearConfirm(true)}
-          />
-          <SettingsRow
             icon={Shield}
             label="Privacy Policy"
             onPress={() => navigate('/privacy')}
           />
-        </div>
-
-        {/* ── Sign out / danger ── */}
-        <SectionHeader title="ACCOUNT ACTIONS" />
-        <div className="flex flex-col gap-2">
-          <SettingsRow
-            icon={LogOut}
-            label="Sign Out"
-            onPress={() => setSignOutConfirm(true)}
-          />
-          <SettingsRow
-            icon={Trash2}
-            label="Delete Account"
-            value="Permanently deletes your account and all data"
-            onPress={() => { triggerHaptic(); del.start() }}
-            danger
-          />
-        </div>
-
-        {/* ── Footer links ── */}
-        <SectionHeader title="MORE" />
-        <div className="flex flex-col gap-2">
           <SettingsRow
             icon={FileText}
             label="Terms of Service"
@@ -521,22 +447,36 @@ export default function Settings() {
           <SettingsRow
             icon={Mail}
             label="Contact Support"
-            value="support@ascendus.com"
             onPress={() => openMailto('support@ascendus.com', 'Support Request')}
           />
-          {isDeveloperRefreshAvailable() && <SettingsRow
-            icon={RefreshCw}
-            label="Dev Refresh"
-            value="Clear local test data and restart after onboarding"
-            onPress={handleDeveloperRefresh}
-          />}
+        </div>
+
+        {/* ── Account options ── */}
+        <SectionHeader title="ACCOUNT OPTIONS" />
+        <div className="flex flex-col gap-2">
+          <SettingsRow
+            icon={Trash2}
+            label="Clear Scan History"
+            onPress={() => setClearConfirm(true)}
+          />
+          <SettingsRow
+            icon={LogOut}
+            label="Sign Out"
+            onPress={() => setSignOutConfirm(true)}
+          />
+          <SettingsRow
+            icon={Trash2}
+            label="Delete Account"
+            onPress={() => { triggerHaptic(); del.start() }}
+            danger
+          />
         </div>
 
         {/* App version */}
         {appVersion && (
           <p className="text-center font-body text-[11px] mt-8 opacity-40"
              style={{ color: 'var(--text-secondary)' }}>
-            Ascendus {appVersion}
+            {isNative() ? `Ascendus ${appVersion}` : appVersion}
           </p>
         )}
       </div>

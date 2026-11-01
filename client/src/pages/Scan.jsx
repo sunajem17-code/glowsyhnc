@@ -32,7 +32,6 @@ import ScanPortrait from '../components/ScanPortrait'
 import ScanUnlockGate from './ScanUnlockGate'
 import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresentation'
 import { validationFailure } from '../utils/validationFailure'
-import { markScanResultsUnlocked, shouldAutoUnlockLocalScanResults } from '../utils/developerUnlock'
 
 async function uploadScanPhoto(imageData) {
   const commaIdx = imageData.indexOf(',')
@@ -235,7 +234,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const videoRef    = useRef()
   const cardRef     = useRef()
   const canvasRef   = useRef()
-  const uploadRef   = useRef()
   const streamRef   = useRef()
   const previewActiveRef = useRef(false)
   // Serializes every start/stop call onto one chain so overlapping calls
@@ -435,25 +433,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     }
   }
 
-  async function handleUpload() {
-    if (isNative()) {
-      try {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) { setCapturedUrl(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
-  }
-
-  function handleFileChange(e) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    const url = URL.createObjectURL(f)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    setCapturedUrl(url)
-  }
-
   const showLive = !capturedUrl
 
   return (
@@ -617,7 +596,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
-      <input ref={uploadRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       {/* Full-screen processing cover while the camera spins up — hides the
           header/card/button while they're still settling into their "ready"
           layout (and, on native, the abrupt pop-in of the native camera layer
@@ -1909,11 +1887,6 @@ export default function Scan() {
   const [step, setStep]                   = useState(recoveredFrontPhoto ? 2 : 1) // skip gender step — already collected in onboarding
   const [cameraOpen, setCameraOpen]        = useState(false) // false = show guide screen, true = camera live
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
-  const [frontTitleTaps, setFrontTitleTaps] = useState(0)
-  const [sideTitleTaps, setSideTitleTaps] = useState(0)
-  const libraryUploadRef = useRef(null)
-  const libraryUploadStepRef = useRef(1)
-  const [choosingLibraryPhoto, setChoosingLibraryPhoto] = useState(false)
   const previewImageRef = useRef(null)
   const [captureFrame, setCaptureFrame] = useState(null)
   const [gender, setLocalGender]          = useState(savedGender ?? null)
@@ -1954,44 +1927,6 @@ export default function Scan() {
   const [scanReady, setScanReady] = useState(false)
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
-
-  async function chooseLibraryPhoto() {
-    if (choosingLibraryPhoto) return
-    libraryUploadStepRef.current = step
-    triggerHaptic()
-    setError('')
-    if (!isNative()) {
-      libraryUploadRef.current?.click()
-      return
-    }
-    setChoosingLibraryPhoto(true)
-    try {
-      const url = await pickPhoto()
-      if (url) setPreviewPhoto({ url, blob: url, forStep: step })
-    } catch (err) {
-      if (!/cancel/i.test(err?.message || '')) setError('Couldn’t open your photo library. Please try again.')
-    } finally {
-      setChoosingLibraryPhoto(false)
-    }
-  }
-
-  function selectLibraryPhoto(event) {
-    const forStep = libraryUploadStepRef.current
-    const file = event.target.files?.[0]
-    event.target.value = '' // Allow choosing the same photo again.
-    if (!file) return
-    if (file.type && !file.type.startsWith('image/')) {
-      setError('Please choose an image file.')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      setError('')
-      setPreviewPhoto({ url: reader.result, blob: file, forStep })
-    }
-    reader.onerror = () => setError('Couldn’t read that picture. Please choose another.')
-    reader.readAsDataURL(file)
-  }
 
   const finishAnimation = useCallback(() => {
     if (animationGateRef.current) triggerHaptic()
@@ -2504,13 +2439,7 @@ export default function Scan() {
         ])
       }
       if (!paywallOpenedRef.current) {
-        // Local browser testing can preview the complete result reveal without
-        // changing the production subscription gate.
-        const localAutoUnlock = shouldAutoUnlockLocalScanResults()
-        if (localAutoUnlock) {
-          useStore.setState(state => markScanResultsUnlocked(state, scanRecord.id))
-        }
-        navigate((isPremium || localAutoUnlock) ? '/results' : '/unlock', { replace: true })
+        navigate(isPremium ? '/results' : '/unlock', { replace: true })
       }
     } catch (err) {
       setScanPaywallOpen(false)
@@ -2618,15 +2547,7 @@ export default function Scan() {
               STEP {step === 1 ? '1' : '2'} OF 2
             </p>
             <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
-              {step === 1 ? (
-                <button type="button" className="text-left" onClick={() => setFrontTitleTaps(taps => Math.min(taps + 1, 3))}>
-                  Take your front photo
-                </button>
-              ) : (
-                <button type="button" className="text-left" onClick={() => setSideTitleTaps(taps => Math.min(taps + 1, 3))}>
-                  Now, your side profile
-                </button>
-              )}
+              {step === 1 ? 'Take your front photo' : 'Now, your side profile'}
             </h1>
           </div>
         ) : (
@@ -2698,11 +2619,13 @@ export default function Scan() {
                     }
                     setCameraOpen(true)
                   }}
-                  className="w-full flex-shrink-0 mt-[30px] py-4 rounded-2xl font-heading font-bold text-[15px]"
+                  className="w-full flex-shrink-0 mt-[30px] h-[60px] rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
                   style={{
                     background: GOLD_GRADIENT,
                     color: '#0A0A0A',
-                    boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
+                    fontFamily: '"Plus Jakarta Sans", sans-serif',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
                     width: gender === 'female' && step === 1 ? 'min(115%, calc(100% + 48px))' : undefined,
                   }}
                 >
@@ -2730,10 +2653,10 @@ export default function Scan() {
               >
                 <button
                   onClick={() => { triggerHaptic(); setPreviewPhoto(null); setCameraOpen(true) }}
-                  className="w-full py-4 rounded-2xl font-heading font-bold text-[16px]"
-                  style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
+                  className="w-full py-3 rounded-2xl font-heading font-bold text-[15px]"
+                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                 >
-                  Use Another
+                  Use Camera Instead
                 </button>
                 <motion.button
                   whileTap={{ scale: 0.97 }}
@@ -2952,23 +2875,11 @@ export default function Scan() {
         </div>
       )}
 
-      {/* Optional library upload stays in the footer; the scan action sits
-          directly beneath the guide photo, as in the original capture flow. */}
-      <input ref={libraryUploadRef} type="file" accept="image/*" onChange={selectLibraryPhoto} className="hidden" />
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {((step === 1 && frontTitleTaps >= 3) || (step === 2 && sideTitleTaps >= 3)) && (
-            <button
-              type="button"
-              onClick={chooseLibraryPhoto}
-              disabled={choosingLibraryPhoto}
-              className="w-full mt-3 py-3 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{ border: `1px solid ${GOLD}`, color: GOLD }}
-            >
-              <Upload size={18} />
-              {choosingLibraryPhoto ? 'Opening library…' : 'Upload picture'}
-            </button>
-          )}
+          {/* Reserve the former upload control's footprint so Begin Scan and
+              the capture guide remain in their established positions. */}
+          <div aria-hidden="true" className="w-full mt-3 h-[46px]" />
         </div>
       )}
     </div>

@@ -8,9 +8,16 @@ test('opening a saved Progress card remembers where its back button should retur
   assert.equal(getProgressCardReturnTo(null), null)
 })
 
-test('free saved Progress results keep normal results chrome while masking only the card', () => {
-  assert.deepEqual(getSavedProgressResultPresentation({ savedProgressCard: true, isPremium: false, hasUnlockedAccess: true }), {
+test('free saved Progress results stay masked until a paid unlock is active', () => {
+  assert.deepEqual(getSavedProgressResultPresentation({ savedProgressCard: true, isPremium: false, hasUnlockedAccess: false }), {
     blurResultCard: true,
+    showUnlockedChrome: false,
+  })
+})
+
+test('a completed purchase clears blur immediately, before premium state finishes refreshing', () => {
+  assert.deepEqual(getSavedProgressResultPresentation({ savedProgressCard: true, isPremium: false, hasUnlockedAccess: true }), {
+    blurResultCard: false,
     showUnlockedChrome: true,
   })
 })

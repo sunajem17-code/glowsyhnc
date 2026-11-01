@@ -16,7 +16,6 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import PageHeader from '../components/PageHeader'
 import GlowScoreRing from '../components/GlowScoreRing'
-import { ACHIEVEMENTS } from '../utils/achievements'
 import { api } from '../utils/api'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -34,7 +33,6 @@ const CANCEL_REASONS = [
 
 const LOSES = [
   { icon: <Ruler size={16} style={{ color: GOLD }} />, label: 'Detailed face metrics (6 pillars + profile)' },
-  { icon: <Sparkles size={16} style={{ color: GOLD }} />, label: 'AI hairstyle simulator (HairMaxx)' },
   { icon: <Map size={16} style={{ color: GOLD }} />, label: 'Your 12-week transformation plan' },
   { icon: <TrendingUp size={16} style={{ color: GOLD }} />, label: 'Progress tracking & before/after' },
   { icon: <RefreshCw size={16} style={{ color: GOLD }} />, label: 'Unlimited monthly scans' },
@@ -282,7 +280,7 @@ function SettingsRow({ icon: Icon, label, value, onClick, danger, toggle, checke
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { user, scans, streak, logout, isPremium, privacySettings, setPrivacySetting, clearAllScanData, achievements } = useStore()
+  const { user, scans, streak, logout, isPremium, privacySettings, setPrivacySetting, clearAllScanData } = useStore()
   const [notifications, setNotifications] = useState(true)
   const [shareOpen, setShareOpen] = useState(false)
   const [rateOpen, setRateOpen] = useState(false)
@@ -436,39 +434,19 @@ export default function Profile() {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h2
-              className="font-heading font-bold text-[17px] truncate"
-              style={{ color: TEXT, letterSpacing: '-0.01em' }}
-            >
-              {user?.name ?? 'Ascendus User'}
-            </h2>
+            <div className="flex min-w-0 items-center gap-2">
+              <h2
+                className="font-heading font-bold text-[17px] truncate"
+                style={{ color: TEXT, letterSpacing: '-0.01em' }}
+              >
+                {user?.name ?? 'Guest'}
+              </h2>
+              {isPremium && <span className="flex-shrink-0 rounded-full px-2 py-0.5 font-heading text-[9px] font-bold" style={{ background: 'rgba(198,168,92,0.12)', border: `1px solid ${GOLD_BORDER}`, color: GOLD }}>✦ MAX</span>}
+            </div>
             <p className="text-[12px] font-body truncate" style={{ color: TEXT_DIM }}>
-              {user?.email ?? 'demo@ascendus.app'}
+              {user?.email?.endsWith('@ascendus.internal') ? 'Temporary session' : user?.email ?? 'Temporary session'}
             </p>
             <div className="flex items-center gap-2 mt-1.5">
-              {isPremium ? (
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-[10px] font-heading font-bold"
-                  style={{
-                    background: 'rgba(198,168,92,0.12)',
-                    border: `1px solid ${GOLD_BORDER}`,
-                    color: GOLD,
-                  }}
-                >
-                  ✦ Premium
-                </span>
-              ) : (
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-[10px] font-heading font-bold"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: TEXT_DIM,
-                  }}
-                >
-                  Free Plan
-                </span>
-              )}
               <span className="text-[10px] font-body" style={{ color: TEXT_DIM }}>
                 Since {user?.createdAt
                   ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
@@ -514,43 +492,6 @@ export default function Profile() {
         ))}
       </motion.div>
 
-      {/* ── Achievements ──────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08, duration: 0.35, ease: EASE_STANDARD }}
-        className="mb-5 rounded-2xl p-4"
-        style={{ background: SURFACE, border: `1px solid ${BORDER}` }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-heading font-bold text-[14px]" style={{ color: TEXT }}>Achievements</p>
-          <p className="font-body text-[11px]" style={{ color: TEXT_DIM }}>
-            {(achievements ?? []).length}/{Object.keys(ACHIEVEMENTS).length} unlocked
-          </p>
-        </div>
-        <div className="grid grid-cols-3 gap-2.5">
-          {Object.values(ACHIEVEMENTS).map(ach => {
-            const unlocked = (achievements ?? []).includes(ach.key)
-            return (
-              <div
-                key={ach.key}
-                className="flex flex-col items-center py-3 px-2 rounded-xl text-center"
-                style={{
-                  background: unlocked ? `${ach.color}10` : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${unlocked ? ach.color + '30' : 'rgba(255,255,255,0.05)'}`,
-                  opacity: unlocked ? 1 : 0.4,
-                }}
-              >
-                <ach.Icon size={20} className="mb-1" style={{ color: unlocked ? ach.color : 'rgba(255,255,255,0.3)' }} />
-                <p className="font-heading font-bold text-[10px] leading-tight" style={{ color: unlocked ? ach.color : TEXT_DIM }}>
-                  {ach.title}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </motion.div>
-
       {/* ── Premium CTA ──────────────────────────────────────────── */}
       {!isPremium && (
         <motion.div
@@ -576,14 +517,14 @@ export default function Profile() {
                 className="text-[10px] font-heading font-bold uppercase tracking-widest"
                 style={{ color: GOLD }}
               >
-                Ascendus Premium
+                Ascendus Max
               </span>
             </div>
             <h3
               className="font-heading font-bold text-[20px] mb-1"
               style={{ color: TEXT, letterSpacing: '-0.02em' }}
             >
-              Unlock Premium Access
+              Unlock Ascendus Max
             </h3>
             <p className="font-body text-[13px] mb-4" style={{ color: TEXT_DIM }}>
               Full analysis. Full control.
@@ -654,8 +595,7 @@ export default function Profile() {
         ) : (
           <SettingsRow
             icon={CreditCard}
-            label="Upgrade to Pro"
-            value="Free"
+            label="Get Ascendus Max"
             onClick={() => navigate('/premium')}
           />
         )}

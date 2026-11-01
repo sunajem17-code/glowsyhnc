@@ -54,7 +54,7 @@ router.post('/scans', auth, async (req, res) => {
     // req.userId is the Supabase UUID in production (same UUID used at registration)
     const sbUserId = req.userId
 
-    const { faceImageUrl, hairstyleRec1, hairstyleRec2, hairstyleRec3 } = req.body
+    const { faceImageUrl } = req.body
     const { ownedResult, latestOwnedResult, ownedImagePath } = require('../lib/coachScanContext')
     // Older clients omit scanId, so link only a recent server-generated result.
     // Browser-supplied scores and premium/status fields are never authoritative.
@@ -65,9 +65,7 @@ router.post('/scans', auth, async (req, res) => {
     const result = verified.result
 
     // Insert scan
-    const { data: scan, error: scanErr } = await sb
-      .from('scans')
-      .upsert({
+    const scanRecord = {
         id: verified.row.id,
         user_id: sbUserId,
         overall_score: result.overallScore,
@@ -80,15 +78,36 @@ router.post('/scans', auth, async (req, res) => {
         dimorphism: result.pillars?.dimorphism ?? null,
         potential_score: result.potentialScore,
         face_image_url: image,
-        hairstyle_recommendation_1: hairstyleRec1 ?? null,
-        hairstyle_recommendation_2: hairstyleRec2 ?? null,
-        hairstyle_recommendation_3: hairstyleRec3 ?? null,
         hair_type_detected: result.hairType ?? null,
         face_shape: result.facialStructure ?? null,
-        extended_metrics: result.extendedMetrics ?? null,
-      })
+        extended_metrics: {
+          ...(result.extendedMetrics && typeof result.extendedMetrics === 'object' ? result.extendedMetrics : {}),
+          ...(result.scanBenchmark ? { scanBenchmark: result.scanBenchmark } : {}),
+        },
+    }
+
+    let { data: scan, error: scanErr } = await sb
+      .from('scans')
+      .upsert(scanRecord)
       .select('id')
       .single()
+
+    // Some deployed Supabase projects have not applied migration 004 yet (or
+    // PostgREST has not refreshed its schema cache). Keep the core scan record
+    // durable so Coach can resolve it, while still persisting extended metrics
+    // whenever the column is available.
+    if (scanErr && /extended_metrics.*schema cache/i.test(scanErr.message || '')) {
+      console.warn('[Supabase] extended_metrics is unavailable; retrying scan save without optional metrics')
+      const compatibleScanRecord = { ...scanRecord }
+      delete compatibleScanRecord.extended_metrics
+      const retry = await sb
+        .from('scans')
+        .upsert(compatibleScanRecord)
+        .select('id')
+        .single()
+      scan = retry.data
+      scanErr = retry.error
+    }
 
     if (scanErr) throw scanErr
 

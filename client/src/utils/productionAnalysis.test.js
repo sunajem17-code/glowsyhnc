@@ -37,7 +37,7 @@ test('missing profile landmarks still sends both photos and returns the API resu
   assert.equal(evidence.profile.status, 'not_assessable')
   assert.deepEqual(evidence.profile.measurements, [])
   let payload
-  const response = { scanId: 'isolated-test-scan', overallScore: 6.2, profileScore: 6.1, visualObservations: ['test observation'] }
+  const response = { scanId: 'isolated-test-scan', overallScore: 6.2, profileScore: 6.1, visualObservations: ['test observation'], appearanceAnalysis: currentAppearance('isolated-test-scan') }
   const result = await requestProductionAnalysis({
     faceImage: 'isolated-front', sideImage: 'isolated-side', evidence,
     apiClient: { ai: { score: async input => { payload = input; return response } } },
@@ -58,7 +58,7 @@ test('successful native profile measurements remain in the request', async t => 
   assert.equal(evidence.profile.status, 'measured')
   let payload
   await requestProductionAnalysis({ faceImage: 'front', sideImage: 'side', evidence, sideProfileGeometry: geometry,
-    apiClient: { ai: { score: async input => { payload = input; return { scanId: 'fixture' } } } },
+    apiClient: { ai: { score: async input => { payload = input; return { scanId: 'fixture', appearanceAnalysis: currentAppearance('fixture') } } } },
   })
   assert.equal(payload.sideProfileGeometry.facialConvexityDegrees, 168.25)
 })
@@ -85,9 +85,43 @@ test('an unresponsive analysis times out and a subsequent retry succeeds', async
     apiClient: { ai: { score: () => new Promise(() => {}) } },
   }), /Analysis timed out/)
   const retry = await requestProductionAnalysis({ evidence,
-    apiClient: { ai: { score: async () => ({ scanId: 'retry-result' }) } },
+    apiClient: { ai: { score: async () => ({ scanId: 'retry-result', appearanceAnalysis: currentAppearance('retry-result') }) } },
   })
   assert.equal(retry.scanId, 'retry-result')
+})
+
+function currentAppearance(scanId) {
+  const finding = title => ({ title, observation: `${title} is visible in the scan.`, significance: 'This changes how the face reads.', recommendation: 'Try one simple, safe change.' })
+  return { version: 7, scanId, strengths: [finding('Clear eyes')], improvementOpportunities: [finding('Soft jaw edge')], positiveObservations: [] }
+}
+
+test('keeps a scored scan usable when detailed Pros and Cons need to load from the results card', async t => {
+  const evidence = await evidenceFor(t)
+  let fallbackCalled = false
+  const result = await requestProductionAnalysis({ faceImage: 'data:image/jpeg;base64,QUJD', evidence,
+    apiClient: {
+      ai: { score: async () => ({ scanId: 'scan-needing-advice', overallScore: 6.2, faceSubScores: { symmetry: 6.5 } }) },
+      coach: { appearance: async () => { fallbackCalled = true; throw new Error('fallback should load from the results card') } },
+    },
+  })
+  assert.equal(result.scanId, 'scan-needing-advice')
+  assert.equal(result.overallScore, 6.2)
+  assert.equal(result.appearanceAnalysis, undefined)
+  assert.equal(fallbackCalled, false)
+})
+
+test('uses scan-embedded Pros and Cons without a second appearance request', async t => {
+  const evidence = await evidenceFor(t)
+  let fallbackCalled = false
+  const advice = currentAppearance('scan-with-embedded-advice')
+  const result = await requestProductionAnalysis({ faceImage: 'data:image/jpeg;base64,QUJD', evidence,
+    apiClient: {
+      ai: { score: async () => ({ scanId: advice.scanId, overallScore: 6.2, appearanceAnalysis: advice }) },
+      coach: { appearance: async () => { fallbackCalled = true; throw new Error('embedded advice should be used') } },
+    },
+  })
+  assert.deepEqual(result.appearanceAnalysis, advice)
+  assert.equal(fallbackCalled, false)
 })
 
 test('optional detection deadline rejects a stuck detector and accepts successful detection', async () => {

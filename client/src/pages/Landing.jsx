@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import {
-  ArrowRight, Camera, TrendingUp, Zap,
+  ArrowRight, Camera, TrendingUp,
   ShieldCheck, Users, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { GOLD } from '../utils/theme'
@@ -32,11 +32,6 @@ const FEATURES = [
     desc: 'A personalized roadmap targeting skincare, grooming, training, and posture, optimized for your exact lowest-scoring areas first.',
   },
   {
-    icon: Zap,
-    title: 'HairMaxx Simulator',
-    desc: 'AI-generated preview of how different haircuts and styles look on your face shape before you commit.',
-  },
-  {
     icon: Users,
     title: 'Progress Tracking',
     desc: 'Full scan history, before & after photo comparison, and a score timeline showing your improvement over time.',
@@ -56,7 +51,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Is Ascendus free to use?',
-    a: 'Yes. You get one free face scan per month with your Glow Score, sub-scores, and basic recommendations. Ascendus Max unlocks unlimited scans, your full 12-week action plan, before & after comparisons, the HairMaxx simulator, and personalized product recommendations.',
+    a: 'Yes. You get one free face scan per month with your Glow Score, sub-scores, and basic recommendations. Ascendus Max unlocks unlimited scans, your full 12-week action plan, before & after comparisons, and personalized product recommendations.',
   },
   {
     q: 'How accurate is the AI face score?',

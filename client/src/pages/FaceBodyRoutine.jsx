@@ -923,7 +923,7 @@ export default function FaceBodyRoutine() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><h3 className="font-heading text-sm font-bold text-primary">Coach tip · Tonight</h3><span className="rounded-full px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wide" style={{ color: GOLD, background: 'rgba(198,168,92,0.12)' }}>Example</span></div>
               <p className="mt-2 font-body text-sm leading-relaxed text-white/70">Keep tonight’s routine simple: cleanse gently, then moisturize. Use added products according to the schedule in My Products.</p>
-              <button type="button" onClick={() => { triggerHaptic(); navigate('/coach', { state: { coachPrompt: 'Can you explain this routine suggestion and help me adapt it to my products?' } }) }} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 font-heading text-xs font-semibold" style={{ color: GOLD }}>Ask a follow-up <ArrowRight size={14} /></button>
+              <button type="button" onClick={() => { triggerHaptic(); navigate('/progress', { state: { coachPrompt: 'Can you explain this routine suggestion and help me adapt it to my products? Please help me follow the Face & Body Routine.' } }) }} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 font-heading text-xs font-semibold" style={{ color: GOLD }}>Ask a follow-up <ArrowRight size={14} /></button>
             </div>
           </div>
         </section>}
@@ -1020,7 +1020,7 @@ export default function FaceBodyRoutine() {
             {otherRecommendations.length > 3 && <button type="button" onClick={() => setShowAllAdvice(value => !value)} className="w-full rounded-xl border border-white/[0.08] px-3 py-2.5 text-center font-heading text-xs font-semibold text-white/65 transition-colors hover:bg-white/[0.04]">{showAllAdvice ? 'Show less' : `Show all ${otherRecommendations.length} recommendations`}</button>}
           </div> : <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
             <p className="font-body text-xs leading-relaxed text-white/65">No saved scan or coach recommendations yet. Ask the AI Coach and the advice will appear here.</p>
-            <button type="button" onClick={() => { triggerHaptic(); navigate('/coach', { state: { coachPrompt: 'Using my completed face and body scans, give me practical recommendations to add to my Face and Body Routine. Include any specific products you recommend and how to use them.' } }) }} className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 font-heading text-xs font-bold text-black" style={{ background: GOLD }}>Ask AI Coach <ArrowRight size={14} /></button>
+            <button type="button" onClick={() => { triggerHaptic(); navigate('/progress', { state: { coachPrompt: 'Using my completed face and body scans, give me practical recommendations for the Face & Body Routine. Tell me which part of the routine to follow and how to do it. Include any specific products you recommend and how to use them.' } }) }} className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 font-heading text-xs font-bold text-black" style={{ background: GOLD }}>Ask AI Coach <ArrowRight size={14} /></button>
           </div>}
           </div>
         </details>

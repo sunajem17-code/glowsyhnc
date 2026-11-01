@@ -1,4 +1,5 @@
 import { getRatingColor } from './revealRatings.js'
+import { isPhysiqueProgressScan } from './progressHistory.js'
 
 function parseField(value, fallback) {
   if (typeof value !== 'string') return value ?? fallback
@@ -42,7 +43,9 @@ export function mergeScanHistory(remoteScans, localScans, currentScan) {
 
 export function getComparisonScans(currentScan, savedScans) {
   const currentIds = new Set([currentScan?.id, currentScan?.serverScanId].filter(Boolean))
-  return mergeScanHistory([], savedScans, null).filter(scan =>
+  const currentIsPhysique = isPhysiqueProgressScan(currentScan)
+  const sameTypeScans = (savedScans || []).filter(scan => isPhysiqueProgressScan(scan) === currentIsPhysique)
+  return mergeScanHistory([], sameTypeScans, null).filter(scan =>
     !currentIds.has(scan.id) && !(scan.serverScanId && currentIds.has(scan.serverScanId)),
   )
 }

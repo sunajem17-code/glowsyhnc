@@ -3,7 +3,7 @@ import { BACKEND_ORIGIN } from '../utils/backend'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, Heart, Star, Sparkles, Bone, ScanLine, Scale, Dumbbell, Scissors, Flame, Zap, Shield, Check, X, Trophy, User, UserRound } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api, setScanInFlight } from '../utils/api'
 import logo from '../assets/ascendus-icon.png'
@@ -146,7 +146,7 @@ function GoldBtn({ label, onClick, disabled, loading, solid = false }) {
     <button
       onClick={handleClick}
       disabled={disabled || loading}
-      className="btn-primary flex items-center justify-center gap-2"
+      className="btn-primary h-[60px] py-0 rounded-2xl text-[17px] flex items-center justify-center gap-2"
       style={{ background: solid ? ONBOARDING_GOLD : GOLD_GRADIENT }}
     >
       {loading && <Loader2 size={16} className="animate-spin" />}
@@ -369,7 +369,7 @@ function StepIntro({ onNext }) {
         transition={{ delay: 0.3, duration: 0.4 }}
         className="pb-10 pt-4"
       >
-        <GoldBtn label="Next" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </motion.div>
     </div>
   )
@@ -726,11 +726,11 @@ function StepReferral({ onNext }) {
           whileTap={{ scale: 0.97 }}
           onClick={handleContinue}
           style={{
-            width: '100%', padding: '22px 0',
-            borderRadius: 50,
+            width: '100%', height: 60, padding: 0,
+            borderRadius: 16,
             background: GOLD_GRADIENT,
             border: 'none', cursor: 'pointer',
-            color: '#000000', fontWeight: 700, fontSize: 20,
+            color: '#000000', fontWeight: 700, fontSize: 17,
             fontFamily: 'inherit',
             boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
           }}
@@ -841,11 +841,11 @@ function StepConsequences({ onNext }) {
           whileTap={{ scale: 0.97 }}
           onClick={() => { triggerHaptic(); onNext() }}
           style={{
-            width: '100%', padding: '22px 0',
-            borderRadius: 50,
+            width: '100%', height: 60, padding: 0,
+            borderRadius: 16,
             background: GOLD_GRADIENT,
             border: 'none', cursor: 'pointer',
-            color: '#000000', fontWeight: 700, fontSize: 20,
+            color: '#000000', fontWeight: 700, fontSize: 17,
             fontFamily: 'inherit',
             boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
           }}
@@ -1002,11 +1002,11 @@ function StepTestimonials({ onNext }) {
           whileTap={{ scale: 0.97 }}
           onClick={() => { triggerHaptic(); onNext() }}
           style={{
-            width: '100%', padding: '22px 0',
-            borderRadius: 50,
+            width: '100%', height: 60, padding: 0,
+            borderRadius: 16,
             background: GOLD_GRADIENT,
             border: 'none', cursor: 'pointer',
-            color: '#000000', fontWeight: 700, fontSize: 20,
+            color: '#000000', fontWeight: 700, fontSize: 17,
             fontFamily: 'inherit',
             boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
           }}
@@ -1085,7 +1085,7 @@ function StepNotifications({ onNext }) {
             boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
           }}
         >
-          <Bell size={100} color="#C6A85C" strokeWidth={1.5} aria-hidden="true" />
+          <span style={{ fontSize: 100 }}>🔔</span>
         </motion.div>
       </div>
 
@@ -1098,11 +1098,11 @@ function StepNotifications({ onNext }) {
           onClick={handleEnable}
           disabled={loading}
           style={{
-            width: '100%', padding: '22px 0',
-            borderRadius: 50,
+            width: '100%', height: 60, padding: 0,
+            borderRadius: 16,
             background: GOLD_GRADIENT,
             border: 'none', cursor: 'pointer',
-            color: '#000000', fontWeight: 700, fontSize: 20,
+            color: '#000000', fontWeight: 700, fontSize: 17,
             fontFamily: 'inherit',
             boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -1565,7 +1565,7 @@ function StepHaloEffect({ onNext, onBack }) {
 
       {/* Bottom button */}
       <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <GoldBtn label="Next" onClick={onNext} solid />
+        <GoldBtn label="Continue" onClick={onNext} solid />
       </div>
     </div>
   )
@@ -1657,7 +1657,7 @@ function StepWhyAppearance({ onNext, onBack }) {
         </div>
       </div>
       <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <GoldBtn label="Next" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -1869,7 +1869,7 @@ function StepAttractivenessImpact({ onNext, onBack }) {
 
       {/* Bottom button — same position as every other page */}
       <div style={{ flexShrink: 0, padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <GoldBtn label="Next" onClick={onNext} />
+        <GoldBtn label="Continue" onClick={onNext} />
       </div>
     </div>
   )
@@ -3113,7 +3113,7 @@ function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
               onClick={next}
               initial={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full py-4 font-heading font-bold text-[15px]"
+              className="w-full h-[60px] py-0 font-heading font-bold text-[17px]"
               style={{
                 background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
                 color: '#000000',

@@ -7,7 +7,7 @@ Use Node.js 22.23.2. Install dependencies from the repository root with
 
 Create `server/.env` locally (Git ignores this file). Set `NODE_ENV=development`,
 `PORT=3002`, `CLIENT_URL=http://localhost:3000`, and separate random values for
-`JWT_SECRET` and `PROMO_CODE`. Never commit those values. Keep cloud service
+`JWT_SECRET`. Never commit those values. Keep cloud service
 credentials out of this file when testing with the local SQLite database.
 Stripe is optional for startup; checkout needs Stripe configuration.
 AI-powered features need their provider configuration to produce real results.

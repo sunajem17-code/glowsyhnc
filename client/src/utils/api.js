@@ -69,11 +69,6 @@ async function request(path, options = {}) {
   }
   clearTimeout(timeoutId)
   if (!res.ok) {
-    if (res.status === 404 && path.startsWith('/developer-access/')) {
-      const error = new Error('Developer unlock is not deployed or enabled on this server.')
-      error.status = 404
-      throw error
-    }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
     // Gateway HTML and 504s are unavailable; our assessment route uses JSON 502s
@@ -186,9 +181,6 @@ export const api = {
     context: () => request('/coach/context'),
     message: (data) => request('/coach/message', { method: 'POST', body: JSON.stringify(data) }),
   },
-  hair: {
-    recommend: (data) => request('/hair/recommend', { method: 'POST', body: JSON.stringify(data) }),
-  },
   leaderboard: {
     get: () => request('/leaderboard'),
     submit: (data) => request('/leaderboard/submit', { method: 'POST', body: JSON.stringify(data) }),
@@ -212,13 +204,6 @@ export const api = {
     addComment:     (id, data)   => request(`/community/post/${id}/comment`, { method: 'POST', body: JSON.stringify(data) }),
     deleteComment:  (id)         => request(`/community/comment/${id}`, { method: 'DELETE' }),
     rate:           (id, score)  => request(`/community/post/${id}/rate`, { method: 'POST', body: JSON.stringify({ score }) }),
-  },
-  promo: {
-    redeem: (code) => request('/promo/redeem', { method: 'POST', body: JSON.stringify({ code }) }),
-  },
-  developerAccess: {
-    status: () => request('/developer-access/status'),
-    unlock: () => request('/developer-access/unlock', { method: 'POST' }),
   },
   potential: {
     analyze: (data) => request('/potential/analyze', { method: 'POST', body: JSON.stringify(data) }),

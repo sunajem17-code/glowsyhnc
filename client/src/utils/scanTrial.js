@@ -5,16 +5,25 @@ export function trialRenewalText(product) {
   return `Then ${product.priceString} per ${period}. Auto-renews unless canceled. Cancel anytime in Settings.`
 }
 
-export function isSevenDayFreeTrial(product) {
+function isFreeTrialDuration(product, expectedDays) {
   const intro = product?.introPrice
   if (!intro || intro.price !== 0 || !trialRenewalText(product)) return false
   const daysPerUnit = { DAY: 1, WEEK: 7 }
-  return daysPerUnit[intro.periodUnit] * intro.periodNumberOfUnits * intro.cycles === 7
+  return daysPerUnit[intro.periodUnit] * intro.periodNumberOfUnits * intro.cycles === expectedDays
 }
+
+export const isSevenDayFreeTrial = product => isFreeTrialDuration(product, 7)
+export const isThreeDayFreeTrial = product => isFreeTrialDuration(product, 3)
 
 // Exit-intent trial renews on the existing monthly product only.
 export function isMonthlyExitTrial(product) {
   return product?.identifier === 'com.ascendus.app.monthly'
     && product.subscriptionPeriod === 'P1M'
     && isSevenDayFreeTrial(product)
+}
+
+// The weekly free-trial exit offer must renew weekly after its three free days.
+export function isWeeklyExitTrial(product) {
+  return product?.subscriptionPeriod === 'P1W'
+    && isThreeDayFreeTrial(product)
 }

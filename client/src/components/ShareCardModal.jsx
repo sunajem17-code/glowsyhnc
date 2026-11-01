@@ -38,12 +38,13 @@ function ScoreMetric({ label, value, index }) {
 
 // Matches the current Results screen: title, portrait, and the six actual
 // facial ratings. Keep it 9:16 so the 4K export is ready for TikTok.
-export function ShareCard({ scan, facePhotoUrl, cardRef }) {
-  const metrics = getShareCardMetrics(scan)
+export function ShareCard({ scan, facePhotoUrl, cardRef, metrics: suppliedMetrics }) {
+  const metrics = suppliedMetrics ?? getShareCardMetrics(scan)
 
   return (
     <div
       ref={cardRef}
+      aria-hidden="true"
       style={{
         position: 'fixed', left: -9999, top: 0,
         width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT,

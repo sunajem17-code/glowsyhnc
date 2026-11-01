@@ -134,7 +134,7 @@ function PhotoStep({ gender, onPhotoSelected, error, loading }) {
             Add a photo of your body
           </p>
           <p className="font-body text-[13px] leading-relaxed" style={{ color: DIM }}>
-            That's the only thing needed: take or upload one body photo and your plan is built from it.
+            That's the only thing needed: take one body photo and your plan is built from it.
           </p>
         </div>
       </div>
@@ -166,7 +166,7 @@ function PhotoStep({ gender, onPhotoSelected, error, loading }) {
           style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)', opacity: loading ? 0.6 : 1 }}
         >
           <Target size={16} />
-          Take or Upload Body Photo
+          Take Body Photo
         </motion.button>
       </div>
     </div>

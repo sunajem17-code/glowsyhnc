@@ -1,5 +1,4 @@
 import useCoachScroll from '../hooks/useCoachScroll'
-import CoachAccessGate from '../components/CoachAccessGate'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -38,7 +37,7 @@ function TypingIndicator() {
       </div>
       <div
         className="px-4 py-3 rounded-2xl rounded-bl-sm"
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: '#2C2C2C' }}
       >
         <div className="flex items-center gap-1">
           {[0, 1, 2].map(i => (
@@ -58,7 +57,7 @@ function TypingIndicator() {
 
 // Renders coach responses with bold headers and line breaks
 
-function MessageBubble({ msg, isNew }) {
+function MessageBubble({ msg, isNew, onGetMax }) {
   const isUser = msg.role === 'user'
   return (
     <motion.div
@@ -78,12 +77,10 @@ function MessageBubble({ msg, isNew }) {
       <div
         className={`px-4 py-3 rounded-2xl max-w-[78%] min-w-0 relative ${msg.locked ? 'select-none' : ''}`}
         style={isUser ? {
-          background: `linear-gradient(135deg, ${GOLD}22 0%, ${GOLD}14 100%)`,
-          border: `1px solid ${GOLD}30`,
+          background: GOLD_GRADIENT,
           borderBottomRightRadius: 4,
         } : {
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#2C2C2C',
           borderBottomLeftRadius: 4,
         }}
       >
@@ -103,7 +100,7 @@ function MessageBubble({ msg, isNew }) {
         <div
           className="font-body text-[14px] leading-snug"
           style={{
-            color: msg.locked ? 'rgba(255,255,255,0.15)' : isUser ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.82)',
+            color: msg.locked ? 'rgba(255,255,255,0.15)' : isUser ? '#0A0A0A' : 'rgba(255,255,255,0.95)',
             filter: msg.locked ? 'blur(3px)' : 'none',
           }}
         >
@@ -111,7 +108,14 @@ function MessageBubble({ msg, isNew }) {
             <img src={msg.image} alt="Scan photo attached to your message"
               className="mb-2 max-h-56 w-full rounded-xl object-cover" style={{ maxWidth: 240 }} />
           )}
-          {isUser ? msg.content : <div className="adonis-pineapple-message"><CoachMessage content={msg.content} reveal={msg.reveal === true} /></div>}
+          {msg.paywall ? (
+            <div>
+              <p className="mb-3">{msg.content}</p>
+              <button onClick={onGetMax} className="rounded-xl px-3 py-2 font-heading font-bold text-[12px]" style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}>
+                Get Ascendus Max
+              </button>
+            </div>
+          ) : isUser ? msg.content : <div className="adonis-pineapple-message"><CoachMessage content={msg.content} reveal={msg.reveal === true} /></div>}
         </div>
       </div>
     </motion.div>
@@ -127,12 +131,13 @@ export default function AICoach() {
   const latestScan = scans[0]
   const [serverScan, setServerScan] = useState(null)
   const isPremium = serverScan?.isPro === true
-  const hasScan = !!latestScan || !!serverScan?.hasCompletedScan
+  // Only server-confirmed scan state may unlock the coach route.
+  const hasScan = serverScan?.hasCompletedScan === true
   const conversationRef = useRef(null)
   const requestGenerationRef = useRef(0)
   const [messagesOwner, setMessagesOwner] = useState(null)
 
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState([{ role: 'assistant', content: 'Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?' }])
   const [input, setInput] = useState(location.state?.coachPrompt || '')
   const [coachPhoto, setCoachPhoto] = useState(location.state?.coachPhotoUrl || null)
   const [loading, setLoading] = useState(false)
@@ -155,26 +160,36 @@ export default function AICoach() {
     setError('')
     setMessagesOwner(user?.id ?? null)
     setServerScan(null)
-    setMessages([])
+    setMessages([{ role: 'assistant', content: 'Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?' }])
     conversationRef.current = null
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(`adonis-chat:${user?.id}`) || 'null')
-      if (saved?.conversationId && Array.isArray(saved.messages)) {
-        conversationRef.current = saved.conversationId
-        setMessages(saved.messages.slice(-12).map(message => ({ ...message, reveal: false })))
+    api.coach.context().then(data => {
+      if (!active) return
+      setServerScan(data)
+      // Do not expose locally cached paid coach replies to a non-member.
+      if (data?.isPro === true) {
+        try {
+          const key = `adonis-chat:${user?.id}`
+          const saved = JSON.parse(localStorage.getItem(key) || sessionStorage.getItem(key) || 'null')
+          if (saved?.conversationId && Array.isArray(saved.messages)) {
+            conversationRef.current = saved.serverConversationId || (/^(?:local-preview:|adonis:)/.test(String(saved.conversationId)) ? null : saved.conversationId)
+            setMessages(saved.messages.map(message => ({ ...message, reveal: false })))
+          }
+        } catch { /* private browsing/storage unavailable */ }
       }
-    } catch { /* private browsing/storage unavailable */ }
-    api.coach.context().then(data => { if (active) setServerScan(data) }).catch(() => { if (active) setServerScan({ status: 'unavailable' }) })
+    }).catch(() => { if (active) setServerScan({ status: 'unavailable' }) })
     return () => { active = false; requestGenerationRef.current += 1 }
   }, [user?.id, latestScan?.id])
 
   useEffect(() => {
     if (!user?.id || messagesOwner !== user.id || !conversationRef.current || !messages.length) return
     try {
-      const savedMessages = messages.slice(-12).map(message => Object.fromEntries(
+      const savedMessages = messages.map(message => Object.fromEntries(
         Object.entries(message).filter(([key]) => key !== 'image'),
       ))
-      sessionStorage.setItem(`adonis-chat:${user.id}`, JSON.stringify({ conversationId: conversationRef.current, messages: savedMessages }))
+      const key = `adonis-chat:${user.id}`
+      const saved = JSON.stringify({ conversationId: conversationRef.current, messages: savedMessages })
+      localStorage.setItem(key, saved)
+      sessionStorage.setItem(key, saved)
     } catch {}
   }, [messages, user?.id, messagesOwner])
 
@@ -184,9 +199,9 @@ export default function AICoach() {
 
   // Initial greeting on mount
   useEffect(() => {
-    if (messages.length > 0 || !hasScan || !isPremium) return
+    if (messages.length > 0 || !hasScan) return
     const pending = useStore.getState().upgradeWelcomePending
-    setMessages([{ role: 'assistant', content: pending ? UPGRADE_WELCOME : `What’s up bro!!! Welcome to Ascendus. I’m Adonis, your AI coach. What would you like to work on today?` }])
+    setMessages([{ role: 'assistant', content: pending && isPremium ? UPGRADE_WELCOME : `Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?` }])
     if (pending) useStore.getState().setUpgradeWelcomePending(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, hasScan])
@@ -194,13 +209,27 @@ export default function AICoach() {
   async function sendMessage(text) {
     const msgText = (text || input).trim()
     if (!msgText || loading) return
+    if (serverScan === null) return
 
     const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(msgText))
     // No scan → redirect to scan
     if (!hasScan) { navigate('/scan'); return }
 
-    // Not premium → open paywall immediately
-    if (!serverScan?.isPro) { navigate('/unlock?paywall=1'); return }
+    // Show the submitted question first, then offer Max. The protected AI
+    // endpoint remains premium-only and is never called for non-members.
+    if (!isPremium) {
+      if (messages.some(message => message.paywall)) return
+      const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
+      setMessages(prev => [...prev, userMsg, {
+        role: 'assistant',
+        content: 'Your question is ready. Get Ascendus Max to unlock Adonis’s personalized reply.',
+        paywall: true,
+      }])
+      setCoachPhoto(null)
+      setInput('')
+      setNewMsgIdx(messages.length + 1)
+      return
+    }
 
     followLatest()
     setInput('')
@@ -252,8 +281,6 @@ export default function AICoach() {
     }
   }
 
-  if (!serverScan?.hasCompletedScan || serverScan?.isPro !== true) return <CoachAccessGate context={serverScan} />
-
   // ── Chat UI (both free and pro) ────────────────────────────────────────────
   return (
     <MotionPage baseClassName="" className="flex min-h-0 flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
@@ -290,11 +317,12 @@ export default function AICoach() {
               setLoading(false)
               setError('')
               conversationRef.current = null
-              try { sessionStorage.removeItem(`adonis-chat:${user?.id}`) } catch {}
+              try {
+                localStorage.removeItem(`adonis-chat:${user?.id}`)
+                sessionStorage.removeItem(`adonis-chat:${user?.id}`)
+              } catch {}
               if (hasScan) {
-                const greeting = isPremium
-                  ? 'Your completed scan is available. Ask me what it found or what to work on.'
-                  : 'Get Ascendus Max to unlock AI Coach.'
+                const greeting = 'Your completed scan is available. Ask me what it found or what to work on.'
                 setMessages([{ role: 'assistant', content: greeting }])
               } else {
                 setMessages([])
@@ -319,7 +347,7 @@ export default function AICoach() {
             className="pt-4"
           >
             <p className="font-body text-[13px] text-secondary text-center mb-5">
-              {latestScan && !isPremium ? 'Ask a question — Pro unlocks the answer' : 'Ask me anything about your appearance & routine'}
+              Ask me anything about your appearance or routine
             </p>
             <div className="grid grid-cols-2 gap-2">
               {STARTER_PROMPTS.map((prompt, i) => (
@@ -345,7 +373,7 @@ export default function AICoach() {
         )}
 
         {messages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} isNew={i === newMsgIdx} />
+          <MessageBubble key={i} msg={msg} isNew={i === newMsgIdx} onGetMax={() => navigate('/unlock?paywall=1')} />
         ))}
 
         {loading && <TypingIndicator />}
@@ -368,7 +396,13 @@ export default function AICoach() {
       </div>
 
       {/* Input bar — disabled state if no scan */}
-      {!hasScan ? (
+      {serverScan === null ? (
+        <div className="px-4 py-3 flex-shrink-0" style={{ background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+          <div className="rounded-2xl px-4 py-3 font-body text-[13px] text-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
+            Adonis is ready
+          </div>
+        </div>
+      ) : !hasScan ? (
         <div className="px-4 pb-8 pt-3 flex-shrink-0">
           <button
             onClick={() => { triggerHaptic(); navigate('/scan') }}
@@ -378,6 +412,10 @@ export default function AICoach() {
             Scan Your Face To Unlock
             <ChevronRight size={16} />
           </button>
+        </div>
+      ) : messages.some(message => message.paywall) ? (
+        <div className="px-4 py-4 flex-shrink-0 text-center font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)', background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+          Your chat is ready when you’re a member.
         </div>
       ) : (
         <div

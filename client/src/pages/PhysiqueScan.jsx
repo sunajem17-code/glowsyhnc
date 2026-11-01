@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft } from 'lucide-react'
+import { Camera, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft, Upload } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -15,12 +15,16 @@ import sideProfileGuideFemale from '../assets/physique-lower-male.jpg'
 import faceGuidePhoto from '../assets/physique-upper-male.jpg'
 import faceGuidePhotoFemale from '../assets/physique-upper-male.jpg'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
-import { takePhoto, pickPhoto, isNative } from '../utils/camera'
+import { isNative } from '../utils/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
+
+// Temporary convenience for physique scans; keep isolated so this control can
+// be removed without touching the camera or scan-confirmation flow.
+const SHOW_TEMPORARY_PHYSIQUE_UPLOAD = true
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -187,7 +191,6 @@ function SideGuide({ size = 'normal', gender }) {
 function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const videoRef    = useRef()
   const canvasRef   = useRef()
-  const uploadRef   = useRef()
   const streamRef   = useRef()
   const [ready, setReady]         = useState(false)
   const [facingMode, setFacingMode] = useState('user')
@@ -255,25 +258,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
       startCamera(facingMode)
     }
-  }
-
-  async function handleUpload() {
-    if (isNative()) {
-      try {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) { setCapturedUrl(dataUrl) }
-      } catch {}
-    } else {
-      uploadRef.current?.click()
-    }
-  }
-
-  function handleFileChange(e) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    const url = URL.createObjectURL(f)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    setCapturedUrl(url)
   }
 
   const showLive = !capturedUrl
@@ -354,286 +338,6 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
-      <input ref={uploadRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-    </div>
-  )
-}
-
-// ─── Photo Action Sheet (iOS-style) ──────────────────────────────────────────
-// Custom JS sheet, not a native action-sheet plugin — @capacitor/action-sheet
-// isn't a dependency here, and adding one is a bigger lift (new native
-// dependency + cap sync) than this redesign calls for. This matches the same
-// visual convention (grouped options card + separate Cancel button, sliding
-// up from the bottom) without it.
-function PhotoActionSheet({ options, onClose }) {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.2, ease: EASE_STANDARD }}
-        className="fixed inset-0 z-50 bg-black/50"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={SPRING_STANDARD}
-        className="fixed inset-x-0 bottom-0 z-50 px-3"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}
-      >
-        <div className="rounded-2xl overflow-hidden mb-2" style={{ background: '#1C1C1E' }}>
-          {options.map((opt, i) => (
-            <button
-              key={opt.label}
-              onClick={opt.onSelect}
-              className="w-full flex items-center justify-center gap-2 py-4 active:opacity-60 transition-opacity"
-              style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none', color: opt.highlight ? GOLD : 'white' }}
-            >
-              <opt.icon size={18} />
-              <span className="font-heading font-semibold text-[16px]">{opt.label}</span>
-            </button>
-          ))}
-        </div>
-      </motion.div>
-    </>
-  )
-}
-
-// ─── Photo Upload Step ────────────────────────────────────────────────────────
-
-export function PhotoUploadStep({ stepNum, guide, photo, onPhoto, gender, heroLayout = false, photoType = 'face', autoOpen = false, triggerRef }) {
-  const uploadRef = useRef()
-  const cameraInFlight = useRef(false)
-  const [cameraOpen, setCameraOpen] = useState(false)
-  const [error, setError] = useState('')
-  const [showActionSheet, setShowActionSheet] = useState(autoOpen)
-
-  useEffect(() => {
-    if (triggerRef) triggerRef.current = () => setShowActionSheet(true)
-  }, [triggerRef])
-
-  async function handleCameraClick() {
-    if (cameraInFlight.current) return
-    cameraInFlight.current = true
-    try {
-      if (isNative()) {
-        const dataUrl = await takePhoto()
-        if (dataUrl) onPhoto(dataUrl, dataUrl)
-      } else {
-        setCameraOpen(true)
-      }
-    } catch (err) {
-      if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-        setError('Camera error: ' + (err?.message || 'Unknown error'))
-      }
-    } finally {
-      cameraInFlight.current = false
-    }
-  }
-
-  async function handleUploadClick() {
-    if (cameraInFlight.current) return
-    cameraInFlight.current = true
-    try {
-      if (isNative()) {
-        const dataUrl = await pickPhoto()
-        if (dataUrl) onPhoto(dataUrl, dataUrl)
-      } else {
-        uploadRef.current?.click()
-      }
-    } catch (err) {
-      if (!err?.message?.includes('cancel') && !err?.message?.includes('Cancel')) {
-        setError('Photo error: ' + (err?.message || 'Unknown error'))
-      }
-    } finally {
-      cameraInFlight.current = false
-    }
-  }
-
-  // ── Hero / full-bleed layout (step 1, PremiumOnboarding only) ───────────────
-  if (heroLayout) {
-    const guideImg = photoType === 'side'
-      ? (gender === 'female' ? sideProfileGuideFemale : sideProfileGuide)
-      : (gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto)
-
-    return (
-      <div className="flex flex-col h-full" style={{ paddingTop: 12 }}>
-        {cameraOpen && (
-          <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
-        )}
-        <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
-
-        {/* Full-bleed card — subtle gold border, rounded corners */}
-        <div
-          className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden pointer-events-none"
-          style={{ background: '#080808', border: '1px solid rgba(198,168,92,0.2)' }}
-        >
-          {photo ? (
-            <>
-              <img src={photo} alt="uploaded" className="absolute inset-0 w-full h-full object-contain" />
-              <div className="absolute inset-0 bg-black/20" />
-              <div
-                className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 pt-16 pointer-events-none"
-                style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.85) 60%)' }}
-              >
-                <button
-                  onClick={() => setShowActionSheet(true)}
-                  className="flex items-center gap-1.5 py-2 px-4 active:opacity-60 transition-opacity pointer-events-auto"
-                >
-                  <RefreshCw size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                  <span className="text-[12px] font-body font-semibold" style={{ color: 'rgba(255,255,255,0.5)' }}>Retake Photo</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <img src={guideImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
-          )}
-        </div>
-
-        {error && (
-          <div className="mt-2 flex items-center gap-2 px-4 py-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
-            <AlertCircle size={15} className="text-warning flex-shrink-0" />
-            <p className="text-sm text-warning font-body flex-1">{error}</p>
-            <button onClick={() => setError('')} aria-label="Dismiss error" className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100">
-              <X size={14} className="text-warning" />
-            </button>
-          </div>
-        )}
-
-        <AnimatePresence>
-          {showActionSheet && (
-            <PhotoActionSheet
-              onClose={() => setShowActionSheet(false)}
-              options={[
-                { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-                { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-              ]}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    )
-  }
-  // ── End hero layout ───────────────────────────────────────────────────────
-
-  return (
-    <div className="flex flex-col h-full px-3 justify-center">
-      {cameraOpen && (
-        <CameraOverlay stepNum={stepNum} onCapture={(url, blob) => { setCameraOpen(false); onPhoto(url, blob) }} onClose={() => setCameraOpen(false)} gender={gender} />
-      )}
-
-      {/* Preview / placeholder — pointer-events-none so nothing inside can block the buttons below.
-          Steps 1 and 2 share the same near-full-width frame shape/border/glow,
-          but step 1's aspect ratio is intentionally 4/5 (not 3/4 like step 2)
-          — see the object-fit: cover + object-position: bottom comment below
-          for why this specific ratio matters there. */}
-      <div
-        className={`relative w-full ${stepNum === 1 ? 'aspect-[4/5]' : 'aspect-[3/4]'} rounded-2xl overflow-hidden flex items-center justify-center mt-2 mb-4 pointer-events-none`}
-        style={{
-          background: '#000000',
-          // Step 1 (face photo) keeps the gold frame; step 2 (side profile) is borderless.
-          ...(stepNum === 1 && {
-            border: `1.5px solid ${GOLD}`,
-            boxShadow: '0 0 16px rgba(198,168,92,0.25)',
-          }),
-        }}
-      >
-        {photo ? (
-          <>
-            {/* object-contain (not cover) on step 1 specifically — cover inside
-                this aspect-[4/5] box was cropping real uploaded/captured
-                photos (whatever aspect ratio the camera/library photo came
-                in at) down to a smaller center region, cutting off the chin
-                or forehead depending on the source photo's proportions.
-                Matches the same fix already applied to this step's guide
-                placeholder image below. Steps 2/3 keep cover — out of scope
-                here, not reported as cropping. */}
-            <img
-              src={photo}
-              alt="uploaded"
-              className={stepNum === 1 ? 'absolute inset-0 w-full h-full object-contain' : 'absolute inset-0 w-full h-full object-cover'}
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-              <div className="w-14 h-14 rounded-full bg-[#C6A85C] flex items-center justify-center">
-                <CheckCircle2 size={30} className="text-white" />
-              </div>
-            </div>
-          </>
-        ) : stepNum === 2 ? (
-          <img
-            src={gender === 'female' ? sideProfileGuideFemale : sideProfileGuide}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center top' }}
-          />
-        ) : stepNum === 1 ? (
-          // object-fit: cover + object-position: bottom (not contain) — this
-          // is a deliberate, computed crop, not a guess. Container is
-          // aspect-[4/5] (0.8); image is 1000x1400 (0.7143). Under cover,
-          // that mismatch always scales by width (image is narrower than
-          // the box), which overflows the box's height by a fixed amount
-          // regardless of viewport size: 1400 - (1.25 / (1000/1000)) *
-          // 1000 = 150 source px. object-position: bottom anchors the
-          // image's bottom edge to the box's bottom edge, so those 150px
-          // come off the TOP only — exactly enough to crop out the orange
-          // dot (source rows 63-75) and the empty space around it, with
-          // ~60px of margin before the hairline (~row 210), which never
-          // gets touched. The chin (row ~1297) stays fully clear of the
-          // bottom edge — this crop budget comes off the top exclusively,
-          // it doesn't eat into the bottom margin at all (verified: chin
-          // margin is ~44px at 428px width, slightly MORE than it was
-          // under the old aspect-[3/4]+contain framing, not less).
-          <img
-            src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full"
-            style={{ objectFit: 'cover', objectPosition: 'center bottom' }}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-4 p-8">
-            <p className="text-white/60 text-xs text-center font-body max-w-[200px]">{guide}</p>
-          </div>
-        )}
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 mb-3 rounded-2xl border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
-          <AlertCircle size={15} className="text-warning flex-shrink-0" />
-          <p className="text-sm text-warning font-body flex-1">{error}</p>
-          <button onClick={() => setError('')} aria-label="Dismiss error" className="ml-1 flex-shrink-0 opacity-50 hover:opacity-100">
-            <X size={14} className="text-warning" />
-          </button>
-        </div>
-      )}
-
-      <input ref={uploadRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(URL.createObjectURL(f), f) }} className="hidden" />
-
-      {stepNum !== 2 && (
-        <div className="mb-1">
-          <button
-            onClick={() => setShowActionSheet(true)}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-full active:scale-95 transition-transform"
-            style={{ background: GOLD_GRADIENT, boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-          >
-            <Camera size={18} style={{ color: '#0A0A0A' }} />
-            <span className="text-[15px] font-heading font-bold" style={{ color: '#0A0A0A' }}>
-              {photo ? 'Retake Selfie' : 'Upload or Take a Selfie'}
-            </span>
-          </button>
-        </div>
-      )}
-      <AnimatePresence>
-        {showActionSheet && (
-          <PhotoActionSheet
-            onClose={() => setShowActionSheet(false)}
-            options={[
-              { label: 'Take Photo', icon: Camera, onSelect: () => { setShowActionSheet(false); handleCameraClick() } },
-              { label: 'Choose from Library', icon: Upload, onSelect: () => { setShowActionSheet(false); handleUploadClick() } },
-            ]}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -1675,6 +1379,7 @@ export default function PhysiqueScan() {
   const isPremium         = useStore(s => s.isPremium)
   const scanCount         = useStore(s => s.scanCount)
   const userProfile       = useStore(s => s.userProfile)
+  const savedPhysiqueStats = userProfile?.physiqueStats
   const lastScanDate      = useStore(s => s.lastScanDate)
   const token             = useStore(s => s.token)
   const setPendingFacePhoto = useStore(s => s.setPendingFacePhoto)
@@ -1702,10 +1407,10 @@ export default function PhysiqueScan() {
   const [showPhotoChoice, setShowPhotoChoice] = useState(false) // bottom sheet: take vs upload
   const [previewPhoto, setPreviewPhoto]    = useState(null)  // {url, blob, forStep} — shown after capture for confirm/retake
   const [gender, setLocalGender]          = useState(savedGender ?? 'male')
-  const [height, setHeight]               = useState('')
-  const [weight, setWeight]               = useState('')
-  const [heightUnit, setHeightUnit]       = useState('cm')
-  const [weightUnit, setWeightUnit]       = useState('kg')
+  const [height, setHeight]               = useState(() => String(savedPhysiqueStats?.heightCm ?? 175))
+  const [weight, setWeight]               = useState(() => String(savedPhysiqueStats?.weightKg ?? 75))
+  const [heightUnit, setHeightUnit]       = useState(savedPhysiqueStats?.heightUnit === 'ft' ? 'ft' : 'cm')
+  const [weightUnit, setWeightUnit]       = useState(savedPhysiqueStats?.weightUnit === 'lbs' ? 'lbs' : 'kg')
   const [facePhoto, setFacePhoto]         = useState(null)
   const [sidePhoto, setSidePhoto]         = useState(null)
   const [analysisStep, setAnalysisStep]   = useState(0)
@@ -1736,6 +1441,8 @@ export default function PhysiqueScan() {
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
+  const physiqueUploadInputRef = useRef(null)
+  const autoAnalyzedPhotoRef = useRef(null)
   const rateLimitInitial  = useRef(30)
   const sideTriggerRef    = useRef(null)
 
@@ -1794,18 +1501,44 @@ export default function PhysiqueScan() {
     return Promise.race([convert, timeout])
   }
 
-  // Auto-advance from photo step to height/weight step (no side profile)
+  // Ask for stats once. After the first scan, reuse the saved body stats and
+  // start scoring as soon as the next photo is ready.
   useEffect(() => {
-    if (step !== 1 || !facePhoto) return
-    setStep(2)
-  }, [step, facePhoto])
+    if (!facePhoto || (step !== 1 && step !== 2)) return
+    const hasSavedStats = Number.isFinite(Number(savedPhysiqueStats?.heightCm))
+      && Number(savedPhysiqueStats?.heightCm) > 0
+      && Number.isFinite(Number(savedPhysiqueStats?.weightKg))
+      && Number(savedPhysiqueStats?.weightKg) > 0
+    if (!hasSavedStats) {
+      if (step !== 2) setStep(2)
+      return
+    }
+    if (autoAnalyzedPhotoRef.current === facePhoto) return
+    autoAnalyzedPhotoRef.current = facePhoto
+    setStep(3)
+    const timer = setTimeout(() => startAnalysisRef.current?.(), 50)
+    return () => clearTimeout(timer)
+  }, [step, facePhoto, savedPhysiqueStats])
 
   // skipSideOverride — set true when user taps "Skip Side Profile"
   async function startAnalysis(skipSideOverride = false) {
     if (isFreeScanBlocked) { navigate('/premium'); return }
 
+    // Mark this photo as already intentionally submitted. Saving the first
+    // stats profile below must not make the current photo auto-submit twice.
+    if (facePhoto) autoAnalyzedPhotoRef.current = facePhoto
     const skipSide = skipSideOverride
     const g        = gender ?? 'male'
+    const heightCm = Number(height)
+    const weightKg = Number(weight)
+    if (Number.isFinite(heightCm) && heightCm > 0 && Number.isFinite(weightKg) && weightKg > 0) {
+      useStore.setState(state => ({
+        userProfile: {
+          ...(state.userProfile || {}),
+          physiqueStats: { heightCm, weightKg, heightUnit, weightUnit },
+        },
+      }))
+    }
     setGender(g)
     setStep(3)  // analyzing
     setError('')
@@ -1899,8 +1632,10 @@ export default function PhysiqueScan() {
         try {
           setScanInFlight(true)
           // Convert to metric for the server — server prompt uses cm/kg
-          const heightCm = height ? (heightUnit === 'ft' ? Math.round(parseFloat(height) * 30.48) : parseFloat(height)) : null
-          const weightKg = weight ? (weightUnit === 'lbs' ? Math.round(parseFloat(weight) * 0.453592) : parseFloat(weight)) : null
+          // Slider state is stored in metric units even when imperial units
+          // are selected for display.
+          const heightCm = height ? Number(height) : null
+          const weightKg = weight ? Number(weight) : null
           const scoreCall = api.ai.scorePhysique({
             bodyImage: faceB64,
             ...(sideB64 ? { sideImage: sideB64 } : {}),
@@ -1934,7 +1669,6 @@ export default function PhysiqueScan() {
       const scanRecord = {
         id:             `scan-${Date.now()}`,
         scanType:       'physique',
-        progressSavedAt: physiqueScoredAt,
         scanDate:       physiqueScoredAt,
         analyzedAt:     physiqueScoredAt,
         facePhotoUrl:   faceB64,
@@ -2107,15 +1841,12 @@ export default function PhysiqueScan() {
     <div className="flex flex-col h-full bg-page">
       <Helmet>
         <title>AI Physique Scan | Ascendus</title>
-        <meta name="description" content="Upload your photo for an instant AI face rating and personalized improvement plan. Get your free looksmax scan in under 60 seconds." />
+        <meta name="description" content="Take photos for an instant AI physique scan and personalized improvement plan." />
         <meta name="keywords" content="face rating, AI face scan, looksmax scanner, appearance score, face analyzer, glow up scan" />
       </Helmet>
 
-      {/* Header — steps 1 and 2 (Face Photo, Side Profile) render the exact
-          same markup (only the title text differs), so the two screens are
-          guaranteed pixel-identical rather than two separately hand-tuned
-          copies that can drift apart. Step 0 (gender select) is the only
-          one still using PageHeader. */}
+      {/* Keep the photo and body-stats steps in the same visual header format
+          as the face scan so switching scan types feels like one flow. */}
       {!isAnalyzing && (
         <div className="relative flex-shrink-0 px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', paddingBottom: 16 }}>
           <button
@@ -2137,7 +1868,7 @@ export default function PhysiqueScan() {
             <ChevronLeft size={18} className="text-primary" />
           </button>
           <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: GOLD }}>
-            PHYSIQUE SCAN
+            STEP {step === 1 ? '1' : '2'} OF 2
           </p>
           <h1 className="font-heading font-bold text-[26px] leading-tight text-primary" style={{ letterSpacing: '-0.02em' }}>
             {step === 2 ? 'Enter your body stats' : 'Take your upper body photo'}
@@ -2147,7 +1878,9 @@ export default function PhysiqueScan() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait">
+        {/* Reset presence bookkeeping with the step, matching the face scan
+            so an outgoing capture view cannot linger over the next screen. */}
+        <AnimatePresence key={`scan-step-${step}`} mode="wait">
           {step === 2 && !isAnalyzing && (
             <motion.div key="stats" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full">
               <HeightWeightSelector
@@ -2159,15 +1892,23 @@ export default function PhysiqueScan() {
             </motion.div>
           )}
           {step === 1 && !cameraOpen && !previewPhoto && (
-            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6">
-              <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '4/5' }}>
+            <motion.div key={`guide-${step}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full flex flex-col items-center justify-center px-6" style={{ overflow: 'visible' }}>
+              <div className="w-full rounded-2xl" style={{ aspectRatio: '4/5', overflow: 'visible', position: 'relative', zIndex: 5, marginTop: '-24px', paddingTop: '24px' }}>
                 <img
                   src={gender === 'female' ? faceGuidePhotoFemale : faceGuidePhoto}
                   alt="Guide"
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scale(1)', transformOrigin: 'center center' }}
+                  className="w-full h-full object-cover rounded-2xl"
                 />
               </div>
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
+                className="w-full flex-shrink-0 mt-[30px] h-[60px] rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center"
+                style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+              >
+                Begin Scan
+              </motion.button>
 
               {/* iOS-style action sheet — appears over the guide content */}
               <AnimatePresence>
@@ -2195,32 +1936,6 @@ export default function PhysiqueScan() {
                         style={{ background: 'rgba(30,30,32,0.96)', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
                       >
                         <Camera size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Take Photo
-                      </button>
-                      {/* Choose from Library row */}
-                      <button
-                        onClick={async () => {
-                          triggerHaptic(); setShowPhotoChoice(false)
-                          try {
-                            let url = null
-                            if (isNative()) { url = await pickPhoto() }
-                            else {
-                              url = await new Promise(resolve => {
-                                const inp = document.createElement('input')
-                                inp.type = 'file'; inp.accept = 'image/*'
-                                inp.onchange = e => resolve(e.target.files?.[0] ? URL.createObjectURL(e.target.files[0]) : null)
-                                inp.click()
-                              })
-                            }
-                            if (url) {
-                              if (step === 1) { setFacePhoto(url); setError(''); setStep(2) }
-                              else { setTransitioning(true); setSidePhoto(url); setError(''); setTimeout(() => { setStep(3); setTransitioning(false); setTimeout(() => startAnalysisRef.current?.(), 50) }, 300) }
-                            }
-                          } catch {}
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-4 font-heading font-semibold text-[17px] active:opacity-70"
-                        style={{ background: 'rgba(30,30,32,0.96)', color: '#fff' }}
-                      >
-                        <Upload size={18} style={{ color: 'rgba(255,255,255,0.7)' }} /> Choose from Library
                       </button>
                     </motion.div>
                   </>
@@ -2435,27 +2150,51 @@ export default function PhysiqueScan() {
       )}
 
       {/* Pinned bottom button — identical position/size on every step */}
-      {!isAnalyzing && !cameraOpen && !previewPhoto && (
+      {!isAnalyzing && !cameraOpen && !previewPhoto && step === 2 && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {step === 1 && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { triggerHaptic(); setShowPhotoChoice(true) }}
-              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-            >
-              Begin Scan
-            </motion.button>
-          )}
-          {step === 2 && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { triggerHaptic(); startAnalysis(true) }}
-              className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
-              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
-            >
-              Analyze My Physique
-            </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { triggerHaptic(); startAnalysis(true) }}
+            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px]"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+          >
+            Analyze My Physique
+          </motion.button>
+        </div>
+      )}
+
+      {!isAnalyzing && !cameraOpen && !previewPhoto && step === 1 && (
+        <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
+          {/* The upload is temporary and replaces only the reserved control
+              space; the guide photo and Begin Scan button stay in place. */}
+          {SHOW_TEMPORARY_PHYSIQUE_UPLOAD && (
+            <>
+              <input
+                ref={physiqueUploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (!file) return
+                  if (!file.type.startsWith('image/')) {
+                    setError('Choose an image file to continue.')
+                    return
+                  }
+                  setError('')
+                  setPreviewPhoto({ url: URL.createObjectURL(file), blob: file, forStep: 1 })
+                }}
+              />
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { triggerHaptic(); physiqueUploadInputRef.current?.click() }}
+                className="w-full mt-3 h-[46px] rounded-2xl font-heading font-semibold text-[15px] flex items-center justify-center gap-2"
+                style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
+              >
+                <Upload size={17} /> Upload a Picture
+              </motion.button>
+            </>
           )}
         </div>
       )}

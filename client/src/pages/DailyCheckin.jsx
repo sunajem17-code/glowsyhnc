@@ -7,13 +7,13 @@ import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
 import StreakFlame from '../components/StreakFlame'
 import { scheduleStreakReminder } from '../utils/notifications'
-import { GOLD, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const WATER_GOAL = 8
 
 // This whole screen is a fixed-dark surface — same deliberate exception
-// PremiumOnboarding.jsx and HairMaxx.jsx make — so every color below is a
+// PremiumOnboarding.jsx makes — so every color below is a
 // literal, not a text-primary/text-secondary/var(--card) theme token. Those
 // tokens flip to their LIGHT-mode values whenever the app's theme setting
 // is light, which would put near-black text on this black background and
@@ -194,7 +194,7 @@ export default function DailyCheckin() {
     )
   }
 
-  // Header ported from Scan.jsx's step header / HairMaxx's intro header:
+  // Header ported from Scan.jsx's step header:
   // same circular back button + gold eyebrow + big heading, instead of the
   // old generic PageHeader, so this screen reads as the same template.
   return (
@@ -360,8 +360,8 @@ export default function DailyCheckin() {
             <button
               onClick={() => { triggerHaptic(); handleSubmit() }}
               disabled={completionScore === 0}
-              className={`w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-opacity ${completionScore === 0 ? 'opacity-50' : ''}`}
-              style={{ background: GOLD, color: '#080808' }}
+              className={`w-full h-[60px] rounded-2xl font-heading font-bold text-[17px] transition-opacity ${completionScore === 0 ? 'opacity-50' : ''}`}
+              style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
             >
               Log Today's Check-In
             </button>

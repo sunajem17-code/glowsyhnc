@@ -12,6 +12,7 @@ const { calculatePotentialScore, withPotentialScore } = require('../utils/potent
 const { normalizePhysiqueScores } = require('../utils/physiqueScore')
 const { normalizeAppearanceAnalysis } = require('../lib/appearanceAnalysis')
 const { APPEARANCE_ADVICE_GUIDANCE } = require('../lib/appearanceAdviceGuidance')
+const { catalogPrompt } = require('../lib/appearanceFindingCatalog')
 
 const router = express.Router()
 
@@ -34,7 +35,7 @@ function sampleB64(s) {
 
 function hashImages(faceB64, bodyB64, sideB64 = null) {
   return crypto.createHash('sha256')
-    .update(cacheNamespace() + '||v11_five_direct_personal_cons||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
+    .update(cacheNamespace() + '||v17_expanded_face_catalog||' + sampleB64(faceB64) + '||' + sampleB64(bodyB64) + '||' + (sideB64 ? sampleB64(sideB64) : 'noside'))
     .digest('hex')
     .slice(0, 24)
 }
@@ -50,7 +51,7 @@ function computeFullHash(faceB64, bodyB64, sideB64 = null) {
   h.update('||SIDE:')
   h.update(sideB64 ?? 'noside')
   h.update('||' + cacheNamespace())
-  h.update('||v11_five_direct_personal_cons') // refresh findings after the minimum-five Cons policy change
+  h.update('||v17_expanded_face_catalog') // refresh cached results after expanding the selectable findings
   return h.digest('hex') // 64-char hex string
 }
 
@@ -63,11 +64,43 @@ function cachedResultForScan(value, scanId) {
       improvement_opportunities: embedded.improvementOpportunities,
       positive_observations: embedded.positiveObservations,
     }, scanId)
-    if (embedded.version !== 15) return null
+    if (embedded.version !== 21) return null
     return { ...value, appearanceAnalysis: normalized }
   } catch {
     return null
   }
+}
+
+// Keep the same finding text across scans when the model still selects the
+// same catalog ID. The current scan controls which IDs remain, so a resolved
+// issue disappears instead of being carried forward as stale advice.
+function retainStableFindingLanguage(result, previousResult, scanBenchmark, scanId) {
+  const current = result?.appearanceAnalysis
+  const previous = previousResult?.appearanceAnalysis
+  const withBenchmark = { ...result }
+  if (scanBenchmark) withBenchmark.scanBenchmark = scanBenchmark
+  else if (!previousResult && scanId) withBenchmark.scanBenchmark = {
+    version: 1,
+    scanId,
+    scores: {
+      overallScore: result.overallScore,
+      faceScore: result.faceScore,
+      groomingScore: result.groomingScore,
+      faceSubScores: result.faceSubScores,
+      faceMetrics: result.faceMetrics,
+      pillars: result.pillars,
+    },
+  }
+  if (!current || previous?.version !== 21) return withBenchmark
+  const priorStrengths = new Map((previous.strengths || []).filter(row => row?.catalogId).map(row => [row.catalogId, row]))
+  const priorCons = new Map((previous.improvementOpportunities || []).filter(row => row?.catalogId).map(row => [row.catalogId, row]))
+  const reuse = (rows, prior) => rows.map(row => prior.has(row.catalogId) ? { ...prior.get(row.catalogId) } : row)
+  return { ...withBenchmark, appearanceAnalysis: {
+    ...current,
+    strengths: reuse(current.strengths || [], priorStrengths),
+    improvementOpportunities: reuse(current.improvementOpportunities || [], priorCons),
+    scanId: current.scanId,
+  } }
 }
 
 function getClient() {
@@ -226,7 +259,7 @@ function sanitizeAnalysisEvidence(input) {
 // not image/input processing.
 // When sideBase64 is provided a second image is sent and profile metrics are
 // returned in the "profile" key. No body. No overall score.
-async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null, analysisEvidence = null) {
+async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null, sideMediaType = null, sideProfileGeometry = null, analysisEvidence = null, scanBenchmark = null) {
   const client = getClient()
   const isFemale = gender === 'female'
   const hasSide = !!sideBase64
@@ -244,6 +277,10 @@ async function getCoreScore(faceBase64, faceMediaType, gender, sideBase64 = null
   const evidenceNote = analysisEvidence?.status === 'measured'
     ? `\n\nDETERMINISTIC PHOTOGRAPHIC EVIDENCE (calculated before this call):\n${JSON.stringify(analysisEvidence)}\nTreat these ratios as the authoritative measured geometry. Do not describe your own visual estimate as a measurement. The numeric appearance scores below remain a legacy subjective product output and must not be described as objective geometry.`
     : '\n\nNo reliable deterministic geometry was supplied. Do not invent measurements.'
+
+  const benchmarkNote = scanBenchmark?.scores
+    ? `\n\nFIRST-SCAN BENCHMARK (same authenticated account; use only to keep ratings consistent): ${JSON.stringify(scanBenchmark.scores)}. Assess the current face as it looks now. Keep a feature near its benchmark score when there is no clear visible change; move it only when the current scan provides a real visible reason. Do not assume a feature improved or worsened from elapsed time alone. Do not copy a score just because it is the benchmark.`
+    : ''
 
   const profileSection = hasSide ? `
 
@@ -265,10 +302,9 @@ Include a "profile" object in your JSON response.` : ''
   const response = await client.generate({
     responseSchema: aiSchemas.core(hasSide), responseName: 'face_core',
     model: 'claude-sonnet-4-6',
-    // extended_metrics (30 more {score, descriptor} pairs) moved to its own
-    // call (getExtendedMetrics) — this budget only needs to cover the core
-    // fields + optional profile block now.
-    max_tokens: 8192,
+    // Keep enough output budget for the full scoring object and detailed,
+    // feature-by-feature Pros and Cons in the same scoring response.
+    max_tokens: 12000,
     temperature: 0,
     system: `You are a facial attractiveness and grooming analyst. You output ONLY a JSON object. No explanations. No text. Just JSON.
 
@@ -391,7 +427,7 @@ FACE METRICS — for each metric provide a score (1.0–10.0) and a one-line des
 - masculinity_femininity: strength of ${isFemale ? 'feminine' : 'masculine'} sex-specific facial characteristics
 - facial_thirds: balance of forehead (upper) : mid-face (middle) : chin/jaw (lower) thirds
 Descriptor rules: describe what IS there, not what is missing. Max 10 words. No filler phrases ("overall", "somewhat", "rather").
-${profileSection}${evidenceNote}
+${profileSection}${evidenceNote}${benchmarkNote}
 
 VISUAL OBSERVATIONS — report only characteristics actually visible. Each observation must be independent. A low skin score does not prove acne, scarring, oiliness, dark circles, or dullness. Do not diagnose a medical condition. Allowed ids are visible_acne, visible_scarring, visible_oiliness, visible_dark_circles, visible_dullness, visible_temporal_recession, visible_crown_thinning, visible_diffuse_thinning, hairline_asymmetry, facial_hair, and grooming_issue. Omit unsupported items. Crown thinning may only be reported when the crown is visible. Each item must name the supporting image and a confidence level.
 
@@ -399,6 +435,8 @@ KEY STRENGTHS — return EXACTLY 2 short summary sentences in key_strengths. The
 
 APPEARANCE ANALYSIS — inspect the front and side views when both are supplied. Return appearance_analysis with strengths, improvement_opportunities, and positive_observations. Apply these rules to every title, explanation, and Try step:
 ${APPEARANCE_ADVICE_GUIDANCE}
+Every appearance finding must use one catalog_id from this scan-supported catalog. Reuse an ID whenever the same feature concern is being described; do not create multiple differently worded findings for one issue. The server will replace titles with the catalog's fixed title. For each distinct feature score below 8, include its matching score-linked catalog finding. Add other catalog findings only when clearly supported by this person's current face. Do not fill a quota by inventing or repeating flaws.
+${catalogPrompt()}
 Positive observations can be empty. For scan JSON recommendations, describe product categories rather than commercial brands or URLs. Named products with purchase links belong in the coach/product recommendation response. Do not change the JSON schema.
 
 TOP IMPROVEMENT — write 3–4 sentences. (1) Name the weakest specific trait by name. (2) Explain exactly what makes it score low — describe the specific structural or visual evidence observable in this face. (3) Give a concrete, specific protocol: what type of product, routine, or action and how often — not a generic suggestion. Make it genuinely useful for THIS person based on what you observed.
@@ -427,8 +465,8 @@ Return ONLY this JSON — no markdown, nothing else:
   "key_weaknesses": ["<weakness 1>", "<weakness 2>"],
   "top_improvement": "<single most impactful improvement>",
   "appearance_analysis": {
-    "strengths": [{"title":"<simple title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
-    "improvement_opportunities": [{"title":"<simple title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
+    "strengths": [{"catalog_id":"<catalog ID>","title":"<catalog title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
+    "improvement_opportunities": [{"catalog_id":"<catalog ID>","title":"<catalog title>","observation":"<exact visible detail>","significance":"<plain reason it matters>","recommendation":"<personal, doable next step>"}],
     "positive_observations": []
   },
   "visual_observations": [
@@ -711,9 +749,11 @@ SCORING RULES:
 - frame_width: apparent shoulder and torso width relative to the visible body proportions, with uncertainty for clothing, pose, and perspective. Do not pretend to determine exact skeletal width.
 - potential: realistic room for aesthetic improvement suggested by visible development and headroom. It is not a guarantee, genetic ceiling, or prediction. Its score must be at least the computed overall score.
 - body_fat_level: choose the closest visual category (very_lean / lean / average / above_average / heavy), not a medical classification.
-- Write 3–5 physique_strengths and 3–5 physique_improvements when the photo supports them; never pad the list with generic advice or repeat the same observation.
-- Make every finding useful and explanatory: return each as "Short title — 1–2 complete sentences explaining the visible evidence and why it matters." Aim for 20–35 words per finding. Be specific to this photo and mention uncertainty where pose, clothing, crop, or lighting limits the read.
-- Strengths should identify genuinely strong visible traits. Improvements should be focused, realistic opportunities supported by visible evidence; do not describe above-average categories as weaknesses just to fill the list.
+- For physique_strengths and physique_improvements, prioritize the four displayed body areas: muscle_mass, body_fat_score, v_taper, and frame_width. For each score below 8.0, include a corrective finding in physique_improvements; for each score of 8.0 or above, include a positive finding in physique_strengths only when supported by visible evidence. Keep strengths strictly positive and improvements strictly corrective.
+- Write findings about the person's body itself, as if describing them face to face. Never mention a photo, picture, image, lighting, camera, crop, pose, framing, clothing, shirt, face, or presentation in strengths or improvements. Do not use a visibility caveat as a substitute for a body-specific finding.
+- Each finding must name a specific visible body area, state what is strong or needs work in plain language, explain why it affects the physique, and give one practical and safe action. Do not invent anatomy, body-fat percentages, or skeletal measurements, and do not repeat one issue under different wording. You may include additional distinct findings only when they identify a separate, clearly visible physique feature.
+- Make each finding useful and specific: return it as "Short, direct title — 1–2 plain-language sentences explaining what is visible and why it matters. Try: one clear, practical action." Aim for 20–35 words total. Recommendations must address that body area; do not suggest a haircut, better photo, or general habit as a fix for a physique rating.
+- Keep advice realistic and safe. Do not prescribe crash diets, claim exercise changes bone structure, or infer a medical condition or exact body-fat percentage.
 - Keep overall on the existing 1–10 scale and calculate it from the five legacy categories as before.
 
 Return ONLY this JSON — no markdown, nothing else:
@@ -849,12 +889,14 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       return res.status(500).json({ error: 'AI scoring unavailable — selected AI provider key not configured on server' })
     }
 
-    const { faceImage, sideImage, bodyImage, gender = 'male', previousScore, bodyGeometry, sideProfileGeometry } = req.body
+    const { faceImage, sideImage, bodyImage, gender = 'male', bodyGeometry, sideProfileGeometry } = req.body
     const analysisEvidence = sanitizeAnalysisEvidence(req.body.analysisEvidence)
     if (!faceImage) {
       return res.status(400).json({ error: 'Face image is required' })
     }
 
+    const previousResult = coachScans.latestCompletedResult(req.userId)
+    const scanBenchmark = await coachScans.firstCompletedBenchmark(req.userId)
     completedScanId = coachScans.startScan(req.userId)
 
     // Detect actual media type BEFORE stripping the prefix
@@ -879,7 +921,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       if (cached) {
         const hydrated = withPotentialScore(cached)
         scoreCache.set(cacheKey, hydrated)
-        return res.json(await coachScans.finishScan(completedScanId, req.userId, hydrated))
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(hydrated, previousResult, scanBenchmark, completedScanId)))
       }
       scoreCache.delete(cacheKey)
       console.log('[aiScore] L1 entry missing valid appearance analysis — rescoring')
@@ -897,7 +939,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
         if (scoreCache.size >= 500) scoreCache.delete(scoreCache.keys().next().value)
         const cached = withPotentialScore(rebound)
         scoreCache.set(cacheKey, cached)
-        return res.json(await coachScans.finishScan(completedScanId, req.userId, cached))
+        return res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(cached, previousResult, scanBenchmark, completedScanId)))
       }
       console.log('[aiScore] L2 entry missing valid appearance analysis — rescoring')
     }
@@ -924,7 +966,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       console.log('[aiScore] STEP 1 — Face scoring...')
       const tFaceStart = Date.now()
       const facePromise = withRetry(
-        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry, analysisEvidence),
+        () => getCoreScore(faceBase64, faceMediaType, gender, sideBase64, sideMediaType, sideProfileGeometry, analysisEvidence, scanBenchmark),
         'face'
       ).then(result => {
         console.log(`[aiScore:TIMING] STEP 1 (face) took ${Date.now() - tFaceStart}ms`)
@@ -977,12 +1019,11 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     console.log('[aiScore] Final:', rawFinal, physiqueResult ? `(face ${faceOnlyScore} × ${FACE_WEIGHT} + physique ${physiqueResult.overall} × ${PHYSIQUE_WEIGHT})` : '(face only)')
     console.log('[aiScore] Pillars — H:', harmony, 'A:', angularity, 'F:', features, 'D:', dimorphism)
 
-    // Rescan anchoring — cap score movement at ±1.0 per rescan to prevent
-    // photo-variance-driven score jumps. Only applied when previousScore is provided.
+    // Keep each scan score server-owned. The old client-supplied previousScore
+    // could influence scoring and was not a trustworthy benchmark.
     let final = rawFinal
-    const prevNum = typeof previousScore === 'number' && previousScore >= 1 && previousScore <= 10
-      ? previousScore
-      : null
+    const prevNum = typeof previousResult?.overallScore === 'number' && previousResult.overallScore >= 1 && previousResult.overallScore <= 10
+      ? previousResult.overallScore : null
     if (prevNum !== null) {
       const delta = rawFinal - prevNum
       if (Math.abs(delta) > 0.5) {
@@ -1096,7 +1137,7 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
       }
     }
 
-    res.json(await coachScans.finishScan(completedScanId, req.userId, result))
+    res.json(await coachScans.finishScan(completedScanId, req.userId, retainStableFindingLanguage(result, previousResult, scanBenchmark, completedScanId)))
   } catch (err) {
     try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {

@@ -1,10 +1,15 @@
-import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner } from '../utils/onboardingStartup.js'
 import { API_BASE } from '../utils/backend'
+import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner } from '../utils/onboardingStartup.js'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
 import { checkAchievements } from '../utils/achievements'
-import { isLocalDeveloperPreview } from '../utils/developerUnlock'
+import { canApplyNegativePremiumRefresh } from '../utils/premiumStatus'
+import { isLocalProPreviewAvailable } from '../utils/developerUnlockPreview.js'
+
+// Monotonic revision prevents an entitlement refresh started before a purchase
+// from applying an outdated "free" result after the purchase succeeds.
+let premiumStateRevision = 0
 
 const useStore = create(
   persist(
@@ -19,55 +24,71 @@ const useStore = create(
       isLocalProPreview: false,
       isLocalProPreviewConfigured: false,
       _premiumBeforeLocalPreview: false,
-      setLocalProPreview: (enabled) => set(state => {
-        if (enabled && !isLocalDeveloperPreview()) return state
-        if (enabled) {
-          return {
-            isLocalProPreview: true,
-            isLocalProPreviewConfigured: true,
-            _premiumBeforeLocalPreview: state.isLocalProPreview ? state._premiumBeforeLocalPreview : state.isPremium,
-            isPremium: true,
+      setLocalProPreview: (enabled) => {
+        if (enabled && !isLocalProPreviewAvailable()) return
+        set(state => {
+          if (enabled) {
+            return {
+              isLocalProPreview: true,
+              isLocalProPreviewConfigured: true,
+              _premiumBeforeLocalPreview: state.isLocalProPreview
+                ? state._premiumBeforeLocalPreview
+                : state.isPremium,
+              // This flag only controls client-side preview UI. API routes
+              // continue to enforce subscription access on the server.
+              isPremium: true,
+            }
           }
-        }
-        return {
-          isLocalProPreview: false,
-          isLocalProPreviewConfigured: true,
-          isPremium: state._premiumBeforeLocalPreview,
-          _premiumBeforeLocalPreview: false,
-        }
-      }),
-
-      setAuth: (user, token) => set(state => ({
-        hasOnboarded: hasCompletedOnboarding({ ...state, user }),
-        user,
-        token,
-        upgradeWelcomePending: false,
-        isAuthenticated: true,
-        isGuest: false,
-        developerPreviewUnlocked: false,
-        // Hydrate from the user object immediately so paying users aren't briefly downgraded
-        // while the async RevenueCat / server check completes.
-        isPremium: (get().isLocalProPreview && isLocalDeveloperPreview()) ||
-          user?.subscriptionTier === 'premium' ||
-          user?.subscription_tier === 'premium' ||
-          user?.is_pro === true ||
-          false,
-      })),
-      setGuestSession: (userId, token) => set(state => ({
-        hasOnboarded: hasCompletedOnboarding({ ...state, user: { id: userId } }),
-        user: { id: userId },
-        token,
-        upgradeWelcomePending: false,
-        isAuthenticated: true,
-        isGuest: true,
-        developerPreviewUnlocked: false,
-        isPremium: get().isLocalProPreview && isLocalDeveloperPreview(),
-      })),
-      setPremium: (val) => set({ isPremium: val }),
+          return {
+            isLocalProPreview: false,
+            isLocalProPreviewConfigured: true,
+            isPremium: state._premiumBeforeLocalPreview,
+            _premiumBeforeLocalPreview: false,
+          }
+        })
+      },
+      setAuth: (user, token) => {
+        premiumStateRevision += 1
+        set(state => ({
+          user,
+          hasOnboarded: hasCompletedOnboarding({ ...state, user }),
+          token,
+          upgradeWelcomePending: false,
+          isAuthenticated: true,
+          isGuest: false,
+          // Hydrate from the user object immediately so paying users aren't briefly downgraded
+          // while the async RevenueCat / server check completes.
+          isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) ||
+            user?.subscriptionTier === 'premium' ||
+            user?.subscription_tier === 'premium' ||
+            user?.is_pro === true ||
+            false,
+        }))
+      },
+      setGuestSession: (userId, token) => {
+        premiumStateRevision += 1
+        set(state => {
+          const user = { id: userId }
+          return {
+            user,
+            hasOnboarded: hasCompletedOnboarding({ ...state, user }),
+            token,
+            upgradeWelcomePending: false,
+            isAuthenticated: true,
+            isGuest: true,
+            isPremium: state.isLocalProPreview && isLocalProPreviewAvailable(),
+          }
+        })
+      },
+      setPremium: (val) => {
+        premiumStateRevision += 1
+        set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || val }))
+      },
       logout: () => {
+        premiumStateRevision += 1
         // Clear session keys so a subsequent login on the same device doesn't
         // inherit stale onboarding state or the pro-splash suppression flag.
-        try { localStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
+        try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
         try { sessionStorage.removeItem('asc_pro_splash_shown') } catch { /* ignore */ }
         try { sessionStorage.removeItem('asc_reveal_shown') } catch { /* ignore */ }
         set({
@@ -76,7 +97,6 @@ const useStore = create(
           upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
-          developerPreviewUnlocked: false,
           scans: [],
           currentPlan: null,
           currentScan: null,
@@ -85,15 +105,11 @@ const useStore = create(
           streak: { current: 0, longest: 0, lastDate: null },
           isPremium: false,
           isLocalProPreview: false,
+          isLocalProPreviewConfigured: false,
           _premiumBeforeLocalPreview: false,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
-          hairProfile: null,
-          hairRecommendationCache: null,
-          savedHairLookIds: [],
           hasOnboarded: false,
-          pendingAchievement: null,
-          achievementQueue: [],
           gender: null,
           userProfile: null,
           legalConsented: false,
@@ -114,11 +130,10 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
-        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
         }
-        return { scans: newScans, achievements: newAchievements, pendingAchievement, achievementQueue }
+        return { scans: newScans, achievements: newAchievements, pendingAchievement }
       }),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
@@ -190,11 +205,10 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
-        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
         }
-        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement, achievementQueue }
+        return { checkins: newCheckins, todayCheckin: checkin, achievements: newAchievements, pendingAchievement }
       }),
       setTodayCheckin: (checkin) => set({ todayCheckin: checkin }),
 
@@ -205,35 +219,35 @@ const useStore = create(
         const toUnlock = checkAchievements(newState)
         const newAchievements = [...state.achievements]
         let pendingAchievement = state.pendingAchievement
-        const achievementQueue = [...state.achievementQueue]
         for (const key of toUnlock) {
-          if (!newAchievements.includes(key)) { newAchievements.push(key); if (!pendingAchievement) pendingAchievement = key; else if (!achievementQueue.includes(key)) achievementQueue.push(key) }
+          if (!newAchievements.includes(key)) { newAchievements.push(key); pendingAchievement = key }
         }
-        return { streak, achievements: newAchievements, pendingAchievement, achievementQueue }
+        return { streak, achievements: newAchievements, pendingAchievement }
       }),
 
       // Settings
       theme: 'dark',
-      toggleTheme: () => set(state => ({
-        theme: state.theme === 'light' ? 'dark' : 'light',
-      })),
 
       // Onboarding
       hasOnboarded: false,
       onboardingHydrated: false,
       onboardingCompletedByUser: {},
-      finishOnboardingHydration: () => set({ onboardingHydrated: true }),
-      // Only the final onboarding screen can create a completion record.
-      // Legacy sign-in/payment callers with no final step cannot complete it.
       setHasOnboarded: (completedStep) => {
-        if (completedStep !== FINAL_ONBOARDING_STEP) return false
-        set(state => ({ hasOnboarded: true,
-          onboardingCompletedByUser: { ...state.onboardingCompletedByUser, [onboardingOwner(state.user)]: true } }))
+        // The onboarding flow passes its final step. PaymentSuccess can also
+        // finish that same flow after a hard redirect, where no step survives.
+        if (completedStep != null && completedStep !== FINAL_ONBOARDING_STEP) return false
+        set(state => ({
+          hasOnboarded: true,
+          onboardingCompletedByUser: {
+            ...state.onboardingCompletedByUser,
+            [onboardingOwner(state.user)]: true,
+          },
+        }))
         return true
       },
       resetOnboarding: () => {
-        try { localStorage.removeItem('ascendus_onboarding_draft'); sessionStorage.removeItem('ascendus_onboarding_draft') } catch {}
-        try { sessionStorage.removeItem('asc_post_onboard_dest') } catch {}
+        try { localStorage.removeItem('ascendus_onboarding_draft'); sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
+        try { sessionStorage.removeItem('asc_post_onboard_dest') } catch { /* ignore */ }
         set(state => {
           const records = { ...state.onboardingCompletedByUser }
           delete records[onboardingOwner(state.user)]
@@ -306,25 +320,12 @@ const useStore = create(
       hairType: null, // null = not set, 'straight'|'wavy'|'curly'|'coily'|'locs'|'bald'
       setHairType: (t) => set({ hairType: t }),
 
-      // HairMax keeps lightweight choices, recommended catalog ids, and reasons.
-      // Model photography is static and never stored in localStorage.
-      hairProfile: null,
-      hairRecommendationCache: null,
-      savedHairLookIds: [],
-      setHairProfile: (profile) => set({ hairProfile: profile }),
-      setHairRecommendationCache: (cache) => set({ hairRecommendationCache: cache }),
-      toggleSavedHairLook: (id) => set(state => ({
-        savedHairLookIds: state.savedHairLookIds.includes(id)
-          ? state.savedHairLookIds.filter(value => value !== id)
-          : [...state.savedHairLookIds, id],
-      })),
-
       // Premium
       isPremium: false,
-      setIsPremium: (v) => set({ isPremium: v }),
-      // Session-only local preview access; intentionally excluded from persist.partialize.
-      developerPreviewUnlocked: false,
-      setDeveloperPreviewUnlocked: (v) => set({ developerPreviewUnlocked: v }),
+      setIsPremium: (v) => {
+        premiumStateRevision += 1
+        set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || v }))
+      },
 
       // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
       showUnlockSlideshow: false,
@@ -339,22 +340,25 @@ const useStore = create(
         // Throttle: skip if we refreshed within the last 60 seconds
         if (!force && Date.now() - _lastProRefresh < 60_000) return
         set({ _lastProRefresh: Date.now() })
+        const revisionAtStart = premiumStateRevision
+        let nativePremiumStatus = null
         try {
           // 0. On iOS check RevenueCat entitlements first (source of truth for IAP).
-          // isPro is a clean boolean once this resolves successfully — set it
-          // either way, not just when true. Previously this only ever
-          // promoted (if (isPro) set({isPremium:true})) and silently did
-          // nothing when isPro was false, meaning any isPremium:true that got
-          // set incorrectly elsewhere (a bug, a stale value, anything) could
-          // never self-correct even when RevenueCat clearly says otherwise.
-          // A thrown/rejected check (network failure, RC not synced yet) is
-          // NOT the same as an explicit false — that's genuinely unknown, so
-          // the catch below still does nothing, on purpose.
+          // A positive RevenueCat result promotes immediately. A negative
+          // result waits for the server response so an active server-verified
+          // entitlement (for example a web subscription) can still grant.
           try {
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPro }))
+              nativePremiumStatus = Boolean(isPro)
+              // RevenueCat is authoritative for App Store purchases. Promote
+              // immediately, but defer a negative result until the server
+              // check completes so its verified entitlement can also grant.
+              if (nativePremiumStatus) {
+                premiumStateRevision += 1
+                set({ isPremium: true })
+              }
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
 
@@ -366,13 +370,33 @@ const useStore = create(
             fetch(`${API_BASE}/user/profile`,    { headers }),
           ])
 
-          // Same reasoning as the RevenueCat check above — /payments/status is
-          // a dedicated, authoritative status endpoint that always returns a
-          // real boolean when the request succeeds, so an explicit false is
-          // just as trustworthy as an explicit true and should actually apply.
+          // The server status is also authoritative. A true response grants
+          // access; a false response only applies if no newer entitlement
+          // change happened while this refresh was in flight. This protects a
+          // newly completed purchase from an older refresh response.
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
-            set(state => ({ isPremium: (state.isLocalProPreview && isLocalDeveloperPreview()) || isPremium }))
+            if (isPremium === true) {
+              premiumStateRevision += 1
+              set({ isPremium: true })
+            } else if (isPremium === false && canApplyNegativePremiumRefresh({
+              revisionAtStart,
+              currentRevision: premiumStateRevision,
+              nativePremiumStatus,
+              serverStatus: isPremium,
+            })) {
+              premiumStateRevision += 1
+              set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || false }))
+            }
+          } else if (canApplyNegativePremiumRefresh({
+            revisionAtStart,
+            currentRevision: premiumStateRevision,
+            nativePremiumStatus,
+          })) {
+            // If the server is unavailable, an explicit RevenueCat negative
+            // can still correct stale local access.
+            premiumStateRevision += 1
+            set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || false }))
           }
 
           // /user/profile is different — it's a general profile hydration
@@ -388,12 +412,10 @@ const useStore = create(
             const serverStreak = profile.streak
             set(state => ({
               user: { ...state.user, ...fresh },
-              isPremium:
-                (state.isLocalProPreview && isLocalDeveloperPreview()) ||
+              isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || state.isPremium ||
                 fresh?.subscriptionTier === 'premium' ||
                 fresh?.subscription_tier === 'premium' ||
-                fresh?.is_pro === true ||
-                state.isPremium,
+                fresh?.is_pro === true,
               streak: serverStreak ? {
                 current: serverStreak.current_streak ?? state.streak.current,
                 longest: serverStreak.longest_streak ?? state.streak.longest,
@@ -426,13 +448,12 @@ const useStore = create(
 
       // Achievements
       achievements: [], // array of achievement keys that have been unlocked
-      achievementQueue: [],
       pendingAchievement: null, // key of achievement to celebrate (shown once then cleared)
       unlockAchievement: (key) => set(state => {
         if (state.achievements.includes(key)) return state
-        return { achievements: [...state.achievements, key], pendingAchievement: state.pendingAchievement || key, achievementQueue: state.pendingAchievement ? [...state.achievementQueue, key] : state.achievementQueue }
+        return { achievements: [...state.achievements, key], pendingAchievement: key }
       }),
-      clearPendingAchievement: () => set(state => ({ pendingAchievement: state.achievementQueue[0] || null, achievementQueue: state.achievementQueue.slice(1) })),
+      clearPendingAchievement: () => set({ pendingAchievement: null }),
 
       // Privacy Settings
       privacySettings: {
@@ -458,38 +479,56 @@ const useStore = create(
     {
       name: 'ascendus-storage',
       merge: (persistedState, currentState) => {
-        const merged = { ...currentState, ...persistedState, ...normalizeOnboardingCompletion(persistedState || {}), onboardingHydrated: false }
-        // First local-dev launch gets the requested preview automatically;
-        // after that, the Settings toggle's saved choice is respected.
-        if (isLocalDeveloperPreview() && !merged.isLocalProPreviewConfigured) {
+        const merged = {
+          ...currentState,
+          ...persistedState,
+          ...normalizeOnboardingCompletion(persistedState || {}),
+          onboardingHydrated: false,
+        }
+        // Dark appearance is the only supported theme; migrate devices that
+        // previously persisted light mode back to the fixed app appearance.
+        merged.theme = 'dark'
+        const localPreviewAvailable = isLocalProPreviewAvailable()
+        // Enable Local Pro on the first local developer run, then honor the
+        // saved Settings toggle on later runs. Production always discards the
+        // preview and restores only the real entitlement.
+        if (localPreviewAvailable && !merged.isLocalProPreviewConfigured) {
           merged.isLocalProPreview = true
+          merged.isLocalProPreviewConfigured = true
           merged._premiumBeforeLocalPreview = Boolean(merged.isPremium)
           merged.isPremium = true
-        }
-        // Never let a development preview carry over as premium access in a
-        // production build that happens to reuse this local storage.
-        if (!isLocalDeveloperPreview() && merged.isLocalProPreview) {
-          merged.isLocalProPreview = false
+        } else if (localPreviewAvailable && merged.isLocalProPreview) {
+          merged.isPremium = true
+        } else if (!localPreviewAvailable && merged.isLocalProPreview) {
           merged.isPremium = merged._premiumBeforeLocalPreview ?? Boolean(
             merged.user?.subscriptionTier === 'premium' ||
             merged.user?.subscription_tier === 'premium' ||
             merged.user?.is_pro === true
           )
+          merged.isLocalProPreview = false
+          merged.isLocalProPreviewConfigured = false
           merged._premiumBeforeLocalPreview = false
         }
+        delete merged.developerPreviewUnlocked
         return merged
       },
       // Normalize any glowScore stored in the old 0-100 scale back to 0-10
-      onRehydrateStorage: () => (state) => {
-        if (!state) {
-          // Corrupt/unavailable storage must finish checking and require onboarding.
-          queueMicrotask(() => useStore.setState({ onboardingHydrated: true, hasOnboarded: false, onboardingCompletedByUser: {} }))
+      onRehydrateStorage: () => (state, error) => {
+        if (!state || error) {
+          // Never leave the app behind the startup gate if persisted storage is
+          // unavailable or corrupt. In that case, start onboarding cleanly.
+          queueMicrotask(() => useStore.setState({
+            onboardingHydrated: true,
+            hasOnboarded: false,
+            onboardingCompletedByUser: {},
+          }))
           return
         }
         const fix = (s) => s && s.glowScore > 10 ? { ...s, glowScore: Math.round(s.glowScore) / 10 } : s
         if (state.scans) state.scans = state.scans.map(fix)
         if (state.currentScan) state.currentScan = fix(state.currentScan)
-        state.finishOnboardingHydration()
+        // Use a store update so React subscribers leave the startup screen.
+        useStore.setState({ onboardingHydrated: true })
       },
       partialize: (state) => ({
         user: state.user,
@@ -510,7 +549,6 @@ const useStore = create(
         checkins: state.checkins,
         todayCheckin: state.todayCheckin,
         streak: state.streak,
-        theme: state.theme,
         hasOnboarded: hasCompletedOnboarding(state),
         onboardingCompletedByUser: state.onboardingCompletedByUser,
         legalConsented: state.legalConsented,
@@ -521,15 +559,12 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
-        isLocalProPreview: isLocalDeveloperPreview() && state.isLocalProPreview,
-        isLocalProPreviewConfigured: isLocalDeveloperPreview() && state.isLocalProPreviewConfigured,
-        _premiumBeforeLocalPreview: isLocalDeveloperPreview() ? state._premiumBeforeLocalPreview : false,
+        isLocalProPreview: isLocalProPreviewAvailable() && state.isLocalProPreview,
+        isLocalProPreviewConfigured: isLocalProPreviewAvailable() && state.isLocalProPreviewConfigured,
+        _premiumBeforeLocalPreview: isLocalProPreviewAvailable() ? state._premiumBeforeLocalPreview : false,
         upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,
-        hairProfile: state.hairProfile,
-        hairRecommendationCache: state.hairRecommendationCache,
-        savedHairLookIds: state.savedHairLookIds,
         userProfile: state.userProfile,
         privacySettings: state.privacySettings,
         assignedPhase: state.assignedPhase,

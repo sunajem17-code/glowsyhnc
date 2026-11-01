@@ -8,20 +8,19 @@ import MotionPage from '../components/MotionPage'
 import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
-import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory } from '../utils/progressHistory'
+import { getProgressScore, isPhysiqueProgressScan, mergeProgressHistory, mergeScanAiScore } from '../utils/progressHistory'
 import { ScanHistoryContent, TrendChart } from './ScanHistory'
 import { normalizeHistoryScan } from '../utils/scanHistory'
 import StreakFlame from '../components/StreakFlame'
 import { loadScanMedia } from '../utils/scanPhotoDb'
 import { getProgressStatPresentation, getProgressTrendPresentation, shouldShowProgressData } from '../utils/scanHistoryPresentation'
-import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
 
 export default function ScanTimeline() {
   const navigate = useNavigate()
   const location = useLocation()
   const reduceMotion = useReducedMotion()
   const { scans, currentScan, streak, isPremium, token, refreshProStatus } = useStore()
-  const canAccessProUi = hasLocalPremiumUiAccess(isPremium)
+  const canAccessProUi = Boolean(isPremium)
   const showProgressData = shouldShowProgressData()
   const progressTrend = getProgressTrendPresentation(canAccessProUi)
   const setCurrentScan = useStore(s => s.setCurrentScan)
@@ -116,11 +115,34 @@ export default function ScanTimeline() {
   const bestScore      = activeScores.length ? Math.max(...activeScores) : null
 
   async function viewHistoryScan(entry) {
-    const saved = currentScan?.id === entry.id ? currentScan
-      : scans.find(scan => scan.id === entry.id || scan.serverScanId === entry.id)
-    const selected = saved || normalizeHistoryScan(entry)
-    const media = selected?.id ? await loadScanMedia(selected.id) : null
-    setCurrentScan({ ...selected, facePhotoUrl: selected.facePhotoUrl || media?.photo || null })
+    const scanMatchesEntry = scan => scan && (
+      scan.id === entry.id
+      || scan.serverScanId === entry.id
+      || scan.id === entry.serverScanId
+      || scan.serverScanId === entry.serverScanId
+    )
+    const localMediaScanId = entry.localMediaScanId
+    const saved = (localMediaScanId && scans.find(scan => scan.id === localMediaScanId))
+      || (scanMatchesEntry(currentScan) ? currentScan : null)
+      || scans.find(scanMatchesEntry)
+    const selected = normalizeHistoryScan({
+      ...entry,
+      ...(saved || {}),
+      id: saved?.id || entry.id,
+      serverScanId: entry.serverScanId || entry.aiScore?.scanId || saved?.serverScanId || saved?.aiScore?.scanId || null,
+      aiScore: mergeScanAiScore(saved?.aiScore, entry.aiScore),
+      appearanceAnalysis: saved?.appearanceAnalysis || entry.appearanceAnalysis || saved?.aiScore?.appearanceAnalysis || entry.aiScore?.appearanceAnalysis,
+      keyStrengths: saved?.keyStrengths || entry.keyStrengths || saved?.aiScore?.keyStrengths || entry.aiScore?.keyStrengths,
+      keyWeaknesses: saved?.keyWeaknesses || entry.keyWeaknesses || saved?.aiScore?.keyWeaknesses || entry.aiScore?.keyWeaknesses,
+      facePhotoUrl: saved?.facePhotoUrl || entry.facePhotoUrl || entry.face_photo_url || entry.face_image_url || null,
+    })
+    const mediaId = localMediaScanId || saved?.id || selected?.id
+    const media = mediaId ? await loadScanMedia(mediaId) : null
+    setCurrentScan({
+      ...selected,
+      localMediaScanId: mediaId,
+      facePhotoUrl: selected.facePhotoUrl || media?.photo || null,
+    })
     if (isPhysiqueProgressScan(entry)) {
       navigate('/physique-results', { state: { source: 'progress-card', returnTo: '/timeline' } })
       return
@@ -205,17 +227,11 @@ export default function ScanTimeline() {
       </div>
 
       {/* History refresh never blocks saved results or page navigation. */}
-      {loading && (
+      {loading && history.length === 0 && (
         <p role="status" className="text-xs text-secondary font-body mb-4">
-          {history.length > 0 ? 'Refreshing scan history…' : 'Loading scan history…'}
+          Loading scan history…
         </p>
       )}
-      {historyError && (
-        <div role="status" className="flex items-center justify-between gap-3 mb-4 text-xs text-secondary font-body">
-          <span>{history.length > 0 ? 'Couldn’t refresh scan history. Showing your saved results.' : 'Couldn’t load scan history.'}</span>
-        </div>
-      )}
-
       {showProgressData && <div className="card mb-4 overflow-hidden">
         <button
           type="button"
@@ -262,7 +278,7 @@ export default function ScanTimeline() {
           <h2 className="font-heading font-bold text-[20px] text-primary mb-4">Scan History</h2>
           <ScanHistoryContent
             embedded scans={activeHistory.map(normalizeHistoryScan)} loading={loading} canAccessProUi={canAccessProUi}
-            error={historyError ? 'Couldn’t refresh scan history. Please try again.' : null}
+            error={null}
             onViewScan={viewHistoryScan}
             emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
           />

@@ -8,9 +8,8 @@ import { isNative } from '../utils/camera'
 import logoSrc from '../assets/ascendus-icon.png'
 
 // ── Secret, dev-only "fake the numbers" card ───────────────────────────────────
-// Rendered ONLY when the signed-in account redeemed the SOHAIL promo code
-// (checked server-side, see user.promoRedeemed — not spoofable from the
-// client). Deliberately a completely separate component from ShareCardModal /
+// Rendered only for accounts with the historical developer-promotion flag
+// returned from the signed-in user's server record. Deliberately separate from ShareCardModal /
 // ShareCard: this never reads or writes the real scan record, never shares
 // the same JSX tree as the card real users see, and has zero risk of leaking
 // into or altering the actual share-card flow. Purely a standalone scratchpad

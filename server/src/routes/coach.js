@@ -12,7 +12,9 @@ router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) =>
   if (req.isDemo) return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   try {
     const context = await loadContext(req.userId)
-    res.json({ access: req.proSource || 'subscription', isPro: req.isPro && req.proSource !== 'local_preview', status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
+    // resolvePro only grants local_preview after the server verifies development
+    // mode, loopback origin, and the configured owner allowlist.
+    res.json({ access: req.proSource || 'subscription', isPro: req.isPro === true, status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
   } catch { res.status(503).json({ error: 'Saved scan context is temporarily unavailable. Please retry.' }) }
 })
 
@@ -62,7 +64,9 @@ async function requireCoachAccess(req, res, next) {
   try {
     const context = req.isDemo ? { latest: null } : await loadContext(req.userId)
     if (!context.latest) return res.status(403).json({ code: 'scan_required', error: 'Scan required — complete a scan to use AI Coach.' })
-    if (!req.isPro || req.proSource === 'local_preview') return res.status(403).json({ code: 'pro_required', error: 'Pro required — get Ascendus Max to unlock AI Coach.' })
+    // Local preview is already authorized server-side by resolvePro; do not
+    // reject it here or the UI can appear unlocked while every chat is blocked.
+    if (!req.isPro) return res.status(403).json({ code: 'pro_required', error: 'Pro required — get Ascendus Max to unlock AI Coach.' })
     req.coachContext = context
     next()
   } catch {

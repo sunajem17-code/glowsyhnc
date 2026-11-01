@@ -9,7 +9,9 @@ export default defineConfig(({ mode }) => {
   // process.cwd() skips client/.env.local and points the proxy at a dead local API.
   const envDir = fileURLToPath(new URL('.', import.meta.url))
   const env = loadEnv(mode, envDir, 'VITE_')
-  const target = resolveBackendOrigin(env.VITE_API_URL || 'http://localhost:3002')
+  // Use the configured API by default. VITE_DEV_API_PROXY_URL can explicitly
+  // route local-preview testing to a running development API instead.
+  const target = resolveBackendOrigin(env.VITE_DEV_API_PROXY_URL || env.VITE_API_URL || 'http://127.0.0.1:3002')
   const proxy = Object.fromEntries(['/api', '/uploads', '/webhooks'].map(prefix => [
     prefix, { target, changeOrigin: true },
   ]))

@@ -11,7 +11,6 @@ import { triggerHaptic } from '../utils/haptics'
 
 import ScanHistoryRow from '../components/ScanHistoryRow'
 import { mergeScanHistory } from '../utils/scanHistory'
-import { hasLocalPremiumUiAccess } from '../utils/developerUnlock'
 import { formatProgressTrendLabels, getProgressTrendAxisTicks, getProgressTrendChartSeries, isPhysiqueProgressScan } from '../utils/progressHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
 import { getScanHistoryViewState } from '../utils/scanHistoryPresentation'
@@ -104,7 +103,7 @@ export function TrendChart({ scans, mode = 'face', metric = 'overall', label = '
 export default function ScanHistory() {
   const navigate = useNavigate()
   const isPremium = useStore(s => s.isPremium)
-  const canAccessProUi = hasLocalPremiumUiAccess(isPremium)
+  const canAccessProUi = Boolean(isPremium)
   const setCurrentScan = useStore(s => s.setCurrentScan)
   const localScans = useStore(s => s.scans)
   const currentScan = useStore(s => s.currentScan)

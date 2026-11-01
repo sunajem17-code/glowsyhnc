@@ -185,13 +185,7 @@ Add a "Mewing" tab or feature inside the app. Daily mewing exercise timer (typic
 
 ---
 
-### #5 — Hairstyle AI Try-On
-**Impact: HIGH | Effort: Medium-High**
-Partner with or build a hairstyle AI feature. Minimum viable: use a Replicate API to render 5-10 hairstyles on the user's photo. Pro-gate 30+ styles. This directly competes with Moggr and gives users a reason to use the camera scan they might otherwise skip. High virality: people share "I tried 10 haircuts on AI" content constantly.
-
----
-
-### #6 — Android Launch
+### #5 — Android Launch
 **Impact: HIGH | Effort: Medium**
 Capacitor makes this ~80% of the work already done. LooksMax AI's 10M Android downloads tells you the demand is there. You don't need a perfect Android app — you need a functional one. 3-4 weeks of polish post-Capacitor build. Submit to Google Play immediately.
 
@@ -244,17 +238,15 @@ The leaderboard and community feed are already built. Now you need to make them 
 
 ---
 
-## 5 FEATURES THE MARKET IS SCREAMING FOR (That You Don't Have)
+## 4 FEATURES THE MARKET IS SCREAMING FOR (That You Don't Have)
 
 1. **"See Your 10/10 Self" AI visualization** — UCHAD's viral feature. Every user shares it. Gates perfectly behind Pro.
 
 2. **Mewing tracker + daily exercise timer** — 4B TikTok searches. No dominant app. Pure organic growth play.
 
-3. **Hairstyle AI try-on** — Moggr's whole business. Extremely high virality. "I tried 10 haircuts" content is TikTok gold.
+3. **Android app** — 10M+ downloads sitting there for whoever builds a decent Android looksmaxxing app.
 
-4. **Android app** — 10M+ downloads sitting there for whoever builds a decent Android looksmaxxing app.
-
-5. **Community "Rate Me" voting** — Users constantly request honest stranger ratings. Build it inside the community feed: post a photo, community votes 1-10, see where you rank vs. other users.
+4. **Community "Rate Me" voting** — Users constantly request honest stranger ratings. Build it inside the community feed: post a photo, community votes 1-10, see where you rank vs. other users.
 
 ---
 

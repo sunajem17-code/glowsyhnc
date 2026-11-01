@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Bot, Camera, Grid2x2, TrendingUp } from 'lucide-react'
+import { Bot, Camera, Grid2x2, TrendingUp, Users } from 'lucide-react'
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const navItems = [
   { to: '/scan',      icon: Camera,    label: 'Scan' },
   { to: '/timeline', icon: TrendingUp, label: 'Progress' },
+  { to: '/community', icon: Users, label: 'Community' },
   { to: '/progress', icon: Bot, label: 'AI Coach' },
   { to: '/extras', icon: Grid2x2, label: 'Extras' },
 ]
@@ -31,7 +32,7 @@ export default function BottomNav() {
         borderTop: 'none',
       }}
     >
-      <div className="flex items-center justify-around h-[74px]">
+      <div className="flex items-stretch justify-evenly h-[78px]">
         {navItems.map(({ to, icon: Icon, image, label }) => {
           const isActive = location.pathname.startsWith(to)
           const isHighlighted = isActive || hoveredTo === to
@@ -44,9 +45,9 @@ export default function BottomNav() {
               onMouseLeave={() => setHoveredTo(null)}
               onFocus={() => setHoveredTo(to)}
               onBlur={() => setHoveredTo(null)}
-              className="relative flex flex-col items-center gap-1.5 px-4 py-2 min-w-[56px]"
+              className="relative flex flex-none min-w-[56px] h-full flex-col items-center justify-center gap-1.5 px-1"
             >
-              <div className="relative w-6 h-6 flex items-center justify-center">
+              <div className="relative w-7 h-7 flex items-center justify-center">
                 {image ? (
                   <img
                     src={image}
@@ -63,7 +64,7 @@ export default function BottomNav() {
                     }}
                   />
                 ) : <Icon
-                  size={24}
+                  size={26}
                   strokeWidth={isHighlighted ? 2.5 : 1.7}
                   style={{
                     color: isHighlighted ? GOLD : 'var(--text-secondary)',
@@ -72,7 +73,7 @@ export default function BottomNav() {
                 />}
                 </div>
               <span
-                className="text-[11px] font-body font-medium transition-colors duration-200"
+                className="text-[11px] font-body font-medium transition-colors duration-200 whitespace-nowrap"
                 style={{ color: isHighlighted ? GOLD : 'var(--text-secondary)' }}
               >
                 {label}

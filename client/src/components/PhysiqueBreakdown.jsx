@@ -8,63 +8,79 @@ function getPhysiqueAnalysis(scan) {
   return scan?.physiqueScore ?? scan?.aiScore?.physiqueScore ?? scan?.aiScore?.physiqueResult ?? scan?.aiScore ?? {}
 }
 
-const RELATED_METRICS = [
-  { key: 'body_fat_score', label: 'Body Fat' },
-  { key: 'v_taper', label: 'V-Taper' },
-  { key: 'frame_width', label: 'Frame Width' },
-  { key: 'muscle_mass', label: 'Muscle Mass' },
-  { key: 'potential', label: 'Potential' },
-  { key: 'overall', label: 'Overall' },
-]
-const SCORE_METRICS = [
-  { key: 'overall', label: 'Overall' },
-  { key: 'potential', label: 'Potential' },
+const ACTIONABLE_METRICS = [
   { key: 'muscle_mass', label: 'Muscle Mass' },
   { key: 'body_fat_score', label: 'Body Fat' },
   { key: 'v_taper', label: 'V-Taper' },
   { key: 'frame_width', label: 'Frame Width' },
 ]
 
-const METRIC_EXPLANATIONS = {
-  overall: 'At this level, the combined visible physique ratings sit above the rubric midpoint; the score describes this photo, not health or fitness.',
-  potential: 'Your potential rating is higher than your overall rating, so the assessment sees more room for refinement than your current score alone suggests.',
-  muscle_mass: 'Visible development across the muscle groups shown supports this rating; areas covered by clothing are not estimated.',
-  body_fat_score: 'The scan notes clear abdominal definition, which supports the visible leanness rating; this is not a body-fat measurement.',
-  v_taper: 'The scan calls out a strong shoulder-to-waist taper, consistent with the visible proportions in this pose.',
-  frame_width: 'This reflects apparent shoulder and torso width in the image; it does not measure skeletal width.',
+const OUT_OF_SCOPE_LANGUAGE = /\b(?:photo|picture|image|lighting|light(?:ing)?|camera|crop(?:ped)?|pose|angle|clothing|shirt|outfit|framing|shot|facial?|face|presentation|in this frame|in this scan)\b/i
+const PHYSIQUE_FOCUS_LANGUAGE = /\b(?:muscle|chest|shoulders?|back|arms?|legs?|abs?|abdomen|waist|taper|lean(?:ness)?|body fat|frame|width|clavicles?|torso|posture|proportions?)\b/i
+const POSITIVE_LANGUAGE = /\b(?:strong|well[- ]developed|balanced|good|clear|proportionate|broad|wide|lean|muscular|above average|stands out)\b/i
+const NEGATIVE_LANGUAGE = /\b(?:weak|soft|limited|needs? work|can improve|room to improve|low|poor|below(?: average)?|underdeveloped|less|lacks?|narrow|uneven|not enough|not strongly|little|mild|can be improved)\b/i
+
+function scoreBasedFinding(metric, score, page) {
+  const value = `${score.toFixed(1)}/10`
+  if (page === 'cons') {
+    const findings = {
+      muscle_mass: {
+        title: `Muscle development needs work (${value})`,
+        explanation: 'This is below the app’s strong range. Building your chest, shoulders, back, and arms can make your upper body look more muscular and balanced.',
+        advice: 'Try three full-body strength workouts each week. Include a press, a row, and a leg exercise; when you can do the reps easily, add a little weight or a few reps.',
+      },
+      body_fat_score: {
+        title: `Visible leanness can improve (${value})`,
+        explanation: 'This score leaves room for more muscle definition. It is a visual rating, not a measurement of your body-fat percentage or health.',
+        advice: 'If losing fat is appropriate for you, use small, steady changes: keep strength training, walk regularly, and eat balanced meals. Avoid crash diets.',
+      },
+      v_taper: {
+        title: `Shoulder-to-waist shape can improve (${value})`,
+        explanation: 'The shoulder-to-waist contrast is below the app’s strong range. More shoulder and back muscle can make the upper body look more V-shaped.',
+        advice: 'Train your back and shoulders twice a week. Use rows or pulldowns for your back and lateral raises for your shoulders, adding reps slowly.',
+      },
+      frame_width: {
+        title: `Upper-body width can improve (${value})`,
+        explanation: 'This score says your upper-body width is an area to build. You cannot change bone width with exercise, but stronger shoulders and back can add visible width.',
+        advice: 'Add rows or pulldowns and lateral raises to strength workouts twice a week. Start with a weight you can lift with steady control.',
+      },
+    }
+    return { ...findings[metric.key], metric, source: 'score' }
+  }
+
+  const findings = {
+    muscle_mass: {
+      title: `Muscle development stands out (${value})`,
+      explanation: 'This is one of your stronger physique scores. Continued strength training can help you keep building your chest, shoulders, back, and arms.',
+      advice: 'Keep a regular strength routine and increase reps or weight gradually as exercises get easier.',
+    },
+    body_fat_score: {
+      title: `Visible leanness stands out (${value})`,
+      explanation: 'This is one of your stronger physique scores for visible definition. Keep the habits that support strength and a steady, healthy routine.',
+      advice: 'Keep moving most days, eat regular balanced meals, and avoid extreme diet changes.',
+    },
+    v_taper: {
+      title: `Shoulder-to-waist shape stands out (${value})`,
+      explanation: 'Your shoulder-to-waist contrast is one of your stronger physique scores and helps create a more V-shaped upper body.',
+      advice: 'Keep training your back and shoulders with rows or pulldowns and lateral raises.',
+    },
+    frame_width: {
+      title: `Upper-body width stands out (${value})`,
+      explanation: 'Your upper-body width is one of your stronger physique scores. Building shoulder and back muscle can help maintain this shape.',
+      advice: 'Keep rows or pulldowns and shoulder exercises in your regular strength routine.',
+    },
+  }
+  return { ...findings[metric.key], metric, source: 'score' }
 }
 
-function explainPoint(text, metric, page, scan) {
-  const match = text.match(/^(.+?)\s+[—–:]\s+(.+)$/)
-  if (match) return { title: match[1].trim(), explanation: match[2].trim() }
-
-  if (page === 'pros' && metric) {
-    const metricScore = getPhysiqueMetricScore(scan, metric.key)
-    if (metric.key === 'potential') {
-      const overall = getPhysiqueMetricScore(scan, 'overall')
-      return { title: text, explanation: `At ${metricScore.toFixed(1)}, this score is above your ${overall?.toFixed(1) ?? 'current'} overall rating, so the assessment sees room for refinement—not a guaranteed outcome.` }
-    }
-    if (metric.key === 'muscle_mass') {
-      return { title: text, explanation: `The scan rated visible muscle development ${metricScore.toFixed(1)}. It considers only the muscle groups shown in this photo, not areas covered by clothing.` }
-    }
-    return { title: text, explanation: METRIC_EXPLANATIONS[metric.key] }
-  }
-
-  const normalizedText = text.toLowerCase()
-  if (page === 'cons' && normalizedText.includes('posture')) {
-    return { title: text, explanation: 'A relaxed, upright stance would make your shoulder and torso proportions easier to read in the photo. This is a suggestion for presenting the scan, not a judgment about your everyday posture.' }
-  }
-  if (page === 'cons' && normalizedText.includes('chest')) {
-    return { title: text, explanation: 'The upper chest appears less developed than the shoulders and arms in this pose, making it a focused area to build. The rest of the visible torso still reads as muscular.' }
-  }
-  if (page === 'cons' && metric) {
-    return { title: text, explanation: `In this photo, ${metric.label.toLowerCase()} appears to be an area with room to refine compared with the other visible features. Pose, lighting, and camera angle can affect how it reads.` }
-  }
-
-  const explanation = page === 'pros'
-    ? 'This is a specific positive observation from the scan; lighting, pose, and camera angle can affect how it appears.'
-    : 'This is a specific area the scan suggests refining, based on how your physique appears in this photo.'
-  return { title: text, explanation }
+function parseFinding(text) {
+  const adviceMatch = text.match(/\s+Try:\s*/i)
+  const findingText = adviceMatch ? text.slice(0, adviceMatch.index).trim() : text.trim()
+  const advice = adviceMatch ? text.slice(adviceMatch.index + adviceMatch[0].length).trim() : ''
+  const match = findingText.match(/^(.+?)\s+[—–:]\s+(.+)$/)
+  return match
+    ? { title: match[1].trim(), explanation: match[2].trim(), advice }
+    : { title: findingText, explanation: '', advice }
 }
 
 function relatedMetric(point, scan) {
@@ -78,30 +94,61 @@ function relatedMetric(point, scan) {
         : text.includes('muscle') || text.includes('chest') || text.includes('arm') || text.includes('back') || text.includes('leg')
           ? 'muscle_mass'
           : null
-  return RELATED_METRICS.find(metric => metric.key === key && getPhysiqueMetricScore(scan, key) != null)
+  return ACTIONABLE_METRICS.find(metric => metric.key === key && getPhysiqueMetricScore(scan, key) != null)
 }
 
-export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
+function getSavedFindings(points, page, scan, usedMetrics) {
+  if (!Array.isArray(points)) return []
+  return points
+    .filter(point => typeof point === 'string' && point.trim() && !OUT_OF_SCOPE_LANGUAGE.test(point) && PHYSIQUE_FOCUS_LANGUAGE.test(point))
+    .map(text => ({ text: text.trim(), ...parseFinding(text.trim()) }))
+    .filter(finding => {
+      const content = `${finding.title} ${finding.explanation}`
+      const isPositive = POSITIVE_LANGUAGE.test(content)
+      const isNegative = NEGATIVE_LANGUAGE.test(content)
+
+      // Enforce category polarity before matching a score. A metric match must
+      // never allow a weakness into Pros or praise into Cons.
+      if (page === 'pros' && (!isPositive || isNegative)) return false
+      if (page === 'cons' && (!isNegative || isPositive)) return false
+
+      const metric = relatedMetric(content, scan)
+      if (metric) {
+        const score = getPhysiqueMetricScore(scan, metric.key)
+        const isExpectedSide = page === 'pros' ? score >= 8 : score < 8
+        return isExpectedSide && !usedMetrics.has(metric.key)
+      }
+      return true
+    })
+    .map(finding => {
+      const metric = relatedMetric(`${finding.title} ${finding.explanation}`, scan)
+      return { ...finding, metric, source: 'analysis' }
+    })
+}
+
+export default function PhysiqueBreakdown({ scan, coachPhotoUrl, showCoach = true, navigation = null }) {
   const navigate = useNavigate()
   const [page, setPage] = useState('pros')
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? analysis.physique_strengths : analysis.physique_improvements
-  const savedPoints = Array.isArray(allPoints)
-    ? allPoints.filter(point => typeof point === 'string' && point.trim()).slice(0, 4).map(text => ({ text: text.trim(), source: 'analysis' }))
-    : []
-  const representedMetrics = new Set(savedPoints.map(({ text }) => relatedMetric(text, scan)?.key).filter(Boolean))
-  const metricPoints = SCORE_METRICS
+  const metricPoints = ACTIONABLE_METRICS
     .map(metric => ({ ...metric, score: getPhysiqueMetricScore(scan, metric.key) }))
-    .filter(metric => metric.score != null && !representedMetrics.has(metric.key)
-      && (page === 'pros' ? metric.score >= 7.5 : metric.score <= 6.5))
+    .filter(metric => metric.score != null && (page === 'pros' ? metric.score >= 8 : metric.score < 8))
     .sort((a, b) => page === 'pros' ? b.score - a.score : a.score - b.score)
-    .slice(0, Math.max(0, 5 - savedPoints.length))
-    .map(metric => ({
-      text: metric.label,
-      metric,
-      source: 'score',
-    }))
-  const points = [...savedPoints, ...metricPoints]
+  const savedFindings = getSavedFindings(allPoints, page, scan, new Set())
+  const pointsByMetric = new Map()
+  const additionalFindings = []
+  for (const finding of savedFindings) {
+    if (!finding.metric) {
+      additionalFindings.push(finding)
+      continue
+    }
+    if (!pointsByMetric.has(finding.metric.key)) pointsByMetric.set(finding.metric.key, finding)
+  }
+  const points = [
+    ...metricPoints.map(metric => pointsByMetric.get(metric.key) || scoreBasedFinding(metric, metric.score, page)),
+    ...additionalFindings,
+  ]
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
@@ -112,29 +159,29 @@ export default function PhysiqueBreakdown({ scan, coachPhotoUrl }) {
     </div>
     <section id="physique-points-panel" role="tabpanel" aria-label={title} className="appearance-points">
       <h2>{title}</h2>
-      <ul className="physique-analysis-list" tabIndex={0} aria-label={`${title} details`}>
+      <ul className="appearance-points-list" tabIndex={0} aria-label={`${title} details`}>
         {points.length
-          ? points.map(({ text, metric: scoredMetric }, index) => {
-            const metric = scoredMetric || relatedMetric(text, scan)
-            const { title: pointTitle, explanation } = explainPoint(text, metric, page, scan)
-            return <li className="physique-analysis-item" key={`${text}-${index}`}>
+          ? points.map(({ title: pointTitle, explanation, advice }, index) => {
+            return <li className="physique-analysis-item" key={`${pointTitle}-${index}`}>
               <span className="physique-analysis-bullet" aria-hidden="true">•</span>
               <div className="physique-analysis-copy">
                 <span className="appearance-point-title">{pointTitle}</span>
                 <p>{explanation}</p>
+                {advice && <p className="appearance-point-advice"><span>Try</span> {advice}</p>}
               </div>
             </li>
           })
           : <li className="physique-analysis-item appearance-points-empty">No saved {page === 'pros' ? 'strengths' : 'improvement areas'} are available for this scan.</li>}
       </ul>
     </section>
-    <button type="button" className="appearance-coach-button" onClick={() => {
+    {navigation}
+    {showCoach && <button type="button" className="appearance-coach-button" onClick={() => {
       triggerHaptic()
       navigate('/coach', { state: {
         scanId,
         coachPhotoUrl: coachPhotoUrl || scan?.bodyPhotoUrl || scan?.facePhotoUrl || null,
         coachPrompt: 'Please help me understand my physique scan and suggest practical next steps based on the visible results.',
       } })
-    }}>Ask AI Coach</button>
+    }}>Ask AI Coach</button>}
   </div>
 }

@@ -145,7 +145,7 @@ export default function Layout() {
           {outlet}
         </motion.div>
       </main>
-      {!['/scan/capture', '/unlock'].includes(location.pathname) && !(isCoach && keyboardOpen) && <BottomNav />}
+      {!['/scan/capture', '/physique-scan', '/unlock'].includes(location.pathname) && !(isCoach && keyboardOpen) && <BottomNav />}
     </div>
   )
 }

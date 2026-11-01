@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { Heart, MessageCircle, Plus, X, Send, Trash2, MoreVertical, TrendingUp, Users, Loader2, Copy, Image, Camera, Check, BarChart2, Flag, ChevronLeft } from 'lucide-react'
+import { Heart, MessageCircle, Plus, X, Send, Trash2, MoreVertical, TrendingUp, Loader2, Copy, Image, Camera, Check, BarChart2, Flag, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import MotionPage from '../components/MotionPage'
@@ -12,40 +12,9 @@ import { triggerHaptic } from '../utils/haptics'
 import { isPhysiqueProgressScan } from '../utils/progressHistory'
 import { getHistoryScoreColor } from '../utils/scanHistory'
 import { loadScanMedia } from '../utils/scanPhotoDb'
-import demoMaleScan from '../assets/face-metrics-demo.jpg'
-import demoFemaleScan from '../assets/face-metrics-demo-female.jpg'
 
 const BORDER = 'rgba(255,255,255,0.07)'
 const GOLD_LINE_GLOW = '0 0 14px rgba(198,168,92,0.4), 0 0 28px rgba(198,168,92,0.18), inset 0 0 10px rgba(198,168,92,0.1)'
-const SAMPLE_LIKES_STORAGE_KEY = 'community.sample-liked-posts'
-
-const SAMPLE_COMMUNITY_POSTS = [
-  { id: 'sample-1', display_name: 'Jordan', post_type: 'glow-up', created_at: new Date(Date.now() - 18 * 60_000).toISOString(), score_before: 6.2, score_after: 7.4, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Six weeks of consistency is starting to show.', likes_count: 28, comments_count: 6, sample_comments: [{ id: 'sample-1-comment-1', display_name: 'Maya', content: 'The progress is really clear!', created_at: new Date(Date.now() - 10 * 60_000).toISOString() }, { id: 'sample-1-comment-2', display_name: 'Ethan', content: 'Consistency pays off. Nice work.', created_at: new Date(Date.now() - 5 * 60_000).toISOString() }] },
-  { id: 'sample-2', display_name: 'Maya', post_type: 'rate-me', created_at: new Date(Date.now() - 52 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.1, rating_count: 24, caption: 'Trying a new haircut. What do you think?', likes_count: 17, comments_count: 4, sample_comments: [{ id: 'sample-2-comment-1', display_name: 'Sofia', content: 'That style suits you!', created_at: new Date(Date.now() - 30 * 60_000).toISOString() }] },
-  { id: 'sample-3', display_name: 'Ethan', post_type: 'glow-up', created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(), score_before: 5.8, score_after: 6.6, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Better sleep and a simpler routine.', likes_count: 21, comments_count: 3, sample_comments: [{ id: 'sample-3-comment-1', display_name: 'Noah', content: 'What did you change in your routine?', created_at: new Date(Date.now() - 90 * 60_000).toISOString() }] },
-  { id: 'sample-4', display_name: 'Ava', post_type: 'rate-me', created_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 7.6, rating_count: 16, caption: 'New lighting setup for my scan. Any tips?', likes_count: 13, comments_count: 2, sample_comments: [{ id: 'sample-4-comment-1', display_name: 'Jordan', content: 'Natural window light usually works well.', created_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString() }] },
-  { id: 'sample-5', display_name: 'Noah', post_type: 'glow-up', created_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), score_before: 6.5, score_after: 7.0, before_photo_url: demoMaleScan, photo_url: demoMaleScan, caption: 'Keeping the routine simple and sticking with it.', likes_count: 35, comments_count: 8, sample_comments: [{ id: 'sample-5-comment-1', display_name: 'Ethan', content: 'Simple routines are easier to stay consistent with.', created_at: new Date(Date.now() - 6 * 60 * 60_000).toISOString() }] },
-  { id: 'sample-6', display_name: 'Sofia', post_type: 'rate-me', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString(), photo_url: demoFemaleScan, avg_rating: 8.4, rating_count: 31, caption: 'Which style suits me better?', likes_count: 26, comments_count: 5, sample_comments: [{ id: 'sample-6-comment-1', display_name: 'Maya', content: 'I like this look best!', created_at: new Date(Date.now() - 9 * 60 * 60_000).toISOString() }] },
-  { id: 'sample-7', display_name: 'Jordan', post_type: 'question', created_at: new Date(Date.now() - 13 * 60 * 60_000).toISOString(), photo_url: demoMaleScan, caption: 'Any advice for reducing under-eye puffiness in the morning?', likes_count: 12, comments_count: 3, sample_comments: [{ id: 'sample-7-comment-1', display_name: 'Maya', content: 'A cool compress and getting enough sleep helped me.', created_at: new Date(Date.now() - 12 * 60 * 60_000).toISOString() }, { id: 'sample-7-comment-2', display_name: 'Ethan', content: 'Try keeping your hydration consistent too.', created_at: new Date(Date.now() - 11 * 60 * 60_000).toISOString() }] },
-].map(post => ({ ...post, user_liked: 0, is_mine: 0 }))
-
-function getSampleLikedIds() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SAMPLE_LIKES_STORAGE_KEY) || '[]')
-    return new Set(Array.isArray(saved) ? saved.filter(id => typeof id === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function withSampleLikeState() {
-  const likedIds = getSampleLikedIds()
-  return SAMPLE_COMMUNITY_POSTS.map(post => {
-    const liked = likedIds.has(post.id)
-    return { ...post, user_liked: liked ? 1 : 0, likes_count: post.likes_count + (liked ? 1 : 0) }
-  })
-}
-
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -165,7 +134,7 @@ function TradingScanCard({ image, imageAlt, label, subtitle, score, selected = f
 }
 
 // ── Comments sheet ────────────────────────────────────────────────────────────
-function CommentsSheet({ post, onCommentAdded, displayName, previewOnly = false, sectionRef }) {
+function CommentsSheet({ post, onCommentAdded, displayName, sectionRef }) {
   const [comments, setComments] = useState([])
   const [loading, setLoading]   = useState(true)
   const [text, setText]         = useState('')
@@ -173,34 +142,15 @@ function CommentsSheet({ post, onCommentAdded, displayName, previewOnly = false,
   const bottomRef = useRef()
 
   useEffect(() => {
-    if (previewOnly) {
-      setComments(post.sample_comments || [])
-      setLoading(false)
-      return undefined
-    }
     api.community.comments(post.id)
       .then(({ comments: c }) => setComments(c || []))
       .finally(() => setLoading(false))
-  }, [post.id, previewOnly, post.sample_comments])
+  }, [post.id])
 
   async function send() {
     if (!text.trim() || sending) return
     setSending(true)
     try {
-      if (previewOnly) {
-        const comment = {
-          id: `local-comment-${Date.now()}`,
-          display_name: displayName || 'You',
-          content: text.trim(),
-          created_at: new Date().toISOString(),
-          is_mine: true,
-        }
-        setComments(prev => [...prev, comment])
-        setText('')
-        onCommentAdded()
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-        return
-      }
       const { comment } = await api.community.addComment(post.id, { content: text.trim(), displayName })
       setComments(prev => [...prev, comment])
       setText('')
@@ -210,10 +160,6 @@ function CommentsSheet({ post, onCommentAdded, displayName, previewOnly = false,
   }
 
   async function deleteComment(id) {
-    if (previewOnly) {
-      setComments(prev => prev.filter(comment => comment.id !== id))
-      return
-    }
     try {
       await api.community.deleteComment(id)
       setComments(prev => prev.filter(c => c.id !== id))
@@ -415,7 +361,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6 space-y-4" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
 
           {postType === 'glow-up' ? (
             <>
@@ -478,28 +424,29 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
               value={caption}
               onChange={e => setCaption(e.target.value.slice(0, 280))}
               placeholder={postType === 'question' ? 'What would you like advice on?' : postType === 'rate-me' ? 'Add context (age, improvements made…)' : 'What worked for you?'}
-              rows={postType === 'question' ? 4 : 3}
+              rows={4}
               className="w-full px-3 py-2.5 rounded-xl font-body text-sm text-primary outline-none resize-none"
-              style={{ background: '#111111', border: `1px solid ${BORDER}`, fontSize: 16 }}
+              style={{ background: '#111111', border: `1px solid ${BORDER}`, fontSize: 16, height: 132, minHeight: 132, maxHeight: 132 }}
             />
           </div>
 
           {err && <p className="text-[12px] font-body" style={{ color: '#EF4444' }}>{err}</p>}
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { triggerHaptic(); submit() }}
-            disabled={posting}
-            className="w-full rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ minHeight: 66, padding: '0 16px', borderRadius: 16, background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-          >
-            {posting
-              ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
-              : postType === 'rate-me' ? 'Post for Rating' : postType === 'question' ? 'Ask for Advice' : 'Post Glow-Up'
-            }
-          </motion.button>
+          <div className="pb-4">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { triggerHaptic(); submit() }}
+              disabled={posting}
+              className="w-full rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-50"
+              style={{ minHeight: 66, padding: '0 16px', borderRadius: 16, background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+            >
+              {posting
+                ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
+                : postType === 'rate-me' ? 'Post for Rating' : postType === 'question' ? 'Post Question' : 'Post Glow-Up'
+              }
+            </motion.button>
+          </div>
 
-          <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
         </div>
       </div>
     </motion.div>,
@@ -902,7 +849,7 @@ function ReportSheet({ postId, onClose }) {
   )
 }
 
-export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onRate, previewOnly = false }) {
+export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onRate }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
   const [showMenu, setShowMenu]             = useState(false)
@@ -1071,7 +1018,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
           <span className="font-body text-[12px]">{post.comments_count ?? 0}</span>
         </button>
         <div className="flex items-center gap-1 ml-auto">
-          {!post.is_mine && !previewOnly && (
+          {!post.is_mine && (
             <button
               onClick={event => { event.stopPropagation(); triggerHaptic(); setShowReport(true) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
@@ -1110,7 +1057,6 @@ export default function Community() {
 
   const [posts, setPosts]           = useState([])
   const [loading, setLoading]       = useState(true)
-  const [previewFeed, setPreviewFeed] = useState(false)
   const [showShare, setShowShare]   = useState(Boolean(shareDraft))
   const [activePost, setActivePost] = useState(null)
   const [showPostComments, setShowPostComments] = useState(false)
@@ -1148,44 +1094,13 @@ export default function Community() {
     setLoading(true)
     try {
       const { posts: p } = await api.community.feed()
-      if (p?.length) {
-        setPosts(p)
-        setPreviewFeed(false)
-      } else if (import.meta.env.DEV) {
-        setPosts(withSampleLikeState())
-        setPreviewFeed(true)
-      } else {
-        setPosts([])
-        setPreviewFeed(false)
-      }
+      setPosts(Array.isArray(p) ? p : [])
     } catch {
-      if (import.meta.env.DEV) {
-        setPosts(withSampleLikeState())
-        setPreviewFeed(true)
-      } else {
-        setPosts([])
-        setPreviewFeed(false)
-      }
+      setPosts([])
     } finally { setLoading(false) }
   }
 
   const handleLike = useCallback(async (postId) => {
-    if (String(postId).startsWith('sample-')) {
-      const post = posts.find(item => item.id === postId)
-      if (!post) return
-      const liked = !post.user_liked
-      const likesCount = Math.max(0, (post.likes_count || 0) + (liked ? 1 : -1))
-      const likedIds = getSampleLikedIds()
-      if (liked) likedIds.add(postId)
-      else likedIds.delete(postId)
-      try { localStorage.setItem(SAMPLE_LIKES_STORAGE_KEY, JSON.stringify([...likedIds])) } catch {}
-      setPosts(prev => prev.map(post => {
-        if (post.id !== postId) return post
-        return { ...post, user_liked: liked ? 1 : 0, likes_count: likesCount }
-      }))
-      setActivePost(current => current?.id === postId ? { ...current, user_liked: liked ? 1 : 0, likes_count: likesCount } : current)
-      return
-    }
     try {
       const { liked, likes } = await api.community.like(postId)
       setPosts(prev => prev.map(p =>
@@ -1193,7 +1108,7 @@ export default function Community() {
       ))
       setActivePost(current => current?.id === postId ? { ...current, user_liked: liked ? 1 : 0, likes_count: likes } : current)
     } catch {}
-  }, [posts])
+  }, [])
 
   const handleDelete = useCallback(async (postId) => {
     try {
@@ -1211,20 +1126,6 @@ export default function Community() {
   }, [activePost?.id])
 
   const handleRate = useCallback(async (postId, score) => {
-    if (String(postId).startsWith('sample-')) {
-      const post = posts.find(item => item.id === postId)
-      if (!post) return
-      const count = post.rating_count || 0
-      const previous = post.user_rating
-      const nextCount = previous == null ? count + 1 : count
-      const nextAverage = previous == null
-        ? ((Number(post.avg_rating || 0) * count) + score) / Math.max(nextCount, 1)
-        : ((Number(post.avg_rating || 0) * count) - previous + score) / Math.max(count, 1)
-      const updated = { ...post, avg_rating: nextAverage, rating_count: nextCount, user_rating: score }
-      setPosts(prev => prev.map(item => item.id === postId ? updated : item))
-      setActivePost(current => current?.id === postId ? { ...current, avg_rating: updated.avg_rating, rating_count: updated.rating_count, user_rating: updated.user_rating } : current)
-      return true
-    }
     try {
       const data = await api.community.rate(postId, score)
       setPosts(prev => prev.map(p =>
@@ -1258,37 +1159,9 @@ export default function Community() {
           <Loader2 size={24} className="animate-spin" style={{ color: GOLD }} />
         </div>
       ) : posts.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center gap-4 py-12 text-center"
-          style={{ minHeight: 'calc(100vh - 160px)' }}
-        >
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(198,168,92,0.1)', border: '1px solid rgba(198,168,92,0.3)', boxShadow: GOLD_LINE_GLOW }}>
-            <Users size={28} style={{ color: GOLD, filter: 'drop-shadow(0 0 6px rgba(198,168,92,0.65))' }} />
-          </div>
-          <p className="font-heading font-bold text-base text-primary">Be the first to share</p>
-          <p className="font-body text-sm text-secondary max-w-[220px]">
-            Share your glow-up and inspire others on their journey.
-          </p>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { triggerHaptic(); setShowShare(true) }}
-            className="w-full max-w-[260px] px-6 py-3 rounded-2xl font-heading font-bold text-sm"
-            style={{ background: GOLD_GRADIENT, color: '#0A0A0A' }}
-          >
-            Share My Glow-Up
-          </motion.button>
-        </motion.div>
+        <div aria-hidden="true" className="min-h-[calc(100vh-160px)]" style={{ background: '#000' }} />
       ) : (
         <>
-        {previewFeed && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl" style={{ background: 'rgba(198,168,92,0.08)', border: '1px solid rgba(198,168,92,0.18)' }}>
-            <Image size={13} style={{ color: GOLD }} />
-            <p className="font-heading font-bold text-[10px] uppercase tracking-widest" style={{ color: GOLD }}>Sample feed · local preview</p>
-          </div>
-        )}
         {posts.map(post => (
           <PostCard
             key={post.id}
@@ -1300,7 +1173,6 @@ export default function Community() {
             onOpenPost={post => openPost(post, false)}
             onDelete={handleDelete}
             onRate={handleRate}
-            previewOnly={previewFeed}
           />
         ))}
         </>
@@ -1368,14 +1240,12 @@ export default function Community() {
                   onOpenComments={scrollToPostComments}
                   onDelete={handleDelete}
                   onRate={handleRate}
-                  previewOnly={previewFeed}
                 />
                 <CommentsSheet
                   key={`post-comments-${activePost.id}`}
                   post={activePost}
                   onCommentAdded={handleCommentAdded}
                   displayName={displayName}
-                  previewOnly={previewFeed}
                   sectionRef={commentsSectionRef}
                 />
               </div>

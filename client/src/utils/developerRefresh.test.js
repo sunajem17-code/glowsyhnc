@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getDeveloperRefreshState, isDeveloperRefreshAvailable } from './developerRefresh.js'
+import { getDeveloperRefreshState, getScanLimitResetState, isDeveloperRefreshAvailable } from './developerRefresh.js'
 
 test('developer refresh is restricted to local development hosts', () => {
   assert.equal(isDeveloperRefreshAvailable(true, 'localhost'), true)
@@ -19,4 +19,12 @@ test('developer refresh clears local scan flow while preserving onboarding and a
   assert.equal('hasOnboarded' in reset, false)
   assert.equal('isPremium' in reset, false)
   assert.equal('token' in reset, false)
+})
+
+test('scan-limit reset clears only the local 24-hour counter', () => {
+  assert.deepEqual(getScanLimitResetState(), {
+    proScanCount: 0,
+    proScanDate: null,
+    proScanFirstAt: null,
+  })
 })

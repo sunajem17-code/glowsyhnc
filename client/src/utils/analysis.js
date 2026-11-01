@@ -942,7 +942,7 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
     improvements: [
       'Daily skincare protocol (retinoid + SPF minimum). Skin texture is the fastest-improving feature metric, visible within 6–10 weeks.',
       'Eye area optimization: 8h sleep, low sodium, cold compresses, eye cream. Puffiness and dark circles significantly reduce eye scores.',
-      'Haircut optimization via HairMaxx. The right cut for your face shape creates an immediate framing effect that elevates all features.',
+      'Ask a barber for a cut that frames your face shape and keeps the sides and top balanced.',
     ],
   }
 
@@ -1001,7 +1001,7 @@ export function derivePillars(pslMetrics, symmetry, skinClarity, edgeDensity = 5
       ? 'Moderate harmony. Some proportional imbalance is visible. Hairstyle, posture correction, and mewing can each correct perceived balance significantly.'
       : 'Harmony (35% weight) has the highest improvement impact available. Posture correction, hairstyle optimization, and mewing are your clearest paths to a meaningful score jump.',
     improvements: [
-      'Hairstyle directly alters perceived upper-third balance. Use HairMaxx to find the cut that best corrects your specific facial thirds.',
+      'Choose a hairstyle that balances the upper face with the middle and lower face.',
       'Posture correction (chin tuck + shoulder retraction) immediately improves perceived facial balance. Zero-cost, instant improvement.',
       'Mewing (correct tongue posture on palate) over months-to-years improves midface alignment, maxilla projection, and overall facial thirds.',
     ],

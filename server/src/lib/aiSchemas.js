@@ -7,13 +7,14 @@ const object = properties => ({ type: 'object', properties, required: Object.key
 const array = (items, limits = {}) => ({ type: 'array', items, ...limits })
 const strings = array(string)
 const enumeration = values => ({ type: 'string', enum: values })
+const { APPEARANCE_FINDING_IDS } = require('./appearanceFindingCatalog')
 const scores = keys => object(Object.fromEntries(keys.map(key => [key, score])))
 const metric = object({ score, descriptor: string })
 const metrics = keys => object(Object.fromEntries(keys.map(key => [key, metric])))
-const appearanceFinding = object({ title: string, observation: string, significance: string, recommendation: string })
+const appearanceFinding = object({ catalog_id: enumeration(APPEARANCE_FINDING_IDS), title: string, observation: string, significance: string, recommendation: string })
 const appearanceAnalysis = object({
   strengths: array(appearanceFinding, { minItems: 1, maxItems: 4 }),
-  improvement_opportunities: array(appearanceFinding, { minItems: 5 }),
+  improvement_opportunities: array(appearanceFinding, { minItems: 1, maxItems: APPEARANCE_FINDING_IDS.length }),
   positive_observations: array(appearanceFinding, { maxItems: 0 }),
 })
 

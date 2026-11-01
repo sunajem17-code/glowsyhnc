@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { ChevronLeft, Dumbbell, Lock, X, Loader2 } from 'lucide-react'
+import { ChevronLeft, Dumbbell, Lock, X, Loader2, Check } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { EASE_STANDARD, GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
@@ -12,7 +12,10 @@ import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigati
 import { getRatingColor } from '../utils/revealRatings'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import PhysiqueBreakdown from '../components/PhysiqueBreakdown'
+import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
+import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
+import { cropPhotoToSquare } from '../utils/shareCardPhoto'
 
 const RESULT_VIEWS = ['results', 'analysis', 'compare']
 const PHYSIQUE_METRICS = [
@@ -24,6 +27,30 @@ const PHYSIQUE_METRICS = [
   { key: 'frame_width', label: 'Frame Width' },
 ]
 
+function PhysiqueResultsNavigation({ activeView, showView }) {
+  return (
+    <div role="tablist" aria-label="Results view" className="mt-2 flex shrink-0 justify-center">
+      {[
+        ['results', 'Show results'],
+        ['analysis', 'Show physique pros and cons'],
+        ['compare', 'Show photo comparison'],
+      ].map(([view, label]) => (
+        <button key={view} type="button" role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}
+          onClick={() => { triggerHaptic(); showView(view) }} onKeyDown={event => {
+            if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+              event.preventDefault()
+              const direction = event.key === 'ArrowRight' ? 1 : -1
+              const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
+              showView(RESULT_VIEWS[index])
+            }
+          }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? GOLD : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
   const reduceMotion = useReducedMotion()
   const metricTextStyles = getRevealMetricTextStyles()
@@ -34,14 +61,14 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
           {photo ? <img src={photo} alt="" loading="eager" decoding="async" className="w-full h-full object-cover" /> : null}
         </div>
       </div>
-      <div className="w-full rounded-3xl pt-14 pb-10 px-4" style={{ background: '#141414', position: 'relative', zIndex: 1 }}>
-        <div className="grid grid-cols-2 gap-x-6" style={{ rowGap: 0 }}>
+      <div className="w-full rounded-3xl" style={{ background: '#141414', position: 'relative', zIndex: 1, padding: `${REVEAL_RATINGS_LAYOUT.panelPaddingTop}px ${REVEAL_RATINGS_LAYOUT.panelPaddingHorizontal}px ${REVEAL_RATINGS_LAYOUT.panelPaddingBottom}px` }}>
+        <div className="grid grid-cols-2" style={{ columnGap: REVEAL_RATINGS_LAYOUT.columnGap, rowGap: 0 }}>
           {PHYSIQUE_METRICS.map(({ key, label }, idx) => {
             const validValue = getPhysiqueMetricScore(scan, key)
             const animation = getRevealRatingAnimation(validValue, { unlocked, reduceMotion, metricKey: label, revealRun })
             return (
-              <div key={key} style={{ paddingBottom: idx < PHYSIQUE_METRICS.length - 2 ? 28 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, height: 21 }}>
+              <div key={key} style={{ paddingBottom: idx < PHYSIQUE_METRICS.length - 2 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: REVEAL_RATINGS_LAYOUT.labelMarginBottom, height: REVEAL_RATINGS_LAYOUT.labelHeight }}>
                   <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
                   <motion.span aria-hidden="true" initial={animation.lock.initial} animate={animation.lock.animate} transition={animation.lock.transition}
                     style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -51,17 +78,17 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
                 {unlocked ? (
                   <motion.div aria-label={`${label}: ${validValue == null ? 'Unavailable' : `${validValue.toFixed(1)} out of 10`}`}
                     initial={animation.number.initial} animate={animation.number.animate} transition={animation.number.transition}
-                    style={{ ...metricTextStyles.value, fontSize: validValue == null ? 20 : metricTextStyles.value.fontSize, marginBottom: 12, fontVariantNumeric: 'tabular-nums', height: 36, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    style={{ ...metricTextStyles.value, fontSize: validValue == null ? 20 : metricTextStyles.value.fontSize, marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom, fontVariantNumeric: 'tabular-nums', height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
                     {validValue == null ? '—' : validValue.toFixed(1)}
                   </motion.div>
                 ) : (
-                  <div aria-label={`${label}: Locked`} style={{ height: 36, display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                  <div aria-label={`${label}: Locked`} style={{ height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom }}>
                     <div style={{ width: 72, height: 26, borderRadius: 99, background: '#fff', filter: 'blur(8px)', opacity: 0.9 }} />
                   </div>
                 )}
                 <div role={unlocked && validValue != null ? 'progressbar' : undefined} aria-label={`${label} score`}
                   aria-valuemin={unlocked && validValue != null ? 0 : undefined} aria-valuemax={unlocked && validValue != null ? 10 : undefined}
-                  aria-valuenow={unlocked && validValue != null ? validValue : undefined} style={{ height: 7, borderRadius: 99, background: '#2A2A2A' }}>
+                  aria-valuenow={unlocked && validValue != null ? validValue : undefined} style={{ height: REVEAL_RATINGS_LAYOUT.barHeight, borderRadius: 99, background: '#2A2A2A' }}>
                   <motion.div key={unlocked ? 'revealed' : 'locked'} initial={animation.bar.initial} animate={animation.bar.animate} transition={animation.bar.transition}
                     style={{ height: '100%', borderRadius: 99, color: unlocked && validValue != null ? getRatingColor(validValue) : '#444', background: 'currentColor' }} />
                 </div>
@@ -207,13 +234,14 @@ export default function PhysiqueResults() {
   const [purchaseError, setPurchaseError] = useState('')
   const [referralCode, setReferralCode] = useState(null)
   const [referralCount, setReferralCount] = useState(0)
-  const [shareStatus, setShareStatus] = useState('')
-  const [sharingResults, setSharingResults] = useState(false)
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+  const [downloadPhoto, setDownloadPhoto] = useState({ source: null, status: 'ready', url: null })
   const [rescoring, setRescoring] = useState(false)
   const [rescoreError, setRescoreError] = useState('')
   const purchaseLockRef = useRef(false)
+  const downloadCardRef = useRef(null)
 
-  const aiScore = currentScan?.aiScore ?? {}
   const photo = currentScan?.facePhotoUrl ?? storedPhoto ?? null
 
   // Fetch referral info upfront so invite sheet is ready instantly
@@ -235,6 +263,19 @@ export default function PhysiqueResults() {
   }, [currentScan?.id, currentScan?.facePhotoUrl])
 
   useEffect(() => {
+    if (!photo) {
+      setDownloadPhoto({ source: photo, status: 'ready', url: null })
+      return undefined
+    }
+    let active = true
+    setDownloadPhoto({ source: photo, status: 'processing', url: null })
+    cropPhotoToSquare(photo)
+      .then(url => { if (active) setDownloadPhoto({ source: photo, status: 'ready', url }) })
+      .catch(() => { if (active) setDownloadPhoto({ source: photo, status: 'failed', url: null }) })
+    return () => { active = false }
+  }, [photo])
+
+  useEffect(() => {
     setActiveView('results')
   }, [currentScan?.id])
 
@@ -244,33 +285,51 @@ export default function PhysiqueResults() {
     setActiveView(view)
   }
 
-  async function handleShareResults() {
-    const scores = PHYSIQUE_METRICS
-      .map(({ key, label }) => {
-        const value = getPhysiqueMetricScore(currentScan, key)
-        return `${label}: ${value == null ? 'Unavailable' : `${value.toFixed(1)}/10`}`
-      })
-      .join('\n')
-    const shareData = { title: 'My Physique Results', text: `My Ascendus physique results:\n${scores}` }
-    setSharingResults(true)
-    setShareStatus('')
+  async function handleDownloadCard() {
+    if (isDownloadingCard || downloadPhoto.status === 'processing') return
+    if (downloadPhoto.status === 'failed') {
+      setDownloadError('Could not prepare the photo. Please try again.')
+      return
+    }
+    setIsDownloadingCard(true)
+    setDownloadError('')
     try {
-      if (navigator.share) {
-        await navigator.share(shareData)
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareData.text)
-        setShareStatus('Results copied')
-      } else {
-        setShareStatus('Sharing is unavailable on this device')
-      }
+      const image = await createShareCardImage(downloadCardRef.current)
+      await saveShareCardImage(image)
     } catch (error) {
-      if (error?.name !== 'AbortError') setShareStatus('Could not share results')
+      console.error('[Physique results card download]', error)
+      setDownloadError('Could not create the results card. Please try again.')
     } finally {
-      setSharingResults(false)
+      setIsDownloadingCard(false)
+    }
+  }
+
+  function handleAddToProgress() {
+    if (!currentScan?.id) return
+    try {
+      useStore.setState(state => {
+        const latest = state.currentScan?.id === currentScan.id ? state.currentScan : currentScan
+        const saved = { ...latest, progressSavedAt: latest.progressSavedAt || new Date().toISOString() }
+        const exists = state.scans.some(scan => scan.id === currentScan.id)
+        return {
+          currentScan: state.currentScan?.id === currentScan.id ? saved : state.currentScan,
+          scans: exists
+            ? state.scans.map(scan => scan.id === currentScan.id ? saved : scan)
+            : [saved, ...state.scans].slice(0, 100),
+        }
+      })
+      triggerHaptic()
+      navigate('/timeline', { replace: true, state: { savedScanId: currentScan.id } })
+    } catch (error) {
+      console.error('[PhysiqueResults] Could not save scan to Progress:', error)
+      setDownloadError('Could not save this scan. Please try again.')
     }
   }
 
   const missingMetrics = PHYSIQUE_METRICS.filter(({ key }) => getPhysiqueMetricScore(currentScan, key) == null)
+  const savedProgressCard = Boolean(currentScan?.progressSavedAt || location.state?.source === 'progress-card')
+  const isPreparingDownloadPhoto = downloadPhoto.source !== photo || downloadPhoto.status === 'processing'
+  const physiqueCardMetrics = PHYSIQUE_METRICS.map(({ key, label }) => ({ label, value: getPhysiqueMetricScore(currentScan, key) }))
 
   async function handleRescoreMissingMetrics() {
     const bodyImage = currentScan?.bodyPhotoUrl || currentScan?.facePhotoUrl || storedPhoto
@@ -394,6 +453,7 @@ export default function PhysiqueResults() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
+      {savedProgressCard && <ShareCard scan={currentScan} facePhotoUrl={downloadPhoto.source === photo && downloadPhoto.status === 'ready' ? downloadPhoto.url : null} cardRef={downloadCardRef} metrics={physiqueCardMetrics} />}
       <div className="relative flex-shrink-0 w-full px-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button
           onClick={() => { triggerHaptic(); navigate(location.state?.returnTo || '/scan') }}
@@ -412,16 +472,13 @@ export default function PhysiqueResults() {
       </div>
 
       <motion.div
-        className="relative w-full px-2"
+        className="relative w-full px-5"
         style={{
-          marginTop: activeView === 'results' ? 150 : 0,
-          flex: activeView === 'analysis' ? '1 1 auto' : '0 0 auto',
-          display: activeView === 'analysis' ? 'flex' : undefined,
-          alignItems: activeView === 'analysis' ? 'stretch' : undefined,
+          marginTop: activeView === 'results' ? 102 : activeView === 'analysis' ? 0 : 20,
           transformOrigin: '50% 50%',
           touchAction: 'pan-y',
         }}
-        drag="x"
+        drag={activeView !== 'compare' ? 'x' : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.15}
         onDragEnd={(_, info) => {
@@ -430,9 +487,9 @@ export default function PhysiqueResults() {
           else if (info.offset.x > 60 || info.velocity.x > 400) showView(RESULT_VIEWS[Math.max(index - 1, 0)])
         }}
       >
-        <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
           {activeView === 'results' && (
-            <motion.div key="results" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+            <div>
               <PhysiqueScorecard photo={photo} scan={currentScan} unlocked />
               {missingMetrics.length > 0 && (
                 <div className="mt-3 rounded-2xl p-4 text-center" style={{ background: '#141414', border: '1px solid rgba(198,168,92,0.18)' }}>
@@ -447,51 +504,52 @@ export default function PhysiqueResults() {
                   {rescoreError && <p role="alert" className="mt-3 text-[12px]" style={{ color: '#FF6B57' }}>{rescoreError}</p>}
                 </div>
               )}
-            </motion.div>
+            </div>
           )}
           {activeView === 'analysis' && (
-            <motion.div key="analysis" className="flex flex-1 min-h-0 flex-col" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-              <PhysiqueBreakdown scan={currentScan} coachPhotoUrl={photo} />
-            </motion.div>
+            <div>
+              <PhysiqueBreakdown
+                scan={currentScan}
+                coachPhotoUrl={photo}
+                showCoach={savedProgressCard}
+                navigation={<PhysiqueResultsNavigation activeView={activeView} showView={showView} />}
+              />
+            </div>
           )}
           {activeView === 'compare' && (
-            <motion.div key="compare" initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reduceMotion ? 0 : -viewDirection * 24, opacity: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+            <div>
               <ScanPhotoComparison scan={currentScan} savedScans={savedScans} />
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </motion.div>
       </motion.div>
 
-      {activeView === 'results' && (
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={handleShareResults}
-          disabled={sharingResults}
-          className="w-[calc(100%-1rem)] mx-auto mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 disabled:opacity-70"
-          style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-        >
-          {sharingResults ? 'Sharing…' : shareStatus || 'Share Results'}
-        </motion.button>
-      )}
+      <div className="w-full px-5 pb-10">
+        {!savedProgressCard && (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleAddToProgress}
+            className="w-full mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 flex items-center justify-center gap-2"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          >
+            <Check size={19} /> Add to Progress
+          </motion.button>
+        )}
+        {activeView === 'results' && savedProgressCard && (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { triggerHaptic(); handleDownloadCard() }}
+            disabled={isDownloadingCard || isPreparingDownloadPhoto}
+            className="w-full mt-4 py-5 rounded-2xl font-heading font-bold text-[17px] flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          >
+            {isDownloadingCard || isPreparingDownloadPhoto ? <Loader2 size={19} className="animate-spin" /> : null}
+            {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
+          </motion.button>
+        )}
+        {activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: '#FF453A' }}>{downloadError}</p>}
 
-      <div role="tablist" aria-label="Results view" className="flex justify-center mt-2 mb-6 flex-shrink-0">
-        {[
-          ['results', 'Show results'],
-          ['analysis', 'Show physique pros and cons'],
-          ['compare', 'Show photo comparison'],
-        ].map(([view, label]) => (
-          <button key={view} role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}
-            onClick={() => { triggerHaptic(); showView(view) }} onKeyDown={event => {
-              if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-                event.preventDefault()
-                const direction = event.key === 'ArrowRight' ? 1 : -1
-                const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
-                showView(RESULT_VIEWS[index])
-              }
-            }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? GOLD : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
-          </button>
-        ))}
+        {activeView !== 'analysis' && <PhysiqueResultsNavigation activeView={activeView} showView={showView} />}
       </div>
     </div>
   )

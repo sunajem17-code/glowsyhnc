@@ -1,22 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Scissors, CheckSquare, CalendarCheck, Settings, Users, ChevronRight } from 'lucide-react'
-import { GOLD, GOLD_GRADIENT } from '../utils/theme'
+import { CheckSquare, CalendarCheck, Settings, ChevronRight } from 'lucide-react'
+import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 
 const CARDS = [
-  {
-    to: '/community',
-    icon: Users,
-    title: 'Community',
-    subtitle: 'Connect and share your glow-up journey',
-  },
-  {
-    to: '/hairmaxx',
-    icon: Scissors,
-    title: 'HairMaxx',
-    subtitle: 'Find your best hairstyle',
-  },
   {
     to: '/checkin',
     icon: CheckSquare,
@@ -26,7 +14,7 @@ const CARDS = [
   {
     to: '/face-body-routine',
     icon: CalendarCheck,
-    title: 'Face and Body Routine',
+    title: 'Face & Body Routine',
     subtitle: 'Build your glow-up plan',
   },
 ]
@@ -68,11 +56,11 @@ export default function Extras() {
     >
       <div
         className="flex flex-col px-5 pb-10"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 100px)' }}
       >
         {/* Header */}
         <motion.div
-          className="flex items-start justify-between mb-8"
+          className="flex items-start justify-between mb-4"
           variants={headerVariants}
           initial="initial"
           animate="animate"
@@ -84,9 +72,6 @@ export default function Extras() {
             >
               Extras
             </h1>
-            <p className="font-body text-[14px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Tools to accelerate your ascent
-            </p>
           </div>
           <button
             onClick={() => { triggerHaptic(); navigate('/settings') }}
@@ -114,7 +99,7 @@ export default function Extras() {
               className="flex items-center gap-4 w-full rounded-2xl px-5 py-5 text-left"
               style={{
                 background: 'var(--card)',
-                border: '1px solid rgba(198,168,92,0.15)',
+                border: '1px solid var(--border)',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
               }}
             >

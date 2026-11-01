@@ -42,8 +42,8 @@ function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, vis
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => { triggerHaptic(); onAction() }}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2"
-            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.3)' }}
+            className="w-full h-[60px] rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2"
+            style={{ background: GOLD_GRADIENT, color: '#0A0A0A', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
             {Icon && <Icon size={17} />}{cta}
           </motion.button>
@@ -61,8 +61,8 @@ function FaceScanCard({ onBegin, limitMessage }) {
         eyebrow="DAILY LIMIT REACHED"
         title="3 Scans Done"
         body={limitMessage}
-        cta="View History"
-        onAction={() => navigate('/history')}
+        cta="View Progress"
+        onAction={() => navigate('/timeline')}
         visualClassName="aspect-[4/5] flex-shrink-0"
         visual={
           <>

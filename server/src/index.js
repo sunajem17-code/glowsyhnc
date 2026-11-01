@@ -6,7 +6,6 @@ if (process.env.NODE_ENV === 'production') {
     ['UPSTASH_REDIS_REST_URL',   'Rate limiting requires Redis in production'],
     ['UPSTASH_REDIS_REST_TOKEN', 'Rate limiting requires Redis in production'],
     ['JWT_SECRET',               'Auth requires JWT_SECRET in production'],
-    ['PROMO_CODE',               'Promo code must be set in Railway, never hardcoded'],
   ]
   for (const [key, msg] of required) {
     if (!process.env[key]) throw new Error(`[boot] ${key} is not set — ${msg}`)
@@ -104,10 +103,7 @@ app.use('/api/ai',          require('./routes/aiScore'))
 app.use('/api/leaderboard', require('./routes/leaderboard').router)
 app.use('/api/supabase',    require('./routes/supabaseRoutes'))
 app.use('/api/coach',       require('./routes/coach'))
-app.use('/api/hair',        require('./routes/hair'))
 app.use('/api/referral',    require('./routes/referral'))
-app.use('/api/promo',       require('./routes/promo'))
-app.use('/api/developer-access', require('./routes/developerAccess'))
 app.use('/api/potential',   require('./routes/potential'))
 app.use('/api/swipemaxx',   require('./routes/swipemaxx'))
 app.use('/api/tindermaxx', express.json({ limit: '15mb' }), require('./routes/tindermaxx'))

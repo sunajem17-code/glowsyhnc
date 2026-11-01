@@ -9,7 +9,7 @@ stub('../supabase', { getSupabase: () => null })
 const originalSetInterval = global.setInterval
 const maintenanceTimers = []
 global.setInterval = (...args) => { const timer = originalSetInterval(...args); maintenanceTimers.push(timer); return timer }
-const { getBreakdown, evidenceFor, CATALOG, cachedBreakdown, schema } = require('./appearanceBreakdown')
+const { getBreakdown, evidenceFor, lowRatedFeatureCount, createSchema, CATALOG, cachedBreakdown, schema } = require('./appearanceBreakdown')
 global.setInterval = originalSetInterval
 const { ownedResult, normalize, publicContext } = require('./coachScanContext')
 const original = { overallScore: 6.2, faceScore: 6.2, keyStrengths: ['A visible side part frames the face.'], faceSubScores: { symmetry: 6.8, jawlineDefinition: 5.4 }, visualObservations: [{ id: 'visible_dullness', category: 'skin', confidence: 'medium', limitations: ['Uneven light'] }] }
@@ -20,7 +20,7 @@ function result() { return { strengths: [finding], improvementOpportunities: [im
   ['Hair shape', 'The sides and top could have a clearer shape.', 'A planned cut makes the outline look neater.', 'Ask a barber for a tidy low taper and textured top.'],
   ['Facial hair', 'The beard edge could look cleaner.', 'A clear cheek and neck line makes grooming look intentional.', 'Trim stray hairs and keep the beard line even.'],
   ['Lip care', 'The lips look dry.', 'Dry lips can look rough.', 'Use plain lip balm during the day.'],
-].map(([title, observation, significance, recommendation]) => ({ ...improvement, title, observation, significance, recommendation, basedOn: ['photo:front'] }))], positiveObservations: [], recommendedActions: [{ title: 'Use consistent photos', reason: 'The saved scan uses mixed lighting.', steps: ['Use the same angle and lighting.'], frequency: 'Each scan', timeframe: '', basedOn: ['photo:front'] }], products: [], limitations: ['Lighting can affect appearance.'] } }
+].map(([title, observation, significance, recommendation]) => ({ ...improvement, title, observation, significance, recommendation, basedOn: ['photo:front'] })), ...Array.from({ length: 8 }, (_, index) => ({ ...improvement, title: `Additional visible upgrade ${index + 1}`, observation: `A distinct visible feature ${index + 1} can be improved.`, significance: 'This can make the overall appearance more polished.', recommendation: 'Choose one simple, safe grooming step.', basedOn: ['photo:front'] }))], positiveObservations: [], recommendedActions: [{ title: 'Use consistent photos', reason: 'The saved scan uses mixed lighting.', steps: ['Use the same angle and lighting.'], frequency: 'Each scan', timeframe: '', basedOn: ['photo:front'] }], products: [], limitations: ['Lighting can affect appearance.'] } }
 const image = { type:'image', source:{type:'base64',media_type:'image/jpeg',data:'isolated-photo-bytes'} }
 const analyze = (userId, id, options = {}) => getBreakdown(userId, id, { loadImage: async () => image, ...options })
 let serial = 0
@@ -44,19 +44,19 @@ test('personalized analysis persists with the same scan, retains scores, and rea
   assert.match(prompt.system, /For brows or facial hair, give a careful grooming step/i)
   assert.match(prompt.system, /Speak to the person face to face/i)
   assert.match(prompt.system, /Do not mention the photo, camera, lighting, angle, image quality, or retaking it/i)
-  assert.match(prompt.system, /at least five distinct Cons and always more Cons than Pros/i)
-  assert.match(prompt.system, /optional, specific style or grooming upgrades tied to visible features/i)
-  assert.match(prompt.system, /Include every distinct useful improvement the evidence supports/i)
+  assert.match(prompt.system, /at least five more separate points outside the scorecard/i)
+  assert.match(prompt.system, /clearly labeled optional upgrades tied to real visible features/i)
+  assert.match(prompt.system, /Include all score-linked concerns even if that means going above this minimum/i)
   assert.match(prompt.system, /say plainly what is weak, uneven, unclear, or needs work/i)
   assert.match(prompt.system, /Do not claim body fat, bloating, or a health problem from a face alone/i)
   assert.match(prompt.system, /do not diagnose lazy eye/i)
   assert.doesNotMatch(prompt.system, /describe a camera angle or light only when/i)
   assert.match(prompt.system, /Evidence IDs stay internal and must never appear in reader-facing text/i)
-  assert.match(prompt.system, /Do a top-to-bottom audit of the visible face/i)
+  assert.match(prompt.system, /Do a careful top-to-bottom audit of the person's visible face/i)
   assert.match(prompt.system, /short everyday words a child can understand/i)
-  assert.equal(analysis.version, 15)
+  assert.equal(analysis.version, 19)
   assert.equal(analysis.strengths.length, 1)
-  assert.equal(analysis.improvementOpportunities.length, 5)
+  assert.equal(analysis.improvementOpportunities.length, 13)
   const context = publicContext({ status:'completed',latest:normalize(saved.row),previous:[],profile:null },true)
   assert.deepEqual(context.latest.appearanceAnalysis.strengths, analysis.strengths)
   assert.deepEqual(context.latest.appearanceAnalysis.recommendedActions, analysis.recommendedActions)
@@ -81,7 +81,7 @@ test('cached analysis is reused without another AI request', async () => {
 })
 test('keeps every distinct supported finding when a scan has more than six', async () => {
   assert.equal(schema.properties.strengths.maxItems, 4)
-  assert.equal(schema.properties.improvementOpportunities.minItems, 5)
+  assert.equal(schema.properties.improvementOpportunities.minItems, 13)
   assert.equal(schema.properties.improvementOpportunities.maxItems, undefined)
   const id = seed()
   const many = (prefix, count) => Array.from({ length: count }, (_, index) => ({
@@ -93,25 +93,36 @@ test('keeps every distinct supported finding when a scan has more than six', asy
   const analysis = await analyze('alice', id, { client: { generate: async () => response({
     ...result(),
     strengths: many('Strength', 4),
-    improvementOpportunities: many('Improvement', 9),
+    improvementOpportunities: many('Improvement', 13),
   }) } })
   assert.equal(analysis.strengths.length, 4)
-  assert.equal(analysis.improvementOpportunities.length, 9)
+  assert.equal(analysis.improvementOpportunities.length, 13)
   assert.equal(cachedBreakdown(ownedResult(id, 'alice').result, id).strengths.length, 4)
 })
-test('version-14 analysis is refreshed with the five-Cons, direct advice rules', async () => {
+test('counts distinct low-rated features, merges duplicate rating aliases, and adds five extra slots', () => {
+  const evidence = evidenceFor({
+    faceMetrics: { jawline: { score: 4.8 }, cheekbones: { score: 5.1 }, symmetry: { score: 8.4 }, masculinityFemininity: { score: null } },
+    faceSubScores: { jawlineDefinition: 4.6, skinClarity: 5.8, symmetry: 6.4, facialHarmony: null },
+  }, {
+    eyes: { eyelidExposure: { score: 6.2 }, underEyeHealth: { score: 7.1 }, eyebrowDensity: null },
+  })
+  assert.equal(lowRatedFeatureCount(evidence), 6)
+  assert.equal(createSchema(Math.max(13, lowRatedFeatureCount(evidence) + 5)).properties.improvementOpportunities.minItems, 13)
+  assert.equal(createSchema(18).properties.improvementOpportunities.minItems, 18)
+})
+test('version-18 analysis is refreshed with score-linked Cons and five additional points', async () => {
   const old = { ...original, appearanceAnalysis: { ...result(), version: 14, scanId: 'old-scan' } }
   const id = seed('alice', old)
   const analysis = await analyze('alice', id, { client: { generate: async () => response(result()) } })
-  assert.equal(analysis.version, 15)
+  assert.equal(analysis.version, 19)
   assert.equal(analysis.scanId, id)
-  assert.equal(ownedResult(id, 'alice').result.appearanceAnalysis.version, 15)
+  assert.equal(ownedResult(id, 'alice').result.appearanceAnalysis.version, 19)
 })
 test('production version-3 two-point analysis is refreshed from its owner-scoped photo without changing scores or history', async () => {
   // Production v3 treated any saved arrays as current and skipped reanalysis.
   const old = { ...original, appearanceAnalysis: { version: 3, strengths: [{ title: 'Old point one', observation: 'Old text.' }, { title: 'Old point two', observation: 'Old text.' }], improvementOpportunities: [{ title: 'Old concern one', observation: 'Old text.' }, { title: 'Old concern two', observation: 'Old text.' }] } }
   const id = seed('alice', old)
-  const five = prefix => Array.from({ length: 5 }, (_, index) => ({ ...finding, title: `${prefix} ${index + 1}`, observation: `Distinct visible photo evidence ${index + 1}.`, basedOn: ['photo:front'] }))
+  const five = prefix => Array.from({ length: 13 }, (_, index) => ({ ...finding, title: `${prefix} ${index + 1}`, observation: `Distinct visible photo evidence ${index + 1}.`, basedOn: ['photo:front'] }))
   let photoWasLoaded = false
   const analysis = await analyze('alice', id, {
     loadImage: async ({ scan, userId }) => { photoWasLoaded = true; assert.equal(userId, 'alice'); assert.equal(scan.imagePath, 'scan/alice/original.jpg'); return image },
@@ -121,12 +132,12 @@ test('production version-3 two-point analysis is refreshed from its owner-scoped
   assert.equal(photoWasLoaded, true)
   assert.equal(analysis.source, 'saved_scan_photo')
   assert.equal(analysis.strengths.length, 4)
-  assert.equal(analysis.improvementOpportunities.length, 5)
+  assert.equal(analysis.improvementOpportunities.length, 13)
   assert.ok(!analysis.strengths.some(point => point.title === 'Old point one'))
   assert.ok(!analysis.improvementOpportunities.some(point => point.title === 'Old concern one'))
   assert.equal(saved.result.overallScore, original.overallScore)
   assert.equal(saved.row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(saved.result.appearanceAnalysis.version, 15)
+  assert.equal(saved.result.appearanceAnalysis.version, 19)
   assert.equal(cachedBreakdown({ appearanceAnalysis: old.appearanceAnalysis }, id), null)
 })
 test('legacy local scan history is reanalyzed and its old score data stays intact', async () => {
@@ -137,9 +148,9 @@ test('legacy local scan history is reanalyzed and its old score data stays intac
   assert.equal(analysis.scanId, id)
   assert.equal(saved.overallScore, original.overallScore)
   assert.equal(saved.keyStrengths[0], original.keyStrengths[0])
-  assert.equal(saved.appearanceAnalysis.version, 15)
+  assert.equal(saved.appearanceAnalysis.version, 19)
   assert.equal(row.face_photo_url, 'scan/alice/original.jpg')
-  assert.equal(normalize(row).appearanceAnalysis.version, 15)
+  assert.equal(normalize(row).appearanceAnalysis.version, 19)
 })
 test('another owner cannot read, generate or overwrite a scan', async () => {
   const id=seed('bob')

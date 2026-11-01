@@ -1,24 +1,10 @@
 export function getRatingColor(score) {
   const value = Math.max(0, Math.min(10, Number.isFinite(score) ? score : 0))
-  const stops = [
-    { score: 0, color: [239, 68, 68] },
-    { score: 2.1, color: [255, 141, 55] },
-    { score: 4.5, color: [249, 115, 22] },
-    { score: 5.7, color: [217, 119, 6] },
-    { score: 6.1, color: [224, 169, 0] },
-    { score: 6.5, color: [250, 204, 21] },
-    { score: 6.8, color: [190, 225, 20] },
-    { score: 7, color: [163, 230, 53] },
-    { score: 8.8, color: [48, 229, 32] },
-    { score: 10, color: [34, 197, 94] },
-  ]
-  const upperIndex = stops.findIndex(stop => stop.score >= value)
-  if (upperIndex <= 0) return `rgb(${stops[0].color.join(', ')})`
-  const lower = stops[upperIndex - 1]
-  const upper = stops[upperIndex]
-  const amount = (value - lower.score) / (upper.score - lower.score)
-  const rgb = lower.color.map((channel, index) => Math.round(channel + (upper.color[index] - channel) * amount))
-  return `rgb(${rgb.join(', ')})`
+  if (value < 2) return '#E9231B'
+  if (value < 5) return '#FF8A00'
+  if (value < 6.5) return '#F18A00'
+  if (value < 7) return '#FFC400'
+  return '#00B82E'
 }
 
 function scoreValue(metric) {

@@ -1,7 +1,12 @@
-import { isLocalDeveloperPreview } from './developerUnlock.js'
+import { isLocalScanOrigin } from './localScanValidation.js'
 
 export function isDeveloperRefreshAvailable(isDev = import.meta.env?.DEV, hostname = globalThis.location?.hostname) {
-  return isLocalDeveloperPreview(isDev, hostname)
+  return Boolean(isDev && isLocalScanOrigin(hostname))
+}
+
+// Reset only the local Pro scan window; history and all other store data remain intact.
+export function getScanLimitResetState() {
+  return { proScanCount: 0, proScanDate: null, proScanFirstAt: null }
 }
 
 // Clear test/session progress while retaining identity, entitlement, and all

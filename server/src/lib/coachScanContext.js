@@ -87,6 +87,63 @@ function latestOwnedResult(userId) {
   return { row, result: parse(row.face_data).result }
 }
 
+// The user's prior score comes only from a completed scan owned by their JWT
+// identity. This is used for gentle rescan anchoring; browser-provided scores
+// are never treated as a benchmark.
+function latestCompletedResult(userId) {
+  if (!userId || userId === 'demo') return null
+  const rows = db.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC LIMIT 30').all(userId)
+  for (const row of rows) {
+    const envelope = parse(row.face_data)
+    if (envelope?.kind !== KIND || envelope.status !== 'completed' || !envelope.result) continue
+    return envelope.result
+  }
+  return null
+}
+
+function scoreSnapshot(result) {
+  if (!result || typeof result.overallScore !== 'number' || !Number.isFinite(result.overallScore)) return null
+  const numeric = value => typeof value === 'number' && Number.isFinite(value) ? value : null
+  return {
+    overallScore: result.overallScore, faceScore: numeric(result.faceScore), groomingScore: numeric(result.groomingScore),
+    faceSubScores: clean(result.faceSubScores), faceMetrics: clean(result.faceMetrics), pillars: clean(result.pillars),
+  }
+}
+
+async function firstCompletedBenchmark(userId) {
+  if (!userId || userId === 'demo') return null
+  const rows = db.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date ASC LIMIT 50').all(userId)
+  for (const row of rows) {
+    const envelope = parse(row.face_data)
+    if (envelope?.kind !== KIND || envelope.status !== 'completed' || !envelope.result) continue
+    const stored = envelope.result.scanBenchmark
+    if (stored?.scanId && stored?.scores?.overallScore != null) return stored
+    const scores = scoreSnapshot(envelope.result)
+    if (scores) return { version: 1, scanId: row.id, scores }
+  }
+
+  // Railway can restart with an empty local SQLite file. Reuse the benchmark
+  // snapshot written to this user's existing cloud scan metadata when present.
+  const supabase = getSupabase()
+  if (!supabase) return null
+  try {
+    const { data, error } = await timeout(supabase.from('scans').select('id,user_id,created_at,overall_score,face_score,grooming_score,harmony,angularity,features,dimorphism,extended_metrics')
+      .eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle())
+    if (error || !data || String(data.user_id) !== String(userId)) return null
+    const extended = parse(data.extended_metrics) || {}
+    if (extended.scanBenchmark?.scanId && extended.scanBenchmark?.scores?.overallScore != null) return extended.scanBenchmark
+    const overallScore = typeof data.overall_score === 'number' ? data.overall_score : Number(data.overall_score)
+    if (data.overall_score == null || !Number.isFinite(overallScore)) return null
+    return { version: 1, scanId: data.id, scores: {
+      overallScore,
+      faceScore: data.face_score == null || !Number.isFinite(Number(data.face_score)) ? null : Number(data.face_score),
+      groomingScore: data.grooming_score == null || !Number.isFinite(Number(data.grooming_score)) ? null : Number(data.grooming_score),
+      faceSubScores: null, faceMetrics: null,
+      pillars: clean({ harmony: data.harmony, angularity: data.angularity, features: data.features, dimorphism: data.dimorphism }),
+    } }
+  } catch { return null }
+}
+
 function normalize(row) {
   const data = parse(row.face_data)
   if (data?.kind === KIND && data.status !== 'completed') return null
@@ -127,11 +184,16 @@ function normalize(row) {
 
 async function loadContext(userId, { database = db, supabase = getSupabase() } = {}) {
   if (!userId || userId === 'demo') throw new Error('Authenticated scan owner required')
-  const local = database.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC LIMIT 12').all(userId)
+  // Keep the full owner-scoped timeline for questions such as “have I been
+  // improving?” The latest-three view remains the compact context for normal
+  // scan questions, but it is not enough to calculate a long-term trend.
+  const local = database.prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY scan_date DESC').all(userId)
   let remote = [], profile = null
   if (supabase) {
     const [scans, user] = await timeout(Promise.all([
-      supabase.from('scans').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(6),
+      // User scan histories are small in normal use. Retrieve a generous
+      // owner-scoped set so cloud-only scans are included after server restarts.
+      supabase.from('scans').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1000),
       supabase.from('users').select('*').eq('id', userId).maybeSingle(),
     ]))
     if (scans.error || user.error) throw new Error('Saved scan context is temporarily unavailable')
@@ -147,12 +209,13 @@ async function loadContext(userId, { database = db, supabase = getSupabase() } =
     if (!existing) byId.set(scan.id, scan)
     else { if (scan.source === 'saved_analysis' && existing.source !== 'saved_analysis') byId.set(scan.id, { ...scan, imagePath: scan.imagePath || existing.imagePath }); else if (!existing.imagePath) existing.imagePath = scan.imagePath }
   }
-  const scans = [...byId.values()].sort((a, b) => (Date.parse(b.completedAt) || 0) - (Date.parse(a.completedAt) || 0)).slice(0, 3)
+  const history = [...byId.values()].sort((a, b) => (Date.parse(b.completedAt) || 0) - (Date.parse(a.completedAt) || 0))
+  const scans = history.slice(0, 3)
   const newest = local.find(row => parse(row.face_data)?.kind === KIND)
   const pending = parse(newest?.face_data)?.status === 'processing'
   const age = Date.now() - Date.parse(newest?.scan_date)
   const status = pending && age < 180000 ? 'processing' : scans.length ? 'completed' : pending ? 'failed' : 'no_scan'
-  return { status, latest: scans[0] || null, previous: scans.slice(1), profile: clean(profile),
+  return { status, latest: scans[0] || null, previous: scans.slice(1), history, profile: clean(profile),
     imageConsent: profile?.ai_consent === true, supabase }
 }
 
@@ -176,7 +239,12 @@ function publicContext(context, isPro) {
     }
     return data
   }
-  return { status: context.status, latest: view(context.latest), previous: context.previous.map(view), goals: context.profile }
+  const history = (context.history || [context.latest, ...context.previous].filter(Boolean)).map(scan => ({
+    scanId: scan.id,
+    completedAt: scan.completedAt,
+    ...(isPro ? { scores: scan.scores, faceMetrics: scan.faceMetrics, physique: scan.physique } : {}),
+  })).sort((a, b) => (Date.parse(a.completedAt) || 0) - (Date.parse(b.completedAt) || 0))
+  return { status: context.status, latest: view(context.latest), previous: context.previous.map(view), history, goals: context.profile }
 }
 
 function ownedImagePath(path, userId) {
@@ -210,4 +278,4 @@ function parseProvidedImage(value) {
   return { type: 'image', source: { type: 'base64', media_type: match[1].toLowerCase(), data: buffer.toString('base64') } }
 }
 
-module.exports = { startScan, finishScan, failScan, ownedResult, ownedCoachScan, latestOwnedResult, loadContext, publicContext, imageForScan, parseProvidedImage, ownedImagePath, normalize, clean, timeout }
+module.exports = { startScan, finishScan, failScan, ownedResult, ownedCoachScan, latestOwnedResult, latestCompletedResult, firstCompletedBenchmark, loadContext, publicContext, imageForScan, parseProvidedImage, ownedImagePath, normalize, clean, timeout }

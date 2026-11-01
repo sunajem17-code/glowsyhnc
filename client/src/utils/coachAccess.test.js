@@ -2,8 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getCoachAccessMode } from './coachAccess.js'
 
-test('local Pro Preview sends Adonis to local preview instead of the paid server route', () => {
-  assert.equal(getCoachAccessMode({ isPremium: true, localPreviewEnabled: true }, true, 'localhost'), 'local-preview')
+test('local preview settings do not bypass server-authoritative premium access', () => {
+  assert.equal(getCoachAccessMode({ isPremium: true, localPreviewEnabled: true }, true, 'localhost'), 'server')
+})
+
+test('local Pro Preview routes messages to the server for real AI replies', () => {
+  assert.equal(getCoachAccessMode({ isPremium: false, localPreviewEnabled: true }, true, 'localhost'), 'server')
 })
 
 test('paid accounts continue to use the server coach', () => {

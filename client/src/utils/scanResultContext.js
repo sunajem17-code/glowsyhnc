@@ -5,7 +5,9 @@ export function getProgressCardReturnTo(routeState) {
 
 export function getSavedProgressResultPresentation({ savedProgressCard = false, isPremium = false, hasUnlockedAccess = false } = {}) {
   return {
-    blurResultCard: Boolean(savedProgressCard && !isPremium),
+    // A saved card may also be temporarily unlocked by the successful
+    // purchase flow before the persisted premium state refreshes.
+    blurResultCard: Boolean(savedProgressCard && !isPremium && !hasUnlockedAccess),
     showUnlockedChrome: Boolean(hasUnlockedAccess),
   }
 }

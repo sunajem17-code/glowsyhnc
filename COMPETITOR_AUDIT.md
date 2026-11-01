@@ -46,7 +46,6 @@
 ## What Ascendus Has That Competitors DON'T
 (Protect these — they're your moat)
 
-- **HairMaxx AI simulator** — unique, no direct competitor matches it
 - **Detailed PSL metrics under the hood** (canthalTilt, hunterEyes, jawDefinition, cheekbones, maxilla, facialThirds) — this data exists in `analysis.js` but is barely surfaced in the UI
 - **Score projection / PotentialViewer** — showing where you'll be in 12 weeks is a genuinely compelling feature
 - **Gold dark aesthetic** — best-looking app in the space, hands down
@@ -154,7 +153,6 @@ Umax's voice coach is genuinely unique. A "Record 30 seconds of yourself speakin
 
 ## Ascendus Strengths to Double Down On
 
-- **HairMaxx is genuinely unique** — make sure it's prominently discoverable in the UI, not buried
 - **The PSL metric suite in analysis.js is your secret weapon** — surface it properly and you leapfrog every competitor on depth
 - **The score reveal animation** is the best in the space — keep it, maybe add haptics on iOS
 - **Gold dark aesthetic** is a strong brand moat — don't dilute it with "modern" redesigns

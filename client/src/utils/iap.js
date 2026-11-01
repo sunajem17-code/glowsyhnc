@@ -1,6 +1,6 @@
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isMonthlyExitTrial } from './scanTrial'
+import { isWeeklyExitTrial } from './scanTrial'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -16,8 +16,13 @@ export async function getEligibleScanTrial() {
   if (!isNative()) return null
   await initRevenueCat()
   const offerings = await Purchases.getOfferings()
-  const packages = offerings.current?.availablePackages || []
-  const candidates = packages.filter(p => isMonthlyExitTrial(p.product))
+  const availableOfferings = [offerings.current, ...Object.values(offerings.all || {})].filter(Boolean)
+  const packages = [...new Map(
+    availableOfferings.flatMap(offering => offering.availablePackages || [])
+      .map(pkg => [pkg.product?.identifier, pkg])
+      .filter(([identifier]) => identifier)
+  ).values()]
+  const candidates = packages.filter(p => isWeeklyExitTrial(p.product))
   if (!candidates.length) return null
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
