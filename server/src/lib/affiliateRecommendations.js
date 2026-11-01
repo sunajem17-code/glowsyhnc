@@ -42,13 +42,19 @@ const COACH_REPLY_SCHEMA = { type: 'object', properties: {
 } }
 const PRODUCT_GUIDANCE = `PRODUCT RECOMMENDATIONS:
 Respond ONLY with JSON {"message":"your conversational answer", "products":[{"name":"real brand and product", "searchQuery":"exact brand and product", "reason":"realistic purpose and limitation"}]}.
-Keep the conversational answer in message. Put all commercial product names you recommend in products, not just in message. Use zero products unless a product is relevant; at most two, prioritizing the user's actual concern and a simple routine. A structural concern may require no product. Mention free actions first when helpful. Never invent ASINs, availability, prices, discounts or URLs; the server adds Amazon affiliate searches. Do not claim a search link is a verified listing. Select on suitability, not commission. Never link prescription drugs, minoxidil/prostaglandin lash products, periocular needling/injection kits, eye-pulling devices or hormone/peptide supplements as cosmetic fixes. Do not make body/eye shape or guaranteed score improvement claims. Use products labelled for their intended area and do not force an eye cream for normal eyelids or structural hollows. If images are unavailable, rely on actual saved evidence or the user's stated concern; label generic options as optional.`
+Keep the conversational answer in message. Put all commercial product names you recommend in products, not just in message. Recommend products ONLY when the user's current message explicitly asks for product suggestions, something to buy, or a specific product choice. Relevance alone is not permission. General scan feedback, routines, improvement advice, and follow-up questions must use products: [] and contain no unsolicited brands or shopping links. When explicitly asked, use at most two products addressing the request. A structural concern may require no product. Mention free actions first when helpful. Never invent ASINs, availability, prices, discounts or URLs; the server adds Amazon affiliate searches. Do not claim a search link is a verified listing. Select on suitability, not commission. Never link prescription drugs, minoxidil/prostaglandin lash products, periocular needling/injection kits, eye-pulling devices or hormone/peptide supplements as cosmetic fixes. Do not make body/eye shape or guaranteed score improvement claims. Use products labelled for their intended area and do not force an eye cream for normal eyelids or structural hollows. If images are unavailable, rely on actual saved evidence or the user's stated concern; label generic options as optional.`
 
 function isAllowedCosmeticProduct(product) {
   return !UNSUITABLE_COSMETIC_PRODUCT.test(`${product.name} ${product.searchQuery}`)
 }
 
 function allowsProductRecommendations(question) {
+  const text = String(question || '')
+  if (/\b(?:no|without)\s+(?:more\s+)?(?:products?|recommendations?|shopping)|\b(?:don.t|do not|stop|avoid)\b.{0,35}\b(?:recommend|suggest|products?|shopping|buy)\b/i.test(text)) return false
+  const product = /\b(?:products?|brands?|moisturi[sz]er|cleanser|sunscreen|serum|shampoo|conditioner|cream|lotion|retinol|exfoliant|supplements?|equipment)\b/i.test(text)
+  const request = /\b(?:recommend|suggest|which|what|buy|purchase|shop|choose|pick|looking for|should I use|can I use|where can I get)\b/i.test(text)
+  const shopping = /\b(?:what|which)\b.{0,35}\b(?:buy|purchase)\b|\b(?:recommend|suggest)\b.{0,25}\b(?:something|anything)\b.{0,25}\b(?:buy|purchase)\b/i.test(text)
+  if (!(product && request) && !shopping) return false
   return !/canthoplast|canthopex|blepharoplast|filler|surgery|surgical|implant|needl|orbital decompression|minoxidil|bimatoprost|latisse|prostaglandin|micro[ -]?needl|derma[ -]?stamp|inject|peptide|hormone|glp[ -]?1|testosterone|jaw[ -]?train|(?:change|alter|fix).{0,40}(?:canthal|orbital|eye shape|bone)|(?:canthal|orbital|eye shape|bone).{0,40}(?:chang|fix|reshape)/i.test(question)
 }
 

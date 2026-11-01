@@ -165,7 +165,7 @@ export default function AICoach() {
     setMessages([{ role: 'assistant', content: 'Welcome to Ascendus. I’m Adonis, your AI coach. What would you like help with today?' }])
     conversationRef.current = null
     loadCoachAccess({
-      native: isNative(), userId: user?.id,
+      native: isNative(), userId: user?.id, claimedPremium: accountPremium,
       checkPurchase: checkProStatus,
       syncPurchase: id => api.payments.syncRc(id),
       loadContext: () => api.coach.context(),

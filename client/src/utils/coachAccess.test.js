@@ -40,3 +40,10 @@ test('non-members keep the server access decision', async()=>{
   const result=await loadCoachAccess({native:true,userId:'free',loadContext:async()=>({isPro:false}),checkPurchase:async()=>false,syncPurchase:()=>assert.fail('unexpected sync')})
   assert.equal(result.isPro,false)
 })
+
+test('browser premium claims trigger server purchase verification without granting access locally', async()=>{
+  let reads=0,synced=false
+  const result=await loadCoachAccess({native:false,userId:'member',claimedPremium:true,loadContext:async()=>({isPro:++reads>1}),syncPurchase:async id=>{assert.equal(id,'member');synced=true}})
+  assert.equal(synced,true)
+  assert.equal(result.isPro,true)
+})

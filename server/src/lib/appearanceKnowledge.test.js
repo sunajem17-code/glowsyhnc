@@ -53,3 +53,11 @@ test('drug, procedure and structural-change questions cannot trigger shopping li
  const reply=formatCoachReply(JSON.stringify({message:'A structural concern is not a cream problem.',products:[{name:'CeraVe Eye Repair Cream',searchQuery:'CeraVe Eye Repair Cream',reason:'An unnecessary model suggestion'}]}),{allowProducts:false})
  assert.doesNotMatch(reply,/amazon|commission|CeraVe/)
 })
+
+
+test('products require an explicit request in the current message', () => {
+ for (const question of ['hi', 'Analyze my scan', 'What should I improve first?', 'Give me a skincare routine', 'How can I improve my skin?', 'Recommend habits for my jawline', 'Stop recommending products', "Don't recommend products even if relevant"]) assert.equal(allowsProductRecommendations(question), false, question)
+ for (const question of ['Recommend products for my skin', 'Which moisturizer should I use?', 'Suggest a sunscreen', 'What should I buy for dry skin?']) assert.equal(allowsProductRecommendations(question), true, question)
+ const reply = formatCoachReply(JSON.stringify({message:'Keep a consistent routine.',products:[{name:'Example cleanser',searchQuery:'gentle cleanser',reason:'Optional cleansing'}]}),{allowProducts:false})
+ assert.equal(reply,'Keep a consistent routine.')
+})

@@ -1,3 +1,4 @@
+import { checkProStatus, isNative } from '../utils/iap'
 import useCoachScroll from '../hooks/useCoachScroll'
 import CoachMessage from '../components/CoachMessage'
 import { useState, useRef, useEffect } from 'react'
@@ -12,7 +13,7 @@ import { triggerHaptic } from '../utils/haptics'
 import { ADONIS_GREETING, getCoachChatSendState, getMessageEntryMotion, getScanRequiredMessages } from '../utils/coachChat'
 import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
 import { prepareCoachPhoto } from '../utils/coachPhoto'
-import { getCoachAccessMode } from '../utils/coachAccess'
+import { getCoachAccessMode, loadCoachAccess } from '../utils/coachAccess'
 
 const STARTER_PROMPTS = [
   "What's holding my score back the most?",
@@ -211,7 +212,7 @@ export default function Progress() {
   const navigate = useNavigate()
   const selectedScanId = location.state?.scanId
 
-  const { scans, userProfile, user, isLocalProPreview } = useStore()
+  const { scans, userProfile, user, isLocalProPreview, isPremium: accountPremium } = useStore()
   const latestScan = scans?.[0] ?? null
   const selectedScan = selectedScanId
     ? scans?.find(scan => [scan.id, scan.serverScanId, scan.aiScore?.scanId].some(id => id != null && String(id) === String(selectedScanId)))
@@ -235,7 +236,7 @@ export default function Progress() {
   const inputRef = useRef(null)
   const coachAccessMode = getCoachAccessMode({
     isPremium: serverScan?.isPro === true,
-    localPreviewEnabled: isLocalProPreview,
+    localPreviewEnabled: false,
   })
 
   useEffect(() => {
@@ -261,7 +262,7 @@ export default function Progress() {
 
   useEffect(() => {
     let active = true
-    const restoreConversation = () => {
+    const restoreConversation = (verifiedPremium = false) => {
       if (!user?.id) return false
       try {
         const key = `adonis-chat:${user.id}`
@@ -270,7 +271,7 @@ export default function Progress() {
         if (saved?.conversationId && Array.isArray(saved.messages)) {
           storageConversationRef.current = saved.storageId || saved.conversationId
           conversationRef.current = saved.serverConversationId || (/^(?:local-preview:|adonis:)/.test(String(saved.conversationId)) ? null : saved.conversationId)
-          setMessages(saved.messages.map(message => ({ ...message, reveal: false })))
+          setMessages(saved.messages.filter(message => !verifiedPremium || (!message.paywall && !/^Pro required — get Ascendus Max to unlock AI Coach\.$/.test(message.content || ''))).map(message => ({ ...message, reveal: false })))
           return true
         }
       } catch {}
@@ -283,30 +284,28 @@ export default function Progress() {
     setServerScan(null)
     conversationRef.current = null
     storageConversationRef.current = null
-    api.coach.context().then(data => {
+    loadCoachAccess({native:isNative(),userId:user?.id,claimedPremium:accountPremium,
+      checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context(),
+    }).then(data => {
       if (!active) return
       setServerScan(data)
       // Server-backed replies require server entitlement. Local Pro Preview is
       // device-only and may restore its own locally generated conversation.
-      if (data?.isPro === true || isLocalProPreview) {
-        const restored = restoreConversation()
+      if (data?.isPro === true) {
+        const restored = restoreConversation(data?.isPro === true)
         if (!restored) setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
       } else {
         setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
       }
-    }).catch(() => {
+    }).catch(error => {
       if (active) {
-        setServerScan({ status: 'unavailable' })
-        if (isLocalProPreview) {
-          const restored = restoreConversation()
-          if (!restored) setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
-        } else {
-          setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
-        }
+        setServerScan({ status: 'unavailable', accessError: error?.message || 'Could not verify your subscription. Please retry.' })
+        setMessages([{role:'assistant',content:error?.message || 'Could not verify your subscription. Please retry.'}])
+        setIntroMode(mode => mode === 'pending' ? 'seen' : mode)
       }
     })
     return () => { active = false; requestGenerationRef.current += 1 }
-  }, [user?.id, latestScan?.id, isLocalProPreview])
+  }, [user?.id, latestScan?.id, isLocalProPreview, accountPremium])
 
   useEffect(() => {
     if (messagesOwner !== user?.id) return
@@ -319,6 +318,10 @@ export default function Progress() {
   async function send(text) {
     const txt = (text || input).trim()
     if (serverScan === null) return
+    if (serverScan.status === 'unavailable') {
+      setMessages(previous => [...previous, {role:'assistant',content:serverScan.accessError || 'Could not verify coach access. Reopen this tab to retry.'}])
+      return
+    }
     const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
     if (sendState === 'ignore') return
     if (user?.id && !storageConversationRef.current) {
