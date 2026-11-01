@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Ruler, ChevronRight, Beef, Lock } from 'lucide-react'
+import { Dumbbell, ChevronDown, ChevronUp, ArrowLeft, RefreshCw, AlertCircle, Zap, Target, Flame, Beef, Lock } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { api } from '../utils/api'
 import PageHeader from '../components/PageHeader'
 import MotionPage from '../components/MotionPage'
-import BodyStatsFlow from '../components/BodyStatsStep'
 // TrainingPlanIntro removed — physique scan now handled by /physique-scan page
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
@@ -379,7 +378,6 @@ export default function WorkoutPlan() {
   const isPremium      = usePremiumUiAccess()
   const actualIsPremium = useStore(s => s.isPremium)
   const userProfile    = useStore(s => s.userProfile)
-  const setUserProfile = useStore(s => s.setUserProfile)
 
   const latestPhysiqueScan = [...scans, ...(currentScan?.scanType === 'physique' ? [currentScan] : [])]
     .filter(scan => scan?.scanType === 'physique' && scan?.physiqueScore)
@@ -387,31 +385,10 @@ export default function WorkoutPlan() {
   const physiqueSourceScan = latestPhysiqueScan ?? (currentScan?.physiqueScore ? currentScan : null)
   const physiqueScores = physiqueSourceScan?.physiqueScore
 
-  // ── Body stats (height/weight) — collected here instead of onboarding, so
-  // they're gathered when actually needed (training-phase calculation) rather
-  // than upfront for every user regardless of whether they ever open this
-  // screen. For a first-time user (no physique score yet), this now happens
-  // as step 2 of TrainingPlanIntro instead of an auto-popping modal racing
-  // the old gate screen — this auto-open only still applies to a returning
-  // user who somehow has a plan already but never set stats (edge case, not
-  // the common path). Also reachable any time via the settings row below.
-  const [showBodyStats, setShowBodyStats] = useState(false)
-  const hasBodyStats = userProfile?.height != null && userProfile?.weight != null
-
-  useEffect(() => {
-    if (physiqueScores && !hasBodyStats) setShowBodyStats(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function handleBodyStatsSave(height, weight) {
-    setUserProfile({ ...userProfile, height, weight })
-    api.user.update({ height_cm: height, weight_kg: weight }).catch(() => {})
-  }
-
   // ─── Nutrition Plan (TDEE) ──────────────────────────────────────────────────
   // Moved here from the main face-scan results screen — this flow is the only
-  // place real height/weight (userProfile.height/weight, set above) actually
-  // exists, so TDEE/macros now resolve instead of always showing "—".
+  // uses previously saved height/weight when available; users are not prompted
+  // to enter these measurements in the plan flow.
   const nutHeightCm = userProfile?.height ?? null
   const nutWeightKg = userProfile?.weight ?? null
   const nutGoal     = userProfile?.goal ?? null
@@ -586,23 +563,6 @@ export default function WorkoutPlan() {
           <WeakAreaChips physiqueScores={physiqueScores} />
         </motion.div>
 
-        {/* Body stats — settings-style row, reopens the same flow shown automatically above */}
-        <motion.button
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => { triggerHaptic(); setShowBodyStats(true) }}
-          className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-        >
-          <div className="flex items-center gap-2.5">
-            <Ruler size={16} style={{ color: GOLD }} />
-            <span className="font-body text-[13px] text-primary">
-              {hasBodyStats ? `${userProfile.height} cm · ${userProfile.weight} kg` : 'Add your body stats'}
-            </span>
-          </div>
-          <ChevronRight size={16} className="text-secondary" />
-        </motion.button>
-
         {/* Fallback notice */}
         {isFallback && !loading && (
           <motion.div
@@ -688,9 +648,6 @@ export default function WorkoutPlan() {
               <div className="flex-1">
                 <p className="text-sm font-heading font-bold text-primary">{nutritionPhaseLabel}</p>
                 <p className="text-[10px] text-secondary font-body leading-snug mt-0.5">{nutritionProjection}</p>
-                {!nutritionTarget && (
-                  <p className="text-[10px] text-secondary font-body mt-1">Add your body stats above for exact targets.</p>
-                )}
               </div>
             </div>
 
@@ -780,17 +737,6 @@ export default function WorkoutPlan() {
         )}
       </div>
     </MotionPage>
-    <AnimatePresence>
-      {showBodyStats && (
-        <BodyStatsFlow
-          initialHeight={userProfile?.height}
-          initialWeight={userProfile?.weight}
-          goal={userProfile?.goal}
-          onSave={handleBodyStatsSave}
-          onClose={() => setShowBodyStats(false)}
-        />
-      )}
-    </AnimatePresence>
     </>
   )
 }

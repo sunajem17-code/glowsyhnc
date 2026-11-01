@@ -1168,97 +1168,54 @@ function ChecklistRow({ step: s, i, currentStep }) {
 
 // ─── Physique-specific analyzing screen ───────────────────────────────────────
 
-const PHYSIQUE_STEP_LABELS = [
-  'Detecting body composition...',
-  'Measuring shoulder-to-waist ratio...',
-  'Evaluating muscle definition...',
-  'Analyzing V-taper & symmetry...',
-  'Finalizing physique matrix...',
-]
+function PhysiqueAnalyzingScreen({ photo, onComplete }) {
+  const completed = useRef(false)
+  const finish = useCallback(() => {
+    if (completed.current) return
+    completed.current = true
+    onComplete?.()
+  }, [onComplete])
 
-const PHYSIQUE_DIAG_LINES_BASE = [
-  'Body silhouette detected',
-  'Shoulder width calibration in progress',
-  'Waist-to-hip ratio analysis running',
-  'Muscle group visibility scanning',
-  'Symmetry index calculation active',
-  'Body fat estimation underway',
-  'Frame structure mapping complete',
-  'V-taper geometry confirmed',
-]
-
-function buildPhysiqueDiagLines(scanResult) {
-  const p = scanResult?.physiqueScore
-  if (!p) return PHYSIQUE_DIAG_LINES_BASE
-  const add = (v, pos, neg) => ((v ?? 0) >= 7 ? pos : neg)
-  return [
-    add(p.muscleDevelopment,  'Strong muscle development detected',      'Muscle development path identified'),
-    add(p.bodyFatEstimate,    'Lean body composition confirmed',          'Body fat reduction opportunity found'),
-    add(p.shoulderToWaist,   'Excellent shoulder-to-waist ratio',        'Frame proportion opportunity detected'),
-    add(p.vTaper,            'V-taper geometry highly favorable',        'V-taper calibration in progress'),
-    add(p.symmetry,          'Bilateral muscle symmetry confirmed',       'Symmetry variance analysis complete'),
-    add(p.overallPhysique,   'Elite physique classification matched',     'Physique potential path identified'),
-  ]
-}
-
-const BODY_ANALYSIS_STAGES = ['V-Taper', 'Shoulders', 'Frame', 'Muscle Definition', 'Body Proportions']
-
-function PhysiqueAnalyzingScreen({ photo, slow, onComplete }) {
-  const [stage, setStage] = useState(0)
-  const sweepCount = useRef(0)
   return <div className="physique-analysis-screen" style={{'--physique-safe-top': isNative() ? '48px' : '16px', '--physique-safe-bottom': isNative() ? '34px' : '16px'}}>
     <style>{`
       .physique-analysis-screen {
-        box-sizing: border-box;
-        width: 100%; height: 100%; min-height: 0;
+        box-sizing: border-box; width: 100%; height: 100%; min-height: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: clamp(12px, 3dvh, 24px); text-align: center; overflow: hidden;
         padding: max(var(--physique-safe-top), env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(var(--physique-safe-bottom), env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
       }
-      .physique-analysis-screen > [role="status"] { flex-shrink: 0; max-width: 100%; }
       .physique-analysis-photo {
-        position: relative; flex-shrink: 1; min-height: 0;
-        width: min(100%, 398px); overflow: hidden; border-radius: 24px; background: #0a0a0a;
+        position: relative; flex-shrink: 1; min-height: 0; width: min(100%, 398px);
+        overflow: hidden; border-radius: 24px; background: #0a0a0a;
       }
       .physique-analysis-photo img {
         display: block; width: 100%; height: auto; object-fit: contain;
         max-height: max(120px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 130px));
-        filter: brightness(.75);
-      }
-      @media (max-height: 500px) and (orientation: landscape) {
-        .physique-analysis-screen { flex-direction: row; gap: 16px; }
-        .physique-analysis-photo { width: min(52%, 398px); }
-      }
-      @keyframes physique-laser-sweep {
-        from { top: 0; }
-        to { top: calc(100% - 3px); }
+        filter: brightness(.72);
       }
       .physique-laser-track {
         position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 3;
         pointer-events: none; background: linear-gradient(90deg, transparent, #c6a85c 15%, #fff6d5 50%, #c6a85c 85%, transparent);
         box-shadow: 0 0 10px 2px #c6a85cbb; will-change: top;
-        animation: physique-laser-sweep 1.8s linear infinite;
       }
-      @media (prefers-reduced-motion: reduce) {
-        .physique-laser-track { animation-duration: 6s; }
+      @media (max-height: 500px) and (orientation: landscape) {
+        .physique-analysis-screen { flex-direction: row; gap: 16px; }
+        .physique-analysis-photo { width: min(52%, 398px); }
       }
     `}</style>
-    <div className="flex flex-col items-center" role="status" aria-live="polite">
-      <div className="reference-status"><span className="reference-status-dot" aria-hidden="true"/>ANALYZING · {stage + 1}/5</div>
-      <div className="reference-segments" aria-hidden="true">{BODY_ANALYSIS_STAGES.map((name, i) => <i key={name} className={i <= stage ? 'is-active' : ''}/>)}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="reference-status" role="status" aria-live="polite">
+        <span className="reference-status-dot" aria-hidden="true" />ANALYZING
+      </div>
     </div>
     <div className="physique-analysis-photo">
-      <img src={photo} alt="Body photo being analyzed"/>
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="physique-laser-track"
-          onAnimationIteration={event => {
-            if (event.target !== event.currentTarget || event.animationName !== 'physique-laser-sweep') return
-            sweepCount.current += 1
-            if (sweepCount.current >= BODY_ANALYSIS_STAGES.length) onComplete?.()
-            setStage(previous => Math.min(previous + 1, BODY_ANALYSIS_STAGES.length - 1))
-          }}>
-        </div>
-      </div>
+      <img src={photo} alt="Body photo being analyzed" />
+      <motion.div
+        className="physique-laser-track"
+        initial={{ top: '0%' }} animate={{ top: '100%' }}
+        transition={{ duration: 1.8, ease: 'easeInOut' }}
+        onAnimationComplete={finish}
+      />
     </div>
   </div>
 }
@@ -1429,6 +1386,9 @@ export default function PhysiqueScan() {
     bodyPresentationRef.current?.finish(false)
     const presentation = presentationGate()
     bodyPresentationRef.current = presentation
+    // The visual animation should be bounded even if the browser pauses it
+    // (for example when the tab is backgrounded during scoring).
+    const presentationFallback = setTimeout(() => presentation.finish(), 4500)
 
     // Mark this photo as already intentionally submitted. Saving the first
     // stats profile below must not make the current photo auto-submit twice.
@@ -1547,7 +1507,7 @@ export default function PhysiqueScan() {
         }
       }
 
-      // Both the real rating and all five full laser passes must finish.
+      // Wait for the score and the single visual sweep before showing results.
       if (!await presentation.promise) return
       setAnalysisStep(4)
 
@@ -1701,6 +1661,7 @@ export default function PhysiqueScan() {
       }
     } finally {
       presentation.finish(false)
+      clearTimeout(presentationFallback)
       analysisInFlightRef.current = false
       clearTimeout(slowTimer)
       setSlowAnalysis(false)

@@ -5,23 +5,17 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { api } from '../utils/api'
 import { fileToResizedBase64 } from '../pages/WorkoutPlan'
-import BodyStatsFlow from './BodyStatsStep'
 import bodyGuideMale from '../assets/body-guide-male.jpg'
 import bodyGuideFemale from '../assets/body-guide-female.jpg'
 
-// ── 4-step intro that runs the first time a user opens Training Plan ─────────
-// Replaces the old bare "Add Your Physique Photo" gate screen in
-// WorkoutPlan.jsx with a proper welcome → stats → photo → generating sequence.
-// Steps 2 (BodyStatsFlow) and the photo-analysis call in step 3/4 reuse
-// existing components/endpoints rather than rebuilding them — this file is
-// just the chrome (progress bar, step counter, welcome copy) tying them
-// together. Same forced-dark palette as onboarding's step screens
+// ── 3-step intro that runs the first time a user opens Training Plan ─────────
+// Welcome → photo → generating. Same forced-dark palette as onboarding's step screens
 // (OnboardingFinalSteps.jsx) since this is a similar "event" moment, distinct
 // from the rest of this page which follows the user's light/dark setting.
 const BG = '#080808'
 const TEXT = '#F0EDE8'
 const DIM = 'rgba(255,255,255,0.5)'
-const STEP_TOTAL = 4
+const STEP_TOTAL = 3
 
 function StepChrome({ step, showStepLabel = true, children }) {
   const pct = (step / STEP_TOTAL) * 100
@@ -110,7 +104,7 @@ function PhotoStep({ gender, onPhotoSelected, error, loading }) {
       <div className="flex flex-col items-center gap-3">
         <div style={frameStyle} className="text-left">
           <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            Step 3 of {STEP_TOTAL}
+            Step 2 of {STEP_TOTAL}
           </span>
         </div>
         <div
@@ -207,7 +201,7 @@ function GeneratingStep({ error, onRetry }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function TrainingPlanIntro({ gender, initialHeight, initialWeight, goal, onBodyStatsSave, onComplete, onClose }) {
+export default function TrainingPlanIntro({ gender, onComplete }) {
   const [step, setStep] = useState(1)
   const [analysisError, setAnalysisError] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -217,7 +211,7 @@ export default function TrainingPlanIntro({ gender, initialHeight, initialWeight
     e.target.value = ''
     if (!file) return
 
-    setStep(4)
+    setStep(3)
     setAnalyzing(true)
     setAnalysisError('')
     try {
@@ -251,42 +245,22 @@ export default function TrainingPlanIntro({ gender, initialHeight, initialWeight
             </StepChrome>
           </motion.div>
         )}
-        {step === 3 && (
+        {step === 2 && (
           <motion.div key="photo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: EASE_STANDARD }} className="h-full">
-            <StepChrome step={3} showStepLabel={false}>
+            <StepChrome step={2} showStepLabel={false}>
               <PhotoStep gender={gender} onPhotoSelected={handlePhotoSelected} error={analysisError} loading={analyzing} />
             </StepChrome>
           </motion.div>
         )}
-        {step === 4 && (
+        {step === 3 && (
           <motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: EASE_STANDARD }} className="h-full">
-            <StepChrome step={4}>
-              <GeneratingStep error={analysisError} onRetry={() => setStep(3)} />
+            <StepChrome step={3}>
+              <GeneratingStep error={analysisError} onRetry={() => setStep(2)} />
             </StepChrome>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Step 2 is the existing BodyStatsFlow component itself (full-screen,
-          z-50 — above this wizard's own z-40 chrome) rather than a screen we
-          render inside StepChrome; stepLabel/progressPct give it the same
-          top bar/counter without touching its layout. onDone (Done button,
-          after Save) advances the wizard; onClose (X, before saving) aborts
-          the whole intro, same as X does everywhere else in the app. */}
-      <AnimatePresence>
-        {step === 2 && (
-          <BodyStatsFlow
-            initialHeight={initialHeight}
-            initialWeight={initialWeight}
-            goal={goal}
-            onSave={onBodyStatsSave}
-            onClose={onClose}
-            onDone={() => setStep(3)}
-            stepLabel={`STEP 2 OF ${STEP_TOTAL}`}
-            progressPct={(2 / STEP_TOTAL) * 100}
-          />
-        )}
-      </AnimatePresence>
     </motion.div>
   )
 }
