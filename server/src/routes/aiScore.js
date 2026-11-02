@@ -14,6 +14,8 @@ const { normalizePhysiqueScores } = require('../utils/physiqueScore')
 const { normalizeAppearanceAnalysis } = require('../lib/appearanceAnalysis')
 const { APPEARANCE_ADVICE_GUIDANCE } = require('../lib/appearanceAdviceGuidance')
 const { catalogPrompt } = require('../lib/appearanceFindingCatalog')
+const { requireScanOwner } = require('../lib/scanOwner')
+const { getSupabase } = require('../supabase')
 
 const router = express.Router()
 
@@ -890,6 +892,8 @@ function calculateFinalScore(faceResult, gender = 'male', physiqueResult = null)
 router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (req, res) => {
   let completedScanId = null
   try {
+    // Reject stale identities before paying for analysis or creating scan rows.
+    await requireScanOwner(getSupabase(), req.userId)
     const apiKey = getAIKey()
     if (!apiKey || apiKey.trim() === '') {
       console.error(`[aiScore] POST /score — selected AI provider key not configured — ${new Date().toISOString()}`)
@@ -1147,6 +1151,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     res.json(await finishScanWithStreak(completedScanId, req.userId, retainStableFindingLanguage(result, previousResult, scanBenchmark, completedScanId)))
   } catch (err) {
     try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
+    if (err.code === 'scan_owner_missing' || err.code === 'scan_owner_unavailable') {
+      return res.status(err.status).json({ error: err.message, errorCode: err.code })
+    }
     if (err.code === 'scan_save_failed') {
       return res.status(503).json({ error: 'scan_save_failed', message: err.message })
     }
