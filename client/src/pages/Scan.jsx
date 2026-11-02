@@ -20,6 +20,7 @@ import faceGuidePhotoFemale from '../assets/female-front-cutout.png'
 import AIConsentModal, { hasAIConsent } from '../components/AIConsentModal'
 import { takePhoto, pickPhoto, isNative } from '../utils/camera'
 import { CameraPreview } from '@capacitor-community/camera-preview'
+import { createNativeCameraSession } from '../utils/nativeCameraSession'
 import { Camera as CapacitorCamera } from '@capacitor/camera'
 import { analyzeSideProfile } from '../utils/photoGeometry'
 import { scheduleRescanNotification } from '../utils/notifications'
@@ -34,6 +35,9 @@ import ScanUnlockGate from './ScanUnlockGate'
 import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresentation'
 import { validationFailure } from '../utils/validationFailure'
 import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
+
+const nativeCameraSession = import.meta.hot?.data.nativeCameraSession || createNativeCameraSession(CameraPreview)
+if (import.meta.hot) import.meta.hot.dispose(data => { data.nativeCameraSession = nativeCameraSession })
 
 const SHOW_TEMPORARY_FACE_UPLOAD = true
 
@@ -239,16 +243,8 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const cardRef     = useRef()
   const canvasRef   = useRef()
   const streamRef   = useRef()
-  const previewActiveRef = useRef(false)
-  const nativePreviewGenerationRef = useRef(0)
-  // Serializes every start/stop call onto one chain so overlapping calls
-  // (e.g. StrictMode's dev-only mount→unmount→remount, which fires this
-  // effect's cleanup and the next mount's start back to back) can never
-  // race each other — without this, a start() from the second mount could
-  // reach the native side before the first mount's stop() finished, and
-  // AVCaptureSession throws ("input may not be added more than once")
-  // because two starts land on the same session before either stop lands.
-  const previewOpRef = useRef(Promise.resolve())
+  const previewOwnerRef = useRef(Symbol('camera-overlay'))
+  const cameraRequestRef = useRef(0)
   const [ready, setReady]         = useState(false)
   const [facingMode, setFacingMode] = useState('user')
   const [error, setError]         = useState('')
@@ -264,61 +260,49 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   }, [ready, capturedUrl, trackingAvailable, alignment.aligned])
 
   // ── Native: CameraPreview live viewfinder ─────────────────────────────────
-  const startNativePreview = useCallback((position) => {
-    const generation = ++nativePreviewGenerationRef.current
-    previewOpRef.current = previewOpRef.current.then(async () => {
-      try {
-        if (previewActiveRef.current) {
-          await CameraPreview.stop()
-          previewActiveRef.current = false
-        }
-        const startedAt = performance.now()
-        // Fill the entire screen so we can overlay our UI on top via z-index
-        await CameraPreview.start({
-          position,
-          toBack: true,        // render BEHIND the WebView; we make the WebView transparent over the camera area
-          disableAudio: true,
-          enableZoom: false,
-          enableHighResolution: true, // plugin defaults this to false, capping captures at a reduced resolution
-          x: 0,
-          y: 0,
-          width: window.screen.width,
-          height: window.screen.height,
-        })
-        previewActiveRef.current = true
-        // CameraPreview.start resolves when the session is running, before
-        // iOS has necessarily delivered a correctly exposed video frame.
-        // Keep the opaque startup cover in place through that exposure ramp;
-        // otherwise the first blown-out white camera frame flashes onscreen.
-        const remainingWarmup = Math.max(0, 900 - (performance.now() - startedAt))
-        const revealPreview = () => {
-          if (generation === nativePreviewGenerationRef.current) setReady(true)
-        }
-        if (remainingWarmup > 0) window.setTimeout(revealPreview, remainingWarmup)
-        else revealPreview()
-      } catch (err) {
-        console.warn('[CameraOverlay] CameraPreview.start failed:', err?.message)
-        setError('Could not start camera. Please close and reopen the app.')
-      }
-    })
-    return previewOpRef.current
+  const startNativePreview = useCallback(async (position, request) => {
+    try {
+      const startedAt = performance.now()
+      await nativeCameraSession.open(previewOwnerRef.current, {
+        position,
+        toBack: true,
+        disableAudio: true,
+        enableZoom: false,
+        enableHighResolution: true,
+        x: 0,
+        y: 0,
+        width: Math.round(window.innerWidth),
+        height: Math.round(window.innerHeight),
+      })
+      const warmup = Math.max(0, 900 - (performance.now() - startedAt))
+      if (warmup > 0) await new Promise(resolve => setTimeout(resolve, warmup))
+      if (cameraRequestRef.current !== request) return
+      setError('')
+      setReady(true)
+    } catch (err) {
+      if (cameraRequestRef.current !== request) return
+      console.warn('[CameraOverlay] CameraPreview.start failed:', err?.message)
+      setReady(false)
+      setError(/denied/i.test(err?.message || '')
+        ? 'Camera access denied. Please allow camera permission and try again.'
+        : 'Could not start camera. Tap Try Again to restart it.')
+    }
   }, [])
 
   const stopNativePreview = useCallback(() => {
-    nativePreviewGenerationRef.current += 1
+    cameraRequestRef.current += 1
     document.body.style.backgroundColor = ''
     document.documentElement.style.backgroundColor = ''
     const rootEl = document.getElementById('root')
     if (rootEl) rootEl.style.visibility = ''
-    previewOpRef.current = previewOpRef.current.then(async () => {
-      if (!previewActiveRef.current) return
-      try { await CameraPreview.stop() } catch {}
-      previewActiveRef.current = false
+    return nativeCameraSession.close(previewOwnerRef.current).catch(err => {
+      console.warn('[CameraOverlay] CameraPreview.stop failed:', err?.message)
     })
-    return previewOpRef.current
   }, [])
 
   const startCamera = useCallback(async (mode) => {
+    const request = ++cameraRequestRef.current
+    setError('')
     if (isNative()) {
       setReady(false)
       document.body.style.backgroundColor = 'transparent'
@@ -329,7 +313,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
       // transparent background otherwise, so it has to stop painting too.
       const rootEl = document.getElementById('root')
       if (rootEl) rootEl.style.visibility = 'hidden'
-      await startNativePreview(mode === 'environment' ? 'rear' : 'front')
+      await startNativePreview(mode === 'environment' ? 'rear' : 'front', request)
       return
     }
     // Web: use getUserMedia with high-res fallback
@@ -551,13 +535,13 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                     style={{ background: GOLD, color: '#000' }}>
                     Open Settings
                   </button>
-                  <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
+                  <button onClick={async () => { if (isNative()) await stopNativePreview(); onClose() }} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => { setError(''); startCamera(facingMode) }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Try Again</button>
-                  <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
-                  {isNative() && <button onClick={async () => { try { const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
+                  <button onClick={async () => { if (isNative()) await stopNativePreview(); onClose() }} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
+                  <button onClick={() => startCamera(facingMode)} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Try Again</button>
+                  {isNative() && <button onClick={async () => { try { await stopNativePreview(); const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
                 </>
               )}
             </div>

@@ -10,7 +10,14 @@ export function startingPointCompletionKey(user) {
 export function hasCompletedStartingPoint(state) {
   return state.startingPointCompletedByUser?.[startingPointCompletionKey(state.user)] === true
 }
+export function isCompletedScan(scan) {
+  return Boolean(scan?.id && scan?.analyzedAt && Number.isFinite(scan.glowScore) && !scan.aiScore?.demoMode)
+}
+export function hasCompletedScan(state) {
+  return state.user?.id != null && state.completedScanByUser?.[onboardingOwner(state.user)] === true
+}
 export function hasCompletedOnboarding(state) {
+  if (hasCompletedScan(state)) return true
   if (state.hasOnboarded === true) return true
   const owner = onboardingOwner(state.user)
   return state.onboardingCompletedByUser?.[owner] === true || hasCompletedStartingPoint(state)
@@ -21,7 +28,7 @@ export function onboardingStartup(state) {
     // A signed-out device with a previously completed account should show the
     // sign-in flow. Without this, logout/401 clears `user`, startup checks the
     // anonymous key, and incorrectly sends the returning account to onboarding.
-    const hasCompletedAccount = Object.entries(state.onboardingCompletedByUser || {})
+    const hasCompletedAccount = Object.entries({ ...state.onboardingCompletedByUser, ...state.completedScanByUser })
       .some(([key, completed]) => key.startsWith('user:') && completed === true)
     if (state.user == null && state.isAuthenticated !== true && hasCompletedAccount) return 'signin'
     return 'onboarding'
@@ -29,6 +36,11 @@ export function onboardingStartup(state) {
   return state.isAuthenticated === true && typeof state.token === 'string' && state.token.length > 0 ? 'app' : 'signin'
 }
 export function normalizeOnboardingCompletion(saved = {}) {
+  const completedScanByUser = Object.fromEntries(Object.entries(saved.completedScanByUser || {})
+    .filter(([key, value]) => key.startsWith('user:') && value === true))
+  // Older installs already persist completed score records, but no scan flag.
+  // Only migrate the identity that owned that saved history.
+  if (saved.onboardingWasReset !== true && saved.user?.id != null && Array.isArray(saved.scans) && saved.scans.some(isCompletedScan)) completedScanByUser[onboardingOwner(saved.user)] = true
   const records = Object.fromEntries(Object.entries(saved.onboardingCompletedByUser || {})
     .filter(([key, value]) => key.startsWith('user:') || key === 'device:anonymous')
     .filter(([, value]) => value === true))
@@ -53,10 +65,11 @@ export function normalizeOnboardingCompletion(saved = {}) {
   // changed after a guest scan. A saved scan plus the selected gender proves
   // that the user already entered their personalized app; repair that record
   // once, unless onboarding was explicitly reset (for example after deletion).
-  const hasCompletedScan = Boolean(saved.currentScan || saved.scans?.length)
+  const hasLegacyScan = Boolean(saved.currentScan || saved.scans?.length)
   const hasSelectedAppSide = saved.gender === 'male' || saved.gender === 'female'
-  if (saved.onboardingWasReset !== true && hasCompletedScan && hasSelectedAppSide) {
+  if (saved.onboardingWasReset !== true && hasLegacyScan && hasSelectedAppSide) {
     records[onboardingOwner(saved.user)] = true
   }
-  return { onboardingCompletedByUser: records, hasOnboarded: records[onboardingOwner(saved.user)] === true }
+  return { completedScanByUser, onboardingCompletedByUser: records,
+    hasOnboarded: hasCompletedScan({ ...saved, completedScanByUser }) || records[onboardingOwner(saved.user)] === true }
 }

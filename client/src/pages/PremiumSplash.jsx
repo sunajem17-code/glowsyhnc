@@ -35,6 +35,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ps-particle-kf'
 
 export default function PremiumSplash({ onDone }) {
   const user = useStore(s => s.user)
+  const isPremium = useStore(s => s.isPremium)
   const firstName = user?.name?.split(' ')[0] || 'there'
   const doneRef = useRef(false)
 
@@ -112,8 +113,8 @@ export default function PremiumSplash({ onDone }) {
         />
       </motion.div>
 
-      {/* Welcome back, [name] */}
-      <motion.p
+      {/* Personalized welcome is reserved for Pro members. */}
+      {isPremium && <motion.p
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.45 }}
@@ -128,10 +129,10 @@ export default function PremiumSplash({ onDone }) {
         }}
       >
         Welcome back, {firstName}.
-      </motion.p>
+      </motion.p>}
 
       {/* PRO MEMBER badge */}
-      <motion.div
+      {isPremium && <motion.div
         initial={{ opacity: 0, scale: 0.8, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.65 }}
@@ -156,7 +157,7 @@ export default function PremiumSplash({ onDone }) {
         }}>
           PRO MEMBER
         </span>
-      </motion.div>
+      </motion.div>}
 
       {/* Divider line */}
       <motion.div

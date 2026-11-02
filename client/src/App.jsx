@@ -1,6 +1,7 @@
 import ScreenLoading from './components/ScreenLoading'
 import { loadScreen } from './utils/screenLoader'
-import { hasCompletedOnboarding, onboardingStartup } from './utils/onboardingStartup.js'
+import { hasCompletedOnboarding, hasCompletedScan, onboardingStartup } from './utils/onboardingStartup.js'
+import ReturningWelcome from './components/ReturningWelcome'
 import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
 import NotificationPrompt from './components/NotificationPrompt'
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
@@ -92,6 +93,7 @@ function PostAuthLanding() {
 export default function App() {
   const theme               = useStore(s => s.theme)
   const hasOnboarded        = useStore(hasCompletedOnboarding)
+  const returningScanner    = useStore(hasCompletedScan)
   const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const isPremium           = useStore(s => s.isPremium)
@@ -183,7 +185,7 @@ export default function App() {
   // ── GATE 0: Cinematic intro — plays once per session for everyone ──
   const startupSplash = getStartupSplash({ cinematicDone, splashDone })
 
-  if (!resetRoute && !hasOnboarded && startupSplash === 'cinematic') {
+  if (!resetRoute && !hasOnboarded && !returningScanner && startupSplash === 'cinematic') {
     return (
       <CinematicIntro onDone={() => {
         localStorage.setItem('asc_cinematic_shown', '1')
@@ -193,7 +195,7 @@ export default function App() {
   }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (!resetRoute && !hasOnboarded && startupSplash === 'welcome') {
+  if (!resetRoute && !hasOnboarded && !returningScanner && startupSplash === 'welcome') {
     return <Splash onDone={handleSplashDone} />
   }
 
@@ -202,7 +204,7 @@ export default function App() {
   // synchronously before React commits the isPremium=true batch, so reading
   // it here during the same render correctly suppresses PremiumSplash when
   // the user just unlocked in-session (UnlockRevealSlideshow is their celebration).
-  if (!resetRoute && hasOnboarded && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
+  if (!resetRoute && hasOnboarded && !returningScanner && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
     return (
       <AnimatePresence>
         <PremiumSplash onDone={handleProSplashDone} />
@@ -212,6 +214,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {startupDecision === 'app' && !resetRoute && <ReturningWelcome key={userId} />}
       <UpdatePrompt />
       <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
       <Suspense fallback={<ScreenLoading />}>
