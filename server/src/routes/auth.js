@@ -193,17 +193,22 @@ router.post('/apple', authLimiter, async (req, res) => {
 
       // Create new user — if a guest session exists, reuse its ID so all scan
       // records written under that ID automatically belong to the real account.
-      const id = guestUserId || uuid()
+      const id = uuid()
       const userName = name || 'Ascendus User'
       const ownCode = genCode()
       if (guestUserId) {
         // Upgrade the guest row in-place rather than creating a new one
-        await sb.from('users').update({
+        const { data: upgraded, error: upgradeError } = await sb.from('users').update({
           email: appleEmail, name: userName, apple_sub: appleSub,
           is_guest: false, referral_code: ownCode,
-        }).eq('id', guestUserId).eq('is_guest', true)
-        const safe = { id: guestUserId, name: userName, email: appleEmail, subscriptionTier: 'free', createdAt: new Date().toISOString(), isAppleUser: true }
-        return res.json({ user: safe, token: signToken(guestUserId, appleEmail) })
+        }).eq('id', guestUserId).eq('is_guest', true).select('id').maybeSingle()
+        if (upgradeError) throw upgradeError
+        // A cleaned-up guest updates zero rows. Never mint a session for that
+        // missing row; continue to create a real account below instead.
+        if (upgraded?.id === guestUserId) {
+          const safe = { id: upgraded.id, name: userName, email: appleEmail, subscriptionTier: 'free', createdAt: new Date().toISOString(), isAppleUser: true }
+          return res.json({ user: safe, token: signToken(upgraded.id, appleEmail) })
+        }
       }
       const newUser = await createUser({
         id, email: appleEmail, name: userName,

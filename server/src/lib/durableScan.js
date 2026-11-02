@@ -13,6 +13,17 @@ async function persistCompletedScan(sb, { id, userId, result, completedAt, clean
     const compatible = { ...record }; delete compatible.extended_metrics
     saved = await sb.from('scans').upsert(compatible).select('id').single()
   }
-  if (saved.error || saved.data?.id !== id) throw new Error('Could not save your scan for AI Coach. Please retry.')
+  if (saved.error || saved.data?.id !== id) {
+    // Keep database diagnostics in server logs, without logging the scan,
+    // user identity, or Postgres details (which can contain row values).
+    console.error('[durableScan] save failed', JSON.stringify({
+      code: saved.error?.code || 'missing_saved_id',
+      message: saved.error?.message || 'Database did not return the saved scan ID',
+    }))
+    const error = new Error('Your scan was analyzed, but could not be saved. Please try again.')
+    error.code = 'scan_save_failed'
+    error.status = 503
+    throw error
+  }
 }
 module.exports = { persistCompletedScan }

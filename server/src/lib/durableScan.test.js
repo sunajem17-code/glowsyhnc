@@ -8,5 +8,5 @@ test('completed scan is saved with its authenticated owner and model findings be
 })
 test('failed durable save cannot report a completed scan to the phone',async()=>{
  const sb={from:()=>({upsert:()=>({select:()=>({single:async()=>({error:{message:'unavailable'}})})})})}
- await assert.rejects(persistCompletedScan(sb,{id:'scan',userId:'owner',result:{overallScore:6},clean:value=>value}),/Could not save/)
+ await assert.rejects(persistCompletedScan(sb,{id:'scan',userId:'owner',result:{overallScore:6},clean:value=>value}),error=>error.code==='scan_save_failed' && error.status===503)
 })
