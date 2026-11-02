@@ -5,7 +5,7 @@ const coachScans = require('../lib/coachScanContext')
 const recordSuccessfulScanStreak = require('../lib/recordScanStreak')
 const { EYE_GUIDANCE } = require('../lib/appearanceKnowledge')
 const crypto = require('crypto')
-const { verifyToken, claudeLimit, scanLimit, resolvePro } = require('../middleware/claudeGate')
+const { verifyToken, claudeLimit, scanLimit, resolvePro, requirePro } = require('../middleware/claudeGate')
 const { getScanCache, setScanCache } = require('../supabase')
 const { getTier } = require('../lib/tier')
 const { updateLeaderboard } = require('./leaderboard')
@@ -1330,7 +1330,7 @@ router.post('/score/extended-metrics', verifyToken, resolvePro, claudeLimit, asy
 // Generates a personalized weekly workout split from physique sub-scores.
 // Uses haiku for speed + cost. Falls back to 500 so the client can show a
 // generic plan rather than an error screen.
-router.post('/workout-plan', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+router.post('/workout-plan', verifyToken, requirePro, claudeLimit, async (req, res) => {
   const { physiqueScores, gender, trainingLevel, gymAccess, daysPerWeek } = req.body
   if (!physiqueScores || typeof physiqueScores !== 'object') {
     return res.status(400).json({ error: 'physiqueScores object required' })

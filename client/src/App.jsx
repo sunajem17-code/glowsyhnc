@@ -1,4 +1,5 @@
 import ScreenLoading from './components/ScreenLoading'
+import PremiumRoutineGate from './components/PremiumRoutineGate'
 import { loadScreen } from './utils/screenLoader'
 import { hasCompletedOnboarding, hasCompletedScan, onboardingStartup } from './utils/onboardingStartup.js'
 import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
@@ -238,8 +239,8 @@ export default function App() {
                 <Route path="tindermaxx" element={<TinderMaxx />} />
                 <Route path="community" element={<Community />} />
                 <Route path="settings" element={<SettingsScreen />} />
-                <Route path="workout-plan" element={<WorkoutPlan />} />
-                <Route path="face-body-routine" element={<FaceBodyRoutine />} />
+                <Route path="workout-plan" element={<PremiumRoutineGate><WorkoutPlan /></PremiumRoutineGate>} />
+                <Route path="face-body-routine" element={<PremiumRoutineGate><FaceBodyRoutine /></PremiumRoutineGate>} />
                 <Route path="physique-scan" element={<Navigate to="/scan" replace />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />

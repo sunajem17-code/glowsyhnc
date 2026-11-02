@@ -55,6 +55,7 @@ const CARD_VARIANTS = {
 
 // Community posts can only use photos already saved with a face scan.
 function FaceScanPhotoPicker({ label, pickerTitle, value, onChange, photos, disabled, emptyMessage, hideLabel = false }) {
+  const isPremium = useStore(state => state.isPremium)
   const [open, setOpen] = useState(false)
   const title = pickerTitle || (label === 'Before' || label === 'After' ? `${label} photo` : label)
 
@@ -76,7 +77,7 @@ function FaceScanPhotoPicker({ label, pickerTitle, value, onChange, photos, disa
       >
         {value ? (
           <div className="absolute inset-0">
-            <TradingScanCard image={value.src} imageAlt={`${label} face scan`} label={label} score={value.score} compact />
+            <TradingScanCard image={value.src} imageAlt={`${label} face scan`} label={label} score={isPremium ? value.score : null} compact />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5">
@@ -103,6 +104,7 @@ function FaceScanPhotoPicker({ label, pickerTitle, value, onChange, photos, disa
                 scan={photo.scan}
                 index={index}
                 showChevron={false}
+                canAccessProUi={isPremium}
                 onTap={() => { onChange(photo); setOpen(false) }}
               />)}
             </div>
@@ -219,6 +221,7 @@ function CommentsSheet({ post, onCommentAdded, displayName, sectionRef }) {
 
 // ── Share modal ───────────────────────────────────────────────────────────────
 function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto }) {
+  const isPremium = useStore(state => state.isPremium)
   const faceScans = [scanToShare, ...scans]
     .filter(scan => scan && !isPhysiqueProgressScan(scan))
     .filter((scan, index, all) => all.findIndex(item => item.id && item.id === scan.id) === index)
@@ -253,7 +256,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
       const date = parsedDate && Number.isFinite(parsedDate.getTime())
         ? parsedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
         : 'Face scan'
-      return { id: scan.id ?? `face-scan-${index}`, src, date, timestamp: timestampMs, score: getFaceScanOverallScore(scan), scan }
+      return { id: scan.id ?? `face-scan-${index}`, src, date, timestamp: timestampMs, score: isPremium ? getFaceScanOverallScore(scan) : null, scan }
     })).then(photos => {
       if (!active) return
       const available = photos.filter(Boolean)
@@ -262,10 +265,8 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
         || available.find(photo => photo.src === initialPhoto) || available[0] || null)
     }).finally(() => { if (active) setLoadingFacePhotos(false) })
     return () => { active = false }
-  }, [scans, scanToShare?.id, initialPhoto])
+  }, [scans, scanToShare?.id, initialPhoto, isPremium])
 
-  const scoreBefore = beforePhoto?.score ?? null
-  const scoreAfter = afterPhoto?.score ?? null
   const beforePhotoChoices = faceScanPhotos.filter(photo => afterPhoto
     ? photo.timestamp != null && afterPhoto.timestamp != null && photo.timestamp < afterPhoto.timestamp
     : photo.id !== beforePhoto?.id)
@@ -299,8 +300,8 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
       if (postType === 'glow-up') {
         await api.community.post({
           displayName,
-          scoreBefore: scoreBefore ?? scoreAfter,
-          scoreAfter,
+          beforeScanId: beforePhoto?.scan?.serverScanId || beforePhoto?.scan?.id || null,
+          afterScanId: afterPhoto?.scan?.serverScanId || afterPhoto?.scan?.id || null,
           photoUrl:       afterPhoto?.src || null,
           beforePhotoUrl: beforePhoto?.src || null,
           caption,

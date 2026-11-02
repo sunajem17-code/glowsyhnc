@@ -43,6 +43,8 @@
 .appearance-points {
   display:flex;
   box-sizing:border-box;
+  width:100%;
+  min-width:0;
   flex:0 0 470px;
   flex-direction:column;
   height:470px;
@@ -74,9 +76,10 @@
   gap:20px;
   min-height:0;
   margin:12px 0 0;
-  padding-left:18px;
-  padding-right:8px;
-  list-style:disc;
+  width:100%;
+  box-sizing:border-box;
+  padding:0 8px 0 0;
+  list-style:none;
   overflow-y:auto;
   /* Let iOS handle finger movement and momentum; no JS drag recognizer. */
   overscroll-behavior-y:contain;
@@ -92,11 +95,20 @@
   touch-action:pan-y pinch-zoom;
 }
 .appearance-points li {
+  position:relative;
   flex:0 0 auto;
-  padding:2px 0 2px 2px;
+  padding:2px 0 2px 20px;
   color:#fff;
   font:600 16px/1.4 "Plus Jakarta Sans",sans-serif;
   overflow-wrap:anywhere
+}
+.appearance-points li::before {
+  content:'•';
+  position:absolute;
+  left:0;
+  top:2px;
+  color:#ddd;
+  font:inherit;
 }
 .appearance-points li::marker { color:#ddd; font-size:.9em }
 .appearance-point-title { display:block; color:#fff }
@@ -173,7 +185,7 @@
 }
 .physique-analysis-item {
   flex:0 0 auto;
-  padding:0 0 0 2px;
+  padding:2px 0 2px 20px;
   color:#fff;
   overflow-wrap:anywhere
 }
