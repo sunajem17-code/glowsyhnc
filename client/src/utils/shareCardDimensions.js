@@ -2,8 +2,10 @@ import { getRevealRatings } from './revealRatings.js'
 
 export const SHARE_CARD_WIDTH = 360
 export const SHARE_CARD_HEIGHT = 640
-export const SHARE_CARD_EXPORT_WIDTH = 2160
-export const SHARE_CARD_EXPORT_HEIGHT = 3840
+// 1080 × 1920 is high-resolution for sharing while keeping html2canvas within
+// mobile browser memory limits (the previous 4K canvas used 4× the pixels).
+export const SHARE_CARD_EXPORT_WIDTH = 1080
+export const SHARE_CARD_EXPORT_HEIGHT = 1920
 export const SHARE_CARD_BRAND_LAYOUT = Object.freeze({
   marginTop: 16,
   fontSize: 15,

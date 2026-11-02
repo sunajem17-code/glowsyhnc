@@ -37,7 +37,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ascendus accesses your photo library so you can choose a photo for face or physique analysis.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Ascendus saves your scan photos to your photo library.</string>
+	<string>Ascendus saves your scan photos and scorecards to your photo library.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

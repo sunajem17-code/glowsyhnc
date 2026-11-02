@@ -86,7 +86,6 @@ export default function Premium() {
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
-          sessionStorage.setItem('asc_pro_splash_shown', '1')
           setIsPremium(true)
           api.payments.syncRc(rcUserId).catch(() => {})
         }
@@ -125,7 +124,6 @@ export default function Premium() {
       if (isPro) {
         const rcUserId = info?.originalAppUserId
         api.payments.syncRc(rcUserId).catch(() => {})
-        sessionStorage.setItem('asc_pro_splash_shown', '1')
         setIsPremium(true)
         navigate('/dashboard')
       } else {
@@ -150,7 +148,6 @@ export default function Premium() {
     try {
       const { ok, isPremium: granted } = await api.referral.unlockPro()
       if (ok && granted) {
-        sessionStorage.setItem('asc_pro_splash_shown', '1')
         setIsPremium(true)
         navigate('/dashboard')
       }

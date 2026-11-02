@@ -12,7 +12,7 @@ import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigati
 import { getRatingColor } from '../utils/revealRatings'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import PhysiqueBreakdown from '../components/PhysiqueBreakdown'
-import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
+import { ShareCard, PhotoSaveError, createShareCardImage, getPhotoSaveErrorMessage, saveShareCardImage } from '../components/ShareCardModal'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 import { cropPhotoToSquare } from '../utils/shareCardPhoto'
@@ -190,7 +190,6 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
           try {
             const { ok, isPremium: granted } = await api.referral.unlockPro()
             if (ok && granted) {
-              try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
               setIsPremium(true)
               onUnlocked?.()
             }
@@ -314,7 +313,7 @@ export default function PhysiqueResults() {
       await saveShareCardImage(image)
     } catch (error) {
       console.error('[Physique results card download]', error)
-      setDownloadError('Could not create the results card. Please try again.')
+      setDownloadError(isNative() ? getPhotoSaveErrorMessage(error) : 'Could not create the results card. Please try again.')
     } finally {
       setIsDownloadingCard(false)
     }
@@ -414,7 +413,6 @@ export default function PhysiqueResults() {
 
   function handleUnlockSuccess() {
     purchaseLockRef.current = false
-    try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     setIsPremium(true)
     updateUser?.({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
     setShowUnlockSlideshow?.(true)
@@ -601,7 +599,7 @@ export default function PhysiqueResults() {
             {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
           </motion.button>
         )}
-        {activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: '#FF453A' }}>{downloadError}</p>}
+        {activeView === 'results' && <PhotoSaveError error={downloadError} className="mx-auto max-w-xl" />}
 
         <PhysiqueResultsNavigation activeView={activeView} showView={showView} />
       </div>

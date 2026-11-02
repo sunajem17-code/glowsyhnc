@@ -26,22 +26,13 @@ export default function ScanTimeline() {
   const [historySnapshot, setHistory] = useState({ token, scans: [] })
   const remoteHistory = historySnapshot.token === token ? historySnapshot.scans : []
   const history = mergeProgressHistory(remoteHistory, scans, currentScan)
-  const [progressMode, setProgressMode] = useState('face')
   const [progressMetric, setProgressMetric] = useState('overall')
   const [graphExpanded, setGraphExpanded] = useState(false)
-  const faceHistory = history.filter(scan => !isPhysiqueProgressScan(scan) && getProgressScore(scan, 'face', 'overall') != null)
-  const physiqueHistory = history.filter(scan => isPhysiqueProgressScan(scan) && getProgressScore(scan, 'physique', 'overall') != null)
-  const activeHistory = progressMode === 'physique' ? physiqueHistory : faceHistory
-  const metricOptions = progressMode === 'physique'
-    ? [
-        { key: 'overall', label: 'Overall' }, { key: 'proportions', label: 'Proportions' },
-        { key: 'leanness', label: 'Leanness' }, { key: 'frame', label: 'Frame' },
-        { key: 'posture', label: 'Posture' }, { key: 'presentation', label: 'Presentation' },
-      ]
-    : [
-        { key: 'overall', label: 'Overall' }, { key: 'potential', label: 'Potential' },
-        { key: 'symmetry', label: 'Symmetry' }, { key: 'skin', label: 'Skin' }, { key: 'jawline', label: 'Jawline' },
-      ]
+  const activeHistory = history.filter(scan => !isPhysiqueProgressScan(scan) && getProgressScore(scan, 'face', 'overall') != null)
+  const metricOptions = [
+    { key: 'overall', label: 'Overall' }, { key: 'potential', label: 'Potential' },
+    { key: 'symmetry', label: 'Symmetry' }, { key: 'skin', label: 'Skin' }, { key: 'jawline', label: 'Jawline' },
+  ]
   const [loading, setLoading]     = useState(true)
   const [historyError, setHistoryError] = useState(false)
   const [flameFlight, setFlameFlight] = useState(null)
@@ -126,7 +117,7 @@ export default function ScanTimeline() {
     return () => { cancelled = true }
   }, [token, isDemo, showProgressData])
 
-  const activeScores = activeHistory.map(scan => getProgressScore(scan, progressMode, 'overall')).filter(Number.isFinite)
+  const activeScores = activeHistory.map(scan => getProgressScore(scan, 'face', 'overall')).filter(Number.isFinite)
   const bestScore      = activeScores.length ? Math.max(...activeScores) : null
 
   async function viewHistoryScan(entry) {
@@ -158,10 +149,6 @@ export default function ScanTimeline() {
       localMediaScanId: mediaId,
       facePhotoUrl: selected.facePhotoUrl || media?.photo || null,
     })
-    if (isPhysiqueProgressScan(entry)) {
-      navigate('/physique-results', { state: { source: 'progress-card', returnTo: '/timeline' } })
-      return
-    }
     navigate('/unlock', { state: { source: 'progress-card', returnTo: '/timeline' } })
   }
 
@@ -175,34 +162,12 @@ export default function ScanTimeline() {
         <h1 className="font-heading font-bold text-[22px] text-primary leading-tight" style={{ letterSpacing: '-0.02em' }}>
           Progress
         </h1>
-        <motion.div layout className="relative flex rounded-full p-1 flex-shrink-0" style={{ background: '#000', border: '1px solid rgba(255,255,255,0.1)' }} role="tablist" aria-label="Progress type">
-          {[
-            { key: 'face', label: 'Face' },
-            { key: 'physique', label: 'Physique' },
-          ].map(({ key, label }) => {
-            const selected = progressMode === key
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => { setProgressMode(key); setProgressMetric('overall'); triggerHaptic() }}
-                className="relative px-3 py-1.5 rounded-full font-heading font-semibold text-[11px] transition-colors duration-200"
-                style={{ color: selected ? '#fff' : 'rgba(255,255,255,0.58)' }}
-              >
-                {selected && <motion.span layoutId="progress-mode-indicator" className="absolute inset-0 rounded-full" style={{ background: '#242424', zIndex: 0 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }} />}
-                <span className="relative z-[1]">{label}</span>
-              </button>
-            )
-          })}
-        </motion.div>
       </div>
 
       {/* Overview stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: `${progressMode === 'face' ? 'Face' : 'Physique'} Scans`, value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} />, lockable: true },
+          { label: 'Face Scans', value: activeHistory.length || 'N/A', icon: <Camera size={20} style={{ color: GOLD }} />, lockable: true },
           { label: 'Best Score',     value: bestScore != null ? bestScore.toFixed(1) : 'N/A', icon: <Trophy size={20} style={{ color: GOLD }} />, lockable: true },
         ].map(({ label, value, icon, lockable }) => {
           const stat = lockable ? getProgressStatPresentation(value, canAccessProUi) : { locked: false, value }
@@ -290,7 +255,7 @@ export default function ScanTimeline() {
                   })}
                 </div>
                 {activeHistory.length >= 2
-                  ? <TrendChart scans={activeHistory} mode={progressMode} metric={progressMetric} label={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} locked={progressTrend.locked} />
+                  ? <TrendChart scans={activeHistory} mode="face" metric={progressMetric} label={metricOptions.find(metric => metric.key === progressMetric)?.label ?? 'Overall'} locked={progressTrend.locked} />
                   : <p className="font-body text-xs text-secondary text-center py-5">Save another scan to see your trend.</p>}
               </div>
             </motion.div>
@@ -306,7 +271,7 @@ export default function ScanTimeline() {
             entryScanId={entryScanId}
             error={null}
             onViewScan={viewHistoryScan}
-            emptyMessage={progressMode === 'face' ? 'No face scans saved to Progress yet.' : 'No physique scans yet. Complete a physique scan to start tracking these scores.'}
+            emptyMessage="No face scans saved to Progress yet."
           />
         </section>
       )}

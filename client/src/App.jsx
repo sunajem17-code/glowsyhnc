@@ -14,7 +14,6 @@ import Layout from './components/Layout'
 import UpdatePrompt from './components/UpdatePrompt'
 import Splash, { CinematicIntro } from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
-import PremiumSplash from './pages/PremiumSplash'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
 import { getStartupSplash } from './utils/splashFlow'
 
@@ -47,13 +46,9 @@ const ScanReady      = lazyScreen(() => import('./pages/ScanReady'))
 const ScanQualityFail = lazyScreen(() => import('./pages/ScanQualityFail'))
 const WorkoutPlan    = lazyScreen(() => import('./pages/WorkoutPlan'))
 const FaceBodyRoutine = lazyScreen(() => import('./pages/FaceBodyRoutine'))
-const PhysiqueScan      = lazyScreen(() => import('./pages/PhysiqueScan'))
-const PhysiqueResults   = lazyScreen(() => import('./pages/PhysiqueResults'))
 const ScanHistory    = lazyScreen(() => import('./pages/ScanHistory'))
 const ScanTimeline   = lazyScreen(() => import('./pages/ScanTimeline'))
 const AnalysisInspector = import.meta.env.DEV ? lazyScreen(() => import('./pages/AnalysisInspector')) : null
-
-const SESSION_KEY = 'asc_pro_splash_shown'
 
 // Stores the referral code from /r/:code links and redirects to onboarding
 function ReferralRedirect() {
@@ -94,7 +89,6 @@ export default function App() {
   const hasOnboarded        = useStore(hasCompletedOnboarding)
   const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
-  const isPremium           = useStore(s => s.isPremium)
   const userId              = useStore(s => s.user?.id)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
   const expireSession           = useStore(s => s.expireSession)
@@ -106,9 +100,6 @@ export default function App() {
   )
   const [splashDone, setSplashDone] = useState(
     () => localStorage.getItem('asc_welcome_splash_shown') === '1'
-  )
-  const [proSplashDone, setProSplashDone] = useState(
-    () => !!sessionStorage.getItem(SESSION_KEY)
   )
 
   useEffect(() => {
@@ -157,11 +148,6 @@ export default function App() {
     setSplashDone(true)
   }, [])
 
-  const handleProSplashDone = useCallback(() => {
-    sessionStorage.setItem(SESSION_KEY, '1')
-    setProSplashDone(true)
-  }, [])
-
   // No route, redirect, premium overlay or splash can bypass this decision.
   if (startupDecision === 'checking') return <StartupCheck />
   if (startupDecision === 'signin') return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
@@ -197,19 +183,6 @@ export default function App() {
     return <Splash onDone={handleSplashDone} />
   }
 
-  // ── GATE 2: PremiumSplash ────────────────────────────────────────
-  // Also check sessionStorage directly: handleUnlockSuccess sets this key
-  // synchronously before React commits the isPremium=true batch, so reading
-  // it here during the same render correctly suppresses PremiumSplash when
-  // the user just unlocked in-session (UnlockRevealSlideshow is their celebration).
-  if (!resetRoute && hasOnboarded && isAuthenticated && isPremium && !proSplashDone && !sessionStorage.getItem(SESSION_KEY)) {
-    return (
-      <AnimatePresence>
-        <PremiumSplash onDone={handleProSplashDone} />
-      </AnimatePresence>
-    )
-  }
-
   return (
     <BrowserRouter>
       <UpdatePrompt />
@@ -239,7 +212,7 @@ export default function App() {
               {/* Full-screen reveal must not wait for the outgoing scan outlet's
                   nested exit animation or inherit its transformed viewport. */}
               <Route path="/unlock" element={<ProtectedRoute><ScanUnlockGate /></ProtectedRoute>} />
-              <Route path="/physique-results" element={<ProtectedRoute><PhysiqueResults /></ProtectedRoute>} />
+              <Route path="/physique-results" element={<Navigate to="/timeline" replace />} />
               <Route path="/results" element={<Navigate to="/unlock" replace />} />
               <Route path="/" element={
                 <ProtectedRoute><Layout /></ProtectedRoute>
@@ -266,7 +239,7 @@ export default function App() {
                 <Route path="settings" element={<SettingsScreen />} />
                 <Route path="workout-plan" element={<WorkoutPlan />} />
                 <Route path="face-body-routine" element={<FaceBodyRoutine />} />
-                <Route path="physique-scan" element={<PhysiqueScan />} />
+                <Route path="physique-scan" element={<Navigate to="/scan" replace />} />
                 <Route path="scan/ready" element={<ScanReady />} />
                 <Route path="scan/quality-fail" element={<ScanQualityFail />} />
               </Route>

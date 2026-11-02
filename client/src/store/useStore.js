@@ -106,9 +106,8 @@ const useStore = create(
       logout: () => {
         premiumStateRevision += 1
         // Clear session keys so a subsequent login on the same device doesn't
-        // inherit stale onboarding state or the pro-splash suppression flag.
+        // inherit stale onboarding state.
         try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
-        try { sessionStorage.removeItem('asc_pro_splash_shown') } catch { /* ignore */ }
         try { sessionStorage.removeItem('asc_reveal_shown') } catch { /* ignore */ }
         set({
           user: null,

@@ -111,6 +111,7 @@ export default function ScanHistory() {
   const refreshProStatus = useStore(s => s.refreshProStatus)
   const [historySnapshot, setScans] = useState({ token, scans: [] })
   const scans = mergeScanHistory(historySnapshot.token === token ? historySnapshot.scans : [], localScans, currentScan)
+    .filter(scan => !isPhysiqueProgressScan(scan))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -137,7 +138,7 @@ export default function ScanHistory() {
   async function viewScan(scan) {
     const media = scan?.id ? await loadScanMedia(scan.id) : null
     setCurrentScan({ ...scan, facePhotoUrl: scan.facePhotoUrl || media?.photo || null })
-    navigate(isPhysiqueProgressScan(scan) ? '/physique-results' : '/unlock')
+    navigate('/unlock')
   }
 
   return (

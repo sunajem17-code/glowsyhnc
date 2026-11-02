@@ -6,7 +6,6 @@ import { api } from '../utils/api'
 import { GOLD } from '../utils/theme'
 
 const GOLD_BORDER = 'rgba(198,168,92,0.25)'
-const SESSION_KEY = 'asc_pro_splash_shown'
 
 export default function PaymentSuccess() {
   const navigate = useNavigate()
@@ -14,8 +13,6 @@ export default function PaymentSuccess() {
   const navigatedRef = useRef(false)
 
   useEffect(() => {
-    sessionStorage.setItem(SESSION_KEY, '1')
-
     // Confirm with server before granting premium. Poll up to 8 times so webhook
     // processing latency doesn't cause a false negative.
     if (isAuthenticated) {

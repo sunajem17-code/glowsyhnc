@@ -65,7 +65,7 @@ export default function Layout() {
       void Keyboard.setScroll({ isDisabled: false }).catch(() => {})
     }
   }, [isCoach])
-  const isScanCapture = location.pathname === '/scan/capture' || location.pathname === '/physique-scan'
+  const isScanCapture = location.pathname === '/scan/capture'
 
   // A cancelled scan can return to any tab, not just ScanHome. Never leave
   // the scan-launch flag covering an unrelated page or its navigation.
@@ -130,7 +130,7 @@ export default function Layout() {
           {outlet}
         </motion.div>
       </main>
-      {!['/scan/capture', '/physique-scan', '/unlock'].includes(location.pathname) && !(isCoach && keyboardOpen) && <BottomNav />}
+      {!['/scan/capture', '/unlock'].includes(location.pathname) && !(isCoach && keyboardOpen) && <BottomNav />}
     </div>
   )
 }

@@ -175,7 +175,6 @@ export default function Streak() {
 
   const current = Math.max(0, Number(streak.current) || 0)
   const faceCurrent = Math.max(0, Number(streak.face?.current) || 0)
-  const physiqueCurrent = Math.max(0, Number(streak.physique?.current) || 0)
 
   return (
     <MotionPage className="px-4 pb-8" style={{ background: PAGE_BG, color: TEXT }}>
@@ -204,10 +203,9 @@ export default function Streak() {
         </p>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 mb-4" aria-label="Scan streaks">
+      <section className="grid grid-cols-1 gap-3 mb-4" aria-label="Face scan streak">
         {[
           { label: 'Face scans', value: faceCurrent, longest: Number(streak.face?.longest) || 0 },
-          { label: 'Physique scans', value: physiqueCurrent, longest: Number(streak.physique?.longest) || 0 },
         ].map(item => (
           <div key={item.label} className="rounded-2xl p-4" style={{ background: '#101010', border: '1px solid rgba(255,255,255,0.08)' }}>
             <p className="font-body text-xs" style={{ color: TEXT_DIM }}>{item.label}</p>

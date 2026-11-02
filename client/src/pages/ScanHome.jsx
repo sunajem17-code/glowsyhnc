@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Dumbbell, Moon } from 'lucide-react'
+import { Camera, Moon } from 'lucide-react'
 import useStore from '../store/useStore'
 const setScanLaunchingSelector = s => s.setScanLaunching
 import MotionPage from '../components/MotionPage'
 import FaceScanOverlay from '../components/FaceScanOverlay'
-import { GOLD, GOLD_GRADIENT, SPRING_STANDARD } from '../utils/theme'
+import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import { hasCompletedStartingPoint, startingPointCompletionKey } from '../utils/onboardingStartup.js'
 
 const DAILY_SCAN_LIMIT = 3
-
-const SLIDE_VARIANTS = {
-  enter: (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (d) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
-}
 
 function CardShell({ eyebrow, title, body, cta, icon: Icon = null, onAction, visual, visualClassName = 'flex-1', footer }) {
   return (
@@ -97,27 +91,6 @@ function FaceScanCard({ onBegin, limitMessage }) {
   )
 }
 
-function PhysiqueScanCard({ onBegin }) {
-  return (
-    <CardShell
-      eyebrow="NEW PHYSIQUE SCAN"
-      title="Begin Scan"
-      body="Get your personalized analysis"
-      cta="Start Your Scan"
-      onAction={onBegin}
-      visualClassName="aspect-[4/5] flex-shrink-0"
-      visual={
-        <>
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#000' }}>
-            <Dumbbell size={48} style={{ color: `${GOLD}66` }} />
-          </div>
-          <FaceScanOverlay loop showDots={false} />
-        </>
-      }
-    />
-  )
-}
-
 export default function ScanHome() {
   const navigate = useNavigate()
   const scans = useStore(s => s.scans)
@@ -128,8 +101,6 @@ export default function ScanHome() {
   const user = useStore(s => s.user)
   const startingPointCompletedByUser = useStore(s => s.startingPointCompletedByUser)
   const completeStartingPoint = useStore(s => s.completeStartingPoint)
-  const [cardIdx, setCardIdx] = useState(0)
-  const [direction, setDirection] = useState(1)
   const [showHint, setShowHint] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
@@ -173,52 +144,12 @@ export default function ScanHome() {
         : 'Come back tomorrow to start a streak!')
     : null
 
-  const hasScans = scans?.length > 0
-
-  // Keep scan selection focused on the face and physique scan flows.
-  const cards = [
-    { id: 'face',    el: <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} /> },
-    { id: 'physique', el: <PhysiqueScanCard onBegin={() => beginScan('/physique-scan')} /> },
-  ]
-
-  function goTo(idx) {
-    if (idx === cardIdx) return
-    setDirection(idx > cardIdx ? 1 : -1)
-    setCardIdx(idx)
-  }
-
-  function handleDragEnd(_, info) {
-    const DISTANCE = 60
-    const VELOCITY = 400
-    const maxIdx = hasScans ? cards.length - 1 : 0
-    if ((info.offset.x < -DISTANCE || info.velocity.x < -VELOCITY) && cardIdx < maxIdx) {
-      goTo(cardIdx + 1)
-    } else if ((info.offset.x > DISTANCE || info.velocity.x > VELOCITY) && cardIdx > 0) {
-      goTo(cardIdx - 1)
-    }
-  }
-
   return (
     <MotionPage baseClassName="" className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={cardIdx}
-            custom={direction}
-            variants={SLIDE_VARIANTS}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={SPRING_STANDARD}
-            className="absolute inset-0"
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
-            onDragEnd={handleDragEnd}
-          >
-            {cards[cardIdx].el}
-          </motion.div>
-        </AnimatePresence>
+        <div className="absolute inset-0">
+          <FaceScanCard onBegin={() => beginScan('/scan/capture')} limitMessage={limitMessage} />
+        </div>
       </div>
 
       {/* First-time hint overlay */}
@@ -287,20 +218,6 @@ export default function ScanHome() {
         )}
       </AnimatePresence>
 
-      {/* Dot indicator — fixed size circles, just color change */}
-      <div className="flex items-center justify-center gap-2 py-4 flex-shrink-0">
-        {cards.map((_, i) => (
-          <div
-            key={i}
-            onClick={() => (hasScans || i === 0) && goTo(i)}
-            style={{
-              width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
-              background: i === cardIdx ? GOLD : 'rgba(255,255,255,0.25)',
-              transition: 'background 0.2s',
-            }}
-          />
-        ))}
-      </div>
     </MotionPage>
   )
 }

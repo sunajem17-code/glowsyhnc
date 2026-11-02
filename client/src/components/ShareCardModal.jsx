@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { X, Download, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import html2canvas from 'html2canvas'
+import { registerPlugin } from '@capacitor/core'
 import { isNative } from '../utils/camera'
 import { GOLD, GOLD_GRADIENT } from '../utils/theme'
 import { getRatingColor } from '../utils/revealRatings'
@@ -11,6 +12,7 @@ import { getRevealMetricTextStyles } from '../utils/revealAnimation'
 import { SHARE_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 
 const METRIC_TEXT = getRevealMetricTextStyles()
+const ScorecardPhotoLibrary = registerPlugin('ScorecardPhotoLibrary')
 
 function ScoreMetric({ label, value, index }) {
   const validScore = Number.isFinite(value) && value >= 0 && value <= 10
@@ -128,20 +130,37 @@ export async function createShareCardImage(cardElement) {
 
 export async function saveShareCardImage(downloadImage) {
   if (!downloadImage) return
-  if (isNative() || (navigator.share && navigator.canShare)) {
+
+  if (isNative()) {
+    const base64 = downloadImage.slice(downloadImage.indexOf(',') + 1)
+    await ScorecardPhotoLibrary.saveImage({ base64 })
+    return
+  }
+
+  // For browsers, construct the File synchronously and invoke share before
+  // awaiting anything, preserving the tap's transient user activation.
+  if (navigator.share && typeof File !== 'undefined') {
     try {
-      const blob = await (await fetch(downloadImage)).blob()
-      const file = new File([blob], 'ascendus-results.jpg', { type: 'image/jpeg' })
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      const [header, encoded] = downloadImage.split(',', 2)
+      const mime = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg'
+      const binary = atob(encoded)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      const file = new File([bytes], 'ascendus-results.jpg', { type: mime })
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'My Ascendus Results' })
         return
       }
     } catch (saveError) {
       if (saveError.name === 'AbortError') return
+      console.error('[ShareCard] browser share failed; using download', saveError)
     }
   }
+
+  const blob = await (await fetch(downloadImage)).blob()
+  const objectUrl = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
-  anchor.href = downloadImage
+  anchor.href = objectUrl
   anchor.download = 'ascendus-results.jpg'
   anchor.style.position = 'fixed'
   anchor.style.left = '0'
@@ -150,6 +169,39 @@ export async function saveShareCardImage(downloadImage) {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+}
+
+export function getPhotoSaveErrorMessage(error) {
+  const message = error?.message || String(error || '')
+  if (/permission|required|denied|not authorized/i.test(message)) {
+    return 'Photos access is off for Ascendus. Enable Add Photos Only in Settings, then try again.'
+  }
+  if (/not implemented|plugin.*not found|unavailable/i.test(message)) {
+    return 'The Photos saver is missing from this installed app version. Rebuild and reinstall Ascendus from Xcode, then try again.'
+  }
+  return message || 'The Photos save failed. Please try again.'
+}
+
+export function PhotoSaveError({ error, className = '' }) {
+  if (!error) return null
+  const needsSettings = /Photos access is off/i.test(error)
+
+  async function openSettings() {
+    try {
+      const { App } = await import('@capacitor/app')
+      await App.openUrl({ url: 'app-settings:' })
+    } catch (settingsError) {
+      console.error('[Scorecard] could not open app settings', settingsError)
+    }
+  }
+
+  return (
+    <div role="alert" className={`mt-3 text-center text-[12px] ${className}`} style={{ color: '#FF453A' }}>
+      <p>{error}</p>
+      {needsSettings && <button type="button" onClick={openSettings} className="mt-2 underline underline-offset-2">Open Settings</button>}
+    </div>
+  )
 }
 
 export default function ShareCardModal({ scan, facePhotoUrl, onClose }) {
@@ -157,6 +209,7 @@ export default function ShareCardModal({ scan, facePhotoUrl, onClose }) {
   const [preview, setPreview] = useState(null)
   const [downloadImage, setDownloadImage] = useState(null)
   const [generating, setGenerating] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [photoState, setPhotoState] = useState(null)
   const photoStatus = !facePhotoUrl
@@ -206,8 +259,17 @@ export default function ShareCardModal({ scan, facePhotoUrl, onClose }) {
   useEffect(() => { generate() }, [generate])
 
   async function handleSave() {
-    if (!downloadImage) return
-    await saveShareCardImage(downloadImage)
+    if (!downloadImage || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await saveShareCardImage(downloadImage)
+    } catch (saveError) {
+      console.error('[ShareCard] save failed', saveError)
+      setError('Could not save the scorecard. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -237,9 +299,9 @@ export default function ShareCardModal({ scan, facePhotoUrl, onClose }) {
       </div>
 
       <div className="px-5 pt-4 flex flex-shrink-0" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom, 0px))' }}>
-        <button onClick={handleSave} disabled={!preview || generating} className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl font-bold text-[15px]" style={{ background: GOLD_GRADIENT, color: '#000' }}>
-          <Download size={17} />
-          Save
+        <button onClick={handleSave} disabled={!preview || generating || saving} className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl font-bold text-[15px] disabled:opacity-70" style={{ background: GOLD_GRADIENT, color: '#000' }}>
+          {saving ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
+          {saving ? 'Saving…' : 'Save Image'}
         </button>
       </div>
     </div>

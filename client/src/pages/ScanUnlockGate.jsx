@@ -22,14 +22,13 @@ import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResults
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
-import { ShareCard, createShareCardImage, saveShareCardImage } from '../components/ShareCardModal'
+import { ShareCard, PhotoSaveError, createShareCardImage, getPhotoSaveErrorMessage, saveShareCardImage } from '../components/ShareCardModal'
 import { cropPhotoToSquare } from '../utils/shareCardPhoto'
 import { getProgressCardReturnTo, getSavedProgressResultPresentation } from '../utils/scanResultContext'
 import { isDeveloperUnlockAvailable } from '../utils/developerUnlockPreview'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
-const DEV_RESULTS_PREVIEW_KEY = 'ascendus_dev_results_preview'
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -928,7 +927,7 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
     setUnlocking(true); setUnlockErr('')
     try {
       const { ok, isPremium: granted } = await api.referral.unlockPro()
-      if (ok && granted) { sessionStorage.setItem('asc_pro_splash_shown', '1'); setIsPremium(true); navigate('/results', { replace: true }) }
+      if (ok && granted) { setIsPremium(true); navigate('/results', { replace: true }) }
     } catch (err) {
       const msg = err?.message || ''
       if (msg.toLowerCase().includes('need')) { const fresh = await pollCount(); setUnlockErr(`${fresh}/${REQUIRED} friends signed up so far.`) }
@@ -1457,7 +1456,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
       await saveShareCardImage(image)
     } catch (downloadFailure) {
       console.error('[Results card download]', downloadFailure)
-      setDownloadError('Could not create the results card. Please try again.')
+      setDownloadError(isNative() ? getPhotoSaveErrorMessage(downloadFailure) : 'Could not create the results card. Please try again.')
     } finally {
       setIsDownloadingCard(false)
     }
@@ -1531,11 +1530,13 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
     ? downloadPhoto.url
     : null
   const isAppearanceView = unlocked && activeView === 'photo'
+  const progressLockedChrome = savedProgressCard && !unlocked
+  const showLargeResultsHeading = unlocked || progressLockedChrome
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className={`mx-auto flex h-full w-full max-w-[430px] flex-col ${unlocked ? 'overflow-y-auto' : 'overflow-hidden'}`} style={{ background: '#0A0A0A' }}>
       <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
-      {!hideNavigationButton && (unlocked ? (
+      {!hideNavigationButton && (unlocked || savedProgressCard ? (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
           className="fixed left-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
           style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
@@ -1560,20 +1561,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
       </>}
       {!isAppearanceView && <>
         <div className="relative w-full">
-        <h1 className={`font-heading font-bold text-[44px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? { ...getUnlockedResultsHeadingStyle(resultsHeading), fontSize: 'clamp(39px, 9.72vw, 45px)' } : { fontSize: 'clamp(28px, 7.29vw, 34px)', whiteSpace: 'nowrap', lineHeight: '1.1' }) }}>
+        <h1 className={`font-heading font-bold text-[44px] text-center leading-tight mb-2 ${showLargeResultsHeading ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(showLargeResultsHeading ? { ...getUnlockedResultsHeadingStyle(resultsHeading), fontSize: 'clamp(39px, 9.72vw, 45px)' } : { fontSize: 'clamp(28px, 7.29vw, 34px)', whiteSpace: 'nowrap', lineHeight: '1.1' }) }}>
           {resultsHeading}
         </h1>
         </div>
-        <div className="h-5 flex shrink-0 items-start justify-center">
+        {!progressLockedChrome && <div className="h-5 flex shrink-0 items-start justify-center">
           {unlocked ? (
             <span className="text-[13px]" style={{ color: '#bcbcbc' }}>{activeView === 'photo' ? 'Your personalized appearance analysis' : ''}</span>
           ) : (
             <span className="font-body text-[12px] leading-5 text-center whitespace-nowrap" style={{ color: G, position: 'relative', top: '-2.5px' }}>Unlock your results with Ascendus Max</span>
           )}
-        </div>
+        </div>}
       </>}
         {/* Face circle + card */}
-        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? 518 : unlocked ? undefined : 416, flex: activeView === 'compare' ? '0 0 518px' : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? 498 : unlocked ? undefined : 416, flex: activeView === 'compare' ? '0 0 498px' : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
           onTouchStart={handleResultsTouchStart}
           onTouchEnd={handleResultsTouchEnd}
           onTouchCancel={() => { resultsSwipeStartRef.current = null }}
@@ -1638,7 +1639,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
             {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} compact={!unlocked} />}
           </div>
           <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={518} />}
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={498} />}
           </div>
           </motion.div>
         </motion.div>
@@ -1680,7 +1681,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           {isDownloadingCard || isPreparingDownloadPhoto ? <Loader2 size={19} className="animate-spin" /> : null}
           {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
         </motion.button>}
-        {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
+        {unlocked && savedProgressCard && activeView === 'results' && <PhotoSaveError error={downloadError} className="mx-auto max-w-xl" />}
         {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 16 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
@@ -1732,7 +1733,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
 function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentScan, scans, pendingFacePhoto, isPremium, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const { currentScan, scans, pendingFacePhoto, isPremium, isLocalProPreview, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
@@ -1745,10 +1746,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
   const developerUnlockAvailable = import.meta.env.DEV
-  const [developerResultsPreview, setDeveloperResultsPreview] = useState(() => {
-    if (!import.meta.env.DEV) return false
-    try { return localStorage.getItem(DEV_RESULTS_PREVIEW_KEY) === '1' } catch { return false }
-  })
   const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
   const completedDemoScan = completeDemoRevealRatings(currentScan)
   const displayedScan = pendingScan ? null : completedDemoScan
@@ -1775,16 +1772,16 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const hasUnlockedAccess = Boolean(isPremium || justUnlocked || (developerUnlockAvailable && developerResultsPreview) || currentScan?.resultsUnlocked)
+  const previewResultsUnlocked = Boolean(developerUnlockAvailable && isLocalProPreview)
+  const hasUnlockedAccess = Boolean(isPremium || justUnlocked || previewResultsUnlocked)
   const savedProgressResultPresentation = getSavedProgressResultPresentation({
     savedProgressCard: Boolean(progressCardReturnTo),
     isPremium,
     // resultsUnlocked means the scan is saved to Progress; it is not a paid
     // entitlement. The local dev preview may reveal this UI without changing
     // the real subscription state.
-    hasUnlockedAccess: Boolean(isPremium || justUnlocked || (developerUnlockAvailable && developerResultsPreview)),
+    hasUnlockedAccess: Boolean(isPremium || justUnlocked || previewResultsUnlocked),
   })
-  const previewResultsUnlocked = developerUnlockAvailable && developerResultsPreview
   const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked || previewResultsUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
@@ -1795,7 +1792,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     justUnlockedRef.current = true
     // Replay only the compact lock-to-score animation on the existing card.
     setRevealRun(run => run + 1)
-    try { sessionStorage.setItem('asc_pro_splash_shown', '1') } catch {}
     try { sessionStorage.setItem('asc_reveal_shown', currentScan?.id ?? '') } catch {}
     setJustUnlocked(true)
     setShowPaywall(false)
@@ -1807,8 +1803,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   function handleDeveloperUnlock() {
     if (!isDeveloperUnlockAvailable(import.meta.env.DEV) || !currentScan) return
     setRevealRun(run => run + 1)
-    try { localStorage.setItem(DEV_RESULTS_PREVIEW_KEY, '1') } catch {}
-    setDeveloperResultsPreview(true)
     setJustUnlocked(true)
     setShowPaywall(false)
     setShowUnlockSlideshow(false)

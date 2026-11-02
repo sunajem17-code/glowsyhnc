@@ -399,11 +399,6 @@ export default function Settings() {
             value={displayEmail}
             onPress={isGuest || displayName === 'Guest' ? undefined : () => navigate('/profile')}
           />
-          {isLocalProPreviewAvailable() && <SettingsRow
-            icon={Crown}
-            label="Local Pro Preview"
-            rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
-          />}
           {isPremium && !isLocalProPreview && <SettingsRow
             icon={Crown}
             label="Manage Ascendus Max"
@@ -411,6 +406,18 @@ export default function Settings() {
             onPress={handleManageSubscription}
           />}
         </div>
+
+        {isLocalProPreviewAvailable() && <>
+          <SectionHeader title="LOCAL TESTING" />
+          <div className="flex flex-col gap-2">
+            <SettingsRow
+              icon={Crown}
+              label="Local Pro Preview"
+              value="Preview premium screens on this local build"
+              rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
+            />
+          </div>
+        </>}
 
         {/* ── Native notification preferences ── */}
         {isNative() && <>

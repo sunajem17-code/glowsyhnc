@@ -522,7 +522,7 @@ export default function WorkoutPlan() {
   // user who already has a physique score skips straight past this entirely.
   useEffect(() => {
     if (!physiqueScores) {
-      navigate('/physique-scan', { replace: true })
+      navigate('/face-body-routine', { replace: true })
     }
   }, [physiqueScores])
 
