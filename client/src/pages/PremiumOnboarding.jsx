@@ -911,41 +911,34 @@ function StepTestimonials({ onNext }) {
 // ── STEP NOTIFICATIONS ───────────────────────────────────────────────────────
 function StepNotifications({ onNext }) {
   const [loading, setLoading] = useState(false)
-  const [permission, setPermission] = useState(null)
-  const [message, setMessage] = useState('')
   const requesting = useRef(false)
 
   async function enableNotifications() {
     if (requesting.current) return
     requesting.current = true
     setLoading(true)
-    setMessage('')
     try {
       const status = { display: await ensureNotificationPermission() }
-      setPermission(status.display)
       if (status.display === 'granted') {
-        const scheduled = await requestNotificationPermission()
-        setMessage(scheduled
-          ? 'Notifications enabled. We’ll remind you to scan at 8 PM.'
-          : 'Notifications enabled. You can set up reminders later in Settings.')
-      } else {
-        setMessage('Notifications are off. To enable them, open iPhone Settings → Notifications → Ascendus → Allow Notifications.')
+        void requestNotificationPermission()
       }
     } catch (err) {
       console.warn('[Notifications] Permission request failed:', err?.message)
-      setMessage('Couldn’t request notification permission. Try again or continue for now.')
     } finally {
       requesting.current = false
       setLoading(false)
+      onNext()
     }
   }
 
 
   function handleEnable() {
     if (requesting.current) return
-    triggerHaptic()
-    if (!isNative() || permission === 'granted' || permission === 'denied') onNext()
-    else void enableNotifications()
+    if (!isNative()) {
+      onNext()
+      return
+    }
+    void enableNotifications()
   }
 
   return (
@@ -974,31 +967,11 @@ function StepNotifications({ onNext }) {
       </div>
 
       <div style={{ padding: '0 24px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        {isNative() && (loading || message) && <p role="status" aria-live="polite" style={{ color: '#ccc', textAlign: 'center', fontSize: 14, marginBottom: 16 }}>
-          {loading ? 'Choose Allow in the notification popup.' : message}
-        </p>}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
+        <GoldBtn
+          label={isNative() ? 'Allow notifications' : 'Continue'}
           onClick={handleEnable}
-          disabled={loading}
-          style={{
-            width: '100%', height: 60, padding: 0,
-            borderRadius: 16,
-            background: GOLD_GRADIENT,
-            border: 'none', cursor: 'pointer',
-            color: '#000000', fontWeight: 700, fontSize: 17,
-            fontFamily: 'inherit',
-            boxShadow: '0 4px 24px rgba(198,168,92,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}
-        >
-          {loading
-            ? <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
-            : isNative() && permission !== 'granted' && permission !== 'denied' ? 'Allow notifications' : 'Continue'}
-        </motion.button>
-        {isNative() && permission === null && !loading && (
-          <button onClick={onNext} style={{ width: '100%', padding: 12, color: '#ccc', background: 'none', border: 'none', cursor: 'pointer' }}>Not now</button>
-        )}
+          loading={loading}
+        />
       </div>
     </div>
   )

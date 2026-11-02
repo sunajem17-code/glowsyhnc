@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { ChevronLeft, Dumbbell, Lock, X, Loader2, Check } from 'lucide-react'
+import { ChevronLeft, Dumbbell, Lock, Loader2, Check, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { EASE_STANDARD, GOLD, GOLD_GRADIENT } from '../utils/theme'
@@ -106,35 +106,45 @@ function PhysiqueScorecard({ photo, scan, unlocked, revealRun = 0 }) {
 const REQUIRED = 3
 
 // Clone of LockedRevealScreen from ScanUnlockGate — physique text only
-function PhysiquePaywall({ photo, scan, onClose, onAscend, onInvite, isPurchasing, error }) {
-  const navigate = useNavigate()
+function PhysiquePaywall({ photo, scan, savedScans, activeView, showView, onClose, onAscend, isPurchasing, error }) {
+  const reduceMotion = useReducedMotion()
+  const [viewDirection, setViewDirection] = useState(1)
+  function changeView(view) {
+    setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
+    showView(view)
+  }
   return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ background: '#0A0A0A' }}>
-      <div className="flex flex-col items-center px-5 pb-10"
-           style={{ paddingTop: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 56px)` }}>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ background: '#0A0A0A' }}>
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden px-5 pb-10"
+           style={{ paddingTop: `calc(max(env(safe-area-inset-top, 0px), ${isNative() ? '48px' : '0px'}) + 16px)` }}>
 
-        {/* Close button */}
-        <div className="w-full flex justify-end mb-3">
-          <button onClick={() => { triggerHaptic(); onClose() }} className="flex items-center justify-center"
-            style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
-          </button>
-        </div>
+        <button onClick={() => { triggerHaptic(); onClose() }} aria-label="View the 3-day free offer" className="fixed right-4 z-10 flex items-center justify-center"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', width: 38, height: 38, borderRadius: '50%', background: '#141414', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <X size={20} style={{ color: '#fff' }} />
+        </button>
 
         {/* Header */}
-        <h1 className="font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
-          Reveal your physique
+        <h1 className="font-heading font-bold text-[40px] text-center leading-tight mb-2" style={{ color: '#fff', letterSpacing: '-0.02em', fontSize: 'clamp(34px, 9vw, 42px)', whiteSpace: 'nowrap' }}>
+          Your Results
         </h1>
-        <p className="font-body text-[14px] text-center mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          See your full physique ratings with Ascendus Max
-        </p>
-
-        <div style={{ marginTop: 120, width: '100%' }}>
-          <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />
+        <div className="flex h-5 shrink-0 items-start justify-center">
+          <span className="font-body text-[12px] leading-5 text-center whitespace-nowrap" style={{ color: GOLD, position: 'relative', top: '-2.5px' }}>Unlock your results with Ascendus Max</span>
         </div>
 
-        {/* CTAs */}
-        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
+        <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 0, height: activeView === 'results' ? 416 : 518, flex: `0 0 ${activeView === 'results' ? 416 : 518}px`, minHeight: 0, overflow: 'visible', touchAction: 'pan-y' }} drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.24}
+          onDragEnd={(_, info) => {
+            const index = RESULT_VIEWS.indexOf(activeView)
+            if (info.offset.x < -60 || info.velocity.x < -400) changeView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
+            else if (info.offset.x > 60 || info.velocity.x > 400) changeView(RESULT_VIEWS[Math.max(index - 1, 0)])
+          }}>
+          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 190, damping: 28, mass: 0.85 }}>
+            {activeView === 'results' && <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />}
+            {activeView === 'analysis' && <PhysiqueBreakdown scan={scan} blurInfo compact />}
+            {activeView === 'compare' && <ScanPhotoComparison scan={scan} savedScans={savedScans} blurPhotos cardHeight={518} />}
+          </motion.div>
+        </motion.div>
+        {/* CTA sits directly under the active results card and above the view dots */}
+        <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 16 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}
@@ -143,9 +153,11 @@ function PhysiquePaywall({ photo, scan, onClose, onAscend, onInvite, isPurchasin
             style={{ background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
           >
             {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
-            {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
+            {isPurchasing ? 'Processing…' : 'Reveal Your Results'}
           </motion.button>
         </div>
+
+        <div className="w-full mt-1"><PhysiqueResultsNavigation activeView={activeView} showView={changeView} /></div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: '#FF453A' }}>{error}</p>}
       </div>
@@ -452,7 +464,10 @@ export default function PhysiqueResults() {
         <PhysiquePaywall
           photo={photo}
           scan={currentScan}
-          onClose={() => navigate(location.state?.returnTo || '/scan')}
+          savedScans={savedScans}
+          activeView={activeView}
+          showView={showView}
+          onClose={() => navigate('/unlock?paywall=1&trial=1', { replace: true })}
           onAscend={handleAscend}
           onInvite={handleInvite}
           isPurchasing={isPurchasing}
@@ -496,6 +511,7 @@ export default function PhysiqueResults() {
         className="relative w-full"
         style={{
           marginTop: activeView === 'results' ? 102 : activeView === 'analysis' ? 0 : 20,
+          ...(activeView === 'compare' ? { height: 518, flex: '0 0 518px' } : {}),
           transformOrigin: '50% 50%',
           touchAction: 'pan-y',
         }}
@@ -536,7 +552,7 @@ export default function PhysiqueResults() {
           )}
           {activeView === 'compare' && (
             <div>
-              <ScanPhotoComparison scan={currentScan} savedScans={savedScans} />
+              <ScanPhotoComparison scan={currentScan} savedScans={savedScans} cardHeight={518} />
             </div>
           )}
         </motion.div>

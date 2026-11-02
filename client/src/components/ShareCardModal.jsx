@@ -44,6 +44,7 @@ export function ShareCard({ scan, facePhotoUrl, cardRef, metrics: suppliedMetric
   return (
     <div
       ref={cardRef}
+      data-share-card-capture
       aria-hidden="true"
       style={{
         position: 'fixed', left: -9999, top: 0,
@@ -110,13 +111,24 @@ export async function createShareCardImage(cardElement) {
     imageTimeout: 3000,
     width: SHARE_CARD_WIDTH,
     height: SHARE_CARD_HEIGHT,
+    onclone: clonedDocument => {
+      const clonedCard = clonedDocument.querySelector('[data-share-card-capture]')
+      if (clonedCard) {
+        Object.assign(clonedCard.style, {
+          position: 'fixed',
+          left: '0px',
+          top: '0px',
+          zIndex: '-1',
+        })
+      }
+    },
   })
   return canvas.toDataURL('image/jpeg', 0.93)
 }
 
 export async function saveShareCardImage(downloadImage) {
   if (!downloadImage) return
-  if (isNative()) {
+  if (isNative() || (navigator.share && navigator.canShare)) {
     try {
       const blob = await (await fetch(downloadImage)).blob()
       const file = new File([blob], 'ascendus-results.jpg', { type: 'image/jpeg' })
@@ -131,7 +143,13 @@ export async function saveShareCardImage(downloadImage) {
   const anchor = document.createElement('a')
   anchor.href = downloadImage
   anchor.download = 'ascendus-results.jpg'
+  anchor.style.position = 'fixed'
+  anchor.style.left = '0'
+  anchor.style.top = '0'
+  anchor.style.opacity = '0'
+  document.body.appendChild(anchor)
   anchor.click()
+  anchor.remove()
 }
 
 export default function ShareCardModal({ scan, facePhotoUrl, onClose }) {

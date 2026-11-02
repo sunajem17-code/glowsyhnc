@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { Check, Sun, Moon, Droplets, Dumbbell, Footprints, BedDouble, Sparkles, ArrowRight, LockKeyhole, Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import PageHeader from '../components/PageHeader'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
 import { getRevealRatings } from '../utils/revealRatings'
 import { parseCoachMessage } from '../utils/coachMessage'
@@ -989,8 +988,7 @@ export default function FaceBodyRoutine() {
   }
 
   return <MotionPage>
-    <PageHeader title="" onBack={() => navigate('/extras')} />
-    <main className="space-y-3 px-4 pb-28 pt-3">
+    <main className="space-y-3 px-4 pb-28 pt-[calc(env(safe-area-inset-top,0px)+8px)]">
         <div className="flex justify-end">
           <div className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-white/10 bg-black p-1" role="tablist" aria-label="Routine sections">
             {['face', 'body'].map(section => <button key={section} type="button" role="tab" id={`routine-tab-${section}`} aria-selected={routineSection === section} aria-controls={`routine-panel-${section}`} onClick={() => { triggerHaptic(); setRoutineSection(section) }} className="min-h-9 rounded-full px-3 font-heading text-xs font-medium transition-colors" style={{ background: routineSection === section ? '#242424' : 'transparent', color: routineSection === section ? '#F5F5F5' : 'rgba(255,255,255,0.58)' }}>{section === 'face' ? 'Face' : 'Body'}</button>)}

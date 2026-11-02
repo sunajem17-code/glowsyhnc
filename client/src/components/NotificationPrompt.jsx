@@ -9,10 +9,13 @@ export default function NotificationPrompt({ enabled, userId }) {
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [permissionAttempted, setPermissionAttempted] = useState(false)
   const key = `ascendus-notification-prompt:${userId}`
   useEffect(() => {
     let cancelled = false
     setVisible(false)
+    setPermissionAttempted(false)
+    setError('')
     if (!enabled || !isNative() || !['/', '/home', '/dashboard', '/scan', '/extras'].includes(pathname)) return
     try { if (localStorage.getItem(key)) return } catch {}
     LocalNotifications.checkPermissions().then(permission => {
@@ -25,13 +28,21 @@ export default function NotificationPrompt({ enabled, userId }) {
     setVisible(false)
   }
   async function enable() {
+    if (permissionAttempted) {
+      dismiss()
+      return
+    }
     setBusy(true)
     setError('')
     try {
       if (await requestNotificationPermission()) dismiss()
-      else setError('Notifications are off. You can enable them in your phone’s Settings for Ascendus.')
+      else {
+        setError('Notifications are off. You can enable them in your phone’s Settings for Ascendus.')
+        setPermissionAttempted(true)
+      }
     } catch {
       setError('Could not set up your reminders. Please try again.')
+      setPermissionAttempted(true)
     } finally { setBusy(false) }
   }
   if (!visible) return null
@@ -40,8 +51,7 @@ export default function NotificationPrompt({ enabled, userId }) {
       <h2 id="notification-title" className="text-2xl font-bold">Keep your progress going</h2>
       <p className="mt-3 text-sm text-white/70">Get a daily reminder at 8 PM to complete a scan, plus a reminder when your next scan is ready.</p>
       {error && <p role="alert" className="mt-3 text-sm text-amber-200">{error}</p>}
-      <button autoFocus disabled={busy} onClick={enable} className="mt-6 w-full rounded-2xl bg-[#C6A85C] py-4 font-bold text-black disabled:opacity-60">{busy ? 'Enabling…' : 'Enable notifications'}</button>
-      <button disabled={busy} onClick={dismiss} className="mt-2 w-full py-3 text-sm text-white/60">Not now</button>
+      <button autoFocus disabled={busy} onClick={enable} className="mt-6 w-full rounded-2xl bg-[#C6A85C] py-4 font-bold text-black disabled:opacity-60">{busy ? 'Enabling…' : 'Continue'}</button>
     </section>
   </div>, document.body)
 }

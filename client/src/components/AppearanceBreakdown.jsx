@@ -37,6 +37,7 @@ export default function AppearanceBreakdown({
   scan,
   isPremium = false,
   embedded = false,
+  compact = false,
   page: controlledPage,
   onPageChange,
 }) {
@@ -85,7 +86,7 @@ export default function AppearanceBreakdown({
   useEffect(() => {
     if (import.meta.env.DEV && analysis) console.info('[appearance-analysis]', { stage: 'findings_rendered', pros: pros.length, cons: focusAreas.length })
   }, [analysis, pros.length, focusAreas.length])
-  return <div className={`appearance-dashboard${embedded ? ' appearance-dashboard--embedded' : ''}`}>
+  return <div className={`appearance-dashboard${embedded ? ' appearance-dashboard--embedded' : ''}${compact ? ' appearance-dashboard--compact' : ''}`}>
     {!embedded && <div role="tablist" aria-label="Appearance points" className="appearance-page-switch">
       <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="appearance-points-panel" onClick={() => changePage('pros')}>Pros</button>
       <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="appearance-points-panel" onClick={() => changePage('cons')}>Cons</button>
@@ -96,7 +97,6 @@ export default function AppearanceBreakdown({
       {error && <div className="appearance-state appearance-error" role="alert"><p>{error}</p>{scanId ? <button type="button" onClick={() => setRetry(value => value + 1)}>Try Again</button> : <button type="button" onClick={() => navigate('/scan')}>Take a New Scan<ChevronRight size={15} /></button>}</div>}
       {analysis && <ul
         className="appearance-points-list"
-        onPointerDown={event => event.stopPropagation()}
         tabIndex={isPremium ? 0 : -1}
         aria-label={`${pageTitle} details`}
         aria-hidden={!isPremium}

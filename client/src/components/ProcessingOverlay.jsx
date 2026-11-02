@@ -10,10 +10,10 @@ import { GOLD } from '../utils/theme'
  *     {isLoading && <ProcessingOverlay />}
  *   </AnimatePresence>
  */
-export default function ProcessingOverlay({ label = 'Processing' }) {
+export default function ProcessingOverlay({ label = 'Processing', immediate = false }) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={immediate ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}

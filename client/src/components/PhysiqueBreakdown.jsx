@@ -141,7 +141,7 @@ function getSavedFindings(points, page, scan, usedMetrics) {
     })
 }
 
-export default function PhysiqueBreakdown({ scan }) {
+export default function PhysiqueBreakdown({ scan, blurInfo = false, compact = false }) {
   const [page, setPage] = useState('pros')
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? (analysis.physique_strengths ?? analysis.strengths ?? analysis.keyStrengths) : (analysis.physique_improvements ?? analysis.improvements ?? analysis.keyWeaknesses)
@@ -173,7 +173,7 @@ export default function PhysiqueBreakdown({ scan }) {
   const title = page === 'pros' ? 'Pros' : 'Cons'
   const scanId = scan?.serverScanId || scan?.aiScore?.scanId
 
-  return <div className="appearance-dashboard physique-dashboard">
+  return <div className={`appearance-dashboard physique-dashboard${compact ? ' appearance-dashboard--compact' : ''}`}>
     <div role="tablist" aria-label="Physique points" className="appearance-page-switch">
       <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => setPage('pros')}>Pros</button>
       <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => setPage('cons')}>Cons</button>
@@ -181,7 +181,8 @@ export default function PhysiqueBreakdown({ scan }) {
     <section id="physique-points-panel" role="tabpanel" aria-label={title} className="appearance-points">
       <h2>{title}</h2>
       <ul className="appearance-points-list"
-        onPointerDown={event => event.stopPropagation()} tabIndex={0} aria-label={`${title} details`}>
+        onPointerDown={event => event.stopPropagation()} tabIndex={blurInfo ? -1 : 0} aria-label={`${title} details`}
+        aria-hidden={blurInfo || undefined} style={blurInfo ? { filter: 'blur(7px)', userSelect: 'none' } : undefined}>
         {points.length
           ? points.map(({ title: pointTitle, explanation, advice }, index) => {
             return <li className="physique-analysis-item" key={`${pointTitle}-${index}`}>

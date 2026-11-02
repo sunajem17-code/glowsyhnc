@@ -54,6 +54,12 @@
   border-radius:22px;
   background:var(--appearance-card)
 }
+.appearance-dashboard:not(.appearance-dashboard--embedded) .appearance-points {
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y pinch-zoom;
+}
 .appearance-points h2 {
   flex-shrink:0;
   margin:0;
@@ -73,12 +79,17 @@
   list-style:disc;
   overflow-y:auto;
   /* Let iOS handle finger movement and momentum; no JS drag recognizer. */
-  overscroll-behavior-y:auto;
+  overscroll-behavior-y:contain;
   -webkit-overflow-scrolling:touch;
   touch-action:pan-y pinch-zoom;
   scroll-behavior:auto;
   scrollbar-width:thin;
   scrollbar-color:#4a4a4a transparent
+}
+.appearance-dashboard:not(.appearance-dashboard--embedded) .appearance-points-list {
+  flex:0 0 auto;
+  overflow:visible;
+  touch-action:pan-y pinch-zoom;
 }
 .appearance-points li {
   flex:0 0 auto;
@@ -216,3 +227,19 @@
   width: 100%;
 }
 .physique-dashboard .appearance-points-list { flex: 1 1 auto; }
+
+/* Locked breakdowns start directly below the subtitle and use the space that
+   the scorecard reserves above its portrait. Their combined slot stays the
+   same height as the scorecard's margin + card, keeping the CTA and dots fixed. */
+.appearance-dashboard--compact {
+  flex: 0 0 518px;
+  height: 518px;
+  min-height: 0;
+  overflow: hidden;
+}
+.appearance-dashboard--compact .appearance-points {
+  flex: 0 0 470px;
+  height: 470px;
+  min-height: 0;
+  max-height: 470px;
+}

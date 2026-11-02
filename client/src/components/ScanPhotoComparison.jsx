@@ -35,7 +35,7 @@ function useScanPhoto(scan) {
   return { image: source || media, loading, failed, setFailed }
 }
 
-function SliderPhoto({ scan, label, clip = 'inset(0)', fallback }) {
+function SliderPhoto({ scan, label, clip = 'inset(0)', fallback, blur = false }) {
   const { image, loading, failed, setFailed } = useScanPhoto(scan)
   return (
     <div
@@ -44,7 +44,7 @@ function SliderPhoto({ scan, label, clip = 'inset(0)', fallback }) {
       style={{ clipPath: clip }}
     >
       {image && !failed
-        ? <img src={image} draggable={false} alt={`${label} scan`} onError={() => setFailed(true)} className="w-full h-full object-contain" />
+        ? <img src={image} draggable={false} alt={`${label} scan`} onError={() => setFailed(true)} className="w-full h-full object-contain" style={blur ? { filter: 'blur(9px)', transform: 'scale(1.04)' } : undefined} />
         : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center" style={{ background: '#141414', color: 'rgba(255,255,255,0.55)' }}>
             <Camera size={24} />
             <span className="font-body text-xs">{loading ? 'Loading photo…' : fallback}</span>
@@ -53,7 +53,7 @@ function SliderPhoto({ scan, label, clip = 'inset(0)', fallback }) {
   )
 }
 
-export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi = false }) {
+export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi = false, blurPhotos = false, cardHeight }) {
   const candidates = getComparisonScans(scan, savedScans)
   const comparisonType = isPhysiqueProgressScan(scan) ? 'physique' : 'face'
   const emptyMessage = `No other ${comparisonType} scans in Progress yet.`
@@ -102,12 +102,12 @@ export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi =
       <div
         ref={comparisonRef}
         className="relative w-full overflow-hidden rounded-2xl select-none"
-        style={{ height: 'min(68vh, 720px)', minHeight: 300, background: '#080808', border: '1px solid rgba(255,255,255,0.1)', touchAction: 'pan-y' }}
+        style={{ height: cardHeight ?? 'min(68vh, 720px)', minHeight: cardHeight ?? 300, background: '#080808', border: '1px solid rgba(255,255,255,0.1)', touchAction: 'pan-y' }}
       >
-        <SliderPhoto scan={scan} label="Photo A" fallback="No photo saved for this scan" />
+        <SliderPhoto scan={scan} label="Photo A" fallback="No photo saved for this scan" blur={blurPhotos} />
         {comparisonScan ? (
           <>
-            <SliderPhoto scan={comparisonScan} label="Photo B" clip={`inset(0 0 0 ${position}%)`} fallback="No photo saved for Photo B" />
+            <SliderPhoto scan={comparisonScan} label="Photo B" clip={`inset(0 0 0 ${position}%)`} fallback="No photo saved for Photo B" blur={blurPhotos} />
             <button type="button" aria-label="Change Photo B from saved Progress scans" onClick={() => setPickerOpen(true)} onPointerDown={event => event.stopPropagation()} className="absolute inset-0 z-10" style={{ clipPath: `inset(0 0 0 ${position}%)`, background: 'transparent' }} />
           </>
         ) : (
@@ -133,7 +133,7 @@ export default function ScanPhotoComparison({ scan, savedScans, canAccessProUi =
           <MoveHorizontal size={20} strokeWidth={2.5} />
         </button>
       </div>
-      {!candidates.length && scan && comparisonType !== 'physique' && <p role="status" className="mt-3 text-center font-body text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
+      {!cardHeight && !candidates.length && scan && comparisonType !== 'physique' && <p role="status" className="mt-3 text-center font-body text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{emptyMessage}</p>}
       {pickerOpen && <div className="fixed inset-0 z-[100] flex flex-col bg-black" role="dialog" aria-modal="true" aria-labelledby="scan-picker-title">
         <header className="flex shrink-0 items-center justify-between px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
             <div>

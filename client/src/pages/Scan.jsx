@@ -26,7 +26,7 @@ import { scheduleRescanNotification } from '../utils/notifications'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/theme'
 import { triggerHaptic, triggerAlignmentHaptic } from '../utils/haptics'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-import { createLiveFaceAlignment, getAlignment, shouldBlockPhotoCapture } from '../utils/liveFaceAlignment'
+import { createLiveFaceAlignment, getAlignment } from '../utils/liveFaceAlignment'
 import { frontFeatureAnchors, profileFeatureAnchors, profilePointsFromMesh, profilePointsFromVision } from '../utils/scanFeatureAnchors'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
 import ScanPortrait from '../components/ScanPortrait'
@@ -240,6 +240,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   const canvasRef   = useRef()
   const streamRef   = useRef()
   const previewActiveRef = useRef(false)
+  const nativePreviewGenerationRef = useRef(0)
   // Serializes every start/stop call onto one chain so overlapping calls
   // (e.g. StrictMode's dev-only mount→unmount→remount, which fires this
   // effect's cleanup and the next mount's start back to back) can never
@@ -264,12 +265,14 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
 
   // ── Native: CameraPreview live viewfinder ─────────────────────────────────
   const startNativePreview = useCallback((position) => {
+    const generation = ++nativePreviewGenerationRef.current
     previewOpRef.current = previewOpRef.current.then(async () => {
       try {
         if (previewActiveRef.current) {
           await CameraPreview.stop()
           previewActiveRef.current = false
         }
+        const startedAt = performance.now()
         // Fill the entire screen so we can overlay our UI on top via z-index
         await CameraPreview.start({
           position,
@@ -283,7 +286,16 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
           height: window.screen.height,
         })
         previewActiveRef.current = true
-        setReady(true)
+        // CameraPreview.start resolves when the session is running, before
+        // iOS has necessarily delivered a correctly exposed video frame.
+        // Keep the opaque startup cover in place through that exposure ramp;
+        // otherwise the first blown-out white camera frame flashes onscreen.
+        const remainingWarmup = Math.max(0, 900 - (performance.now() - startedAt))
+        const revealPreview = () => {
+          if (generation === nativePreviewGenerationRef.current) setReady(true)
+        }
+        if (remainingWarmup > 0) window.setTimeout(revealPreview, remainingWarmup)
+        else revealPreview()
       } catch (err) {
         console.warn('[CameraOverlay] CameraPreview.start failed:', err?.message)
         setError('Could not start camera. Please close and reopen the app.')
@@ -293,6 +305,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
   }, [])
 
   const stopNativePreview = useCallback(() => {
+    nativePreviewGenerationRef.current += 1
     document.body.style.backgroundColor = ''
     document.documentElement.style.backgroundColor = ''
     const rootEl = document.getElementById('root')
@@ -410,28 +423,41 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
     return () => { cancelled = true; clearTimeout(timer); tracker?.close() }
   }, [ready, capturedUrl, facingMode])
 
-  function capture() {
-    if (shouldBlockPhotoCapture(stepNum, trackingAvailable, alignment.aligned)) return
+  async function capture() {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) return
-    // Freeze: pause video so the frame stays visible in-place (no separate img needed)
-    video.pause()
-    canvas.width  = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    // Mirror horizontally for front cam so captured image matches what user saw on screen
-    if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0)
-      ctx.scale(-1, 1)
+    if (!video || !canvas) {
+      setError('Could not access the camera preview. Please reopen the camera and try again.')
+      return
     }
-    ctx.drawImage(video, 0, 0)
-    canvas.toBlob(blob => {
-      if (blob) {
-        const url = URL.createObjectURL(blob)
-        setCapturedUrl(url) // store for onCapture; video stays paused showing the freeze
+    try {
+      // Metadata can arrive a frame before Safari has a drawable video frame.
+      // Wait briefly for actual pixels, but never gate capture on face tracking
+      // or the guide oval turning gold.
+      for (let attempt = 0; attempt < 12 && (!video.videoWidth || video.readyState < 2); attempt += 1) {
+        await new Promise(resolve => requestAnimationFrame(resolve))
       }
-    }, 'image/jpeg', 0.95)
+      if (!video.videoWidth || !video.videoHeight || video.readyState < 2) {
+        throw new Error('The camera preview is not ready yet. Please try again.')
+      }
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Could not prepare the captured photo.')
+      // Mirror horizontally for front cam so captured image matches the preview.
+      if (facingMode === 'user') {
+        ctx.translate(canvas.width, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.drawImage(video, 0, 0)
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95))
+      if (!blob) throw new Error('The camera could not save this photo. Please try again.')
+      video.pause()
+      setCapturedUrl(URL.createObjectURL(blob))
+    } catch (err) {
+      console.warn('[CameraOverlay] photo capture failed:', err?.message)
+      setError(err?.message || 'Could not take the photo. Please try again.')
+    }
   }
 
   function handleContinue() {
@@ -529,6 +555,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                 </>
               ) : (
                 <>
+                  <button onClick={() => { setError(''); startCamera(facingMode) }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Try Again</button>
                   <button onClick={onClose} className="px-6 py-3 bg-white/10 rounded-2xl text-white text-sm font-heading font-bold">Go Back</button>
                   {isNative() && <button onClick={async () => { try { const url = await takePhoto(); if (url) onCapture(url, null) } catch {} }} className="px-6 py-3 rounded-2xl text-sm font-heading font-bold" style={{ background: GOLD, color: '#000' }}>Use System Camera</button>}
                 </>
@@ -601,6 +628,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   // (worst possible quality) regardless of what's passed. 100
                   // is the only value that survives that division intact (1.0).
                   const result = await CameraPreview.capture({ quality: 100 })
+                  if (!result?.value) throw new Error('Camera preview returned an empty photo.')
                   // result.value is a base64 JPEG string (no data: prefix)
                   const dataUrl = `data:image/jpeg;base64,${result.value}`
                   await stopNativePreview()
@@ -610,6 +638,18 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
                   setCapturedUrl(finalUrl)
                 } catch (err) {
                   console.warn('[CameraOverlay] capture failed:', err?.message)
+                  // A preview can be visible while its native capture session
+                  // temporarily refuses a still. Release it, then fall back to
+                  // iOS Camera so the shutter still works without face alignment.
+                  try {
+                    await stopNativePreview()
+                    const fallbackPhoto = await takePhoto()
+                    if (!fallbackPhoto) throw new Error('No photo was returned.')
+                    setCapturedUrl(fallbackPhoto)
+                  } catch (fallbackError) {
+                    console.warn('[CameraOverlay] system camera fallback failed:', fallbackError?.message)
+                    setError('Could not take the photo. Check camera permission and try again.')
+                  }
                 }
                 return
               }
@@ -641,7 +681,7 @@ function CameraOverlay({ stepNum, onCapture, onClose, gender }) {
         {!error && !ready && !capturedUrl && (
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 998, background: '#000' }} />
-            <ProcessingOverlay label="Processing" />
+            <ProcessingOverlay label="Processing" immediate />
           </>
         )}
       </AnimatePresence>

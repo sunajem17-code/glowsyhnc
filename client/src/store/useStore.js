@@ -48,21 +48,36 @@ const useStore = create(
       },
       setAuth: (user, token) => {
         premiumStateRevision += 1
-        set(state => ({
-          user,
-          hasOnboarded: hasCompletedOnboarding({ ...state, user }),
-          token,
-          upgradeWelcomePending: false,
-          isAuthenticated: true,
-          isGuest: false,
-          // Hydrate from the user object immediately so paying users aren't briefly downgraded
-          // while the async RevenueCat / server check completes.
-          isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) ||
-            user?.subscriptionTier === 'premium' ||
-            user?.subscription_tier === 'premium' ||
-            user?.is_pro === true ||
-            false,
-        }))
+        set(state => {
+          const previousOwner = onboardingOwner(state.user)
+          const nextOwner = onboardingOwner(user)
+          const onboardingCompletedByUser = { ...state.onboardingCompletedByUser }
+          const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
+          // A guest can finish onboarding before creating or linking an account.
+          // Carry that device session's completion to the upgraded account so a
+          // relaunch doesn't route the now-registered user back through setup.
+          if (state.isGuest && previousOwner !== nextOwner) {
+            if (onboardingCompletedByUser[previousOwner] === true) onboardingCompletedByUser[nextOwner] = true
+            if (startingPointCompletedByUser[previousOwner] === true) startingPointCompletedByUser[nextOwner] = true
+          }
+          return {
+            user,
+            onboardingCompletedByUser,
+            startingPointCompletedByUser,
+            hasOnboarded: hasCompletedOnboarding({ ...state, user, onboardingCompletedByUser }),
+            token,
+            upgradeWelcomePending: false,
+            isAuthenticated: true,
+            isGuest: false,
+            // Hydrate from the user object immediately so paying users aren't briefly downgraded
+            // while the async RevenueCat / server check completes.
+            isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) ||
+              user?.subscriptionTier === 'premium' ||
+              user?.subscription_tier === 'premium' ||
+              user?.is_pro === true ||
+              false,
+          }
+        })
       },
       setGuestSession: (userId, token) => {
         premiumStateRevision += 1
@@ -203,6 +218,7 @@ const useStore = create(
 
       // Onboarding
       hasOnboarded: false,
+      onboardingWasReset: false,
       onboardingHydrated: false,
       onboardingCompletedByUser: {},
       startingPointCompletedByUser: {},
@@ -218,7 +234,7 @@ const useStore = create(
         const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
         delete onboardingCompletedByUser[owner]
         delete startingPointCompletedByUser[owner]
-        return { hasOnboarded: false, onboardingCompletedByUser, startingPointCompletedByUser }
+        return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser, startingPointCompletedByUser }
       }),
       setHasOnboarded: (completedStep) => {
         // The onboarding flow passes its final step. PaymentSuccess can also
@@ -226,6 +242,7 @@ const useStore = create(
         if (completedStep != null && completedStep !== FINAL_ONBOARDING_STEP) return false
         set(state => ({
           hasOnboarded: true,
+          onboardingWasReset: false,
           onboardingCompletedByUser: {
             ...state.onboardingCompletedByUser,
             [onboardingOwner(state.user)]: true,
@@ -239,7 +256,7 @@ const useStore = create(
         set(state => {
           const records = { ...state.onboardingCompletedByUser }
           delete records[onboardingOwner(state.user)]
-          return { hasOnboarded: false, onboardingCompletedByUser: records }
+          return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser: records }
         })
       },
 
@@ -540,7 +557,8 @@ const useStore = create(
         currentPlan: state.currentPlan,
         checkins: state.checkins,
         streak: state.streak,
-        hasOnboarded: hasCompletedOnboarding(state),
+        hasOnboarded: state.hasOnboarded === true || hasCompletedOnboarding(state),
+        onboardingWasReset: state.onboardingWasReset === true,
         onboardingCompletedByUser: state.onboardingCompletedByUser,
         startingPointCompletedByUser: state.startingPointCompletedByUser,
         legalConsented: state.legalConsented,

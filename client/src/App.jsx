@@ -102,9 +102,11 @@ export default function App() {
   const setShowUnlockSlideshow  = useStore(s => s.setShowUnlockSlideshow)
   const currentScan             = useStore(s => s.currentScan)
   const [cinematicDone, setCinematicDone] = useState(
-    () => !!sessionStorage.getItem('asc_cinematic_shown')
+    () => localStorage.getItem('asc_cinematic_shown') === '1'
   )
-  const [splashDone, setSplashDone] = useState(false)
+  const [splashDone, setSplashDone] = useState(
+    () => localStorage.getItem('asc_welcome_splash_shown') === '1'
+  )
   const [proSplashDone, setProSplashDone] = useState(
     () => !!sessionStorage.getItem(SESSION_KEY)
   )
@@ -150,7 +152,10 @@ export default function App() {
     return () => window.removeEventListener('auth:session-expired', handle)
   }, [expireSession])
 
-  const handleSplashDone = useCallback(() => { setSplashDone(true) }, [])
+  const handleSplashDone = useCallback(() => {
+    localStorage.setItem('asc_welcome_splash_shown', '1')
+    setSplashDone(true)
+  }, [])
 
   const handleProSplashDone = useCallback(() => {
     sessionStorage.setItem(SESSION_KEY, '1')
@@ -178,17 +183,17 @@ export default function App() {
   // ── GATE 0: Cinematic intro — plays once per session for everyone ──
   const startupSplash = getStartupSplash({ cinematicDone, splashDone })
 
-  if (!resetRoute && hasOnboarded && startupSplash === 'cinematic') {
+  if (!resetRoute && !hasOnboarded && startupSplash === 'cinematic') {
     return (
       <CinematicIntro onDone={() => {
-        sessionStorage.setItem('asc_cinematic_shown', '1')
+        localStorage.setItem('asc_cinematic_shown', '1')
         setCinematicDone(true)
       }} />
     )
   }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (!resetRoute && hasOnboarded && startupSplash === 'welcome') {
+  if (!resetRoute && !hasOnboarded && startupSplash === 'welcome') {
     return <Splash onDone={handleSplashDone} />
   }
 

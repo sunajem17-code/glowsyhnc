@@ -11,8 +11,9 @@ export function hasCompletedStartingPoint(state) {
   return state.startingPointCompletedByUser?.[startingPointCompletionKey(state.user)] === true
 }
 export function hasCompletedOnboarding(state) {
-  return Object.hasOwn(state.onboardingCompletedByUser || {}, onboardingOwner(state.user)) &&
-    state.onboardingCompletedByUser[onboardingOwner(state.user)] === true
+  if (state.hasOnboarded === true) return true
+  const owner = onboardingOwner(state.user)
+  return state.onboardingCompletedByUser?.[owner] === true || hasCompletedStartingPoint(state)
 }
 export function onboardingStartup(state) {
   if (state.onboardingHydrated !== true) return 'checking'
@@ -36,6 +37,25 @@ export function normalizeOnboardingCompletion(saved = {}) {
   // when an older, already-completed account was first loaded by this version.
   // Missing, string-valued or truthy flags never mean completed.
   if (saved.hasOnboarded === true && records[onboardingOwner(saved.user)] !== true) {
+    records[onboardingOwner(saved.user)] = true
+  }
+  // The ScanHome first-scan hint is dismissed and persisted when the user has
+  // already reached their starting point. Treat that durable completion as the
+  // onboarding boundary too, so a returning user never gets sent back through
+  // setup just because the older onboarding flag was lost.
+  if (saved.onboardingWasReset !== true && hasCompletedStartingPoint({
+    user: saved.user,
+    startingPointCompletedByUser: saved.startingPointCompletedByUser,
+  })) {
+    records[onboardingOwner(saved.user)] = true
+  }
+  // Older installs could persist `hasOnboarded` as false when the account id
+  // changed after a guest scan. A saved scan plus the selected gender proves
+  // that the user already entered their personalized app; repair that record
+  // once, unless onboarding was explicitly reset (for example after deletion).
+  const hasCompletedScan = Boolean(saved.currentScan || saved.scans?.length)
+  const hasSelectedAppSide = saved.gender === 'male' || saved.gender === 'female'
+  if (saved.onboardingWasReset !== true && hasCompletedScan && hasSelectedAppSide) {
     records[onboardingOwner(saved.user)] = true
   }
   return { onboardingCompletedByUser: records, hasOnboarded: records[onboardingOwner(saved.user)] === true }

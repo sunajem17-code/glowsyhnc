@@ -18,7 +18,7 @@ import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
-import { getRevealMetricTextStyles, getRevealRatingAnimation, getLockedResultsHeadingStyle, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
@@ -29,6 +29,7 @@ import { isDeveloperUnlockAvailable } from '../utils/developerUnlockPreview'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
+const DEV_RESULTS_PREVIEW_KEY = 'ascendus_dev_results_preview'
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -1091,6 +1092,7 @@ const PAYWALL_CARDS = [
 
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [cardIdx, setCardIdx] = useState(0)
   const x = useMotionValue(0)
   const containerRef = useRef(null)
@@ -1098,7 +1100,7 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
   const [totalScans, setTotalScans] = useState(null)
 
   // Exit-intent discount offer state
-  const [showDiscount, setShowDiscount]       = useState(false)
+  const [showDiscount, setShowDiscount]       = useState(() => searchParams.get('trial') === '1')
   const [discountError, setDiscountError]     = useState('')
 
   // Pull real scan count from server — no hardcoded numbers
@@ -1333,7 +1335,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, onDeveloperUnlock, developerUnlockAvailable = false, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, isPurchasing, error, unlocked = false, revealRun = 0 }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, onDeveloperUnlock, developerUnlockAvailable = false, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, hideNavigationButton = false, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const savedScans = useStore(state => state.scans)
@@ -1351,6 +1353,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const resultsCardRef = useRef(null)
   const downloadCardRef = useRef(null)
   const saveProgressButtonRef = useRef(null)
+  const resultsSwipeStartRef = useRef(null)
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
@@ -1370,6 +1373,31 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
     if (view === activeView) return
     setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
     setActiveView(view)
+  }
+
+  function handleResultsTouchStart(event) {
+    if (event.touches.length !== 1) {
+      resultsSwipeStartRef.current = null
+      return
+    }
+    const touch = event.touches[0]
+    resultsSwipeStartRef.current = { x: touch.clientX, y: touch.clientY, time: event.timeStamp }
+  }
+
+  function handleResultsTouchEnd(event) {
+    const start = resultsSwipeStartRef.current
+    resultsSwipeStartRef.current = null
+    const touch = event.changedTouches[0]
+    if (!start || !touch) return
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
+    const distance = Math.abs(dx)
+    const duration = Math.max(1, event.timeStamp - start.time)
+    const threshold = duration < 240 ? 24 : 38
+    if (distance < threshold || distance < Math.abs(dy) * 1.15) return
+    const index = RESULT_VIEWS.indexOf(activeView)
+    if (dx < 0) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
+    else showView(RESULT_VIEWS[Math.max(index - 1, 0)])
   }
 
   function saveResult() {
@@ -1497,7 +1525,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
       }
     : scan
   const metrics = getRevealRatings(recoveredScan)
-  const resultsHeading = unlocked ? getResultsHeading(recoveredScan) : 'Reveal your ratings'
+  const resultsHeading = getResultsHeading(recoveredScan)
   const isPreparingDownloadPhoto = downloadPhoto.source !== facePhoto || downloadPhoto.status === 'processing'
   const preparedDownloadPhoto = downloadPhoto.source === facePhoto && downloadPhoto.status === 'ready'
     ? downloadPhoto.url
@@ -1505,51 +1533,52 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const isAppearanceView = unlocked && activeView === 'photo'
 
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="mx-auto flex h-full w-full max-w-[430px] flex-col overflow-y-auto" style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className={`mx-auto flex h-full w-full max-w-[430px] flex-col ${unlocked ? 'overflow-y-auto' : 'overflow-hidden'}`} style={{ background: '#0A0A0A' }}>
       <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
-      {unlocked && (
+      {!hideNavigationButton && (unlocked ? (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
           className="fixed left-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
           style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
           <ChevronLeft size={18} className="text-primary" />
         </button>
-      )}
-      <div className={`flex flex-col px-5 ${isAppearanceView ? 'items-stretch pb-10' : 'items-center pb-10'}`}
+      ) : (
+        <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="View the 3-day free offer"
+          className="fixed right-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+          <X size={18} className="text-primary" />
+        </button>
+      ))}
+      <div className={`flex min-h-0 flex-1 flex-col px-5 ${isAppearanceView ? 'items-stretch pb-10' : 'items-center pb-10'} ${unlocked ? '' : 'overflow-hidden'}`}
            style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 16px)` }}>
 
       {/* Header */}
       {isAppearanceView && <>
         <div className="relative w-full">
-          <h1 className="w-full px-0 font-heading font-bold text-[32px] text-center leading-tight mb-2" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...getUnlockedResultsHeadingStyle(resultsHeading) }}>Your Results</h1>
+        <h1 className="w-full px-0 font-heading font-bold text-[44px] text-center leading-tight mb-2" style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...getUnlockedResultsHeadingStyle(resultsHeading), fontSize: 'clamp(39px, 9.72vw, 45px)' }}>Your Results</h1>
         </div>
         <div className="h-5 flex items-start justify-center" aria-hidden="true" />
       </>}
       {!isAppearanceView && <>
         <div className="relative w-full">
-        <h1 className={`font-heading font-bold text-[32px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? getUnlockedResultsHeadingStyle(resultsHeading) : getLockedResultsHeadingStyle()) }}>
+        <h1 className={`font-heading font-bold text-[44px] text-center leading-tight mb-2 ${unlocked ? 'px-0' : 'px-12'}`} style={{ color: '#fff', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 700, letterSpacing: '-0.02em', ...(unlocked ? { ...getUnlockedResultsHeadingStyle(resultsHeading), fontSize: 'clamp(39px, 9.72vw, 45px)' } : { fontSize: 'clamp(28px, 7.29vw, 34px)', whiteSpace: 'nowrap', lineHeight: '1.1' }) }}>
           {resultsHeading}
         </h1>
         </div>
-        <div className="h-5 flex items-start justify-center">
+        <div className="h-5 flex shrink-0 items-start justify-center">
           {unlocked ? (
             <span className="text-[13px]" style={{ color: '#bcbcbc' }}>{activeView === 'photo' ? 'Your personalized appearance analysis' : ''}</span>
           ) : (
-            <p className="font-body text-[14px] text-center leading-5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              See your full facial analysis with Ascendus Max
-            </p>
+            <span className="font-body text-[12px] leading-5 text-center whitespace-nowrap" style={{ color: G, position: 'relative', top: '-2.5px' }}>Unlock your results with Ascendus Max</span>
           )}
         </div>
       </>}
         {/* Face circle + card */}
-        <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20, transformOrigin: '50% 50%', touchAction: 'pan-y' }}
-          drag={unlocked && activeView !== 'compare' && activeView !== 'photo' ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.15}
-          onDragEnd={(_, info) => {
-            const index = RESULT_VIEWS.indexOf(activeView)
-            if (info.offset.x < -60 || info.velocity.x < -400) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
-            else if (info.offset.x > 60 || info.velocity.x > 400) showView(RESULT_VIEWS[Math.max(index - 1, 0)])
-          }}
+        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? 518 : unlocked ? undefined : 416, flex: activeView === 'compare' ? '0 0 518px' : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+          onTouchStart={handleResultsTouchStart}
+          onTouchEnd={handleResultsTouchEnd}
+          onTouchCancel={() => { resultsSwipeStartRef.current = null }}
           >
-          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.25, ease: EASE_STANDARD }}>
+          <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 18, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 250, damping: 26, mass: 0.75 }}>
           <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
           <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
@@ -1571,7 +1600,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
                 <div key={ratingAnimation.key} style={{ paddingBottom: idx < 4 ? REVEAL_RATINGS_LAYOUT.metricRowPaddingBottom : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: REVEAL_RATINGS_LAYOUT.labelMarginBottom, height: REVEAL_RATINGS_LAYOUT.labelHeight }}>
                     <p style={{ ...metricTextStyles.label, letterSpacing: '0.02em', textAlign: 'left', whiteSpace: 'nowrap' }}>{label}</p>
-                    <motion.span
+                    {!canAccessProUi && <motion.span
                       aria-hidden="true"
                       initial={ratingAnimation.lock.initial}
                       animate={ratingAnimation.lock.animate}
@@ -1579,7 +1608,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
                       style={{ display: 'inline-flex', width: 13, height: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                     >
                       <Lock size={13} style={{ ...metricTextStyles.lock, flexShrink: 0 }} />
-                    </motion.span>
+                    </motion.span>}
                   </div>
                   {cardShowsUnlockedRatings ? (
                     <motion.div aria-label={`${label}: ${value == null ? 'Not scored' : `${value.toFixed(1)} out of 10`}`} initial={ratingAnimation.number.initial} animate={ratingAnimation.number.animate} transition={ratingAnimation.number.transition} style={{ ...metricTextStyles.value, fontSize: value == null ? 20 : metricTextStyles.value.fontSize, marginBottom: REVEAL_RATINGS_LAYOUT.valueMarginBottom, fontVariantNumeric: 'tabular-nums', height: REVEAL_RATINGS_LAYOUT.valueHeight, display: 'flex', alignItems: 'center', textAlign: 'left', whiteSpace: 'nowrap' }}>
@@ -1605,17 +1634,17 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
             </div>
           </div>
           </div>
-          {unlocked && <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
-            {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} />}
-          </div>}
-          {unlocked && <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} />}
-          </div>}
+          <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
+            {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} compact={!unlocked} />}
+          </div>
+          <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={518} />}
+          </div>
           </motion.div>
         </motion.div>
 
         {/* CTAs */}
-        {unlocked && activeView !== 'compare' && !savedProgressCard && <motion.button
+        {unlocked && !savedProgressCard && <motion.button
           ref={saveProgressButtonRef}
           whileTap={{ scale: 0.97 }}
           onClick={saveToProgress}
@@ -1652,8 +1681,20 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && downloadError && <p role="alert" className="mt-3 text-center text-[12px]" style={{ color: RED }}>{downloadError}</p>}
-        {unlocked && <div role="tablist" aria-label="Results view" className="mt-2 flex shrink-0 justify-center">
-          {[['results', 'Show results'], ['photo', 'Show appearance breakdown'], ['compare', 'Show photo comparison']].map(([view, label]) => (
+        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 16 }}>
+          <motion.button
+            whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
+            onClick={() => { triggerHaptic(); onAscend() }}
+            disabled={isPurchasing}
+            className="w-full py-5 rounded-2xl font-body font-semibold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{ background: GRAD, color: '#0A0A0A', fontFamily: 'Inter, sans-serif', fontWeight: 600, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
+          >
+            {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
+            {isPurchasing ? 'Processing…' : 'Reveal Your Results'}
+          </motion.button>
+        </div>}
+        <div role="tablist" aria-label="Results view" className="mt-1 flex shrink-0 justify-center">
+          {[['results', 'Show results'], ['photo', 'Show pros and cons'], ['compare', 'Show comparison']].map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
               onClick={() => showView(view)} onKeyDown={event => {
                 if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -1666,35 +1707,21 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
             </button>
           ))}
-        </div>}
+        </div>
         {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
         {ratingsRecoveryError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{ratingsRecoveryError}</p>}
-        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 26 }}>
-          <motion.button
-            whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-            onClick={() => { triggerHaptic(); onAscend() }}
-            disabled={isPurchasing}
-            className="w-full py-5 rounded-2xl font-body font-semibold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
-            style={{ background: GRAD, color: '#0A0A0A', fontFamily: 'Inter, sans-serif', fontWeight: 600, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
-          >
-            {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
-            {isPurchasing ? 'Processing…' : 'Get Ascendus Max'}
-          </motion.button>
-
-          {developerUnlockAvailable && onDeveloperUnlock && (
-            <button
-              type="button"
-              onClick={onDeveloperUnlock}
-              className="w-full py-2 font-body text-[12px] text-center"
-              style={{ color: 'rgba(198,168,92,0.7)' }}
-            >
-              Developer unlock (local testing)
-            </button>
-          )}
-
-        </div>}
-
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
+        {!unlocked && developerUnlockAvailable && onDeveloperUnlock && (
+          <button
+            type="button"
+            onClick={onDeveloperUnlock}
+            className="w-full py-2 mt-5 font-body text-[12px] text-center"
+            style={{ color: 'rgba(198,168,92,0.7)' }}
+          >
+            Developer unlock (local testing)
+          </button>
+        )}
+
       </div>
     </motion.div>
   )
@@ -1718,6 +1745,10 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
   const developerUnlockAvailable = import.meta.env.DEV
+  const [developerResultsPreview, setDeveloperResultsPreview] = useState(() => {
+    if (!import.meta.env.DEV) return false
+    try { return localStorage.getItem(DEV_RESULTS_PREVIEW_KEY) === '1' } catch { return false }
+  })
   const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
   const completedDemoScan = completeDemoRevealRatings(currentScan)
   const displayedScan = pendingScan ? null : completedDemoScan
@@ -1744,15 +1775,17 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const hasUnlockedAccess = Boolean(isPremium || justUnlocked || currentScan?.resultsUnlocked)
+  const hasUnlockedAccess = Boolean(isPremium || justUnlocked || (developerUnlockAvailable && developerResultsPreview) || currentScan?.resultsUnlocked)
   const savedProgressResultPresentation = getSavedProgressResultPresentation({
     savedProgressCard: Boolean(progressCardReturnTo),
     isPremium,
     // resultsUnlocked means the scan is saved to Progress; it is not a paid
-    // entitlement. Only premium or this just-completed purchase clears blur.
-    hasUnlockedAccess: Boolean(isPremium || justUnlocked),
+    // entitlement. The local dev preview may reveal this UI without changing
+    // the real subscription state.
+    hasUnlockedAccess: Boolean(isPremium || justUnlocked || (developerUnlockAvailable && developerResultsPreview)),
   })
-  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
+  const previewResultsUnlocked = developerUnlockAvailable && developerResultsPreview
+  const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked || previewResultsUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
       setIsPremium(true)
@@ -1774,6 +1807,8 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   function handleDeveloperUnlock() {
     if (!isDeveloperUnlockAvailable(import.meta.env.DEV) || !currentScan) return
     setRevealRun(run => run + 1)
+    try { localStorage.setItem(DEV_RESULTS_PREVIEW_KEY, '1') } catch {}
+    setDeveloperResultsPreview(true)
     setJustUnlocked(true)
     setShowPaywall(false)
     setShowUnlockSlideshow(false)
@@ -1850,12 +1885,12 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
           <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
         </div>
       ) : hasUnlockedAccess ? (
-        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium || (developerUnlockAvailable && justUnlocked)} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
+        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium || previewResultsUnlocked || (developerUnlockAvailable && justUnlocked)} hideNavigationButton={previewResultsUnlocked && !isPremium && !progressCardReturnTo} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
       ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}
           savedProgressCard={Boolean(progressCardReturnTo)}
-          onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })}
+          onClose={() => navigate('/unlock?paywall=1&trial=1', { replace: true })}
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
