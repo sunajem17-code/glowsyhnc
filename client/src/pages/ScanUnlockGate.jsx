@@ -29,6 +29,7 @@ import { isDeveloperUnlockAvailable } from '../utils/developerUnlockPreview'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
+const COMPARISON_CARD_HEIGHT = 578
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -1370,6 +1371,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
 
   function showView(view) {
     if (view === activeView) return
+    triggerHaptic()
     setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
     setActiveView(view)
   }
@@ -1574,7 +1576,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         </div>}
       </>}
         {/* Face circle + card */}
-        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? 498 : unlocked ? undefined : 416, flex: activeView === 'compare' ? '0 0 498px' : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? COMPARISON_CARD_HEIGHT : unlocked ? undefined : 416, flex: activeView === 'compare' ? `0 0 ${COMPARISON_CARD_HEIGHT}px` : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
           onTouchStart={handleResultsTouchStart}
           onTouchEnd={handleResultsTouchEnd}
           onTouchCancel={() => { resultsSwipeStartRef.current = null }}
@@ -1639,7 +1641,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
             {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} compact={!unlocked} />}
           </div>
           <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={498} />}
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={COMPARISON_CARD_HEIGHT} />}
           </div>
           </motion.div>
         </motion.div>
@@ -1783,6 +1785,17 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     hasUnlockedAccess: Boolean(isPremium || justUnlocked || previewResultsUnlocked),
   })
   const revealView = getRevealView({ hasScan: Boolean(currentScan), pending: pendingScan || !waitingFinished, premium: isPremium || justUnlocked || previewResultsUnlocked, paywallRequested: isPaywallRedirect || showPaywall })
+
+  useEffect(() => {
+    if (revealView !== 'reveal' || !currentScan?.id || progressCardReturnTo) return
+    const hapticKey = `asc_scan_results_haptic:${currentScan.id}`
+    try {
+      if (sessionStorage.getItem(hapticKey)) return
+      sessionStorage.setItem(hapticKey, '1')
+    } catch {}
+    triggerHaptic()
+  }, [revealView, currentScan?.id, progressCardReturnTo])
+
   function handleUnlockSuccess() {
     if (isCurrentAssessment(currentScan)) {
       setIsPremium(true)

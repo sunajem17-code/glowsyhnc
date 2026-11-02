@@ -2,6 +2,7 @@ import { balancedPhysiqueAreas } from '../utils/physiqueBalance'
 import { withoutRatings } from '../utils/prosConsText'
 import { useState } from 'react'
 import { getPhysiqueMetricScore } from '../utils/physiqueResults'
+import { triggerHaptic } from '../utils/haptics'
 import './AppearanceBreakdown.css'
 
 function getPhysiqueAnalysis(scan) {
@@ -143,6 +144,11 @@ function getSavedFindings(points, page, scan, usedMetrics) {
 
 export default function PhysiqueBreakdown({ scan, blurInfo = false, compact = false }) {
   const [page, setPage] = useState('pros')
+  const selectPage = nextPage => {
+    if (nextPage === page) return
+    triggerHaptic()
+    setPage(nextPage)
+  }
   const analysis = getPhysiqueAnalysis(scan)
   const allPoints = page === 'pros' ? (analysis.physique_strengths ?? analysis.strengths ?? analysis.keyStrengths) : (analysis.physique_improvements ?? analysis.improvements ?? analysis.keyWeaknesses)
   const metricPoints = balancedPhysiqueAreas(scan)[page]
@@ -175,8 +181,8 @@ export default function PhysiqueBreakdown({ scan, blurInfo = false, compact = fa
 
   return <div className={`appearance-dashboard physique-dashboard${compact ? ' appearance-dashboard--compact' : ''}`}>
     <div role="tablist" aria-label="Physique points" className="appearance-page-switch">
-      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => setPage('pros')}>Pros</button>
-      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => setPage('cons')}>Cons</button>
+      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="physique-points-panel" onClick={() => selectPage('pros')}>Pros</button>
+      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="physique-points-panel" onClick={() => selectPage('cons')}>Cons</button>
     </div>
     <section id="physique-points-panel" role="tabpanel" aria-label={title} className="appearance-points">
       <h2>{title}</h2>

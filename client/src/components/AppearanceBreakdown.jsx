@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import useStore from '../store/useStore'
+import { triggerHaptic } from '../utils/haptics'
 import { appearanceScoresForScan, getCurrentAppearanceAnalysis, isCurrentAppearanceAnalysis, prepareAppearancePhoto } from '../utils/appearanceAnalysis'
 import './AppearanceBreakdown.css'
 
@@ -52,6 +53,11 @@ export default function AppearanceBreakdown({
   const [internalPage, setInternalPage] = useState('pros')
   const page = controlledPage ?? internalPage
   const changePage = onPageChange ?? setInternalPage
+  const selectPage = nextPage => {
+    if (nextPage === page) return
+    triggerHaptic()
+    changePage(nextPage)
+  }
 
   useEffect(() => {
     let active = true
@@ -88,19 +94,18 @@ export default function AppearanceBreakdown({
   }, [analysis, pros.length, focusAreas.length])
   return <div className={`appearance-dashboard${embedded ? ' appearance-dashboard--embedded' : ''}${compact ? ' appearance-dashboard--compact' : ''}`}>
     {!embedded && <div role="tablist" aria-label="Appearance points" className="appearance-page-switch">
-      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="appearance-points-panel" onClick={() => changePage('pros')}>Pros</button>
-      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="appearance-points-panel" onClick={() => changePage('cons')}>Cons</button>
+      <button type="button" role="tab" aria-selected={page === 'pros'} aria-controls="appearance-points-panel" onClick={() => selectPage('pros')}>Pros</button>
+      <button type="button" role="tab" aria-selected={page === 'cons'} aria-controls="appearance-points-panel" onClick={() => selectPage('cons')}>Cons</button>
     </div>}
     <section id={embedded ? undefined : 'appearance-points-panel'} role="tabpanel" aria-label={pageTitle} className={`appearance-points${embedded ? ' appearance-points--embedded' : ''}`}>
       {!embedded && <h2>{pageTitle}</h2>}
       {loading && !analysis && <div className="appearance-state" role="status"><span className="appearance-loading-line" /><p>Finding your points…</p></div>}
       {error && <div className="appearance-state appearance-error" role="alert"><p>{error}</p>{scanId ? <button type="button" onClick={() => setRetry(value => value + 1)}>Try Again</button> : <button type="button" onClick={() => navigate('/scan')}>Take a New Scan<ChevronRight size={15} /></button>}</div>}
       {analysis && <ul
-        className="appearance-points-list"
+        className={`appearance-points-list${isPremium ? '' : ' appearance-points-list--locked'}`}
         tabIndex={isPremium ? 0 : -1}
         aria-label={`${pageTitle} details`}
         aria-hidden={!isPremium}
-        style={!isPremium ? { filter: 'blur(7px)', userSelect: 'none' } : undefined}
       >{points.length ? points.map((item, index) => {
         const pointTitle = item.title?.trim() || item.observation?.trim()
         const explanationParts = [item.observation?.trim(), item.significance?.trim()]

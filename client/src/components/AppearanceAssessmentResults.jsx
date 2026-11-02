@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
+import { triggerHaptic } from '../utils/haptics'
 import { assessmentPresentation, formatAssessmentRange } from '../utils/assessment'
 import AppearanceBreakdown from './AppearanceBreakdown'
 import './AppearanceAssessmentResults.css'
@@ -21,6 +22,15 @@ export default function AppearanceAssessmentResults({ scan }) {
   const navigate = useNavigate()
   const isPremium = useStore(state => state.isPremium)
   const [page, setPage] = useState('pros')
+  useEffect(() => {
+    if (!scan?.id) return
+    const hapticKey = `asc_scan_results_haptic:${scan.id}`
+    try {
+      if (sessionStorage.getItem(hapticKey)) return
+      sessionStorage.setItem(hapticKey, '1')
+    } catch {}
+    triggerHaptic()
+  }, [scan?.id])
   const assessment = scan?.aiScore?.assessment ?? {}
   const withheld = assessment.scoreRange === null
   const scoreVisible = isPremium || withheld

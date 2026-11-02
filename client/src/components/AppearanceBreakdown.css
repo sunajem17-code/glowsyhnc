@@ -47,6 +47,7 @@
   min-width:0;
   flex:0 0 470px;
   flex-direction:column;
+  width:100%;
   height:470px;
   min-height:470px;
   overflow:hidden;
@@ -88,6 +89,11 @@
   scroll-behavior:auto;
   scrollbar-width:thin;
   scrollbar-color:#4a4a4a transparent
+}
+.appearance-points-list--locked {
+  filter:blur(7px);
+  user-select:none;
+  pointer-events:none
 }
 .appearance-dashboard:not(.appearance-dashboard--embedded) .appearance-points-list {
   flex:0 0 auto;
@@ -244,14 +250,14 @@
    the scorecard reserves above its portrait. Their combined slot stays the
    same height as the scorecard's margin + card, keeping the CTA and dots fixed. */
 .appearance-dashboard--compact {
-  flex: 0 0 518px;
-  height: 518px;
-  min-height: 0;
+  flex: 0 0 416px;
+  height: 416px;
+  min-height: 416px;
   overflow: hidden;
 }
 .appearance-dashboard--compact .appearance-points {
-  flex: 0 0 470px;
-  height: 470px;
-  min-height: 0;
-  max-height: 470px;
+  flex: 0 0 368px;
+  height: 368px;
+  min-height: 368px;
+  max-height: 368px;
 }

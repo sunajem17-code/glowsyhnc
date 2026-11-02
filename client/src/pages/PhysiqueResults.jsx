@@ -36,7 +36,7 @@ function PhysiqueResultsNavigation({ activeView, showView }) {
         ['compare', 'Show photo comparison'],
       ].map(([view, label]) => (
         <button key={view} type="button" role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}
-          onClick={() => { triggerHaptic(); showView(view) }} onKeyDown={event => {
+          onClick={() => showView(view)} onKeyDown={event => {
             if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
               event.preventDefault()
               const direction = event.key === 'ArrowRight' ? 1 : -1
@@ -296,6 +296,7 @@ export default function PhysiqueResults() {
 
   function showView(view) {
     if (view === activeView) return
+    triggerHaptic()
     setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
     setActiveView(view)
   }
