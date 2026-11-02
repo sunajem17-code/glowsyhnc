@@ -31,6 +31,13 @@
               "locale" : "en_US"
             }
           ],
+          "introductoryOffer" : {
+            "displayPrice" : "0.00",
+            "internalID" : "ascendus_monthly_trial_3days",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
           "productID" : "com.ascendus.app.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Ascendus Pro Monthly",

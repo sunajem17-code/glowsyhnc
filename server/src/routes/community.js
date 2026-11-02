@@ -5,7 +5,7 @@ const db = require('../db')
 // JWT), which silently broke every community action for demo sessions.
 // verifyToken accepts demo-token as a rate-limited guest (req.userId='demo'),
 // the same pattern already used for the Claude-gated routes.
-const { verifyToken: authMiddleware, resolvePro } = require('../middleware/claudeGate')
+const { verifyToken: authMiddleware, requirePro } = require('../middleware/claudeGate')
 const { communityScanScores } = require('../lib/communityScanScores')
 const { ownedCoachScan } = require('../lib/coachScanContext')
 const { createLimiter } = require('../middleware/ratelimit')
@@ -38,7 +38,7 @@ router.get('/feed', authMiddleware, (req, res) => {
 })
 
 // ── POST /api/community/post ─────────────────────────────────────────────────
-router.post('/post', authMiddleware, resolvePro, async (req, res) => {
+router.post('/post', authMiddleware, requirePro, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign up for a free account to share with the community.' })
   const allowed = await checkPostLimit(req.userId)
   if (!allowed) return res.status(429).json({ error: 'Slow down — too many posts today.' })

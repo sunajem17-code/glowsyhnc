@@ -6,6 +6,7 @@ import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
 import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
 import { trialRenewalText } from '../utils/scanTrial'
+import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
 import { triggerHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
@@ -251,16 +252,24 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
   const [checking, setChecking] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
   const [trialError, setTrialError] = useState('')
+  const [eligibilityAttempt, setEligibilityAttempt] = useState(0)
   const purchaseLock = useRef(false)
   const completedPurchase = useRef(null)
   const busy = loading || purchasing
   useEffect(() => {
     let active = true
-    getEligibleScanTrial().then(pkg => { if (active) setTrial(pkg) })
-      .catch(() => { if (active) setTrialError('Unable to check trial eligibility Please try again later') })
+    setChecking(true)
+    setTrialError('')
+    setTrial(null)
+    withDeadline(getEligibleScanTrial(), 15000, 'Trial eligibility check timed out. Please try again.').then(pkg => {
+      if (!active) return
+      setTrial(pkg)
+      if (!pkg) setTrialError('A 3-day free trial is not available for this account right now. Check again or close this offer.')
+    })
+      .catch(err => { if (active) setTrialError(err?.message || 'Unable to check trial eligibility. Please try again.') })
       .finally(() => { if (active) setChecking(false) })
     return () => { active = false }
-  }, [])
+  }, [eligibilityAttempt])
   async function startTrial() {
     if (!trial || purchaseLock.current || loading) return
     purchaseLock.current = true
@@ -323,14 +332,14 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </div>
 
         <p className="font-heading font-bold text-[20px] text-white leading-tight tracking-[-0.025em] whitespace-nowrap mb-2.5">
-          Try It First, We'll Impress You
+          {!checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          3 DAYS FREE
+          {trial || checking ? '3 DAYS FREE' : 'TRIAL UNAVAILABLE'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking your trial eligibility…' : '3 days on us • No payment today • Cancel anytime'}
+          {checking ? 'Checking your trial eligibility…' : trial ? '3 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
@@ -345,13 +354,13 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         )}
 
         <button
-          onClick={startTrial}
-          disabled={busy || checking || !trial}
+          onClick={trial ? startTrial : () => setEligibilityAttempt(value => value + 1)}
+          disabled={busy || checking}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : 'Start 3 days free'}
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 3 days free' : 'Check availability again'}
         </button>
       </motion.div>
     </motion.div>

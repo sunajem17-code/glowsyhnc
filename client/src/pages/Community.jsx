@@ -221,6 +221,7 @@ function CommentsSheet({ post, onCommentAdded, displayName, sectionRef }) {
 
 // ── Share modal ───────────────────────────────────────────────────────────────
 function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto }) {
+  const navigate = useNavigate()
   const isPremium = useStore(state => state.isPremium)
   const faceScans = [scanToShare, ...scans]
     .filter(scan => scan && !isPhysiqueProgressScan(scan))
@@ -286,6 +287,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
   }, [])
 
   async function submit() {
+    if (!isPremium) { navigate('/unlock?paywall=1'); return }
     if (postType === 'glow-up' && !latestScan) { setErr('You need a scan first.'); return }
     if (postType === 'glow-up' && beforePhoto && afterPhoto && (
       beforePhoto.timestamp == null || afterPhoto.timestamp == null || beforePhoto.timestamp >= afterPhoto.timestamp
@@ -364,6 +366,7 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
         {/* Scrollable content */}
         <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
 
+          <fieldset disabled={!isPremium} aria-hidden={!isPremium} className="m-0 min-w-0 space-y-4 border-0 p-0" style={!isPremium ? { filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
           {postType === 'glow-up' ? (
             <>
               {/* Before / After photos */}
@@ -431,17 +434,19 @@ function ShareModal({ onClose, onPosted, user, scans, scanToShare, initialPhoto 
             />
           </div>
 
+          </fieldset>
+          {!isPremium && <p className="text-center font-body text-sm text-secondary">Get Ascendus Max to unlock Community posting.</p>}
           {err && <p className="text-[12px] font-body" style={{ color: '#EF4444' }}>{err}</p>}
 
           <div className="pb-4">
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={() => { triggerHaptic(); submit() }}
+              onClick={() => { triggerHaptic(); if (isPremium) submit(); else navigate('/unlock?paywall=1') }}
               disabled={posting}
               className="w-full rounded-2xl font-heading font-bold text-[17px] flex items-center justify-center gap-2 disabled:opacity-50"
               style={{ minHeight: 66, padding: '0 16px', borderRadius: 16, background: GOLD_GRADIENT, color: '#0A0A0A', boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
             >
-              {posting
+              {!isPremium ? 'Unlock Posting with Max' : posting
                 ? <><Loader2 size={15} className="animate-spin" /> Posting…</>
                 : postType === 'rate-me' ? 'Post for Rating' : postType === 'question' ? 'Post Question' : 'Post Glow-Up'
               }

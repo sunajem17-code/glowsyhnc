@@ -15,6 +15,12 @@ function isFreeTrialDuration(product, expectedDays) {
 export const isSevenDayFreeTrial = product => isFreeTrialDuration(product, 7)
 export const isThreeDayFreeTrial = product => isFreeTrialDuration(product, 3)
 
+export function eligibleThreeDayTrial(packages, eligibility, productId = null) {
+  return packages.find(pkg => (!productId || pkg.product?.identifier === productId)
+    && isThreeDayFreeTrial(pkg.product)
+    && eligibility[pkg.product.identifier]?.status === 2) || null
+}
+
 // Exit-intent trial renews on the existing monthly product only.
 export function isMonthlyExitTrial(product) {
   return product?.identifier === 'com.ascendus.app.monthly'

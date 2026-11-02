@@ -1,6 +1,6 @@
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isWeeklyExitTrial } from './scanTrial'
+import { isThreeDayFreeTrial, eligibleThreeDayTrial } from './scanTrial'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -12,7 +12,7 @@ let _initialized = false
 
 export const isNative = () => Capacitor.isNativePlatform()
 
-export async function getEligibleScanTrial() {
+export async function getEligibleScanTrial(productId = null) {
   if (!isNative()) return null
   await initRevenueCat()
   const offerings = await Purchases.getOfferings()
@@ -22,16 +22,16 @@ export async function getEligibleScanTrial() {
       .map(pkg => [pkg.product?.identifier, pkg])
       .filter(([identifier]) => identifier)
   ).values()]
-  const candidates = packages.filter(p => isWeeklyExitTrial(p.product))
+  const candidates = packages.filter(p => isThreeDayFreeTrial(p.product))
   if (!candidates.length) return null
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })
-  return candidates.find(p => eligibility[p.product.identifier]?.status === 2) || null
+  return eligibleThreeDayTrial(candidates, eligibility, productId)
 }
 
 export async function purchaseScanTrial(productId) {
-  const pkg = await getEligibleScanTrial()
+  const pkg = await getEligibleScanTrial(productId)
   if (!pkg || pkg.product.identifier !== productId) throw new Error('This free trial is no longer available.')
   try {
     const result = await Purchases.purchasePackage({ aPackage: pkg })
