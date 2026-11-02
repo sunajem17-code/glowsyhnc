@@ -424,7 +424,7 @@ export default function AICoach() {
 
       {/* Input bar — disabled state if no scan */}
       {serverScan === null ? (
-        <div className="px-4 py-3 flex-shrink-0" style={{ background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="px-4 py-3 flex-shrink-0" style={{ background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 8 }}>
           <div className="rounded-2xl px-4 py-3 font-body text-[13px] text-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
             Adonis is ready
           </div>
@@ -441,7 +441,7 @@ export default function AICoach() {
           </button>
         </div>
       ) : messages.some(message => message.paywall) ? (
-        <div className="px-4 py-4 flex-shrink-0 text-center font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)', background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="px-4 py-4 flex-shrink-0 text-center font-body text-[12px]" style={{ color: 'rgba(255,255,255,0.5)', background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 8 }}>
           Your chat is ready when you’re a member.
         </div>
       ) : (
@@ -450,7 +450,7 @@ export default function AICoach() {
           style={{
             background: 'var(--card)',
             borderTop: '1px solid rgba(255,255,255,0.06)',
-            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            paddingBottom: 8,
           }}
         >
           <div

@@ -1,5 +1,5 @@
 import { API_BASE } from '../utils/backend'
-import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, normalizeOnboardingCompletion, onboardingOwner, startingPointCompletionKey } from '../utils/onboardingStartup.js'
+import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, isCompletedScan, normalizeOnboardingCompletion, onboardingOwner, startingPointCompletionKey } from '../utils/onboardingStartup.js'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
@@ -53,10 +53,12 @@ const useStore = create(
           const nextOwner = onboardingOwner(user)
           const onboardingCompletedByUser = { ...state.onboardingCompletedByUser }
           const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
+          const completedScanByUser = { ...state.completedScanByUser }
           // A guest can finish onboarding before creating or linking an account.
           // Carry that device session's completion to the upgraded account so a
           // relaunch doesn't route the now-registered user back through setup.
           if (state.isGuest && previousOwner !== nextOwner) {
+            if (completedScanByUser[previousOwner] === true) completedScanByUser[nextOwner] = true
             if (onboardingCompletedByUser[previousOwner] === true) onboardingCompletedByUser[nextOwner] = true
             if (startingPointCompletedByUser[previousOwner] === true) startingPointCompletedByUser[nextOwner] = true
           }
@@ -64,7 +66,8 @@ const useStore = create(
             user,
             onboardingCompletedByUser,
             startingPointCompletedByUser,
-            hasOnboarded: hasCompletedOnboarding({ ...state, user, onboardingCompletedByUser }),
+            completedScanByUser,
+            hasOnboarded: hasCompletedOnboarding({ ...state, user, onboardingCompletedByUser, completedScanByUser }),
             token,
             upgradeWelcomePending: false,
             isAuthenticated: true,
@@ -143,6 +146,10 @@ const useStore = create(
       // that lives server-side (the `scans` table in Supabase) if it's ever needed.
       addScan: (scan) => set(state => ({
         scans: [scan, ...state.scans].slice(0, 100),
+        ...(state.user?.id != null && isCompletedScan(scan) ? {
+          completedScanByUser: { ...state.completedScanByUser, [onboardingOwner(state.user)]: true },
+          hasOnboarded: true,
+        } : {}),
       })),
       setCurrentScan: (scan) => set({ currentScan: scan }),
       setScans: (scans) => set({ scans }),
@@ -220,6 +227,7 @@ const useStore = create(
       onboardingWasReset: false,
       onboardingHydrated: false,
       onboardingCompletedByUser: {},
+      completedScanByUser: {},
       startingPointCompletedByUser: {},
       completeStartingPoint: () => set(state => ({
         startingPointCompletedByUser: {
@@ -231,9 +239,11 @@ const useStore = create(
         const owner = onboardingOwner(state.user)
         const onboardingCompletedByUser = { ...state.onboardingCompletedByUser }
         const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
+        const completedScanByUser = { ...state.completedScanByUser }
         delete onboardingCompletedByUser[owner]
         delete startingPointCompletedByUser[owner]
-        return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser, startingPointCompletedByUser }
+        delete completedScanByUser[owner]
+        return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser, startingPointCompletedByUser, completedScanByUser }
       }),
       setHasOnboarded: (completedStep) => {
         // The onboarding flow passes its final step. PaymentSuccess can also
@@ -255,7 +265,9 @@ const useStore = create(
         set(state => {
           const records = { ...state.onboardingCompletedByUser }
           delete records[onboardingOwner(state.user)]
-          return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser: records }
+          const completedScanByUser = { ...state.completedScanByUser }
+          delete completedScanByUser[onboardingOwner(state.user)]
+          return { hasOnboarded: false, onboardingWasReset: true, onboardingCompletedByUser: records, completedScanByUser }
         })
       },
 
@@ -559,6 +571,7 @@ const useStore = create(
         hasOnboarded: state.hasOnboarded === true || hasCompletedOnboarding(state),
         onboardingWasReset: state.onboardingWasReset === true,
         onboardingCompletedByUser: state.onboardingCompletedByUser,
+        completedScanByUser: state.completedScanByUser,
         startingPointCompletedByUser: state.startingPointCompletedByUser,
         legalConsented: state.legalConsented,
         ageConfirmed: state.ageConfirmed,

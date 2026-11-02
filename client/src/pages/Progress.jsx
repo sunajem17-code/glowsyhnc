@@ -430,7 +430,7 @@ export default function Progress() {
       </div>
 
       {/* Keep the composer visible after the upgrade prompt so users can ask another question. */}
-      <div className="flex-shrink-0 px-4 pb-3" style={{ paddingBottom: 'calc(var(--coach-bottom-inset, env(safe-area-inset-bottom, 0px)) + 12px)' }}>
+      <div className="flex-shrink-0 px-4 pb-3" style={{ paddingBottom: 8 }}>
         <div
           className="flex items-center gap-3 px-4 rounded-2xl"
           style={{

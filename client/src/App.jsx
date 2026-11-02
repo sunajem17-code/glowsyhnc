@@ -1,6 +1,6 @@
 import ScreenLoading from './components/ScreenLoading'
 import { loadScreen } from './utils/screenLoader'
-import { hasCompletedOnboarding, onboardingStartup } from './utils/onboardingStartup.js'
+import { hasCompletedOnboarding, hasCompletedScan, onboardingStartup } from './utils/onboardingStartup.js'
 import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
 import NotificationPrompt from './components/NotificationPrompt'
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
@@ -87,6 +87,7 @@ function PostAuthLanding() {
 export default function App() {
   const theme               = useStore(s => s.theme)
   const hasOnboarded        = useStore(hasCompletedOnboarding)
+  const returningScanner    = useStore(hasCompletedScan)
   const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const userId              = useStore(s => s.user?.id)
@@ -169,7 +170,7 @@ export default function App() {
   // ── GATE 0: Cinematic intro — plays once per session for everyone ──
   const startupSplash = getStartupSplash({ cinematicDone, splashDone })
 
-  if (!resetRoute && !hasOnboarded && startupSplash === 'cinematic') {
+  if (!resetRoute && !hasOnboarded && !returningScanner && startupSplash === 'cinematic') {
     return (
       <CinematicIntro onDone={() => {
         localStorage.setItem('asc_cinematic_shown', '1')
@@ -179,7 +180,7 @@ export default function App() {
   }
 
   // ── GATE 1: Splash ───────────────────────────────────────────────
-  if (!resetRoute && !hasOnboarded && startupSplash === 'welcome') {
+  if (!resetRoute && !hasOnboarded && !returningScanner && startupSplash === 'welcome') {
     return <Splash onDone={handleSplashDone} />
   }
 
