@@ -1147,6 +1147,9 @@ router.post('/score', verifyToken, resolvePro, scanLimit, claudeLimit, async (re
     res.json(await finishScanWithStreak(completedScanId, req.userId, retainStableFindingLanguage(result, previousResult, scanBenchmark, completedScanId)))
   } catch (err) {
     try { coachScans.failScan(completedScanId, req.userId) } catch { /* retain original analysis error */ }
+    if (err.code === 'scan_save_failed') {
+      return res.status(503).json({ error: 'scan_save_failed', message: err.message })
+    }
     if (err.code === 'monthly_ai_budget_reached' || err.code === 'monthly_ai_budget_unavailable') {
       return res.status(err.status || 503).json({ error: err.code })
     }
