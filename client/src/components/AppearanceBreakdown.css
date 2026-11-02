@@ -246,18 +246,23 @@
 }
 .physique-dashboard .appearance-points-list { flex: 1 1 auto; }
 
-/* Locked breakdowns start directly below the subtitle and use the space that
-   the scorecard reserves above its portrait. Their combined slot stays the
-   same height as the scorecard's margin + card, keeping the CTA and dots fixed. */
+/* Every locked slide occupies the scorecard's portrait + card frame. */
 .appearance-dashboard--compact {
-  flex: 0 0 416px;
-  height: 416px;
-  min-height: 416px;
-  overflow: hidden;
+  box-sizing:border-box;
+  flex:0 0 var(--locked-slide-height, 518px);
+  height:var(--locked-slide-height, 518px);
+  min-height:0;
+  padding-top:calc(var(--locked-card-top, 102px) - 48px);
+  overflow:hidden;
 }
 .appearance-dashboard--compact .appearance-points {
-  flex: 0 0 368px;
-  height: 368px;
-  min-height: 368px;
-  max-height: 368px;
+  flex:0 0 var(--locked-card-height, 416px);
+  height:var(--locked-card-height, 416px);
+  min-height:0;
+  max-height:var(--locked-card-height, 416px);
+  overflow:hidden;
+}
+.appearance-dashboard--compact .appearance-points-list {
+  flex:1 1 auto;
+  overflow-y:auto;
 }

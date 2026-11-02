@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { isSevenDayFreeTrial, trialRenewalText, isMonthlyExitTrial, eligibleThreeDayTrial } from './scanTrial.js'
+import { isSevenDayFreeTrial, trialRenewalText, isMonthlyExitTrial, eligibleThreeDayTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial.js'
 const product = { priceString: '$9.99', subscriptionPeriod: 'P1M', introPrice: { price: 0, cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } }
 test('only a zero-cost seven-day intro can be advertised as a week free', () => {
   assert.equal(isSevenDayFreeTrial(product), true)
@@ -27,6 +27,9 @@ test('exit trial accepts only the monthly product, never annual or another SKU',
 test('three-day offer accepts a configured eligible product with disclosed renewal terms', () => {
   const monthly = { product: { ...product, identifier: 'monthly', introPrice: { price: 0, cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 3 } } }
   const weekly = { product: { ...monthly.product, identifier: 'weekly', subscriptionPeriod: 'P1W' } }
+  const annual = { product: { ...monthly.product, identifier: 'com.ascendus.app.yearly', subscriptionPeriod: 'P1Y' } }
+  assert.equal(eligibleThreeDayTrial([monthly, annual], { monthly: { status: 3 }, 'com.ascendus.app.yearly': { status: 2 } }), annual)
+  assert.match(trialRenewalText(annual.product), /per year/)
   assert.equal(eligibleThreeDayTrial([weekly, monthly], { weekly: { status: 1 }, monthly: { status: 2 } }), monthly)
   assert.equal(eligibleThreeDayTrial([weekly, monthly], { weekly: { status: 2 }, monthly: { status: 2 } }, 'monthly'), monthly)
 })
@@ -40,11 +43,26 @@ test('unknown eligibility and paid intro offers never become a free trial', () =
 
 test('the active Xcode StoreKit configuration contains the advertised three-day trial', () => {
   const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
-  const monthly = config.subscriptionGroups.flatMap(group => group.subscriptions).find(product => product.productID === 'com.ascendus.app.monthly')
-  assert.equal(monthly.introductoryOffer.paymentMode, 'free')
-  assert.equal(monthly.introductoryOffer.subscriptionPeriod, 'P3D')
-  assert.equal(monthly.introductoryOffer.numberOfPeriods, 1)
-  assert.equal(monthly.recurringSubscriptionPeriod, 'P1M')
+  const subscriptions = config.subscriptionGroups.flatMap(group => group.subscriptions)
+  const yearly = subscriptions.find(product => product.productID === 'com.ascendus.app.yearly')
+  assert.equal(subscriptions.find(product => product.productID === 'com.ascendus.app.monthly').introductoryOffer, null)
+  assert.equal(yearly.introductoryOffer.paymentMode, 'free')
+  assert.equal(yearly.introductoryOffer.subscriptionPeriod, 'P3D')
+  assert.equal(yearly.introductoryOffer.numberOfPeriods, 1)
+  assert.equal(yearly.recurringSubscriptionPeriod, 'P1Y')
   const scheme = readFileSync(new URL('../../ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme', import.meta.url), 'utf8')
-  assert.match(scheme, /storeKitConfigurationFileReference\s*=\s*"\.\.\/App\/Ascendus\.storekit"/)
+  assert.match(scheme, /<StoreKitConfigurationFileReference\s+identifier\s*=\s*"\.\.\/\.\.\/App\/Ascendus\.storekit"/)
+  assert.doesNotMatch(scheme, /\sstoreKitConfigurationFileReference\s*=/)
+})
+
+test('exit offer never substitutes the standard yearly product or a seven-day trial', () => {
+  const annual = { product: { ...product, identifier: 'com.ascendus.app.yearly', subscriptionPeriod: 'P1Y', introPrice: { price: 0, cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 3 } } }
+  const exit = { product: { ...annual.product, identifier: EXIT_TRIAL_PRODUCT_ID } }
+  const eligibility = { [annual.product.identifier]: { status: 2 }, [EXIT_TRIAL_PRODUCT_ID]: { status: 2 } }
+  assert.equal(eligibleExitTrial([annual], eligibility), null)
+  assert.equal(eligibleExitTrial([annual, exit], eligibility), exit)
+  assert.equal(eligibleExitTrial([{ product: { ...exit.product, introPrice: product.introPrice } }], eligibility), null)
+  const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
+  const localExit = config.subscriptionGroups.flatMap(group => group.subscriptions).find(p => p.productID === EXIT_TRIAL_PRODUCT_ID)
+  assert.equal(localExit.introductoryOffer.subscriptionPeriod, 'P3D')
 })

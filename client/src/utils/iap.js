@@ -1,6 +1,7 @@
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isThreeDayFreeTrial, eligibleThreeDayTrial } from './scanTrial'
+import { isThreeDayFreeTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial'
+import { createRevenueCatInitializer, validRevenueCatUserId } from './revenueCatIdentity'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -8,12 +9,36 @@ const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
 // Entitlement identifier — must match exactly what's in RevenueCat dashboard
 const ENTITLEMENT_ID = 'Ascendus Pro'
 
-let _initialized = false
+let legacyGuestRepair = null
+const initializeIdentity = createRevenueCatInitializer({
+  purchases: Purchases,
+  apiKey: REVENUECAT_API_KEY,
+  resolveUserId: async requestedId => {
+    const { default: useStore } = await import('../store/useStore')
+    let state = useStore.getState()
+    if (state.token === 'demo-token' && ['guest', 'demo'].includes(state.user?.id)) {
+      // Old onboarding builds persisted a shared fake login. Replace it with
+      // a server-issued guest account before contacting RevenueCat.
+      if (!legacyGuestRepair) legacyGuestRepair = import('./api')
+        .then(({ api }) => api.auth.guest())
+        .then(({ userId, token }) => {
+          if (!validRevenueCatUserId(userId) || !token) throw new Error('Unable to create your subscription account. Please sign in again.')
+          const latest = useStore.getState()
+          if (latest.token === 'demo-token' && ['guest', 'demo'].includes(latest.user?.id)) latest.setGuestSession(userId, token)
+        }).finally(() => { legacyGuestRepair = null })
+      await legacyGuestRepair
+      state = useStore.getState()
+      return state.user?.id ?? null
+    }
+    return requestedId ?? state.user?.id ?? null
+  },
+})
 
 export const isNative = () => Capacitor.isNativePlatform()
 
-export async function getEligibleScanTrial(productId = null) {
-  if (!isNative()) return null
+export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
+  if (!isNative()) throw new Error('Start your free trial from the iPhone app.')
+  if (productId !== EXIT_TRIAL_PRODUCT_ID) throw new Error('This exit offer is no longer available.')
   await initRevenueCat()
   const offerings = await Purchases.getOfferings()
   const availableOfferings = [offerings.current, ...Object.values(offerings.all || {})].filter(Boolean)
@@ -22,12 +47,17 @@ export async function getEligibleScanTrial(productId = null) {
       .map(pkg => [pkg.product?.identifier, pkg])
       .filter(([identifier]) => identifier)
   ).values()]
-  const candidates = packages.filter(p => isThreeDayFreeTrial(p.product))
-  if (!candidates.length) return null
+  const candidates = packages.filter(p => p.product?.identifier === productId && isThreeDayFreeTrial(p.product))
+  if (!candidates.length) throw new Error('The exit offer is not configured with a 3-day trial in the store yet. Please try again later.')
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })
-  return eligibleThreeDayTrial(candidates, eligibility, productId)
+  const eligible = eligibleExitTrial(candidates, eligibility)
+  if (eligible) return eligible
+  const selected = productId ? candidates.filter(pkg => pkg.product.identifier === productId) : candidates
+  if (!selected.length) throw new Error('This trial offer is no longer available.')
+  if (selected.every(pkg => eligibility[pkg.product.identifier]?.status === 1)) return null
+  throw new Error('Apple could not confirm this trial offer. Please check again in a moment.')
 }
 
 export async function purchaseScanTrial(productId) {
@@ -45,19 +75,12 @@ export async function purchaseScanTrial(productId) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 export async function initRevenueCat(userId) {
   if (!isNative()) return
-  if (_initialized && !userId) return
   try {
     await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG })
-    if (!_initialized) {
-      await Purchases.configure({ apiKey: REVENUECAT_API_KEY })
-      _initialized = true
-    }
-    // Link purchases to the logged-in user so they appear in RC dashboard
-    if (userId) {
-      await Purchases.logIn({ appUserID: userId })
-    }
+    await initializeIdentity(userId)
   } catch (e) {
-    console.error('[RC] initRevenueCat failed:', e?.code, e?.message, e)
+    console.error('[RC] initRevenueCat failed:', e?.code, e?.message)
+    throw e
   }
 }
 

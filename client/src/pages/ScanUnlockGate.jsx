@@ -18,7 +18,7 @@ import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
-import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle } from '../utils/revealAnimation'
+import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle, getRevealRatingsPanelHeight } from '../utils/revealAnimation'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
 import ScanWaitingText from '../components/ScanWaitingText'
 import ScanPhotoComparison from '../components/ScanPhotoComparison'
@@ -30,6 +30,9 @@ import { isDeveloperUnlockAvailable } from '../utils/developerUnlockPreview'
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
 const COMPARISON_CARD_HEIGHT = 578
+const LOCKED_CARD_HEIGHT = getRevealRatingsPanelHeight()
+const LOCKED_CARD_TOP = 102
+const LOCKED_SLIDE_HEIGHT = LOCKED_CARD_TOP + LOCKED_CARD_HEIGHT
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -1536,7 +1539,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const showLargeResultsHeading = unlocked || progressLockedChrome
 
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className={`mx-auto flex h-full w-full max-w-[430px] flex-col ${unlocked ? 'overflow-y-auto' : 'overflow-hidden'}`} style={{ background: '#0A0A0A' }}>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .32, ease: 'easeOut' }} className="mx-auto flex h-full w-full max-w-[430px] flex-col overflow-y-auto" style={{ background: '#0A0A0A', '--locked-card-height': `${LOCKED_CARD_HEIGHT}px`, '--locked-card-top': `${LOCKED_CARD_TOP}px`, '--locked-slide-height': `${LOCKED_SLIDE_HEIGHT}px` }}>
       <ShareCard scan={recoveredScan} facePhotoUrl={preparedDownloadPhoto} cardRef={downloadCardRef} />
       {!hideNavigationButton && (unlocked || savedProgressCard ? (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="Go back"
@@ -1551,7 +1554,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           <X size={18} className="text-primary" />
         </button>
       ))}
-      <div className={`flex min-h-0 flex-1 flex-col px-5 ${isAppearanceView ? 'items-stretch pb-10' : 'items-center pb-10'} ${unlocked ? '' : 'overflow-hidden'}`}
+      <div className={`flex flex-col px-5 ${unlocked ? 'min-h-0 flex-1' : 'shrink-0'} ${isAppearanceView ? 'items-stretch pb-10' : 'items-center pb-10'}`}
            style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 16px)` }}>
 
       {/* Header */}
@@ -1576,15 +1579,15 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         </div>}
       </>}
         {/* Face circle + card */}
-        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : activeView === 'results' ? 102 : 0, height: activeView === 'compare' ? COMPARISON_CARD_HEIGHT : unlocked ? undefined : 416, flex: activeView === 'compare' ? `0 0 ${COMPARISON_CARD_HEIGHT}px` : unlocked ? undefined : '0 0 416px', minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
+        <motion.div className="relative w-full" style={{ marginTop: unlocked ? (activeView === 'results' ? 102 : activeView === 'photo' ? 0 : 20) : 0, height: !unlocked ? LOCKED_SLIDE_HEIGHT : activeView === 'compare' ? COMPARISON_CARD_HEIGHT : undefined, flex: !unlocked ? `0 0 ${LOCKED_SLIDE_HEIGHT}px` : activeView === 'compare' ? `0 0 ${COMPARISON_CARD_HEIGHT}px` : undefined, minHeight: 0, overflow: 'visible', transformOrigin: '50% 50%', touchAction: 'pan-y' }}
           onTouchStart={handleResultsTouchStart}
           onTouchEnd={handleResultsTouchEnd}
           onTouchCancel={() => { resultsSwipeStartRef.current = null }}
           >
           <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 18, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 250, damping: 26, mass: 0.75 }}>
-          <div id="scan-results-panel" role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
+          <div id="scan-results-panel" style={!unlocked ? { position: 'relative', paddingTop: LOCKED_CARD_TOP } : undefined} role={unlocked ? 'tabpanel' : undefined} aria-labelledby={unlocked ? 'scan-results-tab' : undefined} hidden={activeView !== 'results'}>
           {/* Circle — absolutely positioned, fully detached from card */}
-          <div style={{ position: 'absolute', top: -90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
+          <div style={{ position: 'absolute', top: unlocked ? -90 : LOCKED_CARD_TOP - 90, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
             <div style={{ width: 131, height: 131, borderRadius: '50%', border: '3px solid #fff', background: '#0A0A0A', overflow: 'hidden' }}>
               {facePhoto
                 ? <img src={facePhoto} alt="" loading="eager" decoding="async" className="w-full h-full object-cover" style={{ filter: 'brightness(1)' }} />
@@ -1640,8 +1643,8 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
             {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} compact={!unlocked} />}
           </div>
-          <div id="scan-compare-panel" role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={COMPARISON_CARD_HEIGHT} />}
+          <div id="scan-compare-panel" style={!unlocked ? { paddingTop: LOCKED_CARD_TOP } : undefined} role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={unlocked ? COMPARISON_CARD_HEIGHT : LOCKED_CARD_HEIGHT} />}
           </div>
           </motion.div>
         </motion.div>
@@ -1684,7 +1687,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           {isDownloadingCard || isPreparingDownloadPhoto ? 'Preparing scorecard…' : 'Download Scorecard'}
         </motion.button>}
         {unlocked && savedProgressCard && activeView === 'results' && <PhotoSaveError error={downloadError} className="mx-auto max-w-xl" />}
-        {!unlocked && <div className="w-full flex flex-col gap-3.5" style={{ marginTop: 16 }}>
+        {!unlocked && <div className="w-full flex shrink-0 flex-col gap-3.5" style={{ marginTop: 16 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
             onClick={() => { triggerHaptic(); onAscend() }}

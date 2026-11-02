@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Keyboard } from '@capacitor/keyboard'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
@@ -136,87 +138,157 @@ function TradingScanCard({ image, imageAlt, label, subtitle, score, selected = f
 }
 
 // ── Comments sheet ────────────────────────────────────────────────────────────
-function CommentsSheet({ post, onCommentAdded, displayName, sectionRef }) {
+function CommentsSheet({ post, onCommentAdded, displayName, sectionRef, children, viewportHeight, keyboardOpen, onRequirePro }) {
   const [comments, setComments] = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [text, setText]         = useState('')
-  const [sending, setSending]   = useState(false)
-  const bottomRef = useRef()
+  const [loading, setLoading] = useState(true)
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+  const sendingRef = useRef(false)
+  const scrollRef = useRef(null)
+  const inputRef = useRef(null)
+  const scrollToLatest = useCallback(() => {
+    const scroll = scrollRef.current
+    if (scroll) scroll.scrollTop = scroll.scrollHeight
+  }, [])
 
   useEffect(() => {
+    let active = true
     api.community.comments(post.id)
-      .then(({ comments: c }) => setComments(c || []))
-      .finally(() => setLoading(false))
+      .then(({ comments: list }) => { if (active) setComments(list || []) })
+      .catch(() => { if (active) setError('Could not load comments. Please try again.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [post.id])
 
-  async function send() {
-    if (!text.trim() || sending) return
+  useLayoutEffect(() => {
+    if (document.activeElement === inputRef.current) scrollToLatest()
+  }, [viewportHeight, comments.length, scrollToLatest])
+
+  async function send(event) {
+    event.preventDefault()
+    if (!useStore.getState().isPremium) { onRequirePro(); return }
+    if (!text.trim() || sendingRef.current) return
+    const submittedText = text
+    sendingRef.current = true
     setSending(true)
+    setError('')
     try {
-      const { comment } = await api.community.addComment(post.id, { content: text.trim(), displayName })
+      const { comment } = await api.community.addComment(post.id, { content: submittedText.trim(), displayName })
       setComments(prev => [...prev, comment])
-      setText('')
+      setText(current => current === submittedText ? '' : current)
       onCommentAdded()
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    } catch {} finally { setSending(false) }
+    } catch (err) {
+      if (err?.status === 403 && err?.plan === 'premium') onRequirePro()
+      else setError(err?.message || 'Could not send your comment. Please try again.')
+    } finally {
+      sendingRef.current = false
+      setSending(false)
+    }
   }
 
   async function deleteComment(id) {
     try {
       await api.community.deleteComment(id)
-      setComments(prev => prev.filter(c => c.id !== id))
-    } catch {}
+      setComments(prev => prev.filter(comment => comment.id !== id))
+    } catch { setError('Could not delete your comment. Please try again.') }
   }
 
   return (
-    <section ref={sectionRef} className="mt-4 rounded-2xl p-4" style={{ background: '#141414', border: `1px solid ${BORDER}`, scrollMarginTop: 16 }}>
-      <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: BORDER }}>
-        <p className="font-heading font-bold text-sm text-primary">Comments <span className="text-secondary font-body">({post.comments_count ?? comments.length})</span></p>
-      </div>
-
-      <div className="py-3 space-y-3">
-        {loading ? (
-          <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
-        ) : comments.length === 0 ? (
-          <p className="text-secondary font-body text-sm py-3">Be the first to comment</p>
-        ) : comments.map(c => (
-          <div key={c.id} className="flex gap-2.5">
-            <Avatar name={c.display_name} size={8} subtle />
-            <div className="flex-1">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="font-heading font-bold text-[12px] text-primary">{c.display_name}</span>
-                <span className="text-[10px] text-secondary font-body">{timeAgo(c.created_at)}</span>
-              </div>
-              <p className="font-body text-[13px] text-primary leading-snug">{c.content}</p>
-            </div>
-            {c.is_mine && (
-              <button onClick={() => { triggerHaptic(); deleteComment(c.id) }}>
-                <Trash2 size={12} style={{ color: 'rgba(255,255,255,0.2)' }} />
-              </button>
-            )}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-4" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
+        {children}
+        <section ref={sectionRef} className="mt-4 rounded-2xl p-4" style={{ background: '#141414', border: `1px solid ${BORDER}`, scrollMarginTop: 12 }}>
+          <p className="border-b pb-3 font-heading font-bold text-sm text-primary" style={{ borderColor: BORDER }}>Comments <span className="text-secondary">({post.comments_count ?? comments.length})</span></p>
+          <div className="py-3 space-y-3">
+            {loading ? <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin" style={{ color: GOLD }} /></div>
+              : comments.length === 0 ? <p className="text-secondary font-body text-sm">Be the first to comment</p>
+              : comments.map(comment => (
+                <div key={comment.id} className="flex gap-2.5">
+                  <Avatar name={comment.display_name} size={8} subtle />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="font-heading font-bold text-[12px] text-primary">{comment.display_name}</span>
+                      <span className="text-[10px] text-secondary">{timeAgo(comment.created_at)}</span>
+                    </div>
+                    <p className="break-words font-body text-[13px] text-primary leading-snug">{comment.content}</p>
+                  </div>
+                  {comment.is_mine && <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)}><Trash2 size={14} /></button>}
+                </div>
+              ))}
           </div>
-        ))}
-        <div ref={bottomRef} />
+        </section>
       </div>
-
-      <div className="pt-3 flex items-center gap-3 border-t"
-        style={{ borderColor: BORDER }}>
-        <Avatar name={displayName} size={8} subtle />
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="Add a comment…"
-          maxLength={500}
-          className="community-comment-input flex-1 bg-transparent font-body text-primary outline-none placeholder:text-secondary"
-          style={{ fontSize: 16 }}
-        />
-        <button onClick={() => { triggerHaptic(); send() }} disabled={!text.trim() || sending}>
-          <Send size={18} style={{ color: text.trim() ? GOLD : 'rgba(255,255,255,0.2)' }} />
-        </button>
-      </div>
-    </section>
+      <form onSubmit={send} className="shrink-0 border-t px-4 pt-3" style={{ borderColor: BORDER, background: '#141414', paddingBottom: keyboardOpen ? 12 : 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+        {error && <p role="alert" className="mb-2 text-sm text-red-400">{error}</p>}
+        <div className="flex items-center gap-3">
+          <Avatar name={displayName} size={8} subtle />
+          <input ref={inputRef} value={text} onChange={event => setText(event.target.value)} onFocus={scrollToLatest}
+            placeholder="Add a comment…" aria-label="Add a comment" maxLength={500} enterKeyHint="send"
+            className="community-comment-input min-w-0 flex-1 rounded-xl bg-[#222] px-3 py-3 font-body text-primary outline-none placeholder:text-secondary"
+            style={{ fontSize: 16 }} />
+          <button type="submit" aria-label="Send comment" disabled={!text.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: GOLD, color: '#0A0A0A', opacity: !text.trim() || sending ? 0.4 : 1 }}>
+            {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          </button>
+        </div>
+      </form>
+    </div>
   )
+}
+
+function CommunityPostDetail({ post, onClose, onLike, onCommentAdded, onDelete, onRate, onRequirePro, canInteract, displayName, currentUserId, showComments }) {
+  const sectionRef = useRef(null)
+  const baselineHeight = useRef(window.innerHeight)
+  const nativeKeyboardHeight = useRef(0)
+  const [viewport, setViewport] = useState(() => ({ height: window.visualViewport?.height ?? window.innerHeight, top: 0, keyboardOpen: false }))
+  useEffect(() => {
+    let disposed = false
+    const listeners = []
+    const vv = window.visualViewport
+    const update = () => {
+      if (!nativeKeyboardHeight.current) baselineHeight.current = Math.max(window.innerHeight, vv?.height || 0)
+      const height = Math.min(vv?.height ?? window.innerHeight, baselineHeight.current - nativeKeyboardHeight.current)
+      const next = { height, top: vv?.offsetTop ?? 0, keyboardOpen: nativeKeyboardHeight.current > 0 || height < baselineHeight.current - 100 }
+      setViewport(prev => prev.height === next.height && prev.top === next.top && prev.keyboardOpen === next.keyboardOpen ? prev : next)
+    }
+    vv?.addEventListener('resize', update)
+    vv?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    if (Capacitor.getPlatform() === 'ios') {
+      void Keyboard.setScroll({ isDisabled: true }).catch(() => {})
+      const listen = async (name, callback) => {
+        const listener = await Keyboard.addListener(name, callback)
+        if (disposed) await listener.remove()
+        else listeners.push(listener)
+      }
+      void listen('keyboardWillShow', event => { nativeKeyboardHeight.current = event.keyboardHeight; update() })
+      void listen('keyboardWillHide', () => { nativeKeyboardHeight.current = 0; update() })
+    }
+    return () => {
+      disposed = true
+      vv?.removeEventListener('resize', update)
+      vv?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      listeners.forEach(listener => { void listener.remove() })
+      if (Capacitor.getPlatform() === 'ios') void Keyboard.setScroll({ isDisabled: false }).catch(() => {})
+    }
+  }, [])
+  useLayoutEffect(() => {
+    if (showComments) sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }, [showComments])
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Community post" className="fixed left-0 right-0 flex min-h-0 flex-col" style={{ top: viewport.top, height: viewport.height, background: '#0A0A0A', zIndex: 10050 }}>
+      <div className="shrink-0 flex items-center gap-3 px-4 border-b" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 12, borderColor: BORDER }}>
+        <button onClick={onClose} aria-label="Back to community feed" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: '#1A1A1A', color: '#fff' }}><ChevronLeft size={20} /></button>
+        <div><p className="font-heading font-bold text-[11px] uppercase tracking-widest" style={{ color: GOLD }}>Community</p><p className="font-heading font-bold text-base text-primary">Post</p></div>
+      </div>
+      {canInteract ? <CommentsSheet post={post} onCommentAdded={onCommentAdded} displayName={displayName} sectionRef={sectionRef} viewportHeight={viewport.height} keyboardOpen={viewport.keyboardOpen} onRequirePro={onRequirePro}>
+        <PostCard post={post} currentUserId={currentUserId} displayName={displayName} onLike={onLike} onOpenComments={() => sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' })} onDelete={onDelete} onRate={onRate} canInteract onRequirePro={onRequirePro} />
+      </CommentsSheet> : <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-4" style={{ touchAction: 'pan-y' }}>
+        <PostCard post={post} currentUserId={currentUserId} displayName={displayName} onLike={onLike} onOpenComments={onRequirePro} onDelete={onDelete} onRate={onRate} canInteract={false} onRequirePro={onRequirePro} />
+      </div>}
+
+    </div>, document.body)
 }
 
 // ── Share modal ───────────────────────────────────────────────────────────────
@@ -841,7 +913,7 @@ function ReportSheet({ postId, onClose }) {
   )
 }
 
-export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onRate }) {
+export const PostCard = memo(function PostCard({ post, currentUserId, displayName, onLike, onOpenComments, onOpenPost, onDelete, onRate, canInteract = true, onRequirePro }) {
   const [showShareSheet, setShowShareSheet] = useState(false)
   const [showReport, setShowReport]         = useState(false)
   const [showMenu, setShowMenu]             = useState(false)
@@ -977,7 +1049,7 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
 
       {/* Rate Me scoring */}
       {isRateMe && (
-        <RateMeScorer post={post} onRate={onRate} />
+        canInteract ? <RateMeScorer post={post} onRate={onRate} /> : <div className="px-4 pb-4"><button onClick={event => { event.stopPropagation(); onRequirePro() }} className="w-full rounded-xl py-3 font-heading text-sm" style={{ color: GOLD, background: 'rgba(198,168,92,0.1)' }}>Rate with Ascendus Max</button></div>
       )}
 
       {/* Actions */}
@@ -1039,7 +1111,10 @@ export const PostCard = memo(function PostCard({ post, currentUserId, displayNam
 export default function Community() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, scans, currentScan } = useStore()
+  const user = useStore(state => state.user)
+  const scans = useStore(state => state.scans)
+  const currentScan = useStore(state => state.currentScan)
+  const isPremium = useStore(state => state.isPremium)
   const [shareDraft, setShareDraft] = useState(() => location.state?.shareScanId ? {
     scanId: location.state.shareScanId, photo: location.state.sharePhoto,
   } : null)
@@ -1049,10 +1124,15 @@ export default function Community() {
 
   const [posts, setPosts]           = useState([])
   const [loading, setLoading]       = useState(true)
-  const [showShare, setShowShare]   = useState(Boolean(shareDraft))
+  const [showShare, setShowShare]   = useState(Boolean(shareDraft) && isPremium)
   const [activePost, setActivePost] = useState(null)
   const [showPostComments, setShowPostComments] = useState(false)
-  const commentsSectionRef = useRef(null)
+  const requirePro = useCallback(() => navigate('/unlock?paywall=1'), [navigate])
+  const canInteract = () => {
+    if (useStore.getState().isPremium) return true
+    requirePro()
+    return false
+  }
 
   const displayName = user?.name?.split(' ')[0] ?? 'Anonymous'
 
@@ -1066,21 +1146,13 @@ export default function Community() {
     setShowPostComments(false)
   }, [])
 
-  useEffect(() => {
-    if (!activePost || !showPostComments) return
-    const frame = requestAnimationFrame(() => commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-    return () => cancelAnimationFrame(frame)
-  }, [activePost?.id, showPostComments])
-
-  function scrollToPostComments() {
-    setShowPostComments(true)
-    requestAnimationFrame(() => commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-  }
-
   useEffect(() => { loadFeed() }, [])
   useEffect(() => {
-    if (location.state?.shareScanId) navigate(location.pathname, { replace: true, state: null })
-  }, [location.state, location.pathname, navigate])
+    if (location.state?.shareScanId) {
+      if (!useStore.getState().isPremium) requirePro()
+      else navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, navigate, requirePro])
 
   async function loadFeed() {
     setLoading(true)
@@ -1093,14 +1165,17 @@ export default function Community() {
   }
 
   const handleLike = useCallback(async (postId) => {
+    if (!useStore.getState().isPremium) { requirePro(); return }
     try {
       const { liked, likes } = await api.community.like(postId)
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, user_liked: liked ? 1 : 0, likes_count: likes } : p
       ))
       setActivePost(current => current?.id === postId ? { ...current, user_liked: liked ? 1 : 0, likes_count: likes } : current)
-    } catch {}
-  }, [])
+    } catch (error) {
+      if (error?.status === 403 && error?.plan === 'premium') requirePro()
+    }
+  }, [requirePro])
 
   const handleDelete = useCallback(async (postId) => {
     try {
@@ -1118,6 +1193,7 @@ export default function Community() {
   }, [activePost?.id])
 
   const handleRate = useCallback(async (postId, score) => {
+    if (!useStore.getState().isPremium) { requirePro(); return }
     try {
       const data = await api.community.rate(postId, score)
       setPosts(prev => prev.map(p =>
@@ -1133,16 +1209,17 @@ export default function Community() {
       } : current)
       return data
     } catch (error) {
+      if (error?.status === 403 && error?.plan === 'premium') requirePro()
       throw error
     }
-  }, [posts])
+  }, [requirePro])
 
   return (
     <MotionPage
       className="px-4 pb-8"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
-        ...(activePost || showShare ? { overflow: 'hidden', touchAction: 'none' } : {}),
+        ...(activePost || showShare ? { overflow: 'hidden' } : {}),
       }}
     >
 
@@ -1160,8 +1237,10 @@ export default function Community() {
             post={post}
             currentUserId={user?.id}
             displayName={displayName}
+            canInteract={isPremium}
+            onRequirePro={requirePro}
             onLike={handleLike}
-            onOpenComments={post => openPost(post, true)}
+            onOpenComments={post => { if (canInteract()) openPost(post, true) }}
             onOpenPost={post => openPost(post, false)}
             onDelete={handleDelete}
             onRate={handleRate}
@@ -1190,7 +1269,7 @@ export default function Community() {
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           whileTap={{ scale: 0.93 }}
-          onClick={() => { triggerHaptic(); setShowShare(true) }}
+          onClick={() => { triggerHaptic(); if (canInteract()) setShowShare(true) }}
           className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full"
           style={{
             right: 20,
@@ -1204,46 +1283,13 @@ export default function Community() {
         </motion.button>,
         document.body,
       )}
-      {activePost && createPortal(
-            <motion.div
-              key={`post-detail-${activePost.id}`}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 flex flex-col"
-              style={{ background: '#0A0A0A', zIndex: 10050 }}
-            >
-              <div className="flex-shrink-0 flex items-center gap-3 px-4 border-b" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: 12, borderColor: BORDER, background: '#0A0A0A' }}>
-                <button type="button" onClick={() => { triggerHaptic(); closePost() }} aria-label="Back to community feed" className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#1A1A1A', border: `1px solid ${BORDER}`, color: 'rgba(255,255,255,0.75)' }}>
-                  <ChevronLeft size={19} />
-                </button>
-                <div>
-                  <p className="font-heading font-bold text-[11px] uppercase tracking-widest" style={{ color: GOLD }}>Community</p>
-                  <p className="font-heading font-bold text-base text-primary">Post</p>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
-                <PostCard
-                  key={`post-card-detail-${activePost.id}`}
-                  post={activePost}
-                  currentUserId={user?.id}
-                  displayName={displayName}
-                  onLike={handleLike}
-                  onOpenComments={scrollToPostComments}
-                  onDelete={handleDelete}
-                  onRate={handleRate}
-                />
-                <CommentsSheet
-                  key={`post-comments-${activePost.id}`}
-                  post={activePost}
-                  onCommentAdded={handleCommentAdded}
-                  displayName={displayName}
-                  sectionRef={commentsSectionRef}
-                />
-              </div>
-            </motion.div>
-        , document.body
-      )}
+      {activePost && <CommunityPostDetail
+        key={activePost.id} post={activePost} onClose={closePost}
+        onLike={handleLike} onCommentAdded={handleCommentAdded} onDelete={handleDelete} onRate={handleRate}
+        onRequirePro={requirePro} canInteract={isPremium} displayName={displayName} currentUserId={user?.id}
+        showComments={showPostComments}
+      />}
+
     </MotionPage>
   )
 }

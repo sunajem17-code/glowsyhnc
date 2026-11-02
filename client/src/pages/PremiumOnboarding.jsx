@@ -362,108 +362,6 @@ function StepWelcome({ onCreateAccount, onSignIn, onDemo }) {
   )
 }
 
-// ── SIGN IN MODE (inline) ─────────────────────────────────────────────────────
-function SignInView({ onBack, onSuccess, onAppleSignIn }) {
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [showPw, setShowPw] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const setAuth           = useStore(s => s.setAuth)
-  const setLegalConsented = useStore(s => s.setLegalConsented)
-  const setAgeConfirmed   = useStore(s => s.setAgeConfirmed)
-  const setReferralCode   = useStore(s => s.setReferralCode)
-
-  async function handleSignIn(e) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const data = await api.auth.login({ email: form.email, password: form.password })
-      setAuth(data.user, data.token)
-      setReferralCode(String(data.user.id).substring(0, 8).toUpperCase())
-      setLegalConsented()
-      setAgeConfirmed()
-      clearDraft()
-      onSuccess()
-    } catch (err) {
-      setError(err.message || 'Invalid email or password')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const inputStyle = {
-    color: TEXT, borderColor: 'rgba(255,255,255,0.12)', background: SURFACE,
-    borderWidth: 1, borderStyle: 'solid', borderRadius: 12, padding: '14px 16px',
-    width: '100%', fontFamily: 'Inter, sans-serif', fontSize: 14, outline: 'none',
-  }
-
-  return (
-    <div className="flex flex-col h-full px-6">
-      <BackBtn onBack={onBack} />
-      <div className="flex-1 flex flex-col justify-center">
-        <h1 className="font-heading font-bold text-[28px] mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Welcome back
-        </h1>
-        <p className="font-body text-[13px] mb-8" style={{ color: DIM }}>Sign in to continue your journey</p>
-
-        <form onSubmit={handleSignIn} className="space-y-3">
-          <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Email</label>
-            <input type="email" placeholder="you@example.com" value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              style={inputStyle} required />
-          </div>
-          <div>
-            <label className="text-[11px] font-body font-medium uppercase tracking-wide mb-1.5 block" style={{ color: DIM }}>Password</label>
-            <div className="relative">
-              <input type={showPw ? 'text' : 'password'} placeholder="Your password"
-                value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                style={{ ...inputStyle, paddingRight: 48 }} required />
-              <button type="button" onClick={() => setShowPw(v => !v)}
-                aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
-                className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: DIM }}>
-                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <p className="text-sm font-body" style={{ color: '#EF4444' }}>{error}</p>
-            </div>
-          )}
-
-          <div className="pt-2 space-y-3">
-            <GoldBtn label={loading ? 'Signing in…' : 'Sign In'} onClick={handleSignIn} loading={loading} />
-            {Capacitor.getPlatform() === 'ios' && onAppleSignIn && (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-                  <span className="text-[11px] font-body" style={{ color: DIM }}>or</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-                </div>
-                <button
-                  type="button"
-                  onClick={onAppleSignIn}
-                  className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] transition-all flex items-center justify-center gap-2"
-                  style={{ background: '#FFFFFF', color: '#000000', border: 'none' }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="black">
-                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.39.07 2.36.74 3.18.8 1.22-.24 2.39-.93 3.7-.84 1.58.13 2.77.74 3.54 1.9-3.24 1.94-2.54 5.87.5 6.99-.58 1.59-1.36 3.15-2.92 4.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                  </svg>
-                  Sign in with Apple
-                </button>
-              </>
-            )}
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-
 // ── STEP 4: Gender ────────────────────────────────────────────────────────────
 // Mars symbol (♂) — stroke-based SVG
 // Icons rebuilt from design handoff (Gender Onboarding.dc.html).
@@ -979,11 +877,11 @@ function StepNotifications({ onNext }) {
 
 
 // ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
-function StepAuth({ onNext, onSkip }) {
+function StepAuth({ onNext, onSkip, returning = false }) {
   const [loading, setLoading]       = useState(null) // 'apple' | 'google' | 'email' | null
   const [error, setError]           = useState('')
   const [titleTaps, setTitleTaps]   = useState(0)
-  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(returning && !isNative())
   const [emailInput, setEmailInput] = useState('')
   const [passInput, setPassInput]   = useState('')
   const setAuth = useStore(s => s.setAuth)
@@ -1087,9 +985,9 @@ function StepAuth({ onNext, onSkip }) {
       <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
       <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>Create your account</h1>
+          <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>{returning ? 'Continue to Ascendus' : 'Create your account'}</h1>
         </motion.div>
-        <button onClick={onNext} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', paddingTop: 6 }}>Skip</button>
+        {!returning && <button onClick={onNext} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', paddingTop: 6 }}>Skip</button>}
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
@@ -2932,18 +2830,28 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
   }
 
   // Called after StepNotifications — final unlock.
-  function handleFinalDone() {
+  async function handleFinalDone() {
     if (activeStepRef.current !== FINAL_ONBOARDING_STEP) return
+    // Never persist a shared fake login when the guest request failed.
+    if (!useStore.getState().token) {
+      try {
+        await guestReadyRef.current
+        if (!useStore.getState().token) {
+          const { userId, token } = await api.auth.guest()
+          if (!userId || !token) throw new Error('Guest session unavailable')
+          if (!useStore.getState().isAuthenticated) setGuestSession(userId, token)
+        }
+      } catch (err) {
+        console.error('[Onboarding] Could not establish session:', err?.message)
+        setSigningIn(true)
+        return
+      }
+    }
     clearDraft()
     setGender(formData.gender || null)
     if (formData.primaryGoal) setPrimaryGoal(formData.primaryGoal)
     setLegalConsented()
     setAgeConfirmed()
-    // If user skipped auth, set a guest session so ProtectedRoute doesn't block
-    const token = useStore.getState().token
-    if (!token) {
-      useStore.getState().setAuth({ id: 'guest', name: 'Guest', email: '' }, 'demo-token')
-    }
     setHasOnboarded(FINAL_ONBOARDING_STEP)
   }
 
@@ -2989,10 +2897,9 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
   if (signingIn) {
     return (
       <div className="relative flex flex-col h-full overflow-hidden" style={{ background: BG }}>
-        <SignInView
-          onBack={() => setSigningIn(false)}
-          onSuccess={() => { setSigningIn(false); setStep(0); navigate('/') }}
-          onAppleSignIn={handleAppleSignIn}
+        <StepAuth
+          returning
+          onNext={() => { setSigningIn(false); navigate('/') }}
         />
       </div>
     )
@@ -3005,45 +2912,6 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
     setLegalConsented(true)
     setAgeConfirmed(true)
     setStep(0) // Start at gender.
-  }
-
-  // Used only by the Sign In modal (returning users). New-user auth now happens
-  // inside handleAscend at the paywall, not here.
-  async function handleAppleSignIn() {
-    if (!Capacitor.isNativePlatform()) return
-    try {
-      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-      const result = await SignInWithApple.authorize({
-        clientId: 'com.ascendus.app',
-        redirectURI: 'https://ascendus.store/auth/apple/callback',
-        scopes: 'email name',
-        state: Date.now().toString(),
-        nonce: Math.random().toString(36).substring(2, 15),
-      })
-      const token = result?.response?.identityToken
-      if (!token) throw new Error('No identity token returned')
-
-      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identityToken: token,
-          user: result.response.user,
-          email: result.response.email,
-          fullName: result.response.fullName,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Authentication failed')
-
-      setAuth(data.user, data.token)
-      clearDraft()
-      setSigningIn(false)
-    } catch (err) {
-      if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === 1001 || err?.message?.includes('cancel')) return
-      console.error('[APPLE AUTH] Sign-in error:', err)
-      throw err
-    }
   }
 
   // Start directly with the existing gender question.

@@ -1,3 +1,5 @@
+export const EXIT_TRIAL_PRODUCT_ID = 'com.ascendus.app.yearly.discount'
+
 export function trialRenewalText(product) {
   const periods = { P1W: 'week', P1M: 'month', P3M: '3 months', P6M: '6 months', P1Y: 'year' }
   const period = periods[product?.subscriptionPeriod]
@@ -32,4 +34,8 @@ export function isMonthlyExitTrial(product) {
 export function isWeeklyExitTrial(product) {
   return product?.subscriptionPeriod === 'P1W'
     && isThreeDayFreeTrial(product)
+}
+
+export function eligibleExitTrial(packages, eligibility) {
+  return eligibleThreeDayTrial(packages, eligibility, EXIT_TRIAL_PRODUCT_ID)
 }

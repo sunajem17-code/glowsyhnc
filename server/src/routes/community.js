@@ -92,7 +92,7 @@ router.delete('/post/:id', authMiddleware, (req, res) => {
 })
 
 // ── POST /api/community/post/:id/like — toggle ────────────────────────────────
-router.post('/post/:id/like', authMiddleware, (req, res) => {
+router.post('/post/:id/like', authMiddleware, requirePro, (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign up to like posts.' })
   const postId   = req.params.id
   const existing = db.prepare('SELECT id FROM community_likes WHERE post_id = ? AND user_id = ?')
@@ -117,7 +117,7 @@ router.get('/post/:id/comments', authMiddleware, (req, res) => {
 })
 
 // ── POST /api/community/post/:id/comment ─────────────────────────────────────
-router.post('/post/:id/comment', authMiddleware, (req, res) => {
+router.post('/post/:id/comment', authMiddleware, requirePro, (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign up to comment.' })
   const { content, displayName } = req.body
   if (!content?.trim()) return res.status(400).json({ error: 'Comment cannot be empty.' })
@@ -143,7 +143,7 @@ router.delete('/comment/:id', authMiddleware, (req, res) => {
 })
 
 // ── POST /api/community/post/:id/rate — submit or update a 1-10 rating ───────
-router.post('/post/:id/rate', authMiddleware, (req, res) => {
+router.post('/post/:id/rate', authMiddleware, requirePro, (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign up to rate posts.' })
   const postId = req.params.id
   const post   = db.prepare('SELECT id, post_type FROM community_posts WHERE id = ?').get(postId)
