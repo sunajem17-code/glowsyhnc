@@ -16,5 +16,6 @@ public class AscendusViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(FaceScanPlugin())
         bridge?.registerPluginInstance(PhotoGeometryPlugin())
         bridge?.registerPluginInstance(ScorecardPhotoLibraryPlugin())
+        bridge?.registerPluginInstance(NativeAnalyticsPlugin())
     }
 }

@@ -18,6 +18,7 @@ import Splash, { CinematicIntro } from './pages/Splash'
 import PremiumOnboarding from './pages/PremiumOnboarding'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
 import { getStartupSplash } from './utils/splashFlow'
+import AnalyticsTracker from './components/AnalyticsTracker'
 
 const lazyScreen = loader => lazy(() => loadScreen(loader))
 
@@ -216,6 +217,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <AnalyticsTracker />
       <UpdatePrompt />
       <NotificationPrompt enabled={isAuthenticated && hasOnboarded} userId={userId} />
       <Suspense fallback={<ScreenLoading />}>

@@ -35,6 +35,7 @@ import ScanUnlockGate from './ScanUnlockGate'
 import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresentation'
 import { validationFailure } from '../utils/validationFailure'
 import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
+import { trackScanScreen } from '../utils/analytics'
 
 const nativeCameraSession = import.meta.hot?.data.nativeCameraSession || createNativeCameraSession(CameraPreview)
 if (import.meta.hot) import.meta.hot.dispose(data => { data.nativeCameraSession = nativeCameraSession })
@@ -1972,6 +1973,11 @@ export default function Scan() {
   const [scanCapPlan, setScanCapPlan]     = useState('free')
   const [showConsent, setShowConsent]     = useState(false) // consent modal removed
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
+
+  useEffect(() => {
+    if (step === 1) trackScanScreen('front_photo')
+    else if (step === 2) trackScanScreen('side_photo')
+  }, [step])
 
   const startAnalysisRef  = useRef(null)
   const frontLandmarksRef = useRef(null)

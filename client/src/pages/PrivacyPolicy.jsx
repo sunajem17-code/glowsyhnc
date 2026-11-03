@@ -93,7 +93,7 @@ export default function PrivacyPolicy() {
             <li><strong style={{ color: TEXT }}>Delete Account &amp; Data</strong> (Profile → Delete Account & Data): permanently and immediately deletes your account, all scan records, and all photos stored on our servers. This action cannot be undone. You will be signed out upon confirmation.</li>
             <li><strong style={{ color: TEXT }}>Email request:</strong> support@ascendus.com — we will process deletion requests within 30 days as required by applicable law.</li>
           </ul>
-          <p className="mt-2">We retain anonymized usage analytics for up to 12 months. Payment records are retained as required by law.</p>
+          <p className="mt-2">When Anonymous Analytics is enabled in Profile, Firebase Analytics receives a screen-reached event the first time each app installation visits a screen, repeat screen-view events, and app session start and end events, along with its standard anonymous app usage telemetry. This supports aggregate screen reach and drop-off analysis; the app does not attach account IDs, names, email addresses, scan photos, or scan scores to these events. Analytics collection follows the preference you set in the app. Payment records are retained as required by law.</p>
         </Section>
 
         <Section title="7. Third-Party Services">
@@ -105,6 +105,7 @@ export default function PrivacyPolicy() {
             <li><strong style={{ color: TEXT }}>RevenueCat</strong>: Subscription management on iOS (revenuecat.com/privacy)</li>
             <li><strong style={{ color: TEXT }}>Stripe</strong>: Payment processing on web (stripe.com/privacy)</li>
             <li><strong style={{ color: TEXT }}>Railway</strong>: Server hosting (railway.app/legal/privacy)</li>
+            <li><strong style={{ color: TEXT }}>Firebase Analytics</strong>: Anonymous iOS app usage and screen analytics (firebase.google.com/support/privacy)</li>
           </ul>
         </Section>
 

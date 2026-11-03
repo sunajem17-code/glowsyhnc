@@ -33,6 +33,7 @@ import { nextOnboardingStep } from '../utils/onboardingProgress'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { openAppStoreReview } from '../components/OnboardingFinalSteps'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
+import { trackOnboardingScreen } from '../utils/analytics'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // BG/TEXT/DIM now pull from index.css's shared --bg/--text-primary/--text-secondary
@@ -90,6 +91,15 @@ const pageVariants = {
   exit:  (dir) => ({ x: dir > 0 ? -48 : 48, opacity: 0 }),
 }
 const pageTrans = SPRING_STANDARD
+const ONBOARDING_SCREEN_NAMES = [
+  'gender',
+  'halo_effect',
+  'why_appearance',
+  'primary_goal',
+  'notifications',
+  'testimonials',
+  'cinematic',
+]
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 function ConsentMicroText() {
@@ -2158,6 +2168,18 @@ export default function PremiumOnboarding() {
   activeStepRef.current = step
   const [dir, setDir] = useState(1)
   const [sessionError, setSessionError] = useState('')
+
+  useEffect(() => {
+    if (initialSignIn || signingIn) {
+      trackOnboardingScreen('sign_in')
+      return
+    }
+    if (!introDone) {
+      trackOnboardingScreen('intro')
+      return
+    }
+    trackOnboardingScreen(ONBOARDING_SCREEN_NAMES[step])
+  }, [initialSignIn, signingIn, introDone, step])
 
   const [formData, setFormData] = useState({
     gender: '', goal: '', primaryGoal: '',

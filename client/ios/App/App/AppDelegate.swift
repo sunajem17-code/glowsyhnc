@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import FirebaseCore
+import FirebaseAnalytics
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -9,6 +10,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // TODO: re-enable Crashlytics once GoogleService-Info.plist is added back
         FirebaseApp.configure()
+
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("com.ascendus.analytics.collection"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            let enabled = notification.userInfo?["enabled"] as? Bool ?? false
+            Analytics.setAnalyticsCollectionEnabled(enabled)
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("com.ascendus.analytics.event"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let name = notification.userInfo?["name"] as? String,
+                  ["screen_reached", "screen_view", "app_session_start", "app_session_end"].contains(name) else { return }
+
+            let parameters = notification.userInfo?["parameters"] as? [String: Any]
+            Analytics.logEvent(name, parameters: parameters)
+        }
 
         return true
     }
