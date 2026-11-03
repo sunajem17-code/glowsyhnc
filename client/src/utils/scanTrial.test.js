@@ -17,7 +17,7 @@ test('trial cannot hide an unknown renewal price or billing period', () => {
 })
 
 test('exit trial accepts only the monthly product, never annual or another SKU', () => {
-  const monthly = { ...product, identifier: 'com.ascendus.app.monthly' }
+  const monthly = { ...product, identifier: 'com.ascendus.app.monthly', introPrice: { price: 0, cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 3 } }
   assert.equal(isMonthlyExitTrial(monthly), true)
   assert.equal(isMonthlyExitTrial({ ...monthly, subscriptionPeriod: 'P1Y' }), false)
   assert.equal(isMonthlyExitTrial({ ...monthly, identifier: 'com.ascendus.app.yearly.discount' }), false)
@@ -45,7 +45,10 @@ test('the active Xcode StoreKit configuration contains the advertised three-day 
   const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
   const subscriptions = config.subscriptionGroups.flatMap(group => group.subscriptions)
   const yearly = subscriptions.find(product => product.productID === 'com.ascendus.app.yearly')
-  assert.equal(subscriptions.find(product => product.productID === 'com.ascendus.app.monthly').introductoryOffer, null)
+  const monthly = subscriptions.find(product => product.productID === EXIT_TRIAL_PRODUCT_ID)
+  assert.equal(monthly.recurringSubscriptionPeriod, 'P1M')
+  assert.equal(monthly.introductoryOffer.paymentMode, 'free')
+  assert.equal(monthly.introductoryOffer.subscriptionPeriod, 'P3D')
   assert.equal(yearly.introductoryOffer.paymentMode, 'free')
   assert.equal(yearly.introductoryOffer.subscriptionPeriod, 'P3D')
   assert.equal(yearly.introductoryOffer.numberOfPeriods, 1)
@@ -55,12 +58,16 @@ test('the active Xcode StoreKit configuration contains the advertised three-day 
   assert.doesNotMatch(scheme, /\sstoreKitConfigurationFileReference\s*=/)
 })
 
-test('exit offer never substitutes the standard yearly product or a seven-day trial', () => {
+test('exit offer requires monthly renewal and never substitutes an annual plan or a seven-day trial', () => {
   const annual = { product: { ...product, identifier: 'com.ascendus.app.yearly', subscriptionPeriod: 'P1Y', introPrice: { price: 0, cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 3 } } }
-  const exit = { product: { ...annual.product, identifier: EXIT_TRIAL_PRODUCT_ID } }
+  const exit = { product: { ...annual.product, identifier: EXIT_TRIAL_PRODUCT_ID, subscriptionPeriod: 'P1M', priceString: '$7.99' } }
   const eligibility = { [annual.product.identifier]: { status: 2 }, [EXIT_TRIAL_PRODUCT_ID]: { status: 2 } }
   assert.equal(eligibleExitTrial([annual], eligibility), null)
   assert.equal(eligibleExitTrial([annual, exit], eligibility), exit)
+  assert.equal(eligibleExitTrial([{ product: { ...exit.product, subscriptionPeriod: 'P1Y' } }], eligibility), null)
+  assert.equal(eligibleExitTrial([{ product: { ...exit.product, subscriptionPeriod: 'P1W' } }], eligibility), null)
+  assert.equal(eligibleExitTrial([{ product: { ...exit.product, priceString: null } }], eligibility), null)
+  assert.equal(trialRenewalText(exit.product), 'Then $7.99 per month. Auto-renews unless canceled. Cancel anytime in Settings.')
   assert.equal(eligibleExitTrial([{ product: { ...exit.product, introPrice: product.introPrice } }], eligibility), null)
   const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
   const localExit = config.subscriptionGroups.flatMap(group => group.subscriptions).find(p => p.productID === EXIT_TRIAL_PRODUCT_ID)

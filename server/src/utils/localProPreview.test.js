@@ -4,8 +4,8 @@ const { hasLocalProPreview } = require('./localProPreview')
 const req = { userId: 'allowed-owner', socket: { remoteAddress: '127.0.0.1' } }
 const env = { NODE_ENV: 'development', LOCAL_PRO_PREVIEW_USER_IDS: 'allowed-owner' }
 
-test('local Pro preview requires explicit server configuration and an authenticated owner', () => {
-  assert.equal(hasLocalProPreview(req, env), true)
+test('retired local Pro preview cannot grant access even to a configured owner', () => {
+  assert.equal(hasLocalProPreview(req, env), false)
   assert.equal(hasLocalProPreview(req, { NODE_ENV: 'development' }), false)
   assert.equal(hasLocalProPreview({ ...req, userId: undefined }, env), false)
   assert.equal(hasLocalProPreview({ ...req, isDemo: true }, env), false)

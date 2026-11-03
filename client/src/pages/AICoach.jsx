@@ -229,12 +229,26 @@ export default function AICoach() {
       return
     }
 
+    let verifiedAccess = serverScan
+    if (isNative() && serverScan?.isPro !== true) {
+      const generation = requestGenerationRef.current
+      setLoading(true)
+      try {
+        verifiedAccess = await loadCoachAccess({native:true,userId:user?.id,claimedPremium:accountPremium && !isLocalProPreview,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
+        if (generation !== requestGenerationRef.current) return
+        setServerScan(verifiedAccess)
+      } catch (error) {
+        if (generation === requestGenerationRef.current) setError(error.message)
+        return
+      } finally { if (generation === requestGenerationRef.current) setLoading(false) }
+    }
+    const sendAccessMode = getCoachAccessMode({isPremium:verifiedAccess?.isPro === true})
     const includeScanPhoto = Boolean(coachPhoto || selectedScanId || /photo|image|look at|visually|what do you see/i.test(msgText))
     // No scan → redirect to scan
-    if (!hasScan) { navigate('/scan'); return }
+    if (verifiedAccess?.hasCompletedScan !== true) { navigate('/scan'); return }
 
     // Local Pro Preview changes premium UI only; it never unlocks live Coach replies.
-    if (isLocalProPreview && serverScan?.isPro !== true) {
+    if (isLocalProPreview && verifiedAccess?.isPro !== true) {
       const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
       setMessages(prev => [...prev, userMsg, { role: 'assistant', content: LOCAL_PRO_PREVIEW_COACH_NOTICE }])
       setCoachPhoto(null)
@@ -244,7 +258,7 @@ export default function AICoach() {
 
     // Show the submitted question first, then offer Max. The protected AI
     // endpoint remains premium-only and is never called for non-members.
-    if (coachAccessMode === 'paywall') {
+    if (sendAccessMode === 'paywall') {
       if (messages.some(message => message.paywall)) return
       const userMsg = { role: 'user', content: msgText, ...(coachPhoto ? { image: coachPhoto } : {}) }
       setMessages(prev => [...prev, userMsg, {

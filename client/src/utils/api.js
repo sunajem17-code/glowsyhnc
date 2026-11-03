@@ -3,6 +3,7 @@ import { getRequestTimeoutMs } from './requestTimeout'
 
 import { API_BASE as BASE } from './backend'
 import { apiErrorMessage } from './apiError'
+import { shouldExpireSession } from './sessionExpiry'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -89,7 +90,9 @@ async function request(path, options = {}) {
         if (!(isBackgroundPoll && _scanInFlight)) {
           try {
             const stored = JSON.parse(localStorage.getItem('ascendus-storage') || '{}')
-            if (stored?.state?.token && stored.state.token !== 'demo-token') {
+            // An old request may return 401 after login or guest recovery has
+            // already stored a new session. Never erase that newer account.
+            if (shouldExpireSession(token, useStore.getState().token, stored?.state?.token)) {
               stored.state.token = null
               stored.state.isAuthenticated = false
               localStorage.setItem('ascendus-storage', JSON.stringify(stored))

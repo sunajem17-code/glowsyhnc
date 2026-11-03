@@ -876,207 +876,6 @@ function StepNotifications({ onNext }) {
 }
 
 
-// ── STEP AUTH: Sign up / Sign in ─────────────────────────────────────────────
-function StepAuth({ onNext, onSkip, returning = false }) {
-  const [loading, setLoading]       = useState(null) // 'apple' | 'google' | 'email' | null
-  const [error, setError]           = useState('')
-  const [titleTaps, setTitleTaps]   = useState(0)
-  const [showEmailForm, setShowEmailForm] = useState(returning && !isNative())
-  const [emailInput, setEmailInput] = useState('')
-  const [passInput, setPassInput]   = useState('')
-  const setAuth = useStore(s => s.setAuth)
-  const isAuthenticated = useStore(s => s.isAuthenticated)
-  const isGuest         = useStore(s => s.isGuest)
-  const user            = useStore(s => s.user)
-
-  function handleTitleTap() {
-    const next = titleTaps + 1
-    setTitleTaps(next)
-    if (next >= 5) { setShowEmailForm(true); setTitleTaps(0) }
-  }
-
-  async function handleEmailLogin() {
-    if (!emailInput || !passInput) return
-    triggerHaptic()
-    setError('')
-    setLoading('email')
-    try {
-      const res = await fetch(`${BACKEND_ORIGIN}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailInput, password: passInput }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Login failed')
-      setAuth(data.user, data.token)
-      onNext()
-    } catch (err) {
-      setError(err.message || 'Login failed')
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  // Already signed in on native — skip this step (web stays for dev visibility)
-  useEffect(() => {
-    if (isNative() && isAuthenticated && !isGuest) onNext()
-  }, [])
-
-  async function handleApple() {
-    triggerHaptic()
-    setError('')
-    setLoading('apple')
-    try {
-      const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-      const appleResult = await Promise.race([
-        SignInWithApple.authorize({
-          clientId: 'com.ascendus.app',
-          scopes: 'email name',
-          nonce: Math.random().toString(36).substring(2, 15),
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out Please try again'), { name: 'AppleTimeout' })), 30_000)),
-      ])
-      const identityToken = appleResult?.response?.identityToken
-      if (!identityToken) throw new Error('Apple Sign In did not return a valid token')
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 20_000)
-      let authRes
-      try {
-        authRes = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identityToken,
-            user: appleResult.response.user,
-            email: appleResult.response.email,
-            fullName: appleResult.response.fullName,
-            guestUserId: isGuest ? user?.id : undefined,
-            refCode: sessionStorage.getItem('asc_ref_code') || undefined,
-          }),
-          signal: controller.signal,
-        })
-      } finally {
-        clearTimeout(timeoutId)
-      }
-      const authData = await authRes.json()
-      if (!authRes.ok) throw new Error(authData.error || 'Authentication failed')
-      setAuth(authData.user, authData.token)
-      onNext()
-    } catch (err) {
-      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
-        || err?.message?.toLowerCase().includes('cancel')
-        || err?.message?.toLowerCase().includes('dismissed')
-      if (!isCancelled) {
-        setError(err.message || 'Sign in failed Please try again')
-      }
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  function handleGoogle() {
-    triggerHaptic()
-    setError('Google Sign In coming soon')
-  }
-
-  return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box', position: 'relative' }}>
-      <AnimatePresence>{loading && <ProcessingOverlay key="proc" />}</AnimatePresence>
-      <div className="px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-          <h1 className="font-heading font-bold text-[26px] leading-tight" onClick={handleTitleTap} style={{ color: '#ffffff', letterSpacing: '-0.02em', userSelect: 'none' }}>{returning ? 'Continue to Ascendus' : 'Create your account'}</h1>
-        </motion.div>
-        {!returning && <button onClick={onNext} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', paddingTop: 6 }}>Skip</button>}
-      </div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'stretch', padding: '0 24px', gap: 14 }}>
-        {/* Google — white, on top like Umax */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={handleGoogle}
-          disabled={!!loading}
-          style={{
-            width: '100%', padding: '20px 0', borderRadius: 50,
-            background: '#ffffff', border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-            cursor: 'pointer', opacity: loading === 'apple' ? 0.5 : 1,
-          }}
-        >
-          {loading === 'google' ? (
-            <Loader2 size={24} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-          )}
-          <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#000', letterSpacing: '-0.01em' }}>
-            {loading === 'google' ? 'Signing in…' : 'Sign in with Google'}
-          </span>
-        </motion.button>
-
-        {/* Apple — black below like Umax */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={handleApple}
-          disabled={!!loading}
-          style={{
-            width: '100%', padding: '20px 0', borderRadius: 50,
-            background: '#0a0a0a', border: '1.5px solid rgba(255,255,255,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-            cursor: loading ? 'not-allowed' : 'pointer', opacity: loading === 'google' ? 0.5 : 1,
-          }}
-        >
-          {loading === 'apple' ? (
-            <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
-              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.81 3.22.82.94-.17 1.83-.89 3.13-.96 1.69-.09 2.96.64 3.78 1.82-3.47 2.08-2.67 6.62.87 7.89-.62 1.48-1.46 2.94-3 3.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-            </svg>
-          )}
-          <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#fff', letterSpacing: '-0.01em' }}>
-            {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
-          </span>
-        </motion.button>
-
-        {showEmailForm && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-            <input
-              type="email"
-              placeholder="Email"
-              value={emailInput}
-              onChange={e => setEmailInput(e.target.value)}
-              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={passInput}
-              onChange={e => setPassInput(e.target.value)}
-              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
-            />
-            <button
-              onClick={handleEmailLogin}
-              disabled={!!loading}
-              style={{ width: '100%', padding: '16px 0', borderRadius: 50, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
-            >
-              {loading === 'email' ? 'Signing in…' : 'Sign in'}
-            </button>
-          </div>
-        )}
-
-        {error ? (
-          <p className="text-center font-body text-[12px]" style={{ color: '#E85D9E' }}>{error}</p>
-        ) : null}
-
-      </div>
-    </div>
-  )
-}
-
 // ── Halo Effect SVG Diagram ───────────────────────────────────────────────────
 function HaloEffectDiagram() {
   const G = '#C6A85C'
@@ -2309,355 +2108,7 @@ function StepScanCapture({ gender, onDone, onBack, guestReadyRef }) {
 // ── Intro Slides ─────────────────────────────────────────────────────────────
 // Was a separate, drifted gold (#C9A84C) — fixing the color anyway since
 // it's cheap and the file's already being touched.
-const SLIDE_GOLD = GOLD
-const SLIDE_GOLD_DIM = G_DIM
-const SLIDE_GOLD_BORDER = G_BORDER
-
-function Slide1() {
-  const stats = [
-    { num: '72%',  text: 'of people judge character based on appearance alone' },
-    { num: '3.5x', text: 'more likely to be hired if considered attractive' },
-    { num: '8 sec', text: 'before someone decides if they\'re attracted to you' },
-  ]
-  return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
-      <h1 className="font-heading font-bold text-center mb-2" style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        The Truth Nobody Tells You
-      </h1>
-      <p className="font-body text-center text-[14px] mb-7" style={{ color: SLIDE_GOLD }}>
-        Looks affect every area of your life
-      </p>
-
-      <div className="flex flex-col gap-3 mb-6">
-        {stats.map(({ num, text }, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 + i * 0.12, duration: 0.4, ease: EASE_STANDARD }}
-            className="flex items-center gap-4 px-5 py-4 rounded-2xl"
-            style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
-          >
-            <span className="font-heading font-bold flex-shrink-0 w-16 text-center" style={{ fontSize: 28, color: SLIDE_GOLD, lineHeight: 1 }}>{num}</span>
-            <div style={{ width: 1, height: 32, background: SLIDE_GOLD_BORDER, flexShrink: 0 }} />
-            <p className="font-body text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.75)' }}>{text}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      <p className="font-body text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
-        *Princeton University &amp; Harvard Business School research
-      </p>
-    </div>
-  )
-}
-
-function Slide2() {
-  const withoutItems = [
-    'Random grooming',
-    'No idea what to fix',
-    'Hoping for results',
-    'Generic advice',
-  ]
-  const withItems = [
-    'AI identifies your top growth opportunities',
-    'Personalized fix for each one',
-    'Tracks real improvement',
-    'Specific to YOUR face',
-  ]
-  return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
-      <h1 className="font-heading font-bold text-center mb-7" style={{ fontSize: 26, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        Most Guys Are Leaving<br />Points on the Table
-      </h1>
-
-      <div className="flex gap-3 mb-6">
-        {/* Without */}
-        <div className="flex-1 rounded-2xl p-4" style={{ background: 'rgba(224,60,60,0.06)', border: '0.5px solid rgba(224,60,60,0.25)' }}>
-          <p className="font-heading font-bold text-[13px] mb-3" style={{ color: '#E05555' }}>Without a plan</p>
-          {withoutItems.map((item, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 + i * 0.08 }}
-              className="flex items-start gap-2 mb-2"
-            >
-              <X size={10} className="mt-0.5 flex-shrink-0" style={{ color: '#E05555' }} />
-              <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>{item}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* With Ascendus */}
-        <div className="flex-1 rounded-2xl p-4" style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}>
-          <p className="font-heading font-bold text-[13px] mb-3" style={{ color: SLIDE_GOLD }}>With Ascendus</p>
-          {withItems.map((item, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 + i * 0.08 }}
-              className="flex items-start gap-2 mb-2"
-            >
-              <Check size={10} className="mt-0.5 flex-shrink-0" style={{ color: SLIDE_GOLD }} />
-              <p className="font-body text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.80)' }}>{item}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
-        The difference isn't genetics<br />It's information
-      </p>
-    </div>
-  )
-}
-
-function Slide3() {
-  const quickStats = [
-    { num: '+1.4pts', label: 'Average score gain' },
-    { num: '6 wks',  label: 'Avg time to see skin improvement' },
-    { num: '78%',    label: 'Users who see visible results' },
-  ]
-  return (
-    <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-4">
-      <h1 className="font-heading font-bold text-center mb-6" style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#F0EDE8' }}>
-        Your Potential Is<br />Already There
-      </h1>
-
-      {/* Score arrow visual */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: EASE_STANDARD }}
-        className="rounded-2xl px-6 py-5 mb-6 flex flex-col items-center"
-        style={{ background: SLIDE_GOLD_DIM, border: `0.5px solid ${SLIDE_GOLD_BORDER}` }}
-      >
-        <div className="flex items-center gap-4 mb-3">
-          <div className="flex flex-col items-center">
-            <span className="font-heading font-bold text-[36px] leading-none" style={{ color: 'rgba(255,255,255,0.45)' }}>5.1</span>
-            <span className="font-body text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>before</span>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <span style={{ color: SLIDE_GOLD, fontSize: 28 }}>→</span>
-            <span className="font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>90 days</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="font-heading font-bold text-[36px] leading-none" style={{ color: SLIDE_GOLD }}>6.8</span>
-            <span className="font-body text-[10px] mt-1" style={{ color: SLIDE_GOLD }}>after</span>
-          </div>
-        </div>
-        <p className="font-body text-center text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
-          Average Ascendus user improvement in 90 days
-        </p>
-      </motion.div>
-
-      {/* 3 quick stats */}
-      <div className="flex gap-2 mb-6">
-        {quickStats.map(({ num, label }, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.1, duration: 0.4, ease: EASE_STANDARD }}
-            className="flex-1 rounded-xl px-2 py-3 flex flex-col items-center gap-1"
-            style={{ background: '#0A0A0A', border: `0.5px solid rgba(198,168,92,0.25)` }}
-          >
-            <span className="font-heading font-bold text-[18px] leading-none" style={{ color: SLIDE_GOLD }}>{num}</span>
-            <p className="font-body text-[10px] text-center leading-snug" style={{ color: 'rgba(255,255,255,0.45)' }}>{label}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      <p className="font-heading font-bold text-center text-[16px]" style={{ color: '#F0EDE8' }}>
-        You just need to know where to start
-      </p>
-    </div>
-  )
-}
-
-const SLIDE_COMPONENTS = [Slide1, Slide2, Slide3]
-
-function IntroSlides({ onDone, onAppleSignIn, onGoogleSignIn }) {
-  const [slide, setSlide] = useState(0)
-  const [dir, setDir] = useState(1)
-  const [authLoading, setAuthLoading] = useState(null) // 'apple' | 'google' | null
-  const [authError, setAuthError] = useState('')
-  const total = SLIDE_COMPONENTS.length
-  const isLast = slide === total - 1
-
-  function next() {
-    if (slide < total - 1) { setDir(1); setSlide(s => s + 1) }
-    else onDone()
-  }
-
-  async function handleApple() {
-    triggerHaptic()
-    setAuthError('')
-    setAuthLoading('apple')
-    try {
-      await onAppleSignIn()
-    } catch (err) {
-      const isCancelled = err?.code === 1001 || err?.code === 'SIGN_IN_CANCELLED'
-        || err?.message?.toLowerCase().includes('cancel')
-        || err?.message?.toLowerCase().includes('dismissed')
-      if (!isCancelled) setAuthError(err?.message || 'Sign in failed Please try again')
-    } finally {
-      setAuthLoading(null)
-    }
-  }
-
-  function handleGoogle() {
-    triggerHaptic()
-    setAuthError('Google Sign In coming soon')
-  }
-
-  const SlideContent = SLIDE_COMPONENTS[slide]
-
-  return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: '#0A0A0A' }}>
-      <AnimatePresence>{authLoading && <ProcessingOverlay key="proc" />}</AnimatePresence>
-
-      {/* Skip */}
-      <button
-        onClick={onDone}
-        className="absolute right-5 z-20 font-heading font-semibold text-[12px] px-4 py-2 rounded-xl"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 44px)', color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', letterSpacing: '0.04em' }}
-      >
-        Skip
-      </button>
-
-      {/* Progress dots */}
-      <div className="absolute top-[5.5rem] left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-        {SLIDE_COMPONENTS.map((_, i) => (
-          <motion.div
-            key={i}
-            animate={{ width: i === slide ? 20 : 6, opacity: i === slide ? 1 : 0.35 }}
-            transition={{ duration: 0.3 }}
-            style={{ height: 6, borderRadius: 99, background: SLIDE_GOLD }}
-          />
-        ))}
-      </div>
-
-      {/* Slide */}
-      <AnimatePresence mode="wait" custom={dir}>
-        <motion.div
-          key={slide}
-          custom={dir}
-          variants={pageVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={pageTrans}
-          className="flex flex-col h-full"
-        >
-          <SlideContent />
-        </motion.div>
-      </AnimatePresence>
-
-      {/* CTA area */}
-      <div className="px-6 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}>
-        <AnimatePresence mode="wait">
-          {isLast ? (
-            <motion.div
-              key="auth-buttons"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-            >
-              {authError ? (
-                <p style={{ textAlign: 'center', color: '#EF4444', fontSize: 13, marginBottom: 4 }}>{authError}</p>
-              ) : null}
-
-              {/* Google */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleGoogle}
-                disabled={!!authLoading}
-                style={{
-                  width: '100%', padding: '20px 0', borderRadius: 50,
-                  background: '#ffffff', border: 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                  cursor: 'pointer', opacity: authLoading === 'apple' ? 0.5 : 1,
-                }}
-              >
-                {authLoading === 'google' ? (
-                  <Loader2 size={22} color="#000" style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <svg width="22" height="22" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                )}
-                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#000', letterSpacing: '-0.01em' }}>
-                  {authLoading === 'google' ? 'Signing in…' : 'Sign in with Google'}
-                </span>
-              </motion.button>
-
-              {/* Apple */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleApple}
-                disabled={!!authLoading}
-                style={{
-                  width: '100%', padding: '20px 0', borderRadius: 50,
-                  background: '#0a0a0a', border: '1.5px solid rgba(255,255,255,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                  cursor: authLoading ? 'not-allowed' : 'pointer', opacity: authLoading === 'google' ? 0.5 : 1,
-                }}
-              >
-                {authLoading === 'apple' ? (
-                  <Loader2 size={22} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
-                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.81 3.22.82.94-.17 1.83-.89 3.13-.96 1.69-.09 2.96.64 3.78 1.82-3.47 2.08-2.67 6.62.87 7.89-.62 1.48-1.46 2.94-3 3.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                  </svg>
-                )}
-                <span style={{ fontFamily: 'inherit', fontWeight: 700, fontSize: 19, color: '#fff', letterSpacing: '-0.01em' }}>
-                  {authLoading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
-                </span>
-              </motion.button>
-
-              {/* Already have an account / continue quiz */}
-              <button
-                onClick={onDone}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'inherit', paddingTop: 4 }}
-              >
-                Continue without signing in →
-              </button>
-            </motion.div>
-          ) : (
-            <motion.button
-              key="continue-btn"
-              whileTap={{ scale: 0.97 }}
-              onClick={next}
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full h-[60px] py-0 font-heading font-bold text-[17px]"
-              style={{
-                background: `linear-gradient(135deg, #D4B96A 0%, ${SLIDE_GOLD} 50%, #A8893A 100%)`,
-                color: '#000000',
-                borderRadius: 16,
-                boxShadow: '0 4px 20px rgba(198,168,92,0.3)',
-                letterSpacing: '0.02em',
-                border: 'none', cursor: 'pointer',
-              }}
-            >
-              Continue
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  )
-}
-
-export default function PremiumOnboarding({ initialSignIn = false }) {
+export default function PremiumOnboarding() {
   const navigate = useNavigate()
   const isAuthenticated    = useStore(s => s.isAuthenticated)
   const isGuest            = useStore(s => s.isGuest)
@@ -2670,7 +2121,6 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
   const setPrimaryGoal     = useStore(s => s.setPrimaryGoal)
   const setAssignedPhase   = useStore(s => s.setAssignedPhase)
   const setUnits           = useStore(s => s.setUnits)
-  const setAuth            = useStore(s => s.setAuth)
   const setGuestSession    = useStore(s => s.setGuestSession)
   const addScan                = useStore(s => s.addScan)
   const setCurrentScan         = useStore(s => s.setCurrentScan)
@@ -2689,7 +2139,6 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
   // Store the promise so StepScanCapture can await it before firing the score API.
   const guestReadyRef = useRef(null)
   useEffect(() => {
-    if (initialSignIn) return
     if (isAuthenticated) { guestReadyRef.current = Promise.resolve(); return }
     // Strict Mode and quick remounts share one request. A late guest response
     // must never replace an account the user signed into while it was pending.
@@ -2704,12 +2153,11 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
   // Keep answers, but never restore a saved screen index on a new mount.
   // Old drafts can point at the cinematic/end of a different onboarding flow.
   const [draft] = useState(loadDraft)
-  const [introDone, setIntroDone] = useState(true)
   const [step, setStep] = useState(0)
   const activeStepRef = useRef(step)
   activeStepRef.current = step
   const [dir, setDir] = useState(1)
-  const [signingIn, setSigningIn] = useState(initialSignIn)
+  const [sessionError, setSessionError] = useState('')
 
   const [formData, setFormData] = useState({
     gender: '', goal: '', primaryGoal: '',
@@ -2824,11 +2272,6 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
     }
   }
 
-  // Called after StepAuth — moves to notifications step.
-  function handleAuthDone() {
-    goNext()
-  }
-
   // Called after StepNotifications — final unlock.
   async function handleFinalDone() {
     if (activeStepRef.current !== FINAL_ONBOARDING_STEP) return
@@ -2843,7 +2286,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
         }
       } catch (err) {
         console.error('[Onboarding] Could not establish session:', err?.message)
-        setSigningIn(true)
+        setSessionError('Unable to reconnect. Please check your connection and try again.')
         return
       }
     }
@@ -2855,64 +2298,6 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
     setHasOnboarded(FINAL_ONBOARDING_STEP)
   }
 
-
-  // Apple sign-in handler used from both IntroSlides and StepAuth
-  async function handleAppleSignInFromSlide() {
-    if (!Capacitor.isNativePlatform()) throw new Error('Apple Sign In is only available on iOS')
-    const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
-    const result = await Promise.race([
-      SignInWithApple.authorize({
-        clientId: 'com.ascendus.app',
-        scopes: 'email name',
-        nonce: Math.random().toString(36).substring(2, 15),
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Sign in timed out Please try again'), { name: 'AppleTimeout' })), 30_000)),
-    ])
-    const token = result?.response?.identityToken
-    if (!token) throw new Error('Apple Sign In did not return a valid token')
-    const res = await fetch(`${BACKEND_ORIGIN}/api/auth/apple`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identityToken: token, user: result.response.user, email: result.response.email, fullName: result.response.fullName, refCode: sessionStorage.getItem('asc_ref_code') || undefined }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Authentication failed')
-    setAuth(data.user, data.token)
-    clearDraft()
-    navigate('/')
-  }
-
-  // Intro slides (shown before the quiz for new users)
-  if (!introDone) {
-    return (
-      <IntroSlides
-        onDone={() => setIntroDone(true)}
-        onAppleSignIn={handleAppleSignInFromSlide}
-        onGoogleSignIn={() => {}}
-      />
-    )
-  }
-
-  // Sign in mode
-  if (signingIn) {
-    return (
-      <div className="relative flex flex-col h-full overflow-hidden" style={{ background: BG }}>
-        <StepAuth
-          returning
-          onNext={() => { setSigningIn(false); navigate('/') }}
-        />
-      </div>
-    )
-  }
-
-  // REMOVED: purchaseSuccess welcome screen — no longer purchasing in onboarding
-
-  function handleDemo() {
-    setAuth({ id: 'demo', name: 'Demo User', email: 'demo@ascendus.app' }, 'demo-token')
-    setLegalConsented(true)
-    setAgeConfirmed(true)
-    setStep(0) // Start at gender.
-  }
 
   // Start directly with the existing gender question.
   const steps = [
@@ -2931,6 +2316,10 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
       className="relative flex flex-col h-full overflow-hidden dark"
       style={{ background: '#0a0a0a', '--text-secondary': 'rgba(255,255,255,0.5)' }}
     >
+      {sessionError && <div role="alert" className="absolute inset-x-4 bottom-8 z-[60] rounded-2xl bg-[#171717] p-5 text-center text-white">
+        <p>{sessionError}</p>
+        <button className="mt-3 rounded-xl bg-[#C6A85C] px-5 py-3 text-black" onClick={() => { setSessionError(''); handleFinalDone() }}>Try again</button>
+      </div>}
       {/* Progress bar — hidden on cinematic (last) step */}
       {step < steps.length - 1 && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, paddingTop: 'env(safe-area-inset-top, 0px)' }}>

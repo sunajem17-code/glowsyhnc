@@ -47,3 +47,22 @@ test('browser premium claims trigger server purchase verification without granti
   assert.equal(synced,true)
   assert.equal(result.isPro,true)
 })
+
+test('an account with an existing device receipt recovers and then requires server confirmation', async () => {
+  const { createProCustomerInfoReader } = await import('./revenueCatIdentity.js')
+  let recovered = false, serverMember = false
+  const purchases = {
+    getAppUserID: async () => ({appUserID:'replacement-guest'}),
+    invalidateCustomerInfoCache: async () => {},
+    getCustomerInfo: async () => ({customerInfo:{entitlements:{active:recovered ? {'Ascendus Pro':{}} : {}}}}),
+    syncPurchases: async () => { recovered = true },
+  }
+  const read = createProCustomerInfoReader({purchases,initialize:async()=>{},entitlementId:'Ascendus Pro'})
+  const result = await loadCoachAccess({
+    native:true,userId:'replacement-guest',
+    loadContext:async()=>({isPro:serverMember,hasCompletedScan:true}),
+    checkPurchase:async id=>Boolean(await read(id)),
+    syncPurchase:async id=>{assert.equal(id,'replacement-guest'); assert.equal(recovered,true); serverMember=true},
+  })
+  assert.equal(result.isPro,true)
+})

@@ -42,3 +42,49 @@ test('an invalid requested identity is never sent to RevenueCat', async () => {
   await assert.rejects(initialize(), /sign in again/)
   assert.deepEqual(purchases.calls, [])
 })
+
+import { createProCustomerInfoReader } from './revenueCatIdentity.js'
+const paidInfo = { entitlements: { active: { 'Ascendus Pro': { productIdentifier: 'monthly' } } } }
+function purchaseReader({ paid = false, syncError = null } = {}) {
+  let current = 'member'
+  let info = paid ? paidInfo : { entitlements: { active: {} } }
+  let syncs = 0
+  const purchases = {
+    getAppUserID: async () => ({ appUserID: current }),
+    invalidateCustomerInfoCache: async () => {},
+    getCustomerInfo: async () => ({ customerInfo: info }),
+    syncPurchases: async () => { syncs++; if (syncError) throw syncError; info = paidInfo },
+  }
+  return { purchases, read: createProCustomerInfoReader({ purchases, initialize: async () => {}, entitlementId: 'Ascendus Pro' }), syncs: () => syncs, switchAccount: () => { current = 'other' } }
+}
+test('a new app account recovers the device subscription before returning unpaid', async () => {
+  const fixture = purchaseReader()
+  const [a, b] = await Promise.all([fixture.read('member'), fixture.read('member')])
+  assert.equal(a, paidInfo)
+  assert.equal(b, paidInfo)
+  assert.equal(fixture.syncs(), 1)
+  assert.equal(await fixture.read('member'), paidInfo)
+  assert.equal(fixture.syncs(), 1)
+})
+test('an existing cached member submits receipts once before access is returned', async () => {
+  const fixture = purchaseReader({ paid: true })
+  assert.equal(await fixture.read('member'), paidInfo)
+  assert.equal(fixture.syncs(), 1)
+})
+test('receipt verification failure is retryable and is not a free membership result', async () => {
+  const fixture = purchaseReader({ syncError: new Error('Store unavailable') })
+  await assert.rejects(fixture.read('member'), /Store unavailable/)
+  await assert.rejects(fixture.read('member'), /Store unavailable/)
+  assert.equal(fixture.syncs(), 2)
+})
+test('an account change during receipt recovery cannot grant the next user access', async () => {
+  const fixture = purchaseReader()
+  fixture.purchases.syncPurchases = async () => fixture.switchAccount()
+  await assert.rejects(fixture.read('member'), /account changed/)
+})
+test('an unrelated active entitlement does not unlock Pro', async () => {
+  const fixture = purchaseReader()
+  fixture.purchases.syncPurchases = async () => {}
+  fixture.purchases.getCustomerInfo = async () => ({ customerInfo: { entitlements: { active: { Other: {} } } } })
+  assert.equal(await fixture.read('member'), null)
+})

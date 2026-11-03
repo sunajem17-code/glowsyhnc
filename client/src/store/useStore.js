@@ -4,7 +4,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { checkProStatus, isNative } from '../utils/iap'
 import { canApplyNegativePremiumRefresh } from '../utils/premiumStatus'
-import { isLocalProPreviewAvailable } from '../utils/developerUnlockPreview.js'
 
 // Monotonic revision prevents an entitlement refresh started before a purchase
 // from applying an outdated "free" result after the purchase succeeds.
@@ -23,29 +22,6 @@ const useStore = create(
       isLocalProPreview: false,
       isLocalProPreviewConfigured: false,
       _premiumBeforeLocalPreview: false,
-      setLocalProPreview: (enabled) => {
-        if (enabled && !isLocalProPreviewAvailable()) return
-        set(state => {
-          if (enabled) {
-            return {
-              isLocalProPreview: true,
-              isLocalProPreviewConfigured: true,
-              _premiumBeforeLocalPreview: state.isLocalProPreview
-                ? state._premiumBeforeLocalPreview
-                : state.isPremium,
-              // This flag only controls client-side preview UI. API routes
-              // continue to enforce subscription access on the server.
-              isPremium: true,
-            }
-          }
-          return {
-            isLocalProPreview: false,
-            isLocalProPreviewConfigured: true,
-            isPremium: state._premiumBeforeLocalPreview,
-            _premiumBeforeLocalPreview: false,
-          }
-        })
-      },
       setAuth: (user, token) => {
         premiumStateRevision += 1
         set(state => {
@@ -74,8 +50,7 @@ const useStore = create(
             isGuest: false,
             // Hydrate from the user object immediately so paying users aren't briefly downgraded
             // while the async RevenueCat / server check completes.
-            isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) ||
-              user?.subscriptionTier === 'premium' ||
+            isPremium: user?.subscriptionTier === 'premium' ||
               user?.subscription_tier === 'premium' ||
               user?.is_pro === true ||
               false,
@@ -113,13 +88,13 @@ const useStore = create(
             upgradeWelcomePending: false,
             isAuthenticated: true,
             isGuest: true,
-            isPremium: state.isLocalProPreview && isLocalProPreviewAvailable(),
+            isPremium: false,
           }
         })
       },
       setPremium: (val) => {
         premiumStateRevision += 1
-        set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || val }))
+        set(state => ({ isPremium: val }))
       },
       expireSession: () => {
         premiumStateRevision += 1
@@ -360,7 +335,7 @@ const useStore = create(
       isPremium: false,
       setIsPremium: (v) => {
         premiumStateRevision += 1
-        set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || v }))
+        set(state => ({ isPremium: v }))
       },
 
       // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
@@ -387,13 +362,24 @@ const useStore = create(
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              nativePremiumStatus = Boolean(isPro)
-              // RevenueCat is authoritative for App Store purchases. Promote
-              // immediately, but defer a negative result until the server
-              // check completes so its verified entitlement can also grant.
-              if (nativePremiumStatus) {
-                premiumStateRevision += 1
-                set({ isPremium: true })
+              nativePremiumStatus = false
+              if (isPro) {
+                // A device-only test receipt or stale SDK cache must not show
+                // Max while the paid APIs still reject the subscription.
+                const sync = await fetch(`${API_BASE}/payments/sync-rc`, {
+                  method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ rcUserId: u.id }),
+                  signal: AbortSignal.timeout(12000),
+                })
+                if (get().token !== token || get().user?.id !== u.id) return
+                if (sync.ok) {
+                  nativePremiumStatus = true
+                  premiumStateRevision += 1
+                  set({ isPremium: true })
+                } else if (sync.status !== 402) {
+                  nativePremiumStatus = null
+                  throw new Error('Purchase verification is temporarily unavailable')
+                }
               }
             }
           } catch (rcErr) { console.warn('[refreshProStatus] RevenueCat check failed, falling through to server:', rcErr?.message) }
@@ -422,7 +408,7 @@ const useStore = create(
               serverStatus: isPremium,
             })) {
               premiumStateRevision += 1
-              set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || false }))
+              set(state => ({ isPremium: false }))
             }
           } else if (canApplyNegativePremiumRefresh({
             revisionAtStart,
@@ -432,7 +418,7 @@ const useStore = create(
             // If the server is unavailable, an explicit RevenueCat negative
             // can still correct stale local access.
             premiumStateRevision += 1
-            set(state => ({ isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || false }))
+            set(state => ({ isPremium: false }))
           }
 
           // /user/profile is different — it's a general profile hydration
@@ -448,7 +434,7 @@ const useStore = create(
             const serverStreak = profile.streak
             set(state => ({
               user: { ...state.user, ...fresh },
-              isPremium: (state.isLocalProPreview && isLocalProPreviewAvailable()) || state.isPremium ||
+              isPremium: state.isPremium ||
                 fresh?.subscriptionTier === 'premium' ||
                 fresh?.subscription_tier === 'premium' ||
                 fresh?.is_pro === true,
@@ -524,27 +510,13 @@ const useStore = create(
         // Dark appearance is the only supported theme; migrate devices that
         // previously persisted light mode back to the fixed app appearance.
         merged.theme = 'dark'
-        const localPreviewAvailable = isLocalProPreviewAvailable()
-        // Enable Local Pro on the first local developer run, then honor the
-        // saved Settings toggle on later runs. Production always discards the
-        // preview and restores only the real entitlement.
-        if (localPreviewAvailable && !merged.isLocalProPreviewConfigured) {
-          merged.isLocalProPreview = true
-          merged.isLocalProPreviewConfigured = true
-          merged._premiumBeforeLocalPreview = Boolean(merged.isPremium)
-          merged.isPremium = true
-        } else if (localPreviewAvailable && merged.isLocalProPreview) {
-          merged.isPremium = true
-        } else if (!localPreviewAvailable && merged.isLocalProPreview) {
-          merged.isPremium = merged._premiumBeforeLocalPreview ?? Boolean(
-            merged.user?.subscriptionTier === 'premium' ||
-            merged.user?.subscription_tier === 'premium' ||
-            merged.user?.is_pro === true
-          )
-          merged.isLocalProPreview = false
-          merged.isLocalProPreviewConfigured = false
-          merged._premiumBeforeLocalPreview = false
-        }
+        // Retire the old local Pro override. Never retain a premium value
+        // that came from the preview; the purchase/server refresh restores
+        // genuine memberships after hydration.
+        if (merged.isLocalProPreview) merged.isPremium = false
+        merged.isLocalProPreview = false
+        merged.isLocalProPreviewConfigured = false
+        merged._premiumBeforeLocalPreview = false
         // Discard retired achievement data from existing installations.
         delete merged.achievements
         delete merged.pendingAchievement
@@ -601,9 +573,9 @@ const useStore = create(
         referralCode: state.referralCode,
         referralCount: state.referralCount,
         isPremium: state.isPremium,
-        isLocalProPreview: isLocalProPreviewAvailable() && state.isLocalProPreview,
-        isLocalProPreviewConfigured: isLocalProPreviewAvailable() && state.isLocalProPreviewConfigured,
-        _premiumBeforeLocalPreview: isLocalProPreviewAvailable() ? state._premiumBeforeLocalPreview : false,
+        isLocalProPreview: false,
+        isLocalProPreviewConfigured: false,
+        _premiumBeforeLocalPreview: false,
         upgradeWelcomePending: state.upgradeWelcomePending,
         gender: state.gender,
         hairType: state.hairType,

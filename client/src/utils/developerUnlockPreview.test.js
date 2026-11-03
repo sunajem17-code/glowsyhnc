@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isDeveloperUnlockAvailable } from './developerUnlockPreview.js'
+import { isDeveloperUnlockAvailable, isLocalProPreviewAvailable } from './developerUnlockPreview.js'
 
-test('developer unlock is available only in a development build', () => {
-  assert.equal(isDeveloperUnlockAvailable(true), true)
-  assert.equal(isDeveloperUnlockAvailable(false), false)
-  assert.equal(isDeveloperUnlockAvailable(undefined), false)
+test('development and production cannot grant Pro or reveal results through a testing override', () => {
+  for (const mode of [true, false, undefined]) {
+    assert.equal(isDeveloperUnlockAvailable(mode), false)
+    assert.equal(isLocalProPreviewAvailable(mode), false)
+  }
 })

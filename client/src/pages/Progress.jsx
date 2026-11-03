@@ -221,17 +221,8 @@ export default function Progress() {
       }
     }).catch(error => {
       if (active) {
-        const purchaseNotFound = error?.status === 402 && /No active subscription found/i.test(error?.message || '')
-        if (purchaseNotFound) {
-          // A confirmed no-subscription response is a purchase gate, not a
-          // verification outage. Let the next submitted question use the
-          // normal paywall reply and its Get Ascendus Max button.
-          setServerScan({ isPro: false, status: latestScan ? 'no_subscription' : 'no_scan', hasCompletedScan: Boolean(latestScan) })
-          setMessages([])
-        } else {
-          setServerScan({ status: 'unavailable', accessError: error?.message || 'Could not verify your subscription. Please retry.' })
-          setMessages([{ role: 'assistant', content: error?.message || 'Could not verify your subscription. Please retry.' }])
-        }
+        setServerScan({ status: 'unavailable', accessError: error?.message || 'Could not verify your subscription. Please retry.' })
+        setMessages([{ role: 'assistant', content: error?.message || 'Could not verify your subscription. Please retry.' }])
       }
     })
     return () => { active = false; requestGenerationRef.current += 1 }
@@ -260,7 +251,24 @@ export default function Progress() {
       } finally { setLoading(false) }
       return
     }
-    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || serverScan?.hasCompletedScan || serverScan?.status !== 'no_scan'), loading })
+    let verifiedAccess = serverScan
+    if (isNative() && serverScan?.isPro !== true && !loading && txt) {
+      const generation = requestGenerationRef.current
+      setLoading(true)
+      try {
+        verifiedAccess = await loadCoachAccess({native:true,userId:user?.id,claimedPremium:accountPremium && !isLocalProPreview,checkPurchase:checkProStatus,syncPurchase:id=>api.payments.syncRc(id),loadContext:()=>api.coach.context()})
+        if (generation !== requestGenerationRef.current) return
+        setServerScan(verifiedAccess)
+      } catch (error) {
+        if (generation === requestGenerationRef.current) {
+          setServerScan({status:'unavailable',accessError:error.message})
+          setMessages(previous=>[...previous.filter(message=>!message.paywall),{role:'assistant',content:error.message}])
+        }
+        return
+      } finally { if (generation === requestGenerationRef.current) setLoading(false) }
+    }
+    const sendAccessMode = getCoachAccessMode({isPremium:verifiedAccess?.isPro === true})
+    const sendState = getCoachChatSendState({ text: txt, hasScan: Boolean(latestScan || verifiedAccess?.hasCompletedScan || verifiedAccess?.status !== 'no_scan'), loading })
     if (sendState === 'ignore') return
     if (user?.id && !storageConversationRef.current) {
       storageConversationRef.current = `adonis:${user.id}:${Date.now()}`
@@ -285,7 +293,7 @@ export default function Progress() {
     }
 
     // Local Pro Preview changes premium UI only; it never unlocks live Coach replies.
-    if (isLocalProPreview && serverScan?.isPro !== true) {
+    if (isLocalProPreview && verifiedAccess?.isPro !== true) {
       const userMessage = { role: 'user', content: txt }
       const assistantMessage = {
         role: 'assistant',
@@ -299,17 +307,16 @@ export default function Progress() {
     }
 
     // Server-backed replies remain protected by the server's entitlement check.
-    if (coachAccessMode === 'paywall') {
+    if (sendAccessMode === 'paywall') {
       const userMessage = { role: 'user', content: txt, ...(coachPhoto ? { image: coachPhoto, ...(selectedScanPhotoId ? { scanPhotoId: selectedScanPhotoId } : {}) } : {}) }
       setMessages(prev => [...prev, userMessage])
       persistCoachMessages(user?.id, storageConversationRef.current, null, coachAccessMode, [...messages, userMessage])
       setCoachPhoto(null)
       setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 1800))
       if (generation !== requestGenerationRef.current) return
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Your answer is ready. Get Ascendus Max to unlock Adonis’s personalized reply.',
+        content: 'Get Ascendus Max to use Adonis’s personalized coaching.',
         paywall: true,
       }])
       setLoading(false)

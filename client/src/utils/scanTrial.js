@@ -1,4 +1,4 @@
-export const EXIT_TRIAL_PRODUCT_ID = 'com.ascendus.app.yearly.discount'
+export const EXIT_TRIAL_PRODUCT_ID = 'com.ascendus.app.monthly'
 
 export function trialRenewalText(product) {
   const periods = { P1W: 'week', P1M: 'month', P3M: '3 months', P6M: '6 months', P1Y: 'year' }
@@ -27,15 +27,13 @@ export function eligibleThreeDayTrial(packages, eligibility, productId = null) {
 export function isMonthlyExitTrial(product) {
   return product?.identifier === 'com.ascendus.app.monthly'
     && product.subscriptionPeriod === 'P1M'
-    && isSevenDayFreeTrial(product)
-}
-
-// The weekly free-trial exit offer must renew weekly after its three free days.
-export function isWeeklyExitTrial(product) {
-  return product?.subscriptionPeriod === 'P1W'
     && isThreeDayFreeTrial(product)
 }
 
 export function eligibleExitTrial(packages, eligibility) {
-  return eligibleThreeDayTrial(packages, eligibility, EXIT_TRIAL_PRODUCT_ID)
+  return eligibleThreeDayTrial(
+    packages.filter(pkg => isMonthlyExitTrial(pkg.product)),
+    eligibility,
+    EXIT_TRIAL_PRODUCT_ID,
+  )
 }

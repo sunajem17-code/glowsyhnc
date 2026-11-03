@@ -12,8 +12,6 @@ router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) =>
   if (req.isDemo) return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   try {
     const context = await loadContext(req.userId)
-    // resolvePro only grants local_preview after the server verifies development
-    // mode, loopback origin, and the configured owner allowlist.
     res.json({ access: req.proSource || 'subscription', isPro: req.isPro === true, status: context.status, hasCompletedScan: !!context.latest, scanId: context.latest?.id ?? null })
   } catch { res.status(503).json({ error: 'Saved scan context is temporarily unavailable. Please retry.' }) }
 })

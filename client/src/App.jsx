@@ -57,6 +57,29 @@ const AnalysisInspector = import.meta.env.DEV ? lazyScreen(() => import('./pages
 // completed scan does not unexpectedly send the user to account sign-in.
 let guestSessionRecovery = null
 
+// Sessions remain authenticated to the backend, without an account sign-in page.
+function SessionRecovery() {
+  const [attempt, setAttempt] = useState(0)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    setError('')
+    if (!guestSessionRecovery) {
+      guestSessionRecovery = api.auth.guest().finally(() => { guestSessionRecovery = null })
+    }
+    guestSessionRecovery.then(({ userId, token }) => {
+      if (!userId || !token) throw new Error('Unable to reconnect. Please try again.')
+      if (active && (!useStore.getState().isAuthenticated || !useStore.getState().token)) useStore.getState().setGuestSession(userId, token)
+    }).catch(() => { if (active) setError('Unable to reconnect. Check your connection and try again.') })
+    return () => { active = false }
+  }, [attempt])
+  if (!error) return <StartupCheck />
+  return <div className="h-full flex flex-col items-center justify-center gap-5 px-6 text-center bg-[#0a0a0a] text-white">
+    <p role="alert">{error}</p>
+    <button className="rounded-2xl px-8 py-4 bg-[#C6A85C] text-black font-semibold" onClick={() => setAttempt(value => value + 1)}>Try again</button>
+  </div>
+}
+
 // Stores the referral code from /r/:code links and redirects to onboarding
 function ReferralRedirect() {
   const { code } = useParams()
@@ -98,9 +121,7 @@ export default function App() {
   const returningScanner    = useStore(hasCompletedScan)
   const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
-  const isGuest             = useStore(s => s.isGuest)
   const currentScan         = useStore(s => s.currentScan)
-  const setGuestSession     = useStore(s => s.setGuestSession)
   const userId              = useStore(s => s.user?.id)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
   const expireSession           = useStore(s => s.expireSession)
@@ -112,30 +133,6 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(
     () => localStorage.getItem('asc_welcome_splash_shown') === '1'
   )
-  const canRecoverScanSession = hasOnboarded && Boolean(currentScan)
-
-  // Restore an expired guest session silently. Explicit visits to /auth still
-  // show the account sign-in screen, but startup after a guest scan stays in
-  // the app and retains the locally saved scan/results.
-  useEffect(() => {
-    if (startupDecision !== 'signin' || (!isGuest && !canRecoverScanSession) || window.location.pathname === '/auth') return
-    let active = true
-    if (!guestSessionRecovery) {
-      guestSessionRecovery = api.auth.guest().finally(() => { guestSessionRecovery = null })
-    }
-    guestSessionRecovery
-      .then(({ userId, token }) => {
-        if (!userId || !token) throw new Error('Guest session unavailable')
-        if (active && !useStore.getState().isAuthenticated) setGuestSession(userId, token)
-      })
-      .catch(error => {
-        if (active) {
-          console.warn('[auth] Guest session recovery failed:', error?.message)
-        }
-      })
-    return () => { active = false }
-  }, [startupDecision, isGuest, canRecoverScanSession, setGuestSession])
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
@@ -184,12 +181,7 @@ export default function App() {
 
   // No route, redirect, premium overlay or splash can bypass this decision.
   if (startupDecision === 'checking') return <StartupCheck />
-  if (startupDecision === 'signin' && window.location.pathname === '/auth') {
-    return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
-  }
-  if (startupDecision === 'signin' && !canRecoverScanSession) {
-    return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
-  }
+  if (startupDecision === 'signin') return <SessionRecovery />
   const resetRoute = import.meta.env.DEV && window.location.pathname === '/dev/reset-onboarding'
 
   // ── UNLOCK SLIDESHOW: absolute top-level, no portal needed ──────
@@ -240,7 +232,7 @@ export default function App() {
           {/* Unauthenticated "/" falls through to PremiumOnboarding via * below */}
 
           {/* Returning users can sign in directly without restarting setup. */}
-          <Route path="/auth" element={isAuthenticated && hasOnboarded ? <Navigate to="/" replace /> : <PremiumOnboarding initialSignIn />} />
+          <Route path="/auth" element={<Navigate to={hasOnboarded ? "/scan" : "/onboarding"} replace />} />
           <Route path="/onboarding" element={hasOnboarded ? <Navigate to="/" replace /> : <PremiumOnboarding />} />
           {import.meta.env.DEV && <Route path="/dev/reset-onboarding" element={<DevelopmentOnboardingReset />} />}
 

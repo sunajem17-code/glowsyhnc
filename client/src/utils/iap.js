@@ -1,7 +1,7 @@
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isThreeDayFreeTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial'
-import { createRevenueCatInitializer, validRevenueCatUserId } from './revenueCatIdentity'
+import { isMonthlyExitTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial'
+import { createRevenueCatInitializer, createProCustomerInfoReader, validRevenueCatUserId } from './revenueCatIdentity'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -47,8 +47,8 @@ export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
       .map(pkg => [pkg.product?.identifier, pkg])
       .filter(([identifier]) => identifier)
   ).values()]
-  const candidates = packages.filter(p => p.product?.identifier === productId && isThreeDayFreeTrial(p.product))
-  if (!candidates.length) throw new Error('The exit offer is not configured with a 3-day trial in the store yet. Please try again later.')
+  const candidates = packages.filter(p => p.product?.identifier === productId && isMonthlyExitTrial(p.product))
+  if (!candidates.length) throw new Error('The monthly plan with a 3-day free trial is not configured in the store yet. Please try again later.')
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })
@@ -225,9 +225,15 @@ export async function restorePurchases() {
 }
 
 // ── Status check ──────────────────────────────────────────────────────────────
+const readProCustomerInfo = createProCustomerInfoReader({
+  purchases: Purchases, initialize: initRevenueCat, entitlementId: ENTITLEMENT_ID,
+})
+export async function getProCustomerInfo(userId) {
+  if (!isNative()) return null
+  return readProCustomerInfo(userId)
+}
+
 export async function checkProStatus(userId) {
   if (!isNative()) return false
-  await initRevenueCat(userId ?? null)
-  const result = await Purchases.getCustomerInfo()
-  return !!result.customerInfo.entitlements.active?.[ENTITLEMENT_ID]
+  return Boolean(await getProCustomerInfo(userId))
 }

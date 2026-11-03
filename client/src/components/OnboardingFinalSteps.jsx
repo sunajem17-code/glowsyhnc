@@ -4,7 +4,8 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { getEligibleScanTrial, purchaseScanTrial, getProCustomerInfo } from '../utils/iap'
+import { trialRenewalText } from '../utils/scanTrial'
 import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
@@ -254,16 +255,35 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
   const [eligibilityAttempt, setEligibilityAttempt] = useState(0)
   const purchaseLock = useRef(false)
   const completedPurchase = useRef(null)
+  const onClaimRef = useRef(onClaim)
+  const onDeclineRef = useRef(onDecline)
+  onClaimRef.current = onClaim
+  onDeclineRef.current = onDecline
+  const [existingMember, setExistingMember] = useState(false)
   const busy = loading || purchasing
   useEffect(() => {
     let active = true
     setChecking(true)
     setTrialError('')
     setTrial(null)
-    withDeadline(getEligibleScanTrial(), 15000, 'Trial eligibility check timed out. Please try again.').then(pkg => {
+    withDeadline((async () => {
+      const userId = useStore.getState().user?.id
+      const info = await getProCustomerInfo(userId)
+      if (!active) return null
+      if (info) {
+        setExistingMember(true)
+        await api.payments.syncRc(userId)
+        if (active) await onClaimRef.current({ success: true, customerInfo: info })
+        return null
+      }
+      const pkg = await getEligibleScanTrial()
+      // Existing subscribers and accounts that have used a trial should not
+      // get trapped in an offer they cannot redeem.
+      if (active && !pkg) onDeclineRef.current()
+      return pkg
+    })(), 20000, 'Subscription check timed out. Please try again.').then(pkg => {
       if (!active) return
       setTrial(pkg)
-      if (!pkg) setTrialError('A 3-day free trial is not available for this account right now. Check again or close this offer.')
     })
       .catch(err => { if (active) setTrialError(err?.message || 'Unable to check trial eligibility. Please try again.') })
       .finally(() => { if (active) setChecking(false) })
@@ -331,19 +351,22 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </div>
 
         <p className="font-heading font-bold text-[20px] text-white leading-tight tracking-[-0.025em] whitespace-nowrap mb-2.5">
-          {!checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
+          {existingMember ? 'Reconnect Your Pro Access' : !checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trial || checking ? '3 DAYS FREE' : 'TRIAL UNAVAILABLE'}
+          {existingMember ? 'EXISTING MEMBERSHIP' : trial || checking ? '3 DAYS FREE' : 'CHECK AVAILABILITY'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking your trial eligibility…' : trial ? '3 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
+          {existingMember ? 'Restoring your existing subscription' : checking ? 'Checking your subscription…' : trial ? '3 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
           <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
         </div>}
+        {trial && <p className="font-body text-[12px] leading-relaxed mb-5" style={{ color: TEXT }}>
+          {trialRenewalText(trial.product)}
+        </p>}
 
         {(error || trialError) && (
           <p role="alert" className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error || trialError}</p>
@@ -363,7 +386,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 3 days free' : 'Check availability again'}
+          {busy ? 'Processing…' : checking ? 'Checking subscription…' : existingMember ? 'Reconnect Pro access' : trial ? 'Start 3 days free' : 'Check availability again'}
         </button>
       </motion.div>
     </motion.div>

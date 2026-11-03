@@ -18,7 +18,6 @@ const jwt = require('jsonwebtoken')
 const db  = require('../db')
 const { getSupabase, getUserById } = require('../supabase')
 const { createLimiter } = require('./ratelimit')
-const { hasLocalProPreview } = require('../utils/localProPreview')
 const { JWT_SECRET } = require('./auth') // single hardened source of truth
 const { monthlyBudgetStatus, budgetError, runWithBudgetUser } = require('../lib/aiBudget')
 
@@ -112,7 +111,6 @@ async function scanLimit(req, res, next) {
 
 // ── helper: resolve subscription tier ─────────────────────────────────────────
 async function getSubscriptionTier(userId, req) {
-  if (req && hasLocalProPreview(req)) return { tier: 'local_preview', isPro: true, trialExpires: null, source: 'local_preview' }
   // Try Supabase first (production primary store)
   const sbUser = await getUserById(userId)
   if (sbUser) {
