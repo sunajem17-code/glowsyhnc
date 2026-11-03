@@ -39,8 +39,6 @@ import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
 const nativeCameraSession = import.meta.hot?.data.nativeCameraSession || createNativeCameraSession(CameraPreview)
 if (import.meta.hot) import.meta.hot.dispose(data => { data.nativeCameraSession = nativeCameraSession })
 
-const SHOW_TEMPORARY_FACE_UPLOAD = true
-
 async function uploadScanPhoto(imageData) {
   const commaIdx = imageData.indexOf(',')
   const header = commaIdx >= 0 ? imageData.slice(0, commaIdx) : ''
@@ -1976,7 +1974,6 @@ export default function Scan() {
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
-  const faceUploadInputRef = useRef(null)
   const frontLandmarksRef = useRef(null)
   const validatedFrontRef = useRef(recoveredFrontPhoto)
   const animationGateRef = useRef(null)
@@ -2499,6 +2496,8 @@ export default function Scan() {
         ])
       }
       if (!paywallOpenedRef.current) {
+        // Confirm the completed scan as the results screen is handed off.
+        triggerHaptic()
         navigate(isPremium ? '/results' : '/unlock', { replace: true })
       }
     } catch (err) {
@@ -2937,37 +2936,7 @@ export default function Scan() {
 
       {!isAnalyzing && !cameraOpen && !previewPhoto && (
         <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {step === 1 && SHOW_TEMPORARY_FACE_UPLOAD ? (
-            <>
-              <input
-                ref={faceUploadInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={event => {
-                  const file = event.target.files?.[0]
-                  event.target.value = ''
-                  if (!file) return
-                  if (!file.type.startsWith('image/')) {
-                    setError('Choose an image file to continue.')
-                    return
-                  }
-                  setError('')
-                  setPreviewPhoto({ url: URL.createObjectURL(file), blob: file, forStep: 1 })
-                }}
-              />
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => { triggerHaptic(); faceUploadInputRef.current?.click() }}
-                className="w-full mt-3 h-[46px] rounded-2xl font-heading font-semibold text-[15px] flex items-center justify-center gap-2"
-                style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
-              >
-                <Upload size={17} /> Upload a Picture
-              </motion.button>
-            </>
-          ) : (
-            <div aria-hidden="true" className="w-full mt-3 h-[46px]" />
-          )}
+          <div aria-hidden="true" className="w-full mt-3 h-[46px]" />
         </div>
       )}
     </div>

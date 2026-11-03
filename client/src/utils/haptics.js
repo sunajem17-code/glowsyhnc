@@ -12,6 +12,16 @@ export async function triggerHaptic() {
   }
 }
 
+// Distinct success feedback for major milestones such as scan reveal.
+export async function triggerStrongHaptic() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await Haptics.notification({ type: NotificationType.Success })
+  } catch {
+    // Haptics are optional and must never block the interaction.
+  }
+}
+
 // Soft haptic for when content/text animates onto screen (page transitions).
 export async function triggerPageHaptic() {
   if (!Capacitor.isNativePlatform()) return

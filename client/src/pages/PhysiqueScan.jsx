@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft, Upload } from 'lucide-react'
+import { Camera, CheckCircle2, Loader2, AlertCircle, X, RefreshCw, SkipForward, Lock, Gift, Target, Star, Zap, Map, ChevronLeft } from 'lucide-react'
 import useStore from '../store/useStore'
 import { getTier } from '../utils/analysis'
 import { api, setScanInFlight } from '../utils/api'
@@ -24,10 +24,6 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/th
 import { triggerHaptic } from '../utils/haptics'
 import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-
-// Temporary convenience for physique scans; keep isolated so this control can
-// be removed without touching the camera or scan-confirmation flow.
-const SHOW_TEMPORARY_PHYSIQUE_UPLOAD = true
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -1298,7 +1294,6 @@ export default function PhysiqueScan() {
   const [analysisResult, setAnalysisResult] = useState(null) // real API result once resolved, drives diagnostic feed + score ticker
 
   const startAnalysisRef  = useRef(null)
-  const physiqueUploadInputRef = useRef(null)
   const autoAnalyzedPhotoRef = useRef(null)
   const analysisInFlightRef = useRef(false)
   const bodyPresentationRef = useRef(null)
@@ -2008,41 +2003,6 @@ export default function PhysiqueScan() {
         </div>
       )}
 
-      {!isAnalyzing && !cameraOpen && !previewPhoto && step === 1 && (
-        <div className="flex-shrink-0 px-6" style={{ paddingTop: 8, paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))' }}>
-          {/* The upload is temporary and replaces only the reserved control
-              space; the guide photo and Begin Scan button stay in place. */}
-          {SHOW_TEMPORARY_PHYSIQUE_UPLOAD && (
-            <>
-              <input
-                ref={physiqueUploadInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={event => {
-                  const file = event.target.files?.[0]
-                  event.target.value = ''
-                  if (!file) return
-                  if (!file.type.startsWith('image/')) {
-                    setError('Choose an image file to continue.')
-                    return
-                  }
-                  setError('')
-                  setPreviewPhoto({ url: URL.createObjectURL(file), blob: file, forStep: 1 })
-                }}
-              />
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => { triggerHaptic(); physiqueUploadInputRef.current?.click() }}
-                className="w-full mt-3 h-[46px] rounded-2xl font-heading font-semibold text-[15px] flex items-center justify-center gap-2"
-                style={{ background: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD }}
-              >
-                <Upload size={17} /> Upload a Picture
-              </motion.button>
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }

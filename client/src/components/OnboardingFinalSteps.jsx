@@ -5,10 +5,9 @@ import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
 import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
-import { trialRenewalText } from '../utils/scanTrial'
 import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import logo from '../assets/ascendus-icon.png'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from './CategoryCard'
@@ -346,15 +345,19 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
         </div>}
 
-        {trial && <p className="font-body text-[11px] leading-relaxed mb-3" style={{ color: DIM }}>
-          {trialRenewalText(trial.product)}
-        </p>}
         {(error || trialError) && (
           <p role="alert" className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error || trialError}</p>
         )}
 
         <button
-          onClick={trial ? startTrial : () => setEligibilityAttempt(value => value + 1)}
+          onClick={() => {
+            if (trial) {
+              triggerHaptic()
+              startTrial()
+            } else {
+              setEligibilityAttempt(value => value + 1)
+            }
+          }}
           disabled={busy || checking}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] text-black transition-all duration-200 active:scale-[0.97] mb-2.5 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
@@ -454,6 +457,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
       nextIdx = cardIdx - 1
     }
     if (nextIdx !== cardIdx) {
+      triggerPageHaptic()
       goTo(nextIdx)
     } else {
       // Swipe didn't cross the page threshold — snap back to the current

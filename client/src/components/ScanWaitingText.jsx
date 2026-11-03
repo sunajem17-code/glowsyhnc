@@ -7,6 +7,7 @@ import {
   waitingFrame,
   waitingTextOpacity,
 } from '../utils/scanWaiting'
+import { triggerStrongHaptic } from '../utils/haptics'
 
 const GOLD = '#C6A85C'
 const GOLD_LIGHT = '#F2D889'
@@ -75,6 +76,7 @@ export default function ScanWaitingText({ ready, onComplete }) {
     if (!frame.done || completedRef.current) return undefined
     completedRef.current = true
     setShowConfetti(true)
+    triggerStrongHaptic()
     const timer = setTimeout(() => onCompleteRef.current?.(), 2200)
     return () => clearTimeout(timer)
   }, [frame.done])

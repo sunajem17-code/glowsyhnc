@@ -1582,8 +1582,8 @@ function StepAttractivenessImpact({ onNext, onBack }) {
     if (touchStartX.current === null) return
     const dx = e.changedTouches[0].clientX - touchStartX.current
     touchStartX.current = null
-    if (dx < -50) onNext()
-    else if (dx > 50) onBack()
+    if (dx < -50) { triggerPageHaptic(); onNext() }
+    else if (dx > 50) { triggerPageHaptic(); onBack() }
   }
   return (
     <div
@@ -2956,7 +2956,7 @@ export default function PremiumOnboarding({ initialSignIn = false }) {
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.15}
           onDragEnd={(e, info) => {
-            if (info.offset.x > 60 && step > 0) { triggerHaptic(); goBack() }
+            if (info.offset.x > 60 && step > 0) { triggerPageHaptic(); goBack() }
           }}
         >
           {steps[step]}

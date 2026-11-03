@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
+import { api } from './utils/api'
 import { scheduleStreakReminder } from './utils/notifications'
 import { AnimatePresence } from 'framer-motion'
 import useStore from './store/useStore'
@@ -51,6 +52,11 @@ const ScanHistory    = lazyScreen(() => import('./pages/ScanHistory'))
 const ScanTimeline   = lazyScreen(() => import('./pages/ScanTimeline'))
 const AnalysisInspector = import.meta.env.DEV ? lazyScreen(() => import('./pages/AnalysisInspector')) : null
 
+// A guest account's JWT can expire while its scan and onboarding data remain
+// saved on this device. Recover a fresh guest session in the background so a
+// completed scan does not unexpectedly send the user to account sign-in.
+let guestSessionRecovery = null
+
 // Stores the referral code from /r/:code links and redirects to onboarding
 function ReferralRedirect() {
   const { code } = useParams()
@@ -63,10 +69,11 @@ function ReferralRedirect() {
 function ProtectedRoute({ children }) {
   const isAuthenticated = useStore(s => s.isAuthenticated)
   const startup = useStore(onboardingStartup)
+  const hasSavedScan = useStore(s => hasCompletedOnboarding(s) && Boolean(s.currentScan))
   if (startup === 'checking') return <StartupCheck />
-  if (startup === 'signin') return <Navigate to="/auth" replace />
+  if (startup === 'signin' && !hasSavedScan) return <Navigate to="/auth" replace />
   if (startup === 'onboarding') return <Navigate to="/onboarding" replace />
-  return isAuthenticated ? children : <Navigate to="/auth" replace />
+  return isAuthenticated || hasSavedScan ? children : <Navigate to="/auth" replace />
 }
 
 // Where to land right after onboarding finishes. finishOnboarding() sets this
@@ -91,18 +98,43 @@ export default function App() {
   const returningScanner    = useStore(hasCompletedScan)
   const startupDecision     = useStore(onboardingStartup)
   const isAuthenticated     = useStore(s => s.isAuthenticated)
+  const isGuest             = useStore(s => s.isGuest)
+  const currentScan         = useStore(s => s.currentScan)
+  const setGuestSession     = useStore(s => s.setGuestSession)
   const userId              = useStore(s => s.user?.id)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
   const expireSession           = useStore(s => s.expireSession)
   const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
   const setShowUnlockSlideshow  = useStore(s => s.setShowUnlockSlideshow)
-  const currentScan             = useStore(s => s.currentScan)
   const [cinematicDone, setCinematicDone] = useState(
     () => localStorage.getItem('asc_cinematic_shown') === '1'
   )
   const [splashDone, setSplashDone] = useState(
     () => localStorage.getItem('asc_welcome_splash_shown') === '1'
   )
+  const canRecoverScanSession = hasOnboarded && Boolean(currentScan)
+
+  // Restore an expired guest session silently. Explicit visits to /auth still
+  // show the account sign-in screen, but startup after a guest scan stays in
+  // the app and retains the locally saved scan/results.
+  useEffect(() => {
+    if (startupDecision !== 'signin' || (!isGuest && !canRecoverScanSession) || window.location.pathname === '/auth') return
+    let active = true
+    if (!guestSessionRecovery) {
+      guestSessionRecovery = api.auth.guest().finally(() => { guestSessionRecovery = null })
+    }
+    guestSessionRecovery
+      .then(({ userId, token }) => {
+        if (!userId || !token) throw new Error('Guest session unavailable')
+        if (active && !useStore.getState().isAuthenticated) setGuestSession(userId, token)
+      })
+      .catch(error => {
+        if (active) {
+          console.warn('[auth] Guest session recovery failed:', error?.message)
+        }
+      })
+    return () => { active = false }
+  }, [startupDecision, isGuest, canRecoverScanSession, setGuestSession])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -152,7 +184,12 @@ export default function App() {
 
   // No route, redirect, premium overlay or splash can bypass this decision.
   if (startupDecision === 'checking') return <StartupCheck />
-  if (startupDecision === 'signin') return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
+  if (startupDecision === 'signin' && window.location.pathname === '/auth') {
+    return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
+  }
+  if (startupDecision === 'signin' && !canRecoverScanSession) {
+    return <BrowserRouter><PremiumOnboarding initialSignIn /></BrowserRouter>
+  }
   const resetRoute = import.meta.env.DEV && window.location.pathname === '/dev/reset-onboarding'
 
   // ── UNLOCK SLIDESHOW: absolute top-level, no portal needed ──────

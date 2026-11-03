@@ -86,9 +86,29 @@ const useStore = create(
         premiumStateRevision += 1
         set(state => {
           const user = { id: userId }
+          const previousOwner = onboardingOwner(state.user)
+          const nextOwner = onboardingOwner(user)
+          const onboardingCompletedByUser = { ...state.onboardingCompletedByUser }
+          const startingPointCompletedByUser = { ...state.startingPointCompletedByUser }
+          const completedScanByUser = { ...state.completedScanByUser }
+          // Guest sessions may be refreshed or re-created after their JWT
+          // expires. Carry this device's local setup and scan completion to
+          // the replacement guest identity so scan recovery stays in-app.
+          if (previousOwner !== nextOwner) {
+            if (onboardingCompletedByUser[previousOwner] === true) onboardingCompletedByUser[nextOwner] = true
+            if (startingPointCompletedByUser[previousOwner] === true) startingPointCompletedByUser[nextOwner] = true
+            if (completedScanByUser[previousOwner] === true || isCompletedScan(state.currentScan) || state.scans.some(isCompletedScan)) {
+              completedScanByUser[nextOwner] = true
+            }
+          }
           return {
             user,
-            hasOnboarded: hasCompletedOnboarding({ ...state, user }),
+            onboardingCompletedByUser,
+            startingPointCompletedByUser,
+            completedScanByUser,
+            hasOnboarded: state.hasOnboarded === true || hasCompletedOnboarding({
+              ...state, user, onboardingCompletedByUser, startingPointCompletedByUser, completedScanByUser,
+            }),
             token,
             upgradeWelcomePending: false,
             isAuthenticated: true,

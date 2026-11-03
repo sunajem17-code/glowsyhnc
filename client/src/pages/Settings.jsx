@@ -4,7 +4,7 @@ import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
-  User, Crown, Bell, Trash2, LogOut,
+  User, Crown, Trash2, LogOut,
   ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -12,10 +12,8 @@ import MotionPage from '../components/MotionPage'
 import { isNative } from '../utils/iap'
 import { clearAllScanMedia } from '../utils/scanPhotoDb'
 import { triggerHaptic } from '../utils/haptics'
-import { requestNotificationPermission } from '../utils/notifications'
 import { GOLD } from '../utils/theme'
 import { useDeleteAccount } from '../utils/useDeleteAccount'
-import { isLocalProPreviewAvailable } from '../utils/developerUnlockPreview.js'
 
 // ── Small primitives ──────────────────────────────────────────────────────────
 
@@ -69,50 +67,17 @@ function SettingsRow({ icon: Icon, label, value, onPress, danger, disabled, righ
   )
 }
 
-function Toggle({ value, onChange }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      aria-label="Local Pro Preview"
-      onClick={() => { triggerHaptic(); onChange(!value) }}
-      className="relative flex-shrink-0 transition-all"
-      style={{
-        width: 44, height: 26,
-        borderRadius: 13,
-        background: value ? GOLD : 'rgba(255,255,255,0.15)',
-        transition: 'background 0.2s',
-      }}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          top: 3, left: value ? 21 : 3,
-          width: 20, height: 20,
-          borderRadius: 10,
-          background: '#fff',
-          transition: 'left 0.2s',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-        }}
-      />
-    </button>
-  )
-}
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout, isLocalProPreview, setLocalProPreview,
+    user, isGuest, isPremium, logout,
     clearAllScanData,
   } = useStore()
 
   const [appVersion, setAppVersion] = useState('')
-  const [notifPermission, setNotifPermission] = useState(null) // 'granted' | 'denied' | 'prompt' | null
-  const [notifRequesting, setNotifRequesting] = useState(false)
 
   // Delete-account flow (shared hook — see useDeleteAccount.js)
   const del = useDeleteAccount()
@@ -131,23 +96,6 @@ export default function Settings() {
       .then(info => setAppVersion(`v${info.version} (${info.build})`))
       .catch(() => setAppVersion(''))
   }, [])
-
-  useEffect(() => {
-    if (!isNative()) return
-    import('@capacitor/local-notifications').then(({ LocalNotifications }) =>
-      LocalNotifications.checkPermissions().then(p => setNotifPermission(p.display))
-    ).catch(() => {})
-  }, [])
-
-  async function handleRequestNotifications() {
-    setNotifRequesting(true)
-    try {
-      const granted = await requestNotificationPermission()
-      setNotifPermission(granted ? 'granted' : 'denied')
-    } finally {
-      setNotifRequesting(false)
-    }
-  }
 
   async function handleManageSubscription() {
     if (isNative()) {
@@ -399,44 +347,13 @@ export default function Settings() {
             value={displayEmail}
             onPress={isGuest || displayName === 'Guest' ? undefined : () => navigate('/profile')}
           />
-          {isPremium && !isLocalProPreview && <SettingsRow
+          {isPremium && <SettingsRow
             icon={Crown}
             label="Manage Ascendus Max"
             value="Manage or cancel membership"
             onPress={handleManageSubscription}
           />}
         </div>
-
-        {isLocalProPreviewAvailable() && <>
-          <SectionHeader title="LOCAL TESTING" />
-          <div className="flex flex-col gap-2">
-            <SettingsRow
-              icon={Crown}
-              label="Local Pro Preview"
-              value="Preview premium screens on this local build"
-              rightElement={<Toggle value={isLocalProPreview} onChange={setLocalProPreview} />}
-            />
-          </div>
-        </>}
-
-        {/* ── Native notification preferences ── */}
-        {isNative() && <>
-          <SectionHeader title="PREFERENCES" />
-          <div className="flex flex-col gap-2">
-            <SettingsRow
-              icon={Bell}
-              label="Notifications"
-              value={
-                notifPermission === 'granted' ? 'Enabled — streak & scan reminders' :
-                notifPermission === 'denied'  ? 'Blocked — enable in iOS Settings' :
-                notifPermission === 'prompt'  ? 'Tap to enable reminders' :
-                'Checking…'
-              }
-              onPress={notifPermission === 'prompt' && !notifRequesting ? handleRequestNotifications : undefined}
-              disabled={notifRequesting || notifPermission === 'denied' || notifPermission === 'granted'}
-            />
-          </div>
-        </>}
 
         {/* ── Data & Privacy ── */}
         <SectionHeader title="DATA & PRIVACY" />

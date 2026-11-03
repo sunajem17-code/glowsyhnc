@@ -3,7 +3,7 @@ import { motion, useMotionValue, useAnimation, AnimatePresence } from 'framer-mo
 import { X, Loader2 } from 'lucide-react'
 import { purchasePro, restorePurchases } from '../utils/iap'
 import useStore from '../store/useStore'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { useNavigate } from 'react-router-dom'
 
 const GOLD = '#C6A85C'
@@ -276,8 +276,13 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
   const handleDragEnd = (_, info) => {
     setIsDragging(false)
     const offset = info.offset.x
-    if (offset < -60) goToCard(cardIndex + 1)
-    else if (offset > 60) goToCard(cardIndex - 1)
+    if (offset < -60) {
+      if (cardIndex < TOTAL_CARDS - 1) triggerPageHaptic()
+      goToCard(cardIndex + 1)
+    } else if (offset > 60) {
+      if (cardIndex > 0) triggerPageHaptic()
+      goToCard(cardIndex - 1)
+    }
   }
 
   const handlePurchase = async () => {

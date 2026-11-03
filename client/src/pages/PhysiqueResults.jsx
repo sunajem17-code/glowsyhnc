@@ -5,7 +5,7 @@ import { ChevronLeft, Dumbbell, Lock, Loader2, Check, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import usePremiumUiAccess from '../utils/usePremiumUiAccess'
 import { EASE_STANDARD, GOLD, GOLD_GRADIENT } from '../utils/theme'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { purchasePro, isNative } from '../utils/iap'
 import { api } from '../utils/api'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getResultsNavigationDotButtonStyle, getUnlockedResultsHeadingStyle } from '../utils/revealAnimation'
@@ -27,14 +27,10 @@ const PHYSIQUE_METRICS = [
   { key: 'frame_width', label: 'Frame Width' },
 ]
 
-function PhysiqueResultsNavigation({ activeView, showView }) {
+function PhysiqueResultsNavigation({ activeView, showView, views = RESULT_VIEWS }) {
   return (
     <div role="tablist" aria-label="Results view" className="mt-2 flex shrink-0 justify-center">
-      {[
-        ['results', 'Show results'],
-        ['analysis', 'Show physique pros and cons'],
-        ['compare', 'Show photo comparison'],
-      ].map(([view, label]) => (
+      {views.map(view => ([view, view === 'results' ? 'Show results' : view === 'analysis' ? 'Show physique pros and cons' : 'Show photo comparison'])).map(([view, label]) => (
         <button key={view} type="button" role="tab" id={`physique-${view}-tab`} aria-label={label} aria-selected={activeView === view}
           onClick={() => showView(view)} onKeyDown={event => {
             if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -109,8 +105,10 @@ const REQUIRED = 3
 function PhysiquePaywall({ photo, scan, savedScans, activeView, showView, onClose, onAscend, isPurchasing, error }) {
   const reduceMotion = useReducedMotion()
   const [viewDirection, setViewDirection] = useState(1)
+  const lockedViews = RESULT_VIEWS.filter(view => view !== 'compare')
   function changeView(view) {
-    setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
+    if (!lockedViews.includes(view) || view === activeView) return
+    setViewDirection(lockedViews.indexOf(view) > lockedViews.indexOf(activeView) ? 1 : -1)
     showView(view)
   }
   return (
@@ -133,9 +131,9 @@ function PhysiquePaywall({ photo, scan, savedScans, activeView, showView, onClos
 
         <motion.div className="relative w-full" style={{ marginTop: activeView === 'results' ? 102 : 0, height: activeView === 'results' ? 416 : 518, flex: `0 0 ${activeView === 'results' ? 416 : 518}px`, minHeight: 0, overflow: 'visible', touchAction: 'pan-y' }} drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.24}
           onDragEnd={(_, info) => {
-            const index = RESULT_VIEWS.indexOf(activeView)
-            if (info.offset.x < -60 || info.velocity.x < -400) changeView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
-            else if (info.offset.x > 60 || info.velocity.x > 400) changeView(RESULT_VIEWS[Math.max(index - 1, 0)])
+            const index = lockedViews.indexOf(activeView)
+            if (info.offset.x < -60 || info.velocity.x < -400) changeView(lockedViews[Math.min(index + 1, lockedViews.length - 1)])
+            else if (info.offset.x > 60 || info.velocity.x > 400) changeView(lockedViews[Math.max(index - 1, 0)])
           }}>
           <motion.div key={activeView} initial={{ x: reduceMotion ? 0 : viewDirection * 24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 190, damping: 28, mass: 0.85 }}>
             {activeView === 'results' && <PhysiqueScorecard photo={photo} scan={scan} unlocked={false} />}
@@ -157,7 +155,7 @@ function PhysiquePaywall({ photo, scan, savedScans, activeView, showView, onClos
           </motion.button>
         </div>
 
-        <div className="w-full mt-1"><PhysiqueResultsNavigation activeView={activeView} showView={changeView} /></div>
+        <div className="w-full mt-1"><PhysiqueResultsNavigation activeView={activeView} showView={changeView} views={lockedViews} /></div>
 
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: '#FF453A' }}>{error}</p>}
       </div>
@@ -296,7 +294,7 @@ export default function PhysiqueResults() {
 
   function showView(view) {
     if (view === activeView) return
-    triggerHaptic()
+    triggerPageHaptic()
     setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
     setActiveView(view)
   }

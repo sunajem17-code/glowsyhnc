@@ -255,6 +255,47 @@ const DAILY_STEPS = [
   { id: 'evening', group: 'Evening', icon: Moon, title: 'Night routine', steps: ['Rinse or use a gentle cleanser', 'Apply moisturizer'] },
 ]
 
+// Shared with the paywall preview so it renders the same routine names and
+// progression data as the full Face & Body Routine screen.
+export function getRoutinePreviewForWeek(section, weekNumber) {
+  const week = Math.min(PLAN_TOTAL_WEEKS, Math.max(1, Number(weekNumber) || 1))
+  if (section === 'body') {
+    // Feature a different real day from the weekly schedule as the preview
+    // advances, so each week shows its actual session focus instead of Push
+    // on every card. The exercise list still comes from this plan week/day.
+    const previewWeekday = (week - 1) % 7
+    const challengeDay = (week - 1) * 7 + previewWeekday + 1
+    const plan = createHomeWorkoutPlan(getLocalDateKey())
+    const { session } = getSessionForPlanDay(plan, challengeDay)
+    return {
+      phase: ROUTINE_WEEK_NAMES[week - 1],
+      day: previewWeekday + 1,
+      title: (session?.name || 'Recovery day').replace(/^Day\s*\d+\s*[·:—-]\s*/i, ''),
+      tasks: getBodyTasksForDay(plan, challengeDay).map(task => ({ title: task.title, reps: task.reps })),
+    }
+  }
+
+  const routineExercises = [
+    { title: 'Towel method', reps: '3 × 15' },
+    { title: 'Chin tucks', reps: '3 × 10' },
+    { title: 'Neck curls', reps: '2 × 8' },
+  ]
+  const base = DAILY_STEPS.filter(step => ['morning', 'evening'].includes(step.id)).map(step => ({
+    title: step.title,
+    icon: step.icon,
+    tasks: [...step.steps, ...routineExercises.map(item => item.title)].map((title, index) => ({
+      title,
+      reps: index >= step.steps.length ? routineExercises[index - step.steps.length].reps : '',
+    })),
+  }))
+  const firstDayProgressions = FACE_WEEKLY_PROGRESSIONS.filter(item => item.week <= week && item.weekday === 0)
+  for (const item of firstDayProgressions) {
+    const routine = base.find(entry => entry.title === (item.period === 'Morning' ? 'Morning routine' : 'Night routine'))
+    routine?.tasks.push({ title: item.name, reps: 'Weekly' })
+  }
+  return { phase: ROUTINE_WEEK_NAMES[week - 1], routines: base }
+}
+
 const PRODUCT_GUIDANCE = {
   cleanser: { time: 'Morning and night', frequency: 7, note: 'A gentle cleanser is commonly used daily; reduce use if your skin feels dry or irritated' },
   moisturizer: { time: 'Morning and night', frequency: 7, note: 'Moisturizer is commonly used daily, after cleansing' },

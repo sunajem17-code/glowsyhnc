@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useMotionValue, animate } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { SPRING_STANDARD } from '../utils/theme'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerPageHaptic } from '../utils/haptics'
 
 // Left-edge hit width — matches the width iOS's own edge-pan recognizer uses,
 // which keeps this from fighting interior horizontal gestures (CompareSlider,
@@ -84,7 +84,7 @@ export function useSwipeBack({ enabled }) {
     const commit   = progress > COMMIT_DISTANCE_RATIO || velocity.current > COMMIT_VELOCITY
 
     if (commit) {
-      triggerHaptic()
+      triggerPageHaptic()
       setSwipeExit({ velocity: velocity.current, width })
       // Deferred a frame so the swipeExit state commits — and Layout re-renders
       // the still-current page with the updated `custom` — before navigate(-1)

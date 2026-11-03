@@ -6,15 +6,17 @@ import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } fr
 import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
-  Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity,
+  Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity, Sun, Moon, Droplets,
+  Dumbbell, BedDouble, Footprints, RotateCcw,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
 import AppearanceBreakdown from '../components/AppearanceBreakdown'
+import { getRoutinePreviewForWeek } from './FaceBodyRoutine'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { CardShell, BlurLock, EXTENDED_CATEGORIES, CategoryCard, MetricTile, TEASER_KEYS } from '../components/CategoryCard'
 import ProcessingOverlay from '../components/ProcessingOverlay'
-import { triggerHaptic } from '../utils/haptics'
+import { triggerHaptic, triggerPageHaptic, triggerStrongHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
@@ -25,7 +27,6 @@ import ScanPhotoComparison from '../components/ScanPhotoComparison'
 import { ShareCard, PhotoSaveError, createShareCardImage, getPhotoSaveErrorMessage, saveShareCardImage } from '../components/ShareCardModal'
 import { cropPhotoToSquare } from '../utils/shareCardPhoto'
 import { getProgressCardReturnTo, getSavedProgressResultPresentation } from '../utils/scanResultContext'
-import { isDeveloperUnlockAvailable } from '../utils/developerUnlockPreview'
 
 const G    = GOLD
 const RESULT_VIEWS = ['results', 'photo', 'compare']
@@ -33,6 +34,11 @@ const COMPARISON_CARD_HEIGHT = 578
 const LOCKED_CARD_HEIGHT = getRevealRatingsPanelHeight()
 const LOCKED_CARD_TOP = 102
 const LOCKED_SLIDE_HEIGHT = LOCKED_CARD_TOP + LOCKED_CARD_HEIGHT
+// Detail slides (pros/cons and comparison) use the same fixed carousel slot.
+// Move their cards upward while keeping their bottom edge and every control
+// below the carousel anchored in the same place.
+const LOCKED_DETAIL_CARD_TOP = 48
+const LOCKED_DETAIL_CARD_HEIGHT = LOCKED_SLIDE_HEIGHT - LOCKED_DETAIL_CARD_TOP
 const GRAD = GOLD_GRADIENT
 // Fixed fill for every locked tile's progress bar (Card1Score, Card3FaceMetrics),
 // identical regardless of the real score — a real (but non-computed) percentage
@@ -747,6 +753,7 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onContinue, isPurchasi
 
   function goTo(idx) {
     if (idx === cardIdx) return
+    triggerPageHaptic()
     setCardIdx(idx)
   }
 
@@ -1087,10 +1094,66 @@ function PaywallCoachCard() {
   )
 }
 
+function PaywallRoutineCard() {
+  const [section, setSection] = useState('face')
+  const [week, setWeek] = useState(1)
+  const plan = getRoutinePreviewForWeek(section, week)
+  const bodyTopicIcon = /recovery|mobility/i.test(plan.title)
+    ? BedDouble
+    : /legs|core/i.test(plan.title)
+      ? Footprints
+      : /reset/i.test(plan.title)
+        ? RotateCcw
+        : Dumbbell
+  const routines = section === 'face' ? plan.routines : [{ title: plan.title, icon: bodyTopicIcon, tasks: plan.tasks }]
+
+  return (
+    <div className="flex flex-col gap-2 pr-0.5">
+      <div className="flex shrink-0 justify-end">
+        <div className="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-black p-0.5" role="tablist" aria-label="Routine type">
+          {['face', 'body'].map(value => <button key={value} type="button" role="tab" aria-selected={section === value} onClick={() => setSection(value)} className="rounded-full px-2 py-1 font-heading text-[9px] font-medium" style={{ background: section === value ? '#242424' : 'transparent', color: section === value ? '#F5F5F5' : 'rgba(255,255,255,0.58)' }}>{value === 'face' ? 'Face' : 'Body'}</button>)}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5" style={{ background: 'linear-gradient(145deg, rgba(198,168,92,0.08), rgba(255,255,255,0.02))', borderColor: 'rgba(198,168,92,0.22)' }}>
+        <div className="min-w-0">
+          <p className="font-heading text-[8px] font-bold uppercase tracking-[0.16em]" style={{ color: '#C6A85C' }}>{plan.phase}</p>
+          <p className="font-heading text-[14px] font-bold leading-tight text-white">Week {week}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" aria-label="Previous week" disabled={week <= 1} onClick={() => { if (week > 1) triggerPageHaptic(); setWeek(value => Math.max(1, value - 1)) }} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 disabled:text-white/30"><ChevronLeft size={15} /></button>
+          <button type="button" aria-label="Next week" disabled={week >= 12} onClick={() => { if (week < 12) triggerPageHaptic(); setWeek(value => Math.min(12, value + 1)) }} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 disabled:text-white/30"><ChevronRight size={15} /></button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {routines.map(({ title, tasks, icon: Icon }) => (
+          <section key={title} className="rounded-xl border p-2.5" style={{ background: '#101010', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="mb-1.5 flex items-center gap-1.5">
+              {Icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ color: '#C6A85C', background: 'rgba(198,168,92,0.12)' }}><Icon size={15} /></span>}
+              <span className="min-w-0 flex-1 font-heading text-[11px] font-semibold text-white">{title}</span>
+              <span className="font-body text-[9px] text-white/45">{section === 'body' ? `Day ${plan.day} · ` : ''}{tasks.length} steps</span>
+            </div>
+            {section === 'face' && <><div className="mb-1 flex items-center gap-1.5" aria-hidden="true">{Array.from({ length: 4 }, (_, index) => <Droplets key={index} size={13} strokeWidth={3.2} style={{ color: 'rgba(255,255,255,0.14)' }} />)}</div><div className="mb-2 h-1 w-[108px] max-w-full overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }}><div className="h-full w-0 rounded-full" style={{ background: '#C6A85C' }} /></div></>}
+            <div className="space-y-1.5">
+              {tasks.map(({ title: task, reps }, index) => (
+                <div key={`${task}-${index}`} className="flex min-h-8 items-center gap-2 rounded-xl border px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                  <Lock size={12} className="shrink-0" style={{ color: '#C6A85C' }} aria-label="Locked task" />
+                  <span className="min-w-0 flex-1 select-none font-body text-[9px] leading-tight text-white/75 blur-[3px]" aria-hidden="true">{task}</span>
+                  {reps && <span className="shrink-0 select-none rounded-full px-2 py-1 font-heading text-[8px] font-bold whitespace-nowrap blur-[3px]" style={{ background: 'rgba(198,168,92,0.15)', color: '#C6A85C' }} aria-hidden="true">{reps}</span>}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const PAYWALL_CARDS = [
   { title: 'Get your face ratings',    content: () => <PaywallRatingsCard /> },
   { title: 'Get your physique ratings', content: () => <PaywallPhysiqueCard /> },
   { title: 'AI Coach',                 content: () => <PaywallCoachCard /> },
+  { title: 'Customized glow-up plan',  content: () => <PaywallRoutineCard /> },
 ]
 
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
@@ -1125,8 +1188,13 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
 
   function handleDragEnd(_, info) {
     const D = 60, V = 400
-    if ((info.offset.x < -D || info.velocity.x < -V) && cardIdx < PAYWALL_CARDS.length - 1) setCardIdx(c => c + 1)
-    else if ((info.offset.x > D || info.velocity.x > V) && cardIdx > 0) setCardIdx(c => c - 1)
+    if ((info.offset.x < -D || info.velocity.x < -V) && cardIdx < PAYWALL_CARDS.length - 1) {
+      triggerPageHaptic()
+      setCardIdx(c => c + 1)
+    } else if ((info.offset.x > D || info.velocity.x > V) && cardIdx > 0) {
+      triggerPageHaptic()
+      setCardIdx(c => c - 1)
+    }
     else animate(x, -cardIdx * containerW, { type: 'tween', duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
   }
 
@@ -1215,7 +1283,7 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
           onDragEnd={handleDragEnd}
         >
           {PAYWALL_CARDS.map((card, i) => (
-            <div key={i} className="flex flex-col p-4 overflow-y-auto" style={{ width: containerW || '100%', flexShrink: 0, height: 240 }}>
+            <div key={i} className="flex flex-col p-4 overflow-y-auto overscroll-contain" style={{ width: containerW || '100%', flexShrink: 0, height: 240, WebkitOverflowScrolling: 'touch' }}>
               <h2 className="font-heading font-bold text-[18px] mb-3" style={{ color: '#fff', letterSpacing: '-0.01em' }}>
                 {card.title}
               </h2>
@@ -1338,7 +1406,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
 }
 
 // ── Locked reveal screen (shown to free users before purchase) ────────────────
-function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, onDeveloperUnlock, developerUnlockAvailable = false, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, hideNavigationButton = false, isPurchasing, error, unlocked = false, revealRun = 0 }) {
+function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, savedProgressCard = false, blurSavedProgressResults = false, canAccessProUi = false, hideNavigationButton = false, isPurchasing, error, unlocked = false, revealRun = 0 }) {
   const navigate = useNavigate()
   const facePhoto = scan?.facePhotoUrl ?? null
   const savedScans = useStore(state => state.scans)
@@ -1358,6 +1426,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   const saveProgressButtonRef = useRef(null)
   const resultsSwipeStartRef = useRef(null)
   const reduceMotion = useReducedMotion()
+  const resultViews = unlocked ? RESULT_VIEWS : RESULT_VIEWS.filter(view => view !== 'compare')
 
   useEffect(() => {
     if (!facePhoto) {
@@ -1373,9 +1442,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
   }, [facePhoto])
 
   function showView(view) {
-    if (view === activeView) return
-    triggerHaptic()
-    setViewDirection(RESULT_VIEWS.indexOf(view) > RESULT_VIEWS.indexOf(activeView) ? 1 : -1)
+    if (!resultViews.includes(view) || view === activeView) return
+    triggerPageHaptic()
+    setViewDirection(resultViews.indexOf(view) > resultViews.indexOf(activeView) ? 1 : -1)
     setActiveView(view)
   }
 
@@ -1399,9 +1468,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
     const duration = Math.max(1, event.timeStamp - start.time)
     const threshold = duration < 240 ? 24 : 38
     if (distance < threshold || distance < Math.abs(dy) * 1.15) return
-    const index = RESULT_VIEWS.indexOf(activeView)
-    if (dx < 0) showView(RESULT_VIEWS[Math.min(index + 1, RESULT_VIEWS.length - 1)])
-    else showView(RESULT_VIEWS[Math.max(index - 1, 0)])
+    const index = resultViews.indexOf(activeView)
+    if (dx < 0) showView(resultViews[Math.min(index + 1, resultViews.length - 1)])
+    else showView(resultViews[Math.max(index - 1, 0)])
   }
 
   function saveResult() {
@@ -1549,9 +1618,9 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         </button>
       ) : (
         <button type="button" onClick={() => { triggerHaptic(); onClose?.() }} aria-label="View the 3-day free offer"
-          className="fixed right-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-          <X size={18} className="text-primary" />
+            className="fixed right-4 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)', background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+            <X size={18} className="text-primary" />
         </button>
       ))}
       <div className={`flex flex-col px-5 ${unlocked ? 'min-h-0 flex-1' : 'shrink-0'} ${isAppearanceView ? 'items-stretch pb-10' : 'items-center pb-10'}`}
@@ -1640,11 +1709,11 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
             </div>
           </div>
           </div>
-          <div id="scan-photo-panel" role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
+          <div id="scan-photo-panel" style={!unlocked ? { '--locked-card-top': `${LOCKED_DETAIL_CARD_TOP}px`, '--locked-card-height': `${LOCKED_DETAIL_CARD_HEIGHT}px` } : undefined} role="tabpanel" aria-labelledby="scan-photo-tab" hidden={activeView !== 'photo'}>
             {activeView === 'photo' && <AppearanceBreakdown key={scan?.id} scan={scan} isPremium={canAccessProUi} compact={!unlocked} />}
           </div>
-          <div id="scan-compare-panel" style={!unlocked ? { paddingTop: LOCKED_CARD_TOP } : undefined} role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
-            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={unlocked ? COMPARISON_CARD_HEIGHT : LOCKED_CARD_HEIGHT} />}
+          <div id="scan-compare-panel" style={!unlocked ? { paddingTop: LOCKED_DETAIL_CARD_TOP } : undefined} role="tabpanel" aria-labelledby="scan-compare-tab" hidden={activeView !== 'compare'}>
+            {activeView === 'compare' && <ScanPhotoComparison key={scan?.id} scan={scan} savedScans={savedScans} canAccessProUi={canAccessProUi} blurPhotos={!canAccessProUi} cardHeight={unlocked ? COMPARISON_CARD_HEIGHT : LOCKED_DETAIL_CARD_HEIGHT} />}
           </div>
           </motion.div>
         </motion.div>
@@ -1690,7 +1759,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         {!unlocked && <div className="w-full flex shrink-0 flex-col gap-3.5" style={{ marginTop: 16 }}>
           <motion.button
             whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-            onClick={() => { triggerHaptic(); onAscend() }}
+            onClick={() => { triggerStrongHaptic(); onAscend() }}
             disabled={isPurchasing}
             className="w-full py-5 rounded-2xl font-body font-semibold text-[17px] flex items-center justify-center gap-2 disabled:opacity-70"
             style={{ background: GRAD, color: '#0A0A0A', fontFamily: 'Inter, sans-serif', fontWeight: 600, boxShadow: '0 4px 24px rgba(198,168,92,0.35)' }}
@@ -1700,14 +1769,14 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
           </motion.button>
         </div>}
         <div role="tablist" aria-label="Results view" className="mt-1 flex shrink-0 justify-center">
-          {[['results', 'Show results'], ['photo', 'Show pros and cons'], ['compare', 'Show comparison']].map(([view, label]) => (
+          {resultViews.map(view => ([view, view === 'results' ? 'Show results' : view === 'photo' ? 'Show pros and cons' : 'Show comparison'])).map(([view, label]) => (
             <button key={view} role="tab" id={`scan-${view}-tab`} aria-label={label} aria-controls={`scan-${view}-panel`} aria-selected={activeView === view}
               onClick={() => showView(view)} onKeyDown={event => {
                 if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
                   event.preventDefault()
                   const direction = event.key === 'ArrowRight' ? 1 : -1
-                  const index = (RESULT_VIEWS.indexOf(activeView) + direction + RESULT_VIEWS.length) % RESULT_VIEWS.length
-                  showView(RESULT_VIEWS[index])
+                  const index = (resultViews.indexOf(activeView) + direction + resultViews.length) % resultViews.length
+                  showView(resultViews[index])
                 }
               }} className="flex items-center justify-center" style={getResultsNavigationDotButtonStyle()}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeView === view ? G : 'rgba(255,255,255,0.25)', transition: 'background 0.2s' }} />
@@ -1717,17 +1786,6 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, o
         {saveError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{saveError}</p>}
         {ratingsRecoveryError && <p role="alert" className="mt-3 text-sm text-center" style={{ color: RED }}>{ratingsRecoveryError}</p>}
         {error && <p className="text-center text-[11px] font-body mt-3" style={{ color: RED }}>{error}</p>}
-        {!unlocked && developerUnlockAvailable && onDeveloperUnlock && (
-          <button
-            type="button"
-            onClick={onDeveloperUnlock}
-            className="w-full py-2 mt-5 font-body text-[12px] text-center"
-            style={{ color: 'rgba(198,168,92,0.7)' }}
-          >
-            Developer unlock (local testing)
-          </button>
-        )}
-
       </div>
     </motion.div>
   )
@@ -1750,7 +1808,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   const [referralCount, setReferralCount] = useState(0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
-  const developerUnlockAvailable = import.meta.env.DEV
   const [waitingFinished, setWaitingFinished] = useState(!embeddedReveal && !pendingScan)
   const completedDemoScan = completeDemoRevealRatings(currentScan)
   const displayedScan = pendingScan ? null : completedDemoScan
@@ -1777,7 +1834,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
   // paywall sheet—already set to open via useState—never renders.
   const isPaywallRedirect = directPaywall || searchParams.get('paywall') === '1'
   const progressCardReturnTo = getProgressCardReturnTo(location.state)
-  const previewResultsUnlocked = Boolean(developerUnlockAvailable && isLocalProPreview)
+  const previewResultsUnlocked = Boolean(isLocalProPreview)
   const hasUnlockedAccess = Boolean(isPremium || justUnlocked || previewResultsUnlocked)
   const savedProgressResultPresentation = getSavedProgressResultPresentation({
     savedProgressCard: Boolean(progressCardReturnTo),
@@ -1797,6 +1854,9 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
       sessionStorage.setItem(hapticKey, '1')
     } catch {}
     triggerHaptic()
+    // Keep the completion/confetti haptic and add a second, distinct cue as
+    // the results card replaces the "Invest in yourself" processing screen.
+    triggerStrongHaptic()
   }, [revealView, currentScan?.id, progressCardReturnTo])
 
   function handleUnlockSuccess() {
@@ -1815,15 +1875,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     setIsPremium(true)
     updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
-
-  function handleDeveloperUnlock() {
-    if (!isDeveloperUnlockAvailable(import.meta.env.DEV) || !currentScan) return
-    setRevealRun(run => run + 1)
-    setJustUnlocked(true)
-    setShowPaywall(false)
-    setShowUnlockSlideshow(false)
-  }
-
 
   async function handleAscend() {
     if (purchaseLockRef.current) return
@@ -1895,7 +1946,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
           <button onClick={() => navigate('/scan')} className="rounded-2xl px-8 py-4 font-bold" style={{ background: GRAD, color: '#0A0A0A' }}>Start your scan</button>
         </div>
       ) : hasUnlockedAccess ? (
-        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium || previewResultsUnlocked || (developerUnlockAvailable && justUnlocked)} hideNavigationButton={previewResultsUnlocked && !isPremium && !progressCardReturnTo} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
+        <LockedRevealScreen scan={revealScan} unlocked blurSavedProgressResults={savedProgressResultPresentation.blurResultCard} canAccessProUi={isPremium || previewResultsUnlocked} hideNavigationButton={previewResultsUnlocked && !isPremium && !progressCardReturnTo} savedProgressCard={Boolean(progressCardReturnTo)} revealRun={revealRun} onClose={() => navigate(progressCardReturnTo ?? '/timeline', { replace: true })} />
       ) : (
         <LockedRevealScreen
           scan={displayedScan ? { ...displayedScan, facePhotoUrl: displayedScan.facePhotoUrl || null } : revealScan}
@@ -1904,8 +1955,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
           referralCode={referralCode}
           onAscend={() => { triggerHaptic(); setShowPaywall(true) }}
           onInvite={() => { triggerHaptic(); setShowInvite(true) }}
-          onDeveloperUnlock={handleDeveloperUnlock}
-          developerUnlockAvailable={developerUnlockAvailable && Boolean(currentScan)}
           isPurchasing={isPurchasing}
           error={purchaseError}
         />
