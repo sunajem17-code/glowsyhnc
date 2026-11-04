@@ -177,7 +177,7 @@ export default function Progress() {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const coachAccessMode = getCoachAccessMode({
-    isPremium: serverScan?.isPro === true,
+    isPremium: serverScan?.isPro,
   })
 
   useEffect(() => {

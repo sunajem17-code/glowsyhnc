@@ -168,7 +168,7 @@ export const api = {
     createCheckout: (plan) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
     portal: () => request('/payments/portal', { method: 'POST' }),
     status: () => request('/payments/status'),
-    syncRc: (rcUserId) => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({ rcUserId }) }),
+    syncRc: () => request('/payments/sync-rc', { method: 'POST', body: JSON.stringify({}) }),
   },
   ai: {
     validateScan: (imageB64) => request('/ai/validate-scan', { method: 'POST', body: JSON.stringify({ imageB64 }) }),

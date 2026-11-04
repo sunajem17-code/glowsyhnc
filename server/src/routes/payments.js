@@ -1,3 +1,4 @@
+const { verifyCoachSubscription, resolveSubscription } = require('../lib/verifiedCoachSubscription')
 const express = require('express')
 const Stripe = require('stripe')
 const db = require('../db')
@@ -324,50 +325,27 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
 // Check premium status (called after redirect back from Stripe)
 router.get('/status', authMiddleware, async (req, res) => {
-  const sbUser = await getUserById(req.userId).catch(() => null)
-  let tier = sbUser?.subscription_tier || 'free'
-  if (!sbUser && !isConfigured()) {
-    const row = db.prepare('SELECT subscription_tier FROM users WHERE id = ?').get(req.userId)
-    tier = row?.subscription_tier || 'free'
+  try {
+    let user = await getUserById(req.userId)
+    if (!user && !isConfigured()) user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId)
+    const access = await resolveSubscription(req.userId, { user })
+    res.json({ isPremium: access.isPro, status: access.status })
+  } catch {
+    res.status(503).json({ status: 'unavailable', error: 'Subscription verification is temporarily unavailable. Please retry.' })
   }
-  const isPro = sbUser?.is_pro === true
-  res.json({ isPremium: tier === 'premium' || isPro })
 })
 
 // Sync RevenueCat iOS purchase to server — called by client after a successful IAP.
 // Verifies the subscription is actually active via RevenueCat REST API before granting Pro.
 router.post('/sync-rc', authMiddleware, async (req, res) => {
-  const rcApiKey = process.env.REVENUECAT_API_KEY
-  const { rcUserId } = req.body
-
-  // Server-side verification via RevenueCat REST API
-  if (rcApiKey && rcUserId) {
-    try {
-      const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
-        headers: { Authorization: `Bearer ${rcApiKey}`, 'Content-Type': 'application/json' },
-      })
-      if (!rcRes.ok) {
-        console.warn(`[sync-rc] RevenueCat lookup failed for ${rcUserId}: HTTP ${rcRes.status}`)
-        return res.status(402).json({ error: 'Could not verify purchase — please restore purchases or contact support.' })
-      }
-      const data = await rcRes.json()
-      const subscriber = data.subscriber
-      const entitlements = subscriber?.entitlements ?? {}
-      const isPro = Object.values(entitlements).some(e => e.expires_date == null || new Date(e.expires_date) > new Date())
-      if (!isPro) {
-        console.warn(`[sync-rc] No active entitlement for rcUserId=${rcUserId} userId=${req.userId}`)
-        return res.status(402).json({ error: 'No active subscription found — please complete your purchase first.' })
-      }
-      console.log(`[sync-rc] RC verified Pro for userId=${req.userId} rcUserId=${rcUserId}`)
-    } catch (err) {
-      // If RevenueCat is unreachable, fail safe — do not grant Pro
-      console.error(`[sync-rc] RevenueCat verification error: ${err.message}`)
-      return res.status(503).json({ error: 'Purchase verification unavailable — please try again in a moment.' })
+  // Never grant the authenticated account someone else's entitlement supplied
+  // in the body (including CustomerInfo.originalAppUserId from an older alias).
+  try {
+    if (!await verifyCoachSubscription(req.userId)) {
+      return res.status(402).json({ status: 'inactive', error: 'No active Pro subscription was verified for this account. Restore purchases to reconnect it.' })
     }
-  } else {
-    // No RC key configured — log loudly but do not grant Pro silently
-    console.error('[sync-rc] REVENUECAT_API_KEY not set or rcUserId missing — purchase NOT granted. Set REVENUECAT_API_KEY in Railway.')
-    return res.status(503).json({ error: 'Server configuration error — contact support.' })
+  } catch {
+    return res.status(503).json({ status: 'unavailable', error: 'Purchase verification unavailable — please try again in a moment.' })
   }
 
   // Do not report success until the same store used by coach access confirms it.

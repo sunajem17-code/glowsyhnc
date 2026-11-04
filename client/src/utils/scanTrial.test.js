@@ -41,7 +41,7 @@ test('unknown eligibility and paid intro offers never become a free trial', () =
   assert.equal(eligibleThreeDayTrial([{ product: { ...pkg.product, introPrice: { ...pkg.product.introPrice, price: 1 } } }], { weekly: { status: 2 } }), null)
 })
 
-test('the active Xcode StoreKit configuration contains the advertised three-day trial', () => {
+test('the optional local fixture contains the trial while the app scheme uses Apple sandbox', () => {
   const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
   const subscriptions = config.subscriptionGroups.flatMap(group => group.subscriptions)
   const yearly = subscriptions.find(product => product.productID === 'com.ascendus.app.yearly')
@@ -54,7 +54,7 @@ test('the active Xcode StoreKit configuration contains the advertised three-day 
   assert.equal(yearly.introductoryOffer.numberOfPeriods, 1)
   assert.equal(yearly.recurringSubscriptionPeriod, 'P1Y')
   const scheme = readFileSync(new URL('../../ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme', import.meta.url), 'utf8')
-  assert.match(scheme, /<StoreKitConfigurationFileReference\s+identifier\s*=\s*"\.\.\/\.\.\/App\/Ascendus\.storekit"/)
+  assert.doesNotMatch(scheme, /<StoreKitConfigurationFileReference/)
   assert.doesNotMatch(scheme, /\sstoreKitConfigurationFileReference\s*=/)
 })
 

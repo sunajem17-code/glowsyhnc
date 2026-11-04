@@ -1,4 +1,4 @@
-const { verifyCoachSubscription } = require('../lib/verifiedCoachSubscription')
+const { resolveSubscription } = require('../lib/verifiedCoachSubscription')
 /**
  * claudeGate.js
  * Security middleware for all Claude API endpoints.
@@ -144,7 +144,7 @@ async function requirePro(req, res, next) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   }
   try {
-    const { isPro, source } = await getSubscriptionTier(req.userId, req)
+    const { isPro } = await resolveSubscription(req.userId, { user: await getUserById(req.userId) })
     if (isPro) {
       req.isPro = true
       return next()
@@ -160,12 +160,10 @@ async function requirePro(req, res, next) {
 async function resolvePro(req, res, next) {
   if (req.isDemo) { req.isPro = false; return next() }
   try {
-    const { isPro, source } = await getSubscriptionTier(req.userId, req)
+    const { isPro, source } = req.baseUrl === '/api/coach'
+      ? await resolveSubscription(req.userId, { user: await getUserById(req.userId) })
+      : await getSubscriptionTier(req.userId, req)
     req.isPro = isPro
-    if (!isPro && req.baseUrl === '/api/coach') {
-      req.isPro = await verifyCoachSubscription(req.userId)
-      if (req.isPro) req.proSource = 'revenuecat'
-    }
     req.proSource = req.proSource || source || 'subscription'
   } catch (err) {
     if (req.baseUrl === '/api/coach') return res.status(503).json({error:'Could not verify your subscription. Please retry.'})

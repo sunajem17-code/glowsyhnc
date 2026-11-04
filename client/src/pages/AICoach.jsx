@@ -133,7 +133,7 @@ export default function AICoach() {
   const latestScan = scans[0]
   const [serverScan, setServerScan] = useState(null)
   const isPremium = serverScan?.isPro === true
-  const coachAccessMode = getCoachAccessMode({ isPremium })
+  const coachAccessMode = getCoachAccessMode({ isPremium: serverScan?.isPro })
   // Only server-confirmed scan state may unlock the coach route.
   const hasScan = serverScan?.hasCompletedScan === true
   const conversationRef = useRef(null)
@@ -440,10 +440,10 @@ export default function AICoach() {
       {serverScan === null ? (
         <div className="px-4 py-3 flex-shrink-0" style={{ background: 'var(--card)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 8 }}>
           <div className="rounded-2xl px-4 py-3 font-body text-[13px] text-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
-            Adonis is ready
+            Checking your Adonis access…
           </div>
         </div>
-      ) : !hasScan ? (
+      ) : !hasScan && serverScan.status !== 'unavailable' ? (
         <div className="px-4 pb-8 pt-3 flex-shrink-0">
           <button
             onClick={() => { triggerHaptic(); navigate('/scan') }}

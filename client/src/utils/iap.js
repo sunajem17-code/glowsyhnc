@@ -220,8 +220,18 @@ export async function purchaseDiscountedAnnual() {
 export async function restorePurchases() {
   if (!isNative()) return null
   await initRevenueCat()
-  const result = await Purchases.restoreInAppPurchases()
-  return result.customerInfo
+  const { default: useStore } = await import('../store/useStore')
+  const owner = useStore.getState().user?.id
+  useStore.getState().setSubscriptionStatus('restoring')
+  try {
+    const result = await Purchases.restoreInAppPurchases()
+    if (useStore.getState().user?.id !== owner) throw new Error('Your account changed. Please retry.')
+    await useStore.getState().refreshProStatus({ force: true })
+    return result.customerInfo
+  } catch (error) {
+    if (useStore.getState().user?.id === owner) useStore.getState().setSubscriptionStatus('unavailable')
+    throw error
+  }
 }
 
 // ── Status check ──────────────────────────────────────────────────────────────

@@ -2170,16 +2170,8 @@ export default function PremiumOnboarding() {
   const [sessionError, setSessionError] = useState('')
 
   useEffect(() => {
-    if (initialSignIn || signingIn) {
-      trackOnboardingScreen('sign_in')
-      return
-    }
-    if (!introDone) {
-      trackOnboardingScreen('intro')
-      return
-    }
     trackOnboardingScreen(ONBOARDING_SCREEN_NAMES[step])
-  }, [initialSignIn, signingIn, introDone, step])
+  }, [step])
 
   const [formData, setFormData] = useState({
     gender: '', goal: '', primaryGoal: '',

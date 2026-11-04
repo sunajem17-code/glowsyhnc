@@ -66,3 +66,13 @@ test('an account with an existing device receipt recovers and then requires serv
   })
   assert.equal(result.isPro,true)
 })
+
+test('receipt recovery continues when initial server verification is unavailable', async () => {
+  let reads = 0
+  const result = await loadCoachAccess({native:true,userId:'member',loadContext:async()=>{if (++reads===1) throw new Error('temporarily unavailable'); return {isPro:true,hasCompletedScan:true}},checkPurchase:async()=>true,syncPurchase:async id=>assert.equal(id,'member')})
+  assert.equal(result.isPro,true)
+})
+test('loading and provider failure never turn into a free-user decision', async () => {
+  assert.equal(getCoachAccessMode({isPremium:null}),'loading')
+  await assert.rejects(loadCoachAccess({native:true,userId:'member',loadContext:async()=>{throw new Error('unavailable')},checkPurchase:async()=>false}),/unavailable/)
+})

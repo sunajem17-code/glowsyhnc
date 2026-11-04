@@ -48,17 +48,7 @@ function isAuthorized(req) {
 // wrong (and revoking access someone already paid for); asking "are they
 // actually entitled right now" can't make that mistake, for any event type,
 // including ones RevenueCat adds in the future.
-async function fetchIsEntitled(appUserId) {
-  const rcApiKey = process.env.REVENUECAT_API_KEY
-  if (!rcApiKey) throw new Error('REVENUECAT_API_KEY not configured')
-  const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
-    headers: { Authorization: `Bearer ${rcApiKey}`, 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) throw new Error(`RevenueCat subscriber lookup failed: HTTP ${res.status}`)
-  const data = await res.json()
-  const entitlements = data.subscriber?.entitlements ?? {}
-  return Object.values(entitlements).some(e => e.expires_date == null || new Date(e.expires_date) > new Date())
-}
+const { verifyCoachSubscription: fetchIsEntitled } = require('../lib/verifiedCoachSubscription')
 
 // ── POST /api/webhooks/revenuecat ─────────────────────────────────────────────
 router.post('/revenuecat', async (req, res) => {
