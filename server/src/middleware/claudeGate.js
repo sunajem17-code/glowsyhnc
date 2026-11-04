@@ -17,7 +17,7 @@ const { resolveSubscription } = require('../lib/verifiedCoachSubscription')
 const { requireCurrentAccount } = require('../lib/accountSession')
 const jwt = require('jsonwebtoken')
 const db  = require('../db')
-const { getSupabase, getUserById } = require('../supabase')
+const { getUserById, isConfigured } = require('../supabase')
 const { createLimiter } = require('./ratelimit')
 const { JWT_SECRET } = require('./auth') // single hardened source of truth
 const { monthlyBudgetStatus, budgetError, runWithBudgetUser } = require('../lib/aiBudget')
@@ -112,33 +112,11 @@ async function scanLimit(req, res, next) {
   next()
 }
 
-// ── helper: resolve subscription tier ─────────────────────────────────────────
-async function getSubscriptionTier(userId, req) {
-  // Try Supabase first (production primary store)
-  const sbUser = await getUserById(userId)
-  if (sbUser) {
-    return {
-      tier:        sbUser.subscription_tier || 'free',
-      trialExpires: sbUser.pro_trial_expires_at || null,
-      isPro:
-        sbUser.subscription_tier === 'premium' ||
-        (sbUser.subscription_tier === 'trial' &&
-          sbUser.pro_trial_expires_at &&
-          new Date() < new Date(sbUser.pro_trial_expires_at)) ||
-        sbUser.is_pro === true,
-    }
-  }
-  // Fall back to SQLite (local dev)
-  const row = db.prepare('SELECT subscription_tier, pro_trial_expires_at, is_pro FROM users WHERE id = ?').get(userId)
-  const trialActive =
-    row?.subscription_tier === 'trial' &&
-    row.pro_trial_expires_at &&
-    new Date() < new Date(row.pro_trial_expires_at)
-  return {
-    tier:        row?.subscription_tier || 'free',
-    trialExpires: row?.pro_trial_expires_at || null,
-    isPro:       row?.subscription_tier === 'premium' || trialActive || row?.is_pro === 1,
-  }
+// All paid feature routes use the same live membership decision as billing.
+async function getSubscriptionUser(userId) {
+  const user = await getUserById(userId)
+  if (user || isConfigured()) return user
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
 }
 
 // ── 4. Pro gate ────────────────────────────────────────────────────────────────
@@ -147,7 +125,7 @@ async function requirePro(req, res, next) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   }
   try {
-    const { isPro } = await resolveSubscription(req.userId, { user: await getUserById(req.userId) })
+    const { isPro } = await resolveSubscription(req.userId, { user: await getSubscriptionUser(req.userId) })
     if (isPro) {
       req.isPro = true
       return next()
@@ -155,7 +133,7 @@ async function requirePro(req, res, next) {
     return res.status(403).json({ error: 'Pro required — upgrade to access this feature', plan: 'premium' })
   } catch (err) {
     console.error('[claudeGate] requirePro error:', err.message)
-    return res.status(500).json({ error: 'internal_error' })
+    return res.status(503).json({ error: 'Could not verify your subscription. Please retry.' })
   }
 }
 
@@ -163,15 +141,12 @@ async function requirePro(req, res, next) {
 async function resolvePro(req, res, next) {
   if (req.isDemo) { req.isPro = false; return next() }
   try {
-    const { isPro, source } = req.baseUrl === '/api/coach'
-      ? await resolveSubscription(req.userId, { user: await getUserById(req.userId) })
-      : await getSubscriptionTier(req.userId, req)
+    const { isPro, source } = await resolveSubscription(req.userId, { user: await getSubscriptionUser(req.userId) })
     req.isPro = isPro
     req.proSource = req.proSource || source || 'subscription'
   } catch (err) {
-    if (req.baseUrl === '/api/coach') return res.status(503).json({error:'Could not verify your subscription. Please retry.'})
-    console.error('[claudeGate] resolvePro error (non-fatal, defaulting to free):', err.message)
-    req.isPro = false
+    console.error('[claudeGate] resolvePro error:', err.message)
+    return res.status(503).json({error:'Could not verify your subscription. Please retry.'})
   }
   next()
 }

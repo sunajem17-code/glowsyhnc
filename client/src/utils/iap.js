@@ -128,6 +128,7 @@ function isCancelError(e) {
 // plan: 'monthly' | 'yearly' | 'annual' | 'weekly'
 export async function purchasePro(plan = 'monthly') {
   if (!isNative()) return { success: false, reason: 'web' }
+  let purchaseCompleted = false
   try {
     await initRevenueCat()
 
@@ -174,8 +175,8 @@ export async function purchasePro(plan = 'monthly') {
 
     const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
-    const active = result?.customerInfo?.entitlements?.active ?? {}
-    const isPro = !!active[ENTITLEMENT_ID] && await confirmAccountPurchase(result.customerInfo, purchasedFor)
+    purchaseCompleted = true
+    const isPro = await confirmAccountPurchase(result.customerInfo, purchasedFor)
     return { success: isPro, customerInfo: result.customerInfo }
   } catch (e) {
     if (isCancelError(e)) {
@@ -183,7 +184,9 @@ export async function purchasePro(plan = 'monthly') {
     }
     // Log full RC/StoreKit error for diagnostics — code, message, and raw object
     console.error('[RC] purchasePro failed — code:', e?.code, '| msg:', e?.message, '| full:', e)
-    throw new Error('Unable to complete purchase. Please try again.')
+    throw new Error(purchaseCompleted
+      ? 'Your purchase could not be verified. Use Restore Purchases to reconnect it before buying again.'
+      : 'Unable to complete purchase. Please try again.')
   }
 }
 
@@ -226,8 +229,7 @@ export async function purchaseDiscountedAnnual() {
 
     const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
-    const active = result?.customerInfo?.entitlements?.active ?? {}
-    const isPro = !!active[ENTITLEMENT_ID] && await confirmAccountPurchase(result.customerInfo, purchasedFor)
+    const isPro = await confirmAccountPurchase(result.customerInfo, purchasedFor)
     return { success: isPro, customerInfo: result.customerInfo }
   } catch (e) {
     if (isCancelError(e)) {
@@ -245,7 +247,7 @@ export async function restorePurchases() {
   const owner = useStore.getState().user?.id
   useStore.getState().setSubscriptionStatus('restoring')
   try {
-    const result = await Purchases.restoreInAppPurchases()
+    const result = await Purchases.restorePurchases()
     const { appUserID } = await Purchases.getAppUserID()
     premiumDiagnostic('restore', { accountId: owner, rcId: appUserID, nativeActive: Boolean(result.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID]), restored: true, status: 'verifying' })
     if (useStore.getState().user?.id !== owner) throw new Error('Your account changed. Please retry.')

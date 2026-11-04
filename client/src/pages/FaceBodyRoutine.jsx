@@ -536,7 +536,7 @@ function getPlanProgress(key, day) {
           ? nextDay
         : lastCompletedDate === day && completedDays.length ? completedDays.length : nextDay
     const preserveCompletedChecks = nextUnlockAt > Date.now() && completedDays.includes(activeDay)
-    return { completedDays, lastCompletedDate, nextUnlockAt, nextDayUnlocked, activeDay, today: day, checked: saved.today === day || preserveCompletedChecks ? (saved.checked || {}) : {}, checkedHistory: saved.checkedHistory && typeof saved.checkedHistory === 'object' ? saved.checkedHistory : {} }
+    return { completedDays, lastCompletedDate, nextUnlockAt, nextDayUnlocked, activeDay, today: day, checked: saved.activeDay === activeDay && (saved.today === day || preserveCompletedChecks) ? (saved.checked || {}) : (saved.checkedHistory?.[activeDay] || {}), checkedHistory: saved.checkedHistory && typeof saved.checkedHistory === 'object' ? saved.checkedHistory : {} }
   } catch {
     return { completedDays: [], lastCompletedDate: null, nextUnlockAt: null, nextDayUnlocked: false, activeDay: 1, today: day, checked: {}, checkedHistory: {} }
   }
@@ -607,6 +607,7 @@ export default function FaceBodyRoutine() {
   const scans = useStore(state => state.scans)
   const currentScan = useStore(state => state.currentScan)
   const userId = useStore(state => state.user?.id)
+  const isPremium = useStore(state => state.isPremium)
   const allScans = useMemo(() => {
     const unique = new Map()
     for (const scan of [currentScan, ...scans]) {
@@ -640,7 +641,7 @@ export default function FaceBodyRoutine() {
   const displayedFacePlanDay = Math.min(PLAN_TOTAL_DAYS, Math.max(1, selectedFacePlanDay))
   const selectedFaceWeek = Math.ceil(displayedFacePlanDay / 7)
   const selectedFaceWeekday = (displayedFacePlanDay - 1) % 7
-  const selectedFaceDayLocked = displayedFacePlanDay > faceDayUnlocks.unlockedDay
+  const selectedFaceDayLocked = !isPremium && displayedFacePlanDay > faceDayUnlocks.unlockedDay
   const faceUnlockCountdown = formatUnlockCountdown(faceDayUnlocks.nextUnlockAt, countdownNow)
   const selectedFaceDate = getDateForWeekday(facePlan.startWeek, displayedFacePlanDay - 1)
   const selectedFaceWeekKey = getWeekKey(new Date(`${selectedFaceDate}T12:00:00`))
@@ -842,15 +843,15 @@ export default function FaceBodyRoutine() {
   const showCoachAdvicePreview = new URLSearchParams(window.location.search).get('coachAdvicePreview') === '1'
   const activeMissionSteps = getBodyTasksForDay(plan, selectedPlanDay)
   const selectedRoutineWeek = routineSection === 'face' ? selectedFaceWeek : selectedPlanWeek
-  const selectedBodyWeekLocked = selectedPlanWeek > activeWeekNumber
+  const selectedBodyWeekLocked = !isPremium && selectedPlanWeek > activeWeekNumber
   const routineProgressWeek = selectedRoutineWeek
-  const selectedRoutineWeekLocked = routineSection === 'face'
+  const selectedRoutineWeekLocked = !isPremium && (routineSection === 'face'
     ? selectedFaceWeek > Math.ceil(faceDayUnlocks.unlockedDay / 7)
-    : selectedBodyWeekLocked
+    : selectedBodyWeekLocked)
   const selectedRoutineDay = routineSection === 'face' ? displayedFacePlanDay : selectedPlanDay
   const routineDayUnlockLimit = routineSection === 'face' ? faceDayUnlocks.unlockedDay : planProgress.activeDay
   const routineDayIsPast = selectedRoutineDay < routineDayUnlockLimit
-  const routineDayIsLocked = selectedRoutineDay > routineDayUnlockLimit
+  const routineDayIsLocked = !isPremium && selectedRoutineDay > routineDayUnlockLimit
   const routineStartDate = routineSection === 'face' ? facePlan.startWeek : (plan?.startDate || facePlan.startWeek)
   const selectedRoutineDate = getDateForWeekday(routineStartDate, selectedRoutineDay - 1)
   const selectedRoutineDateLabel = new Date(`${selectedRoutineDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
@@ -919,7 +920,7 @@ export default function FaceBodyRoutine() {
     if (!planProgress.nextUnlockAt || planProgress.nextUnlockAt > countdownNow || planProgress.activeDay >= PLAN_TOTAL_DAYS) return
     const nextDay = Math.min(PLAN_TOTAL_DAYS, planProgress.completedDays.length + 1)
     if (planProgress.activeDay === nextDay) return
-    const next = { ...planProgress, activeDay: nextDay, nextUnlockAt: null, nextDayUnlocked: true, checked: {}, today: day }
+    const next = { ...planProgress, activeDay: nextDay, nextUnlockAt: null, nextDayUnlocked: true, checked: planProgress.checkedHistory?.[nextDay] || {}, today: day }
     setPlanProgress(next)
     try { localStorage.setItem(`${planKey}-progress`, JSON.stringify(next)) } catch { /* keep the unlocked day available for this visit */ }
   }, [planProgress, countdownNow, day, planKey])
@@ -1011,8 +1012,18 @@ export default function FaceBodyRoutine() {
   }
 
   function togglePlanStep(index) {
-    if (!viewingCurrentDay || !activeWeek || planDayDone) return
+    if (!activeWeek || selectedPlanDayDone || (!isPremium && !viewingCurrentDay)) return
     triggerHaptic()
+    // Members can use any day in the full plan. Keep its checks under that
+    // day instead of accidentally changing the current day's completion.
+    if (!viewingCurrentDay) {
+      const key = `${selectedPlanDay}-${index}`
+      const checked = { ...selectedPlanDayChecks, [key]: !selectedPlanDayChecks[key] }
+      const next = { ...planProgress, checkedHistory: { ...planProgress.checkedHistory, [selectedPlanDay]: checked } }
+      setPlanProgress(next)
+      try { localStorage.setItem(`${planKey}-progress`, JSON.stringify(next)) } catch { /* keep this day's checks usable */ }
+      return
+    }
     const checked = { ...planProgress.checked, [`${planProgress.activeDay}-${index}`]: !planProgress.checked[`${planProgress.activeDay}-${index}`] }
     const now = Date.now()
     const sharedUnlockAt = [faceDayUnlocks.nextUnlockAt, planProgress.nextUnlockAt].find(target => target && target > now)
@@ -1054,13 +1065,13 @@ export default function FaceBodyRoutine() {
           {showWeekCalendar && <div className="mt-3 border-t border-white/[0.08] pt-3">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 font-body text-xs">
               <span className="font-semibold text-primary">{selectedRoutineDateLabel}</span>
-              {!routineDayIsLocked && !routineDayIsPast && <span style={{ color: 'rgba(255,255,255,0.58)' }}>{(routineSection === 'face' ? faceUnlockCountdown : bodyUnlockCountdown) ? `Next day unlocks in ${routineSection === 'face' ? faceUnlockCountdown : bodyUnlockCountdown}` : 'Check off a task to start the 12-hour unlock'}</span>}
+              {!isPremium && !routineDayIsLocked && !routineDayIsPast && <span style={{ color: 'rgba(255,255,255,0.58)' }}>{(routineSection === 'face' ? faceUnlockCountdown : bodyUnlockCountdown) ? `Next day unlocks in ${routineSection === 'face' ? faceUnlockCountdown : bodyUnlockCountdown}` : 'Check off a task to start the 12-hour unlock'}</span>}
             </div>
             <div className="mt-3 grid grid-cols-7 gap-1.5" role="group" aria-label={`Days in week ${selectedRoutineWeek}`}>
               {weekCalendarDays.map(challengeDay => {
                 const date = getDateForWeekday(routineStartDate, challengeDay - 1)
                 const dateNumber = new Date(`${date}T12:00:00`).getDate()
-                const locked = challengeDay > routineDayUnlockLimit
+                const locked = !isPremium && challengeDay > routineDayUnlockLimit
                 const selected = challengeDay === selectedRoutineDay
                 return <button key={challengeDay} type="button" aria-label={`${new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${locked ? ', locked preview' : ''}`} aria-disabled={locked} aria-current={selected ? 'date' : undefined} onClick={() => selectRoutineDay(challengeDay)} className="flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border text-xs transition-colors" style={{ color: selected ? '#111' : locked ? GOLD : 'rgba(255,255,255,0.78)', background: selected ? GOLD : locked ? 'rgba(198,168,92,0.06)' : 'rgba(255,255,255,0.035)', borderColor: selected ? GOLD : 'rgba(255,255,255,0.08)', opacity: locked && !selected ? 0.7 : 1 }}><span className="text-[9px] uppercase">{new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}</span><span className="font-semibold">{locked ? <LockKeyhole size={12} /> : dateNumber}</span></button>
               })}
@@ -1085,7 +1096,7 @@ export default function FaceBodyRoutine() {
                     <div className="grid w-[172px] grid-cols-4 gap-2">
                       {Array.from({ length: 4 }, (_, index) => {
                         const filled = isHydrationGlassChecked(hydrationPeriod, index)
-                        return <button key={`water-${step.id}-${index}`} type="button" disabled={selectedFaceDayLocked || routineDayIsPast} aria-label={`${hydrationPeriod} water glass ${index + 1} of 4`} aria-pressed={filled} onClick={() => toggleHydrationGlass(hydrationPeriod, index)} className="flex min-h-9 items-center justify-center rounded-lg transition-all duration-200 active:scale-110 disabled:cursor-not-allowed disabled:opacity-100"><Droplets size={20} strokeWidth={3.5} style={{ color: filled ? GOLD : 'rgba(255,255,255,0.12)', filter: filled ? CHECKED_ICON_GLOW : 'none' }} /></button>
+                        return <button key={`water-${step.id}-${index}`} type="button" disabled={selectedFaceDayLocked || (!isPremium && routineDayIsPast)} aria-label={`${hydrationPeriod} water glass ${index + 1} of 4`} aria-pressed={filled} onClick={() => toggleHydrationGlass(hydrationPeriod, index)} className="flex min-h-9 items-center justify-center rounded-lg transition-all duration-200 active:scale-110 disabled:cursor-not-allowed disabled:opacity-100"><Droplets size={20} strokeWidth={3.5} style={{ color: filled ? GOLD : 'rgba(255,255,255,0.12)', filter: filled ? CHECKED_ICON_GLOW : 'none' }} /></button>
                       })}
                     </div>
                     <div role="progressbar" aria-label={`${hydrationPeriod} water progress`} aria-valuemin={0} aria-valuemax={4} aria-valuenow={hydrationCount(hydrationPeriod)} className="mt-1.5 h-1 w-[172px] overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }}>
@@ -1096,7 +1107,7 @@ export default function FaceBodyRoutine() {
                     const itemChecked = isRoutineStepChecked(step, index)
                     const stepKey = routineStepKey(step, index)
                     const detail = step.stepDetails?.[stepKey]
-                    return <button key={step.stepKeys?.[index] ?? instruction} type="button" disabled={selectedFaceDayLocked || routineDayIsPast} aria-pressed={itemChecked} aria-disabled={selectedFaceDayLocked || routineDayIsPast} onClick={() => toggleRoutineStep(step, index)} className="flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-200 active:scale-[0.99] disabled:cursor-default disabled:opacity-75" style={{ borderColor: itemChecked ? GOLD : 'rgba(255,255,255,0.08)', background: itemChecked ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.035)', boxShadow: itemChecked ? CHECKED_ROW_GLOW : 'none' }}>
+                    return <button key={step.stepKeys?.[index] ?? instruction} type="button" disabled={selectedFaceDayLocked || (!isPremium && routineDayIsPast)} aria-pressed={itemChecked} aria-disabled={selectedFaceDayLocked || (!isPremium && routineDayIsPast)} onClick={() => toggleRoutineStep(step, index)} className="flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-200 active:scale-[0.99] disabled:cursor-default disabled:opacity-75" style={{ borderColor: itemChecked ? GOLD : 'rgba(255,255,255,0.08)', background: itemChecked ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.035)', boxShadow: itemChecked ? CHECKED_ROW_GLOW : 'none' }}>
                       {selectedFaceDayLocked ? <LockKeyhole className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-label="Locked until this day unlocks" /> : <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: itemChecked ? GOLD : 'rgba(255,255,255,0.25)', background: itemChecked ? 'rgba(198,168,92,0.12)' : 'transparent', color: GOLD, filter: itemChecked ? CHECKED_ICON_GLOW : 'none' }}>{itemChecked && <Check size={12} strokeWidth={3} />}</span>}
                       <span className="flex min-w-0 flex-1 items-center justify-between gap-3"><span className={`${detail ? 'font-heading font-semibold' : 'font-body'} min-w-0 text-sm leading-relaxed ${itemChecked ? 'line-through' : ''}`} style={{ color: itemChecked ? GOLD : 'rgba(255,255,255,0.8)', textShadow: itemChecked ? CHECKED_TEXT_GLOW : 'none' }}>{instruction}</span>{detail && <span className="shrink-0 rounded-full px-2.5 py-1.5 font-heading text-xs font-bold whitespace-nowrap" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>{detail}</span>}</span>
                     </button>
@@ -1147,7 +1158,7 @@ export default function FaceBodyRoutine() {
                 <div className="mb-3 flex items-center gap-2"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(198,168,92,0.12)', color: GOLD }}><Dumbbell size={19} /></span><h3 className="flex-1 font-heading text-base font-semibold text-primary">{(todaysSession?.name || 'Recovery day').replace(/^Day\s*\d+\s*[·:—-]\s*/i, '')}</h3>{!selectedBodyWeekLocked && <span className="font-body text-sm" style={{ color: selectedPlanDayDone ? GOLD : 'rgba(255,255,255,0.5)' }}>{viewingCurrentDay ? (planDayDone ? activeMissionSteps.length : `${checkedPlanSteps}/${activeMissionSteps.length}`) : routineDayIsPast ? 'Past day' : null}</span>}</div>
                 {activeMissionSteps.length > 0 && <div className="space-y-1.5">{activeMissionSteps.map((step, index) => {
                   const checked = Boolean(selectedPlanDayChecks[`${selectedPlanDay}-${index}`])
-                  return <div key={`step-${index}`}><button type="button" disabled={selectedBodyWeekLocked || !viewingCurrentDay || planDayDone} onClick={() => togglePlanStep(index)} aria-pressed={checked} className="flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-200 active:scale-[0.99] disabled:cursor-default" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.08)', background: checked ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.035)', boxShadow: checked ? CHECKED_ROW_GLOW : 'none' }}>{selectedBodyWeekLocked || routineDayIsLocked ? <LockKeyhole className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-label="Locked" /> : <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.25)', background: checked ? 'rgba(198,168,92,0.12)' : 'transparent', color: GOLD, filter: checked ? CHECKED_ICON_GLOW : 'none' }}>{checked && <Check size={12} strokeWidth={3} />}</span>}<span className="min-w-0 flex-1 font-body text-sm" style={{ color: checked ? GOLD : 'rgba(255,255,255,0.92)', textShadow: checked ? CHECKED_TEXT_GLOW : 'none' }}>{step.title}</span>{step.reps && <span className="shrink-0 rounded-full px-2.5 py-1.5 font-heading text-xs font-bold whitespace-nowrap" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>{step.reps}</span>}</button>{step.details && <ul aria-label="Home cardio examples" className="space-y-1 px-3 py-2.5 font-body text-xs leading-relaxed text-white/65">{step.details.map(example => <li key={example} className="flex gap-2"><span aria-hidden="true" style={{ color: GOLD }}>•</span><span>{example}</span></li>)}</ul>}</div>
+                  return <div key={`step-${index}`}><button type="button" disabled={selectedBodyWeekLocked || (!isPremium && !viewingCurrentDay) || selectedPlanDayDone} onClick={() => togglePlanStep(index)} aria-pressed={checked} className="flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all duration-200 active:scale-[0.99] disabled:cursor-default" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.08)', background: checked ? 'rgba(198,168,92,0.12)' : 'rgba(255,255,255,0.035)', boxShadow: checked ? CHECKED_ROW_GLOW : 'none' }}>{selectedBodyWeekLocked || routineDayIsLocked ? <LockKeyhole className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-label="Locked" /> : <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: checked ? GOLD : 'rgba(255,255,255,0.25)', background: checked ? 'rgba(198,168,92,0.12)' : 'transparent', color: GOLD, filter: checked ? CHECKED_ICON_GLOW : 'none' }}>{checked && <Check size={12} strokeWidth={3} />}</span>}<span className="min-w-0 flex-1 font-body text-sm" style={{ color: checked ? GOLD : 'rgba(255,255,255,0.92)', textShadow: checked ? CHECKED_TEXT_GLOW : 'none' }}>{step.title}</span>{step.reps && <span className="shrink-0 rounded-full px-2.5 py-1.5 font-heading text-xs font-bold whitespace-nowrap" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>{step.reps}</span>}</button>{step.details && <ul aria-label="Home cardio examples" className="space-y-1 px-3 py-2.5 font-body text-xs leading-relaxed text-white/65">{step.details.map(example => <li key={example} className="flex gap-2"><span aria-hidden="true" style={{ color: GOLD }}>•</span><span>{example}</span></li>)}</ul>}</div>
                 })}</div>}
         </section>}
         </div>

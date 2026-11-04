@@ -11,6 +11,34 @@ test('only a current server-verified Pro entitlement grants coach access', async
 test('provider failure does not become a paywall or grant',async()=>{
  await assert.rejects(verifyCoachSubscription('owner',{apiKey:'fixture',fetcher:async()=>({ok:false,status:503})}),/unavailable/)
 })
+test('an active sandbox entitlement is found after an empty production response', async () => {
+  const environments = []
+  assert.equal(await verifyCoachSubscription('owner', { apiKey: 'fixture', fetcher: async (url, options) => {
+    assert.match(url, /subscribers\/owner$/)
+    const sandbox = options.headers['X-Is-Sandbox']
+    environments.push(sandbox)
+    return { ok: true, json: async () => ({ subscriber: { entitlements: sandbox === 'true'
+      ? { 'Ascendus Pro': { expires_date: new Date(Date.now() + 60000).toISOString() } } : {} } }) }
+  } }), true)
+  assert.deepEqual(environments, ['false', 'true'])
+})
+test('active production membership does not depend on a sandbox lookup', async () => {
+  const environments = []
+  assert.equal(await verifyCoachSubscription('owner', { apiKey: 'fixture', fetcher: async (url, options) => {
+    environments.push(options.headers['X-Is-Sandbox'])
+    return { ok: true, json: async () => ({ subscriber: { entitlements: { 'Ascendus Pro': { expires_date: null } } } }) }
+  } }), true)
+  assert.deepEqual(environments, ['false'])
+})
+test('expired sandbox purchases and sandbox outages never grant access', async () => {
+  assert.equal(await verifyCoachSubscription('owner', { apiKey: 'fixture', fetcher: async () => ({ ok: true,
+    json: async () => ({ subscriber: { entitlements: { 'Ascendus Pro': { expires_date: '2020-01-01' } } } }),
+  }) }), false)
+  await assert.rejects(verifyCoachSubscription('owner', { apiKey: 'fixture', fetcher: async (url, options) =>
+    options.headers['X-Is-Sandbox'] === 'true' ? { status: 503, ok: false }
+      : { ok: true, json: async () => ({ subscriber: { entitlements: {} } }) },
+  }), /unavailable/)
+})
 
 const { resolveSubscription } = require('./verifiedCoachSubscription')
 test('stale iOS database flags cannot override expiry; active iOS recovers a free row', async () => {

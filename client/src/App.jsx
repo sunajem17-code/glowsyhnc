@@ -151,10 +151,10 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return
     refreshProStatus()
-    const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus() }
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshProStatus({ force: true }) }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [isAuthenticated])
+  }, [isAuthenticated, userId, refreshProStatus])
 
   // Schedule streak reminder only — permission is requested during onboarding
   useEffect(() => {

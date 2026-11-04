@@ -325,6 +325,7 @@ router.post('/portal', authMiddleware, async (req, res) => {
 
 // Check premium status (called after redirect back from Stripe)
 router.get('/status', authMiddleware, async (req, res) => {
+  res.set('Cache-Control', 'no-store')
   try {
     let user = await getUserById(req.userId)
     if (!user && !isConfigured()) user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId)

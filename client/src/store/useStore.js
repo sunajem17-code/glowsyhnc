@@ -350,6 +350,7 @@ const useStore = create(
       // Premium
       isPremium: false, subscriptionStatus: 'inactive',
       setIsPremium: async (v) => {
+        if (v && get().subscriptionStatus === 'active' && get().isPremium) return
         premiumStateRevision += 1
         if (!v) { set({ isPremium: false, subscriptionStatus: 'inactive' }); return }
         // Purchase callbacks request verification; only the server response
@@ -371,7 +372,7 @@ const useStore = create(
         if (!isAuthenticated || !token || token === 'demo-token') return
         // Throttle: skip if we refreshed within the last 60 seconds
         if (!force && Date.now() - _lastProRefresh < 60_000) return
-        set({ _lastProRefresh: Date.now(), isPremium: false, subscriptionStatus: 'loading' })
+        set({ _lastProRefresh: Date.now(), subscriptionStatus: 'loading' })
         const revisionAtStart = premiumStateRevision
         try {
           // Native status may request server reconciliation, but only the
@@ -398,18 +399,21 @@ const useStore = create(
           const headers = { Authorization: `Bearer ${token}` }
 
           // Run both fetches in parallel — cuts startup time in half
-          const [statusRes, profileRes] = await Promise.all([
-            fetch(`${API_BASE}/payments/status`, { headers }),
-            fetch(`${API_BASE}/user/profile`,    { headers }),
+          const [statusResult, profileResult] = await Promise.allSettled([
+            fetch(`${API_BASE}/payments/status`, { headers, cache: 'no-store', signal: AbortSignal.timeout(12000) }),
+            fetch(`${API_BASE}/user/profile`,    { headers, signal: AbortSignal.timeout(12000) }),
           ])
+
+          const statusRes = statusResult.status === 'fulfilled' ? statusResult.value : null
+          const profileRes = profileResult.status === 'fulfilled' ? profileResult.value : null
 
           // The server status is also authoritative. A true response grants
           // access; a false response only applies if no newer entitlement
           // change happened while this refresh was in flight. This protects a
           // newly completed purchase from an older refresh response.
           if (get().token !== token) return
-          if (statusRes.status === 401 || profileRes.status === 401) { get().logout(); return }
-          if (statusRes.ok) {
+          if (statusRes?.status === 401 || profileRes?.status === 401) { get().logout(); return }
+          if (statusRes?.ok) {
             const { isPremium } = await statusRes.json()
             if (get().token !== token) return
             premiumDiagnostic('server-status', { accountId: get().user?.id, serverActive: isPremium, status: isPremium ? 'active' : 'inactive' })
@@ -429,11 +433,15 @@ const useStore = create(
 
           }
 
-          if (!statusRes.ok) set({ isPremium: false, subscriptionStatus: 'unavailable' })
+          // A transport/profile error is not evidence that a verified paid
+          // membership expired. Keep access until a current server denial.
+          if (!statusRes?.ok && revisionAtStart === premiumStateRevision) {
+            set({ subscriptionStatus: 'unavailable', _lastProRefresh: 0 })
+          }
 
           // Profile fields hydrate personal data only. Subscription status
           // comes from the entitlement checks above, never stale profile flags.
-          if (profileRes.ok) {
+          if (profileRes?.ok) {
             const profile = await profileRes.json()
             if (get().token !== token) return
             const fresh = profile.user || profile
@@ -460,7 +468,7 @@ const useStore = create(
             }))
           }
         } catch (err) {
-          if (get().token === token) set({ isPremium: false, subscriptionStatus: 'unavailable' })
+          if (get().token === token && revisionAtStart === premiumStateRevision) set({ subscriptionStatus: 'unavailable', _lastProRefresh: 0 })
           console.warn('[refreshProStatus] status/profile fetch failed:', err?.message)
         }
       },

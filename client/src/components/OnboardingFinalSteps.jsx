@@ -5,7 +5,7 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { getEligibleScanTrial, purchaseScanTrial, restorePurchases } from '../utils/iap'
 import { trialRenewalText } from '../utils/scanTrial'
 import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
@@ -256,8 +256,6 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
   const [eligibilityAttempt, setEligibilityAttempt] = useState(0)
   const purchaseLock = useRef(false)
   const completedPurchase = useRef(null)
-  const onDeclineRef = useRef(onDecline)
-  onDeclineRef.current = onDecline
   const busy = loading || purchasing
   useEffect(() => {
     let active = true
@@ -266,9 +264,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
     setTrial(null)
     withDeadline((async () => {
       const pkg = await getEligibleScanTrial()
-      // Existing subscribers and accounts that have used a trial should not
-      // get trapped in an offer they cannot redeem.
-      if (active && !pkg) onDeclineRef.current()
+      if (active && !pkg) setTrialError('Your Apple account is not eligible for this free trial. You can close this offer or restore an existing purchase.')
       return pkg
     })(), 20000, 'Subscription check timed out. Please try again.').then(pkg => {
       if (!active) return
@@ -293,6 +289,22 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
       }
     } catch (err) {
       setTrialError(err?.message || 'Unable to start your trial Please try again')
+    } finally {
+      purchaseLock.current = false
+      setPurchasing(false)
+    }
+  }
+  async function restoreTrialPurchase() {
+    if (purchaseLock.current || loading) return
+    purchaseLock.current = true
+    setPurchasing(true)
+    setTrialError('')
+    try {
+      const customerInfo = await restorePurchases()
+      if (!customerInfo) throw new Error('Restore purchases from the iPhone app.')
+      await onClaim({ success: true, customerInfo })
+    } catch (err) {
+      setTrialError(err?.message || 'Restore failed. Please try again.')
     } finally {
       purchaseLock.current = false
       setPurchasing(false)
@@ -376,6 +388,9 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 7 days free' : 'Check availability again'}
+        </button>
+        <button onClick={restoreTrialPurchase} disabled={busy} className="font-body text-[12px] underline disabled:opacity-50" style={{ color: DIM }}>
+          Restore Purchases
         </button>
       </motion.div>
     </motion.div>

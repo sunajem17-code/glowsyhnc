@@ -6,6 +6,7 @@ import { purchasePro, purchaseScanTrial, restorePurchases } from '../utils/iap'
 import useStore from '../store/useStore'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { useNavigate } from 'react-router-dom'
+import { FreeTrialOfferModal } from './OnboardingFinalSteps'
 
 const GOLD = '#C6A85C'
 const BG = '#080808'
@@ -233,6 +234,9 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
   const [cardIndex, setCardIndex] = useState(0)
   const [segmentProgress, setSegmentProgress] = useState(0) // 0..1
   const [loading, setLoading] = useState(false)
+  const [showTrialOffer, setShowTrialOffer] = useState(false)
+  const [purchaseError, setPurchaseError] = useState('')
+  const purchaseLock = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
 
   const dragX = useMotionValue(0)
@@ -288,28 +292,47 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
   }
 
   const handlePurchase = async () => {
+    if (purchaseLock.current) return
+    purchaseLock.current = true
     triggerHaptic()
     setLoading(true)
+    setPurchaseError('')
     try {
       const result = monthlyTrial ? await purchaseScanTrial(monthlyTrial.product.identifier) : await purchasePro('monthly')
       if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
         setIsPremium(true)
         onPurchaseSuccess?.()
+      } else if (result?.reason !== 'cancelled') {
+        setPurchaseError('Your purchase could not be verified. Please use Restore Purchase before buying again.')
       }
     } catch (err) {
+      setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
       console.error('[PaywallModal] purchase error', err)
     } finally {
       setLoading(false)
+      purchaseLock.current = false
     }
   }
 
   const handleRestore = async () => {
+    if (purchaseLock.current) return
+    purchaseLock.current = true
     triggerHaptic()
+    setLoading(true)
+    setPurchaseError('')
     try {
       await restorePurchases()
+      if (useStore.getState().subscriptionStatus === 'active') {
+        useStore.getState().setUpgradeWelcomePending(true)
+        onPurchaseSuccess?.()
+      } else setPurchaseError('No active purchase was found to restore.')
     } catch (err) {
+      setPurchaseError(err?.message || 'Restore failed. Please try again.')
       console.error('[PaywallModal] restore error', err)
+    } finally {
+      setLoading(false)
+      purchaseLock.current = false
     }
   }
 
@@ -374,7 +397,9 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
 
           {onClose && (
             <button
-              onClick={() => { triggerHaptic(); onClose() }}
+              aria-label="Close"
+              disabled={loading}
+              onClick={() => { triggerHaptic(); setShowTrialOffer(true) }}
               style={{
                 marginLeft: 8,
                 width: 32,
@@ -588,6 +613,18 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
         </div>
       </div>
 
+      {purchaseError && <p role="alert" style={{ color: '#EF4444', textAlign: 'center', padding: '8px 24px' }}>{purchaseError}</p>}
+      <AnimatePresence>
+        {showTrialOffer && <FreeTrialOfferModal
+          loading={loading}
+          onDecline={() => { setShowTrialOffer(false); onClose?.() }}
+          onClaim={() => {
+            useStore.getState().setUpgradeWelcomePending(true)
+            setShowTrialOffer(false)
+            onPurchaseSuccess?.()
+          }}
+        />}
+      </AnimatePresence>
       {/* Spinner keyframe */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </motion.div>

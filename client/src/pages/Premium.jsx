@@ -109,7 +109,7 @@ export default function Premium() {
         setSessionExpired(true)
       } else if (!lower.includes('cancel')) {
         // Always show a generic message — never expose raw RC/StoreKit errors
-        setCheckoutError('Unable to complete purchase. Please try again.')
+        setCheckoutError(msg || 'Unable to complete purchase. Please try again.')
       }
     } finally {
       setSubscribingNow(false)
@@ -122,10 +122,8 @@ export default function Premium() {
     setCheckoutError('')
     try {
       const info = await restorePurchases()
-      const isPro = !!info?.entitlements?.active?.['Ascendus Pro']
+      const isPro = Boolean(info) && useStore.getState().subscriptionStatus === 'active'
       if (isPro) {
-        const rcUserId = info?.originalAppUserId
-        api.payments.syncRc(rcUserId).catch(() => {})
         setIsPremium(true)
         navigate('/dashboard')
       } else {
