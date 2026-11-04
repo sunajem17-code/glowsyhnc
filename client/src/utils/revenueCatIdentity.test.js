@@ -57,34 +57,65 @@ function purchaseReader({ paid = false, syncError = null } = {}) {
   }
   return { purchases, read: createProCustomerInfoReader({ purchases, initialize: async () => {}, entitlementId: 'Ascendus Pro' }), syncs: () => syncs, switchAccount: () => { current = 'other' } }
 }
-test('a new app account recovers the device subscription before returning unpaid', async () => {
+test('new accounts never recover device receipts as a side effect of reading status', async () => {
   const fixture = purchaseReader()
-  const [a, b] = await Promise.all([fixture.read('member'), fixture.read('member')])
-  assert.equal(a, paidInfo)
-  assert.equal(b, paidInfo)
-  assert.equal(fixture.syncs(), 1)
-  assert.equal(await fixture.read('member'), paidInfo)
-  assert.equal(fixture.syncs(), 1)
+  assert.deepEqual(await Promise.all([fixture.read('member'), fixture.read('member')]), [null, null])
+  assert.equal(fixture.syncs(), 0)
 })
-test('an existing cached member submits receipts once before access is returned', async () => {
+test('current account membership is read without restoring another identity', async () => {
   const fixture = purchaseReader({ paid: true })
   assert.equal(await fixture.read('member'), paidInfo)
-  assert.equal(fixture.syncs(), 1)
+  assert.equal(fixture.syncs(), 0)
 })
-test('receipt verification failure is retryable and is not a free membership result', async () => {
-  const fixture = purchaseReader({ syncError: new Error('Store unavailable') })
-  await assert.rejects(fixture.read('member'), /Store unavailable/)
-  await assert.rejects(fixture.read('member'), /Store unavailable/)
-  assert.equal(fixture.syncs(), 2)
-})
-test('an account change during receipt recovery cannot grant the next user access', async () => {
+test('native network failure stays unavailable instead of becoming free', async () => {
   const fixture = purchaseReader()
-  fixture.purchases.syncPurchases = async () => fixture.switchAccount()
+  fixture.purchases.getCustomerInfo = async () => { throw new Error('Store unavailable') }
+  await assert.rejects(fixture.read('member'), /Store unavailable/)
+})
+test('an account change during status read cannot grant the next user access', async () => {
+  const fixture = purchaseReader({ paid: true })
+  fixture.purchases.getCustomerInfo = async () => { fixture.switchAccount(); return { customerInfo: paidInfo } }
   await assert.rejects(fixture.read('member'), /account changed/)
 })
+test('deletion disconnects a pending login before a new account can initialize', async () => {
+  const purchases = sdk()
+  let owner = 'old'
+  const initialize = createRevenueCatInitializer({ purchases, apiKey: 'fixture', resolveUserId: async () => owner })
+  const oldLogin = initialize()
+  const logout = initialize.disconnect()
+  await Promise.all([oldLogin, logout])
+  assert.equal((await purchases.getAppUserID()).appUserID, '$RCAnonymousID:new')
+  owner = 'new'
+  await initialize()
+  assert.equal((await purchases.getAppUserID()).appUserID, 'new')
+  assert.deepEqual(purchases.calls.map(([op])=>op), ['configure','logout','login'])
+})
+test('an unauthenticated startup disconnects a custom identity retained by the SDK', async () => {
+  const purchases = sdk('deleted')
+  const initialize = createRevenueCatInitializer({ purchases, apiKey: 'fixture', resolveUserId: async () => null })
+  await initialize()
+  assert.equal((await purchases.getAppUserID()).appUserID, '$RCAnonymousID:new')
+})
+
 test('an unrelated active entitlement does not unlock Pro', async () => {
   const fixture = purchaseReader()
   fixture.purchases.syncPurchases = async () => {}
   fixture.purchases.getCustomerInfo = async () => ({ customerInfo: { entitlements: { active: { Other: {} } } } })
   assert.equal(await fixture.read('member'), null)
+})
+
+import { finishAccountPurchase } from './revenueCatIdentity.js'
+test('purchase and restore complete only for the same server-verified account', async()=>{
+ let session={user:{id:'owner'},token:'token',subscriptionStatus:'loading'},synced=0
+ const options={expectedId:'owner',customerInfo:paidInfo,entitlementId:'Ascendus Pro',getSession:()=>session,getIdentity:async()=>session.user.id,sync:async()=>{synced++},refresh:async()=>{session={...session,subscriptionStatus:'active'}}}
+ assert.equal(await finishAccountPurchase(options),true);assert.equal(synced,1)
+ session={...session,subscriptionStatus:'inactive'}
+ await assert.rejects(finishAccountPurchase({...options,refresh:async()=>{}}),/verification/)
+ session={...session,subscriptionStatus:'loading'}
+ await assert.rejects(finishAccountPurchase({...options,sync:async()=>{session={user:{id:'new'},token:'new-token'}}}),/account changed/)
+})
+test('a native-only, unrelated or unowned entitlement never completes purchase/restoration',async()=>{
+ const options={expectedId:'owner',customerInfo:paidInfo,entitlementId:'Ascendus Pro',getSession:()=>({user:{id:'other'},token:'token'}),getIdentity:async()=>'owner',sync:()=>assert.fail('unowned sync')}
+ await assert.rejects(finishAccountPurchase(options),/account changed/)
+ assert.equal(await finishAccountPurchase({...options,customerInfo:{entitlements:{active:{Other:{}}}}}),false)
 })

@@ -50,7 +50,7 @@ async function visualReview(context, userId, question, client, includeScanPhoto 
     }), 30000)
     const review = JSON.parse(response.content.find(block => block.type === 'text')?.text)
     if (!Array.isArray(review.observations) || !Array.isArray(review.limitations)) throw new Error('Invalid visual review')
-    visuals.set(key, { review, expires: Date.now() + 10 * 60 * 1000 })
+    visuals.set(key, { userId, review, expires: Date.now() + 10 * 60 * 1000 })
     return { status: 'fresh_vision_review', ...review }
   } catch {
     return { status: 'vision_error', explanation: 'Image review failed. Explain saved structured results without claiming to have viewed the photo.' }
@@ -79,4 +79,9 @@ async function answer({ userId, conversationId, question, context, isPro, includ
   } finally { session.busy = false }
 }
 
-module.exports = { answer, visualReview, historyFor, BASE_PROMPT }
+function clearAccountContext(userId) {
+  for (const map of [sessions, visuals]) {
+    for (const [key, value] of map) if (key.startsWith(`${userId}:`) || value.userId === userId) map.delete(key)
+  }
+}
+module.exports = { answer, visualReview, historyFor, BASE_PROMPT, clearAccountContext }

@@ -1,7 +1,8 @@
+import { premiumDiagnostic } from './premiumDiagnostics'
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
 import { isMonthlyExitTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial'
-import { createRevenueCatInitializer, createProCustomerInfoReader, validRevenueCatUserId } from './revenueCatIdentity'
+import { createRevenueCatInitializer, createProCustomerInfoReader, validRevenueCatUserId, finishAccountPurchase } from './revenueCatIdentity'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
 const REVENUECAT_API_KEY = 'appl_LIKxNXBwFteqKVMvOUvkansTrdr'
@@ -30,9 +31,26 @@ const initializeIdentity = createRevenueCatInitializer({
       state = useStore.getState()
       return state.user?.id ?? null
     }
-    return requestedId ?? state.user?.id ?? null
+    const currentId = state.isAuthenticated ? state.user?.id ?? null : null
+    if (requestedId && requestedId !== currentId) throw new Error('Your account changed. Please retry.')
+    return currentId
   },
 })
+
+async function confirmAccountPurchase(customerInfo, expectedId) {
+  const { default: useStore } = await import('../store/useStore')
+  const { api } = await import('./api')
+  return finishAccountPurchase({ expectedId, customerInfo, entitlementId: ENTITLEMENT_ID,
+    getSession: () => useStore.getState(),
+    getIdentity: async () => (await Purchases.getAppUserID()).appUserID,
+    sync: () => api.payments.syncRc(),
+    refresh: () => useStore.getState().refreshProStatus({ force: true }),
+  })
+}
+
+export async function disconnectRevenueCat() {
+  if (Capacitor.isNativePlatform()) await initializeIdentity.disconnect()
+}
 
 export const isNative = () => Capacitor.isNativePlatform()
 
@@ -48,7 +66,7 @@ export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
       .filter(([identifier]) => identifier)
   ).values()]
   const candidates = packages.filter(p => p.product?.identifier === productId && isMonthlyExitTrial(p.product))
-  if (!candidates.length) throw new Error('The monthly plan with a 3-day free trial is not configured in the store yet. Please try again later.')
+  if (!candidates.length) throw new Error('The monthly plan with a 7-day free trial is not configured in the store yet. Please try again later.')
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })
@@ -64,8 +82,9 @@ export async function purchaseScanTrial(productId) {
   const pkg = await getEligibleScanTrial(productId)
   if (!pkg || pkg.product.identifier !== productId) throw new Error('This free trial is no longer available.')
   try {
+    const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
-    return { success: !!result.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID], customerInfo: result.customerInfo }
+    return { success: await confirmAccountPurchase(result.customerInfo, purchasedFor), customerInfo: result.customerInfo }
   } catch (error) {
     if (isCancelError(error)) return { success: false, reason: 'cancelled' }
     throw error
@@ -76,7 +95,7 @@ export async function purchaseScanTrial(productId) {
 export async function initRevenueCat(userId) {
   if (!isNative()) return
   try {
-    await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG })
+    await Purchases.setLogLevel({ level: LOG_LEVEL.ERROR })
     await initializeIdentity(userId)
   } catch (e) {
     console.error('[RC] initRevenueCat failed:', e?.code, e?.message)
@@ -153,9 +172,10 @@ export async function purchasePro(plan = 'monthly') {
       throw new Error('The selected subscription plan is not available. Please try again later.')
     }
 
+    const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
     const active = result?.customerInfo?.entitlements?.active ?? {}
-    const isPro = !!active[ENTITLEMENT_ID]
+    const isPro = !!active[ENTITLEMENT_ID] && await confirmAccountPurchase(result.customerInfo, purchasedFor)
     return { success: isPro, customerInfo: result.customerInfo }
   } catch (e) {
     if (isCancelError(e)) {
@@ -204,9 +224,10 @@ export async function purchaseDiscountedAnnual() {
     // show a real "not available" message instead of a generic purchase error.
     if (!pkg) return { success: false, reason: 'not_configured' }
 
+    const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
     const active = result?.customerInfo?.entitlements?.active ?? {}
-    const isPro = !!active[ENTITLEMENT_ID]
+    const isPro = !!active[ENTITLEMENT_ID] && await confirmAccountPurchase(result.customerInfo, purchasedFor)
     return { success: isPro, customerInfo: result.customerInfo }
   } catch (e) {
     if (isCancelError(e)) {
@@ -225,8 +246,10 @@ export async function restorePurchases() {
   useStore.getState().setSubscriptionStatus('restoring')
   try {
     const result = await Purchases.restoreInAppPurchases()
+    const { appUserID } = await Purchases.getAppUserID()
+    premiumDiagnostic('restore', { accountId: owner, rcId: appUserID, nativeActive: Boolean(result.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID]), restored: true, status: 'verifying' })
     if (useStore.getState().user?.id !== owner) throw new Error('Your account changed. Please retry.')
-    await useStore.getState().refreshProStatus({ force: true })
+    if (!await confirmAccountPurchase(result.customerInfo, owner)) throw new Error('No active purchase was found to restore.')
     return result.customerInfo
   } catch (error) {
     if (useStore.getState().user?.id === owner) useStore.getState().setSubscriptionStatus('unavailable')
@@ -240,7 +263,10 @@ const readProCustomerInfo = createProCustomerInfoReader({
 })
 export async function getProCustomerInfo(userId) {
   if (!isNative()) return null
-  return readProCustomerInfo(userId)
+  const info = await readProCustomerInfo(userId)
+  const { appUserID } = await Purchases.getAppUserID()
+  premiumDiagnostic('native-status', { accountId: userId, rcId: appUserID, nativeActive: Boolean(info) })
+  return info
 }
 
 export async function checkProStatus(userId) {

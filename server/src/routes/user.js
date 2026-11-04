@@ -77,7 +77,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 // 3. Cascade-delete all user data from SQLite
 router.delete('/account', authMiddleware, async (req, res) => {
   const userId = req.userId
-  console.log('[deleteAccount] Starting deletion for userId:', userId)
+  console.log('[deleteAccount] Starting account cleanup')
 
   // ── Fetch user (need stripe_subscription_id) — non-fatal if not found ───────
   let user = await getUserById(userId).catch(() => null)
@@ -103,113 +103,41 @@ router.delete('/account', authMiddleware, async (req, res) => {
         maxNetworkRetries: 1,
       })
       await stripe.subscriptions.cancel(subId)
-      console.log('[deleteAccount] Stripe subscription cancelled:', subId)
+      console.log('[deleteAccount] Stripe subscription cancellation completed')
     } catch (err) {
       // Non-fatal — may already be cancelled or test key mismatch
       console.warn('[deleteAccount] Stripe cancel skipped:', err.message)
     }
   }
 
-  // ── 2. Supabase cascade delete ────────────────────────────────────────────
-  const sb = getSupabase()
-  if (sb) {
-    // Delete FK-dependent tables first, then the user row
-    const sbTables = [
-      'task_completions',
-      'daily_checkins',
-      'streaks',
-      'plan_tasks',
-      'progress',
-      'scans',
-      'leaderboard',
-      'action_plans',
-    ]
-    for (const table of sbTables) {
-      try {
-        await sb.from(table).delete().eq('user_id', userId)
-      } catch (err) {
-        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
-      }
-    }
-    // Also clean up optional tables (may or may not exist in this environment)
-    for (const table of ['email_sends', 'scan_cache', 'affiliate_clicks']) {
-      try {
-        await sb.from(table).delete().eq('user_id', userId)
-      } catch (err) {
-        console.warn(`[deleteAccount] Supabase ${table} delete skipped:`, err.message)
-      }
-    }
-    try {
-      await sb.from('profiles').delete().eq('id', userId)
-      console.log('[deleteAccount] Supabase profiles row deleted')
-    } catch (err) {
-      console.warn('[deleteAccount] Supabase profiles delete skipped:', err.message)
-    }
-    try {
-      await sb.from('users').delete().eq('id', userId)
-      console.log('[deleteAccount] Supabase users row deleted')
-    } catch (err) {
-      console.warn('[deleteAccount] Supabase users delete skipped:', err.message)
-    }
-
-    // ── Delete scan images from Supabase Storage ────────────────────────────
-    // Files are stored under scan-images/{folder}/{userId}/... where folder
-    // is always 'scan' (the default in /supabase/upload-image). We list only
-    // this user's prefix so we never touch any other user's files.
-    try {
-      const { data: files, error: listErr } = await sb.storage
-        .from('scan-images')
-        .list(`scan/${userId}`)
-      if (listErr) {
-        console.warn('[deleteAccount] Storage list failed:', listErr.message)
-      } else if (files && files.length > 0) {
-        const paths = files.map(f => `scan/${userId}/${f.name}`)
-        const { error: removeErr } = await sb.storage
-          .from('scan-images')
-          .remove(paths)
-        if (removeErr) {
-          console.warn('[deleteAccount] Storage remove failed:', removeErr.message)
-        } else {
-          console.log(`[deleteAccount] Storage: removed ${paths.length} file(s) for userId:`, userId)
-        }
-      } else {
-        console.log('[deleteAccount] Storage: no scan images found for userId:', userId)
-      }
-    } catch (err) {
-      console.warn('[deleteAccount] Storage cleanup error:', err.message)
-    }
-  }
-
-  // ── 3. SQLite cascade delete ──────────────────────────────────────────────
   try {
-    // task_completions may reference tasks; delete via plan ownership
-    const plans = db.prepare('SELECT id FROM action_plans WHERE user_id = ?').all(userId)
-    for (const plan of plans) {
-      try { db.prepare('DELETE FROM tasks WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] tasks by plan delete skipped:', err.message) }
-      try { db.prepare('DELETE FROM task_completions WHERE plan_id = ?').run(plan.id) } catch (err) { console.warn('[deleteAccount] task_completions by plan delete skipped:', err.message) }
+    const sb = getSupabase()
+    // Local tables differ by app generation. Missing legacy tables/columns
+    // are harmless; disk, constraint and permission errors must surface.
+    const remove = (sql, value = userId) => {
+      try { db.prepare(sql).run(value) }
+      catch (error) { if (!/no such (table|column)/i.test(error.message)) throw error }
     }
-    // Also try direct user_id column in case schema differs
-    try { db.prepare('DELETE FROM task_completions WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] task_completions by user delete skipped:', err.message) }
-    db.prepare('DELETE FROM daily_checkins WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM streaks WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM action_plans WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM scans WHERE user_id = ?').run(userId)
-    try { db.prepare('DELETE FROM community_likes WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_likes delete skipped:', err.message) }
-    try { db.prepare('DELETE FROM community_posts WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] community_posts delete skipped:', err.message) }
-    try { db.prepare('DELETE FROM leaderboard WHERE user_id = ?').run(userId) } catch (err) { console.warn('[deleteAccount] leaderboard delete skipped:', err.message) }
+    let plans = []
+    try { plans = db.prepare('SELECT id FROM action_plans WHERE user_id = ?').all(userId) }
+    catch (error) { if (!/no such (table|column)/i.test(error.message)) throw error }
+    for (const plan of plans) {
+      remove('DELETE FROM task_completions WHERE plan_id = ?', plan.id)
+      remove('DELETE FROM tasks WHERE plan_id = ?', plan.id)
+    }
+    for (const table of ['task_completions', 'daily_checkins', 'streaks', 'scans', 'community_likes', 'community_comments', 'community_ratings', 'community_posts', 'leaderboard', 'action_plans']) {
+      remove(`DELETE FROM ${table} WHERE user_id = ?`)
+    }
+    remove('DELETE FROM community_reports WHERE reporter_id = ?')
     db.prepare('DELETE FROM users WHERE id = ?').run(userId)
-    console.log('[deleteAccount] SQLite cleanup done')
-  } catch (err) {
-    console.error('[deleteAccount] SQLite cleanup error:', err.message)
+    if (db.prepare('SELECT id FROM users WHERE id = ?').get(userId)) throw new Error('Account remains')
+    if (sb) await require('../lib/deleteAccountData').deleteCloudAccountData(sb, userId)
+    require('../lib/coachIntelligence').clearAccountContext(userId)
+    res.json({ success: true, appleSubscriptionCancelled: false })
+  } catch {
+    // No success response for partially deleted records or failed storage.
+    res.status(503).json({ error: 'Account deletion could not be completed. Please retry or contact support.' })
   }
-
-  // This app uses its own `users` table for auth (Apple Sign In verifies an
-  // Apple JWT and creates a row in users; no Supabase Auth records exist).
-  // Deleting the users row above is sufficient — sb.auth.admin.deleteUser
-  // would always return "User not found" because auth.users is never populated.
-
-  console.log('[deleteAccount] Done for userId:', userId)
-  res.json({ success: true })
 })
 
 // ── GET /api/user/unsubscribe?uid=:userId ─────────────────────────────────────

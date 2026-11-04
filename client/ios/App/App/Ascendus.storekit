@@ -9,7 +9,7 @@
       "subscriptions": [
         {
           "debugDescription": "Monthly subscription",
-          "displayPrice": "7.99",
+          "displayPrice": "9.99",
           "groupNumber": 1,
           "internalID": "ascendus_monthly_001",
           "localizations": [
@@ -30,10 +30,10 @@
           "winbackOffers": [],
           "introductoryOffer": {
             "displayPrice": "0.00",
-            "internalID": "ascendus_monthly_trial_3days",
+            "internalID": "ascendus_monthly_trial_7days",
             "numberOfPeriods": 1,
             "paymentMode": "free",
-            "subscriptionPeriod": "P3D"
+            "subscriptionPeriod": "P1W"
           }
         },
         {

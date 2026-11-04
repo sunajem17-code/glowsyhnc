@@ -14,6 +14,7 @@ const { resolveSubscription } = require('../lib/verifiedCoachSubscription')
  * Falls back to in-memory automatically when Upstash is not configured.
  */
 
+const { requireCurrentAccount } = require('../lib/accountSession')
 const jwt = require('jsonwebtoken')
 const db  = require('../db')
 const { getSupabase, getUserById } = require('../supabase')
@@ -44,7 +45,7 @@ const checkScan = {
 }
 
 // ── 1. Token verification ──────────────────────────────────────────────────────
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
   const header = req.headers.authorization
   const token  = header?.startsWith('Bearer ') ? header.slice(7) : null
 
@@ -62,10 +63,12 @@ function verifyToken(req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET)
+    await requireCurrentAccount(payload.userId)
     req.userId = payload.userId
     req.isDemo = false
     return runWithBudgetUser(req.userId, next)
   } catch (jwtErr) {
+    if (jwtErr.status === 503) return res.status(503).json({ error: 'Account verification temporarily unavailable' })
     console.error('[claudeGate] verifyToken rejected:', jwtErr.name, jwtErr.message)
     res.status(401).json({ error: 'Invalid or expired token' })
   }

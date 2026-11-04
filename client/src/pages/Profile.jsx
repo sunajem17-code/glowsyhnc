@@ -280,7 +280,7 @@ function SettingsRow({ icon: Icon, label, value, onClick, danger, toggle, checke
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { user, scans, streak, logout, isPremium, privacySettings, setPrivacySetting, clearAllScanData } = useStore()
+  const { user, scans, streak, logout, isPremium, subscriptionStatus, privacySettings, setPrivacySetting, clearAllScanData } = useStore()
   const [notifications, setNotifications] = useState(true)
   const [shareOpen, setShareOpen] = useState(false)
   const [rateOpen, setRateOpen] = useState(false)
@@ -493,7 +493,7 @@ export default function Profile() {
       </motion.div>
 
       {/* ── Premium CTA ──────────────────────────────────────────── */}
-      {!isPremium && (
+      {!isPremium && subscriptionStatus === 'inactive' && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -592,6 +592,8 @@ export default function Profile() {
               </p>
             )}
           </>
+        ) : subscriptionStatus !== 'inactive' ? (
+          <p className="px-4 py-3 text-xs opacity-70">{subscriptionStatus === 'unavailable' ? 'Membership verification unavailable. Please retry.' : 'Checking membership…'}</p>
         ) : (
           <SettingsRow
             icon={CreditCard}

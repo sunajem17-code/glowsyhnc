@@ -27,13 +27,10 @@ export function eligibleThreeDayTrial(packages, eligibility, productId = null) {
 export function isMonthlyExitTrial(product) {
   return product?.identifier === 'com.ascendus.app.monthly'
     && product.subscriptionPeriod === 'P1M'
-    && isThreeDayFreeTrial(product)
+    && isSevenDayFreeTrial(product)
 }
 
 export function eligibleExitTrial(packages, eligibility) {
-  return eligibleThreeDayTrial(
-    packages.filter(pkg => isMonthlyExitTrial(pkg.product)),
-    eligibility,
-    EXIT_TRIAL_PRODUCT_ID,
-  )
+  return packages.find(pkg => isMonthlyExitTrial(pkg.product)
+    && eligibility[pkg.product.identifier]?.status === 2) || null
 }

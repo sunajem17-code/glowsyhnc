@@ -1,3 +1,4 @@
+const { requireCurrentAccount } = require('../lib/accountSession')
 const jwt = require('jsonwebtoken')
 
 // JWT_SECRET signs every auth token. The old hardcoded fallback
@@ -11,7 +12,7 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET env var is required in production — set it in Railway')
 }
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const header = req.headers.authorization
   if (!header || !header.startsWith('Bearer ')) {
     console.warn(`[auth] rejected ${req.method} ${req.originalUrl} — no Authorization header`)
@@ -20,10 +21,12 @@ function authMiddleware(req, res, next) {
   const token = header.slice(7)
   try {
     const payload = jwt.verify(token, JWT_SECRET)
+    await requireCurrentAccount(payload.userId)
     req.userId = payload.userId
     req.userEmail = payload.email || null
     next()
   } catch (err) {
+    if (err.status === 503) return res.status(503).json({ error: 'Account verification temporarily unavailable' })
     // err.name distinguishes an actually-expired token (TokenExpiredError) from
     // a malformed/forged one (JsonWebTokenError) — logging it is the only way
     // to confirm which one a real rejection was instead of assuming.

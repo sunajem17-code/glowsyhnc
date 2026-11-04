@@ -1,8 +1,9 @@
+import { premiumDiagnostic } from '../utils/premiumDiagnostics'
 import { API_BASE } from '../utils/backend'
 import { FINAL_ONBOARDING_STEP, hasCompletedOnboarding, isCompletedScan, normalizeOnboardingCompletion, onboardingOwner, startingPointCompletionKey } from '../utils/onboardingStartup.js'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { checkProStatus, isNative } from '../utils/iap'
+import { checkProStatus, isNative, disconnectRevenueCat } from '../utils/iap'
 import { canApplyNegativePremiumRefresh } from '../utils/premiumStatus'
 
 // Monotonic revision prevents an entitlement refresh started before a purchase
@@ -49,12 +50,7 @@ const useStore = create(
             isAuthenticated: true,
             isGuest: false,
             subscriptionStatus: 'loading',
-            // Hydrate from the user object immediately so paying users aren't briefly downgraded
-            // while the async RevenueCat / server check completes.
-            isPremium: user?.subscriptionTier === 'premium' ||
-              user?.subscription_tier === 'premium' ||
-              user?.is_pro === true ||
-              false,
+            isPremium: false,
           }
         })
       },
@@ -93,10 +89,7 @@ const useStore = create(
           }
         })
       },
-      setPremium: (val) => {
-        premiumStateRevision += 1
-        set(state => ({ isPremium: val, subscriptionStatus: val ? 'active' : 'inactive' }))
-      },
+      setPremium: val => get().setIsPremium(val),
       expireSession: () => {
         premiumStateRevision += 1
         // Keep the owner and completed setup so reauthentication opens sign-in.
@@ -104,6 +97,15 @@ const useStore = create(
       },
       logout: () => {
         premiumStateRevision += 1
+        // Queue SDK disconnection before any new-account initialization.
+        disconnectRevenueCat().catch(() => {})
+        try {
+          for (const storage of [localStorage, sessionStorage]) {
+            for (const key of Object.keys(storage)) {
+              if (/^adonis-chat(?:-photos)?:/.test(key)) storage.removeItem(key)
+            }
+          }
+        } catch {}
         // Clear session keys so a subsequent login on the same device doesn't
         // inherit stale onboarding state.
         try { sessionStorage.removeItem('ascendus_onboarding_draft') } catch { /* ignore */ }
@@ -111,6 +113,16 @@ const useStore = create(
         set({
           user: null,
           token: null,
+          _lastProRefresh: 0,
+          showUnlockSlideshow: false,
+          assignedPhase: null,
+          primaryGoal: null,
+          hairType: null,
+          scanCount: 0,
+          lastScanDate: null,
+          referralCode: null,
+          referralCount: 0,
+          freeCoachMessages: 0,
           upgradeWelcomePending: false,
           isAuthenticated: false,
           isGuest: false,
@@ -125,6 +137,9 @@ const useStore = create(
           _premiumBeforeLocalPreview: false,
           pendingFacePhoto: null,
           pendingBodyPhoto: null,
+          lastFaceScanImage: null,
+          lastFaceScanLandmarks2D: null,
+          lastFaceScanFaceMetrics: null,
           hasOnboarded: false,
           gender: null,
           userProfile: null,
@@ -334,9 +349,12 @@ const useStore = create(
 
       // Premium
       isPremium: false, subscriptionStatus: 'inactive',
-      setIsPremium: (v) => {
+      setIsPremium: async (v) => {
         premiumStateRevision += 1
-        set(state => ({ isPremium: v, subscriptionStatus: v ? 'active' : 'inactive' }))
+        if (!v) { set({ isPremium: false, subscriptionStatus: 'inactive' }); return }
+        // Purchase callbacks request verification; only the server response
+        // may label this authenticated account Premium across the app.
+        await get().refreshProStatus({ force: true })
       },
 
       // Unlock reveal slideshow — set true in handleUnlockSuccess, cleared by the slideshow itself
@@ -353,26 +371,17 @@ const useStore = create(
         if (!isAuthenticated || !token || token === 'demo-token') return
         // Throttle: skip if we refreshed within the last 60 seconds
         if (!force && Date.now() - _lastProRefresh < 60_000) return
-        set({ _lastProRefresh: Date.now(), subscriptionStatus: 'loading' })
+        set({ _lastProRefresh: Date.now(), isPremium: false, subscriptionStatus: 'loading' })
         const revisionAtStart = premiumStateRevision
-        let nativePremiumStatus = null
         try {
-          // 0. On iOS check RevenueCat entitlements first (source of truth for IAP).
-          // A positive RevenueCat result promotes immediately. A negative
-          // result waits for the server response so an active server-verified
-          // entitlement (for example a web subscription) can still grant.
+          // Native status may request server reconciliation, but only the
+          // authenticated backend decision grants account-wide Premium.
           try {
             if (isNative()) {
               const { user: u } = get()
               const isPro = await checkProStatus(u?.id ?? null)
-              nativePremiumStatus = false
               if (isPro) {
-                // A freshly reconciled native entitlement unlocks purchased UI.
-                // Server APIs independently verify access while their record syncs.
                 if (get().token !== token || get().user?.id !== u.id) return
-                nativePremiumStatus = true
-                premiumStateRevision += 1
-                set({ isPremium: true, subscriptionStatus: 'active' })
                 const sync = await fetch(`${API_BASE}/payments/sync-rc`, {
                   method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                   body: JSON.stringify({ rcUserId: u.id }),
@@ -399,16 +408,19 @@ const useStore = create(
           // change happened while this refresh was in flight. This protects a
           // newly completed purchase from an older refresh response.
           if (get().token !== token) return
+          if (statusRes.status === 401 || profileRes.status === 401) { get().logout(); return }
           if (statusRes.ok) {
             const { isPremium } = await statusRes.json()
-            if (revisionAtStart === premiumStateRevision || isPremium || nativePremiumStatus === true) set({ subscriptionStatus: isPremium || nativePremiumStatus === true ? 'active' : 'inactive' })
+            if (get().token !== token) return
+            premiumDiagnostic('server-status', { accountId: get().user?.id, serverActive: isPremium, status: isPremium ? 'active' : 'inactive' })
+            if (revisionAtStart === premiumStateRevision || isPremium) set({ subscriptionStatus: isPremium ? 'active' : 'inactive' })
             if (isPremium === true) {
               premiumStateRevision += 1
               set({ isPremium: true, subscriptionStatus: 'active' })
             } else if (isPremium === false && canApplyNegativePremiumRefresh({
               revisionAtStart,
               currentRevision: premiumStateRevision,
-              nativePremiumStatus,
+              nativePremiumStatus: null,
               serverStatus: isPremium,
             })) {
               premiumStateRevision += 1
@@ -417,12 +429,13 @@ const useStore = create(
 
           }
 
-          if (!statusRes.ok && nativePremiumStatus !== true) set({ subscriptionStatus: 'unavailable' })
+          if (!statusRes.ok) set({ isPremium: false, subscriptionStatus: 'unavailable' })
 
           // Profile fields hydrate personal data only. Subscription status
           // comes from the entitlement checks above, never stale profile flags.
           if (profileRes.ok) {
             const profile = await profileRes.json()
+            if (get().token !== token) return
             const fresh = profile.user || profile
             const serverStreak = profile.streak
             set(state => ({
@@ -447,7 +460,7 @@ const useStore = create(
             }))
           }
         } catch (err) {
-          if (get().token === token) set({ subscriptionStatus: nativePremiumStatus === true ? 'active' : 'unavailable' })
+          if (get().token === token) set({ isPremium: false, subscriptionStatus: 'unavailable' })
           console.warn('[refreshProStatus] status/profile fetch failed:', err?.message)
         }
       },
@@ -503,7 +516,8 @@ const useStore = create(
         // Retire the old local Pro override. Never retain a premium value
         // that came from the preview; the purchase/server refresh restores
         // genuine memberships after hydration.
-        if (merged.isLocalProPreview) merged.isPremium = false
+        merged.isPremium = false
+        merged.subscriptionStatus = merged.token ? 'loading' : 'inactive'
         merged.isLocalProPreview = false
         merged.isLocalProPreviewConfigured = false
         merged._premiumBeforeLocalPreview = false
@@ -562,7 +576,7 @@ const useStore = create(
         lastScanDate: state.lastScanDate,
         referralCode: state.referralCode,
         referralCount: state.referralCount,
-        isPremium: state.isPremium,
+        isPremium: false,
         isLocalProPreview: false,
         isLocalProPreviewConfigured: false,
         _premiumBeforeLocalPreview: false,

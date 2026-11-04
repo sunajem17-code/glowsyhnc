@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from './api'
+import { disconnectRevenueCat } from './iap'
 import { clearAllScanMedia } from './scanPhotoDb'
 import useStore from '../store/useStore'
 
@@ -66,12 +67,17 @@ export function useDeleteAccount() {
         setStep('error')
         return
       }
-      // Wipe IndexedDB scan photos (logout() handles Zustand + sessionStorage)
-      await clearAllScanMedia().catch(err =>
-        console.warn('[deleteAccount] clearAllScanMedia failed:', err)
-      )
+      // Retain a cleanup marker if IndexedDB is interrupted: old media stays
+      // unreadable, and the next photo save retries cleanup before writing.
+      try { localStorage.setItem('ascendus_pending_media_cleanup', '1') } catch {}
+      // Invalidate local authority before any asynchronous storage/SDK work.
       resetOnboardingForDeletedAccount()
       logout()
+      await disconnectRevenueCat().catch(() => {})
+      // Wipe IndexedDB scan photos (logout() handles Zustand + sessionStorage)
+      await clearAllScanMedia({ strict: true }).catch(err =>
+        console.warn('[deleteAccount] clearAllScanMedia failed:', err)
+      )
       // navigate to '/' — App.jsx renders PremiumOnboarding because
       // hasOnboarded is now false, exactly like a fresh install.
       navigate('/', { replace: true })

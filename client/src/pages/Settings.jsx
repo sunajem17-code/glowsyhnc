@@ -73,7 +73,7 @@ export default function Settings() {
   const navigate = useNavigate()
 
   const {
-    user, isGuest, isPremium, logout,
+    user, isGuest, isPremium, subscriptionStatus, logout,
     clearAllScanData,
   } = useStore()
 
@@ -344,7 +344,7 @@ export default function Settings() {
                 {isPremium && <span className="font-heading font-bold text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(198,168,92,0.15)', color: GOLD }}>✦ MAX</span>}
               </span>
             }
-            value={displayEmail}
+            value={subscriptionStatus === 'loading' || subscriptionStatus === 'restoring' ? 'Checking membership…' : subscriptionStatus === 'unavailable' ? 'Membership verification unavailable' : displayEmail}
             onPress={isGuest || displayName === 'Guest' ? undefined : () => navigate('/profile')}
           />
           {isPremium && <SettingsRow

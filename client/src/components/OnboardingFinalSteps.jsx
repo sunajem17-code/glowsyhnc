@@ -1,3 +1,4 @@
+import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { Star, Check, Loader2, X, Tag } from 'lucide-react'
@@ -236,7 +237,7 @@ function OverallCard({ scan }) {
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
-// ── Exit-intent: three-day free trial, preserving the original offer shell ──
+// ── Exit-intent: seven-day free trial, preserving the original offer shell ──
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
 // is deliberately no "only show once, skip straight through afterward" path.
 // An earlier version gated this behind a persisted flag so only the first-
@@ -343,10 +344,10 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trial || checking ? '3 DAYS FREE' : 'CHECK AVAILABILITY'}
+          {trial ? '7 DAYS FREE' : 'CHECK AVAILABILITY'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking free trial eligibility…' : trial ? '3 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
+          {checking ? 'Checking free trial eligibility…' : trial ? '7 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
@@ -374,7 +375,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 3 days free' : 'Check availability again'}
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 7 days free' : 'Check availability again'}
         </button>
       </motion.div>
     </motion.div>
@@ -382,6 +383,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
 }
 
 export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchasing = false, error = '' }) {
+  const monthlyTrial = useMonthlyTrialOffer()
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -531,7 +533,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={onAscend}
+          onClick={() => monthlyTrial ? setShowDiscountOffer(true) : onAscend()}
           disabled={isPurchasing}
           className="btn-primary flex items-center justify-center gap-2.5 disabled:opacity-70"
           style={{ background: GOLD_GRAD, fontSize: 19, letterSpacing: '0.02em', color: 'white', paddingTop: 19, paddingBottom: 19 }}
@@ -567,7 +569,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
               className="flex items-center justify-center gap-2.5"
             >
               {isPurchasing && <Loader2 size={20} className="animate-spin" />}
-              {isPurchasing ? 'Processing…' : 'Ready to Transform'}
+              {isPurchasing ? 'Processing…' : monthlyTrial ? 'Start 7 days free' : 'Ready to Transform'}
             </motion.span>
           </AnimatePresence>
         </motion.button>

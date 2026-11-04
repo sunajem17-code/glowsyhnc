@@ -108,6 +108,7 @@ async function request(path, options = {}) {
       throw new Error(friendlyError(errBody.error, 'Invalid email or password'))
     }
     // Attach structured fields (retryAfter, plan, status, errorCode, etc.) to the thrown error
+    if (path.startsWith('/coach/') && res.status === 403 && errBody.code === 'pro_required' && useStore.getState().token === token) window.dispatchEvent(new CustomEvent('premium:recheck'))
     const err = new Error(apiErrorMessage(errBody) || friendlyError(errBody.error, `Something went wrong (${res.status})`))
     err.status     = res.status
     err.errorCode = errBody.errorCode || errBody.code || errBody.error

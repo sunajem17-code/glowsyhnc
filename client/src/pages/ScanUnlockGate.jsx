@@ -1,9 +1,10 @@
+import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
 import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
-import { isNative, purchasePro } from '../utils/iap'
+import { isNative, purchasePro, restorePurchases } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity, Sun, Moon, Droplets,
@@ -1157,6 +1158,8 @@ const PAYWALL_CARDS = [
 ]
 
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
+  const monthlyTrial = useMonthlyTrialOffer()
+  const [restoring, setRestoring] = useState(false)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [cardIdx, setCardIdx] = useState(0)
@@ -1304,14 +1307,23 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
       <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 4 }}>
         <motion.button
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={() => { triggerHaptic(); onPurchase() }}
+          onClick={() => { triggerHaptic(); monthlyTrial ? setShowDiscount(true) : onPurchase() }}
           disabled={isPurchasing}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.4)' }}
         >
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
-          {isPurchasing ? 'Processing…' : 'Unlock Now'}
+          {isPurchasing ? 'Processing…' : monthlyTrial ? 'Start 7 days free' : 'Unlock Now'}
         </motion.button>
+        {isNative() && <button type="button" disabled={restoring || isPurchasing} className="mt-3 w-full text-center text-xs" style={{ color: G }} onClick={async () => {
+          if (restoring) return
+          setRestoring(true)
+          setDiscountError('')
+          try { await restorePurchases(); onUnlock() }
+          catch (error) { setDiscountError(error.message || 'Restore failed. Please retry.') }
+          finally { setRestoring(false) }
+        }}>{restoring ? 'Restoring…' : 'Restore Purchases'}</button>}
+        {discountError && !showDiscount && <p role="alert" className="mt-2 text-center text-xs" style={{ color: '#EF4444' }}>{discountError}</p>}
         <div className="flex items-center justify-center gap-5" style={{ marginTop: 18 }}>
           <button type="button" onClick={() => navigate('/terms')} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Terms of Use</button>
           <span className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Cancel Anytime</span>

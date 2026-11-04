@@ -25,6 +25,7 @@ function openDb() {
 
 export async function saveScanMedia(scanId, { photo, landmarks2D, faceMetrics }) {
   try {
+    if (localStorage.getItem('ascendus_pending_media_cleanup')) await clearAllScanMedia({ strict: true })
     const db = await openDb()
     return new Promise((resolve, reject) => {
       const tx   = db.transaction(STORE_NAME, 'readwrite')
@@ -40,6 +41,7 @@ export async function saveScanMedia(scanId, { photo, landmarks2D, faceMetrics })
 
 export async function loadScanMedia(scanId) {
   try {
+    if (localStorage.getItem('ascendus_pending_media_cleanup')) return null
     const db = await openDb()
     return new Promise((resolve, reject) => {
       const tx    = db.transaction(STORE_NAME, 'readonly')
@@ -54,18 +56,20 @@ export async function loadScanMedia(scanId) {
   }
 }
 
-export async function clearAllScanMedia() {
+export async function clearAllScanMedia({ strict = false } = {}) {
   try {
     const db = await openDb()
-    return new Promise((resolve) => {
-      const tx    = db.transaction(STORE_NAME, 'readwrite')
-      const store = tx.objectStore(STORE_NAME)
-      const req   = store.clear()
-      req.onsuccess = resolve
-      req.onerror   = resolve  // non-fatal
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite')
+      tx.objectStore(STORE_NAME).clear()
+      tx.oncomplete = resolve
+      tx.onerror = () => reject(tx.error || new Error('Local photo cleanup failed'))
+      tx.onabort = () => reject(tx.error || new Error('Local photo cleanup interrupted'))
     })
+    localStorage.removeItem('ascendus_pending_media_cleanup')
   } catch (err) {
     console.warn('[scanPhotoDb] clearAllScanMedia failed:', err.message)
+    if (strict) throw err
   }
 }
 

@@ -8,7 +8,13 @@ const router = express.Router()
 const { loadContext, clean, ownedCoachScan, parseProvidedImage } = require('../lib/coachScanContext')
 const { answer } = require('../lib/coachIntelligence')
 
-router.get('/context', verifyToken, resolvePro, claudeLimit, async (req, res) => {
+// Deny before loading any owned scan, saved conversation or model context.
+function requireVerifiedCoach(req, res, next) {
+  if (req.isDemo || req.isPro !== true) return res.status(403).json({ code: 'pro_required', error: 'Adonis requires an active Premium subscription or free trial.' })
+  next()
+}
+
+router.get('/context', verifyToken, resolvePro, requireVerifiedCoach, claudeLimit, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Pro required — upgrade to access this feature' })
   try {
     const context = await loadContext(req.userId)
@@ -36,7 +42,7 @@ async function serveSavedAppearance(req, res, next) {
   }
 }
 
-router.post('/appearance', verifyToken, resolvePro, serveSavedAppearance, claudeLimit, async (req, res) => {
+router.post('/appearance', verifyToken, resolvePro, requireVerifiedCoach, serveSavedAppearance, claudeLimit, async (req, res) => {
   if (req.isDemo) return res.status(403).json({ error: 'Sign in to analyze your saved scan.' })
   if (typeof req.body.scanId !== 'string' || req.body.scanId.length > 100) return res.status(400).json({ error: 'A saved scan ID is required.' })
   const providedPhoto = parseProvidedImage(req.body.scanPhotoData)
@@ -80,7 +86,7 @@ async function requireCoachAccess(req, res, next) {
 }
 
 // POST /api/coach/message
-router.post('/message', verifyToken, resolvePro, requireCoachAccess, claudeLimit, async (req, res) => {
+router.post('/message', verifyToken, resolvePro, requireVerifiedCoach, requireCoachAccess, claudeLimit, async (req, res) => {
   const { messages, conversationId } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {

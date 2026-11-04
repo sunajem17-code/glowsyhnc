@@ -1,3 +1,4 @@
+import VerifiedCoachGate from './components/VerifiedCoachGate'
 import ScreenLoading from './components/ScreenLoading'
 import PremiumRoutineGate from './components/PremiumRoutineGate'
 import { loadScreen } from './utils/screenLoader'
@@ -256,7 +257,7 @@ export default function App() {
                 {/* The reveal/unlock screen is the single post-scan destination. */}
                 <Route path="extras" element={<Extras />} />
                 <Route path="plan" element={<ActionPlan />} />
-                <Route path="progress" element={<Progress />} />
+                <Route path="progress" element={<VerifiedCoachGate><Progress /></VerifiedCoachGate>} />
                 <Route path="checkin" element={<Navigate to="/face-body-routine" replace />} />
                 <Route path="streak" element={<Streak />} />
                 <Route path="profile" element={<Profile />} />
@@ -265,7 +266,7 @@ export default function App() {
                 <Route path="compare" element={<Compare />} />
                 <Route path="history" element={<ScanHistory />} />
                 <Route path="timeline" element={<ScanTimeline />} />
-                <Route path="coach" element={<AICoach />} />
+                <Route path="coach" element={<VerifiedCoachGate><AICoach /></VerifiedCoachGate>} />
                 <Route path="swipemaxx" element={<SwipeMaxx />} />
                 <Route path="tindermaxx" element={<TinderMaxx />} />
                 <Route path="community" element={<Community />} />

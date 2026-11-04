@@ -23,6 +23,7 @@ async function resolveSubscription(userId, { user, verify = verifyCoachSubscript
   const web = user?.stripe_subscription_id && (user.subscription_tier === 'premium' || user.is_pro === true || user.is_pro === 1)
   if (trial || web) return { isPro: true, status: 'active', source: trial ? 'trial' : 'stripe' }
   const isPro = await verify(userId)
+  if (process.env.NODE_ENV !== 'production') console.debug('[premium]', { account: `…${String(userId).slice(-4)}`, source: 'revenuecat', serverActive: isPro, reason: isPro ? 'active-entitlement' : 'missing-or-expired-entitlement' })
   return { isPro, status: isPro ? 'active' : 'inactive', source: 'revenuecat' }
 }
 module.exports = { ENTITLEMENT_ID, hasProEntitlement, verifyCoachSubscription, resolveSubscription }

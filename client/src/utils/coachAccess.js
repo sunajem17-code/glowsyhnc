@@ -9,7 +9,10 @@ export function getCoachAccessMode({ isPremium }) {
 // Keep coach access server-authorized while reconciling existing App Store purchases.
 export async function loadCoachAccess({ native, userId, claimedPremium = false, checkPurchase, syncPurchase, loadContext }) {
   let context, contextError
-  try { context = await loadContext() } catch (error) { contextError = error }
+  try { context = await loadContext() } catch (error) {
+    if (error.status === 403 && error.errorCode === 'pro_required') context = { isPro: false }
+    else contextError = error
+  }
   if (context?.isPro === true) return context
   if (!userId || (!native && !claimedPremium)) {
     if (contextError) throw contextError
@@ -26,4 +29,12 @@ export async function loadCoachAccess({ native, userId, claimedPremium = false, 
   const refreshed = await loadContext()
   if (refreshed?.isPro !== true) throw new Error('Your subscription is active, but coach access has not synced yet. Please retry in a moment.')
   return refreshed
+}
+
+// An app-wide Premium boolean is deliberately not an input: Coach requires
+// a fresh server decision belonging to this exact authenticated session.
+export function coachGateState({ token, account, subscriptionStatus, access }) {
+  if (!token || !account) return 'inactive'
+  if (!access || access.token !== token || access.account !== account || access.subscriptionStatus !== subscriptionStatus) return 'loading'
+  return ['active', 'inactive', 'unavailable'].includes(access.state) ? access.state : 'loading'
 }

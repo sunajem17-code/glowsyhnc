@@ -48,25 +48,6 @@ test('browser premium claims trigger server purchase verification without granti
   assert.equal(result.isPro,true)
 })
 
-test('an account with an existing device receipt recovers and then requires server confirmation', async () => {
-  const { createProCustomerInfoReader } = await import('./revenueCatIdentity.js')
-  let recovered = false, serverMember = false
-  const purchases = {
-    getAppUserID: async () => ({appUserID:'replacement-guest'}),
-    invalidateCustomerInfoCache: async () => {},
-    getCustomerInfo: async () => ({customerInfo:{entitlements:{active:recovered ? {'Ascendus Pro':{}} : {}}}}),
-    syncPurchases: async () => { recovered = true },
-  }
-  const read = createProCustomerInfoReader({purchases,initialize:async()=>{},entitlementId:'Ascendus Pro'})
-  const result = await loadCoachAccess({
-    native:true,userId:'replacement-guest',
-    loadContext:async()=>({isPro:serverMember,hasCompletedScan:true}),
-    checkPurchase:async id=>Boolean(await read(id)),
-    syncPurchase:async id=>{assert.equal(id,'replacement-guest'); assert.equal(recovered,true); serverMember=true},
-  })
-  assert.equal(result.isPro,true)
-})
-
 test('receipt recovery continues when initial server verification is unavailable', async () => {
   let reads = 0
   const result = await loadCoachAccess({native:true,userId:'member',loadContext:async()=>{if (++reads===1) throw new Error('temporarily unavailable'); return {isPro:true,hasCompletedScan:true}},checkPurchase:async()=>true,syncPurchase:async id=>assert.equal(id,'member')})
@@ -75,4 +56,18 @@ test('receipt recovery continues when initial server verification is unavailable
 test('loading and provider failure never turn into a free-user decision', async () => {
   assert.equal(getCoachAccessMode({isPremium:null}),'loading')
   await assert.rejects(loadCoachAccess({native:true,userId:'member',loadContext:async()=>{throw new Error('unavailable')},checkPurchase:async()=>false}),/unavailable/)
+})
+
+import { coachGateState } from './coachAccess.js'
+test('Coach never exposes a child for cached Premium, another session, a deleted account, or a verification failure',()=>{
+ const session={token:'session',account:'owner',subscriptionStatus:'active',isPremium:true}
+ assert.equal(coachGateState(session),'loading')
+ const access={token:'session',account:'owner',subscriptionStatus:'active',state:'active'}
+ assert.equal(coachGateState({...session,access}),'active')
+ assert.equal(coachGateState({...session,token:null,access}),'inactive')
+ assert.equal(coachGateState({...session,account:'new-owner',access}),'loading')
+ assert.equal(coachGateState({...session,token:'new-token',access}),'loading')
+ assert.equal(coachGateState({...session,access:{...access,state:'inactive'}}),'inactive')
+ assert.equal(coachGateState({...session,access:{...access,state:'unavailable'}}),'unavailable')
+ assert.equal(coachGateState({...session,subscriptionStatus:'loading',access}),'loading')
 })

@@ -5,11 +5,11 @@ const database = new Database(':memory:')
 database.exec(`CREATE TABLE scans (id TEXT PRIMARY KEY,user_id TEXT,scan_date TEXT,face_photo_url TEXT,face_data TEXT,
   glow_score REAL,face_total_score REAL,presentation_score REAL,insights TEXT,analyzed_at TEXT);
   CREATE TABLE users (id TEXT PRIMARY KEY,subscription_tier TEXT,is_pro INTEGER,pro_trial_expires_at TEXT,coach_messages_used INTEGER);
-  INSERT INTO users VALUES ('alice','premium',1,NULL,0),('bob','premium',1,NULL,0);`)
+  INSERT INTO users VALUES ('alice','premium',1,NULL,0),('bob','premium',1,NULL,0),('new-user','premium',1,NULL,0),('no-scan-user','premium',1,NULL,0);`)
 function stub(name, exports) { const id = require.resolve(name); require.cache[id] = { id, filename: id, loaded: true, exports } }
 stub('../db', database)
 let cloud = null
-stub('../supabase', { getSupabase: () => cloud, isConfigured: () => !!cloud, getUserById: async () => null, getScanCache: async () => null, setScanCache: async () => {} })
+stub('../supabase', { getSupabase: () => cloud, isConfigured: () => !!cloud, getUserById: async id => cloud ? database.prepare('SELECT * FROM users WHERE id = ?').get(id) : null, getScanCache: async () => null, setScanCache: async () => {} })
 process.env.AI_PROVIDER = 'openai'
 process.env.OPENAI_API_KEY = 'isolated-test-no-real-credential'
 function schemaFixture(schema) {
@@ -244,7 +244,7 @@ test('HTTP coach rejects local preview configuration without a subscription', as
     process.env.NODE_ENV = 'development'; process.env.LOCAL_PRO_PREVIEW_USER_IDS = 'alice'
     const context = await fetch(`${base}/coach/context`, { headers: { Authorization: `Bearer ${signToken('alice')}` } })
     const state = await context.json()
-    assert.equal(state.isPro, false)
+    assert.equal(context.status, 403); assert.equal(state.code, 'pro_required')
     assert.equal((await post({ messages: [{ role: 'user', content: 'What does my scan say?' }] })).status, 403)
     assert.equal((await post({ messages: [{ role: 'user', content: 'Hello' }] }, 'bob')).status, 403)
     process.env.NODE_ENV = 'production'

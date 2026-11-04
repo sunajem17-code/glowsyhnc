@@ -26,10 +26,11 @@ async function getUserByEmail(email) {
   return data
 }
 
-async function getUserById(id) {
+async function getUserById(id, { strict = false } = {}) {
   const sb = getSupabase()
   if (!sb || !id) return null
-  const { data } = await sb.from('users').select('*').eq('id', id).maybeSingle()
+  const { data, error } = await sb.from('users').select('*').eq('id', id).maybeSingle()
+  if (strict && error) throw new Error('Account verification unavailable')
   return data
 }
 
