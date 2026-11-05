@@ -35,3 +35,8 @@ export function eligibleExitTrial(packages, eligibility) {
   return packages.find(pkg => isMonthlyExitTrial(pkg.product)
     && eligibility[pkg.product.identifier]?.status === 2) || null
 }
+
+export function trialPackageForIneligibleAccount(packages, eligibility) {
+  if (!packages.length || !packages.every(pkg => eligibility[pkg.product.identifier]?.status === 1)) return null
+  return packages[0]
+}

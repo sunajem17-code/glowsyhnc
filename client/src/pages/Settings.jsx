@@ -4,12 +4,12 @@ import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 import {
-  User, Crown, Trash2, LogOut,
+  User, Crown, Trash2, LogOut, RotateCcw,
   ChevronRight, Shield, FileText, Mail, AlertTriangle, CheckSquare, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import MotionPage from '../components/MotionPage'
-import { isNative } from '../utils/iap'
+import { isNative, restorePurchases } from '../utils/iap'
 import { clearAllScanMedia } from '../utils/scanPhotoDb'
 import { triggerHaptic } from '../utils/haptics'
 import { GOLD } from '../utils/theme'
@@ -78,6 +78,8 @@ export default function Settings() {
   } = useStore()
 
   const [appVersion, setAppVersion] = useState('')
+  const [restoringPurchases, setRestoringPurchases] = useState(false)
+  const [restoreMessage, setRestoreMessage] = useState('')
 
   // Delete-account flow (shared hook — see useDeleteAccount.js)
   const del = useDeleteAccount()
@@ -102,6 +104,21 @@ export default function Settings() {
       await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' }).catch(() => {})
     } else {
       navigate('/premium')
+    }
+  }
+
+  async function handleRestorePurchases() {
+    if (restoringPurchases) return
+    setRestoringPurchases(true)
+    setRestoreMessage('')
+    try {
+      await restorePurchases()
+      useStore.getState().setIsPremium(true)
+      setRestoreMessage('Your verified Ascendus membership is active.')
+    } catch (error) {
+      setRestoreMessage(error?.message || 'No active purchase was found for this Apple account.')
+    } finally {
+      setRestoringPurchases(false)
     }
   }
 
@@ -353,6 +370,14 @@ export default function Settings() {
             value="Manage or cancel membership"
             onPress={handleManageSubscription}
           />}
+          {isNative() && !isGuest && <SettingsRow
+            icon={RotateCcw}
+            label={restoringPurchases ? 'Checking purchases…' : 'Restore Purchases'}
+            value="Restore an active App Store membership"
+            onPress={handleRestorePurchases}
+            disabled={restoringPurchases}
+          />}
+          {restoreMessage && <p role="status" className="px-2 font-body text-[12px]" style={{ color: 'var(--text-secondary)' }}>{restoreMessage}</p>}
         </div>
 
         {/* ── Data & Privacy ── */}

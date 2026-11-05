@@ -1,7 +1,7 @@
 import { premiumDiagnostic } from './premiumDiagnostics'
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isMonthlyExitTrial, eligibleExitTrial, eligibleThreeDayTrial, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID } from './scanTrial'
+import { isMonthlyExitTrial, eligibleExitTrial, eligibleThreeDayTrial, trialPackageForIneligibleAccount, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID } from './scanTrial'
 import { createRevenueCatInitializer, createProCustomerInfoReader, validRevenueCatUserId, finishAccountPurchase } from './revenueCatIdentity'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
@@ -76,13 +76,18 @@ export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
   if (eligible) return eligible
   const selected = productId ? candidates.filter(pkg => pkg.product.identifier === productId) : candidates
   if (!selected.length) throw new Error('This trial offer is no longer available.')
-  if (selected.every(pkg => eligibility[pkg.product.identifier]?.status === 1)) return null
+  // Ineligible accounts can still buy the same App Store product at its
+  // standard price. Mark it explicitly so the UI never describes that as a
+  // free trial and the purchase helper can require an explicit opt-in.
+  const ineligiblePackage = trialPackageForIneligibleAccount(selected, eligibility)
+  if (ineligiblePackage) return { ...ineligiblePackage, ascendusTrialEligible: false }
   throw new Error('Apple could not confirm this trial offer. Please check again in a moment.')
 }
 
-export async function purchaseScanTrial(productId) {
+export async function purchaseScanTrial(productId, { allowIneligible = false } = {}) {
   const pkg = await getEligibleScanTrial(productId)
   if (!pkg || pkg.product.identifier !== productId) throw new Error('This free trial is no longer available.')
+  if (pkg.ascendusTrialEligible === false && !allowIneligible) throw new Error('This Apple account is not eligible for the free trial.')
   try {
     const { appUserID: purchasedFor } = await Purchases.getAppUserID()
     const result = await Purchases.purchasePackage({ aPackage: pkg })
@@ -187,7 +192,7 @@ export async function purchasePro(plan = 'monthly') {
     // Log full RC/StoreKit error for diagnostics — code, message, and raw object
     console.error('[RC] purchasePro failed — code:', e?.code, '| msg:', e?.message, '| full:', e)
     throw new Error(purchaseCompleted
-      ? 'Your purchase could not be verified. Use Restore Purchases to reconnect it before buying again.'
+      ? 'Your purchase could not be verified. Open Settings and choose Restore Purchases before buying again.'
       : 'Unable to complete purchase. Please try again.')
   }
 }

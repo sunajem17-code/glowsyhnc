@@ -1,19 +1,19 @@
 import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { motion } from 'framer-motion'
-import { Check, X, ChevronLeft, Lock, Users, Share2, CheckCircle, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Check, ChevronLeft, Lock, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
-import { isNative, purchasePro, purchaseScanTrial, restorePurchases, initRevenueCat } from '../utils/iap'
+import { isNative, purchasePro, purchaseScanTrial, initRevenueCat } from '../utils/iap'
+import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
+import { EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
-const GOLD_LIGHT = '#D4B96A'
-const GOLD_DARK = '#A8893A'
 const SURFACE = '#0D0D0D'
 const SURFACE_2 = '#141414'
 const BORDER = 'rgba(255,255,255,0.06)'
@@ -43,15 +43,9 @@ export default function Premium() {
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
   const [subscribingNow, setSubscribingNow] = useState(false)
-  const [restoring, setRestoring] = useState(false)
+  const [showExitOffer, setShowExitOffer] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
-  const [referralCount, setReferralCount] = useState(0)
-  const [referralCode, setReferralCode]   = useState(null)
-  const [unlocking, setUnlocking]         = useState(false)
-  const [unlockMsg, setUnlockMsg]         = useState('')
-  const [copied, setCopied]               = useState(false)
-  const [copyFailed, setCopyFailed]       = useState(false)
   // Synchronous re-entrancy lock — see PremiumOnboarding.jsx's handleAscend
   // for why subscribingNow alone can't prevent a true double-tap.
   const purchaseLockRef = useRef(false)
@@ -60,12 +54,6 @@ export default function Premium() {
 
   useEffect(() => {
     initRevenueCat().catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    api.referral.count()
-      .then(({ count, code }) => { setReferralCount(count || 0); setReferralCode(code) })
-      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -117,80 +105,18 @@ export default function Premium() {
     }
   }
 
-  async function handleRestore() {
-    setRestoring(true)
-    setCheckoutError('')
-    try {
-      const info = await restorePurchases()
-      const isPro = Boolean(info) && useStore.getState().subscriptionStatus === 'active'
-      if (isPro) {
-        setIsPremium(true)
-        navigate('/dashboard')
-      } else {
-        setCheckoutError('No previous purchase found.')
-      }
-    } catch (err) {
-      setCheckoutError('Restore failed. Please try again.')
-    } finally {
-      setRestoring(false)
-    }
-  }
-
   function handleRelogin() {
     if (typeof logout === 'function') logout()
     localStorage.removeItem('ascendus-storage')
     navigate('/auth')
   }
 
-  async function handleUnlockPro() {
-    setUnlocking(true)
-    setUnlockMsg('')
-    try {
-      const { ok, isPremium: granted } = await api.referral.unlockPro()
-      if (ok && granted) {
-        setIsPremium(true)
-        navigate('/dashboard')
-      }
-    } catch (err) {
-      setUnlockMsg(err.message || 'Not enough referrals yet.')
-    } finally {
-      setUnlocking(false)
-    }
-  }
-
-  async function handleCopyReferral() {
-    const link = referralCode
-      ? `https://ascendus.store/r/${referralCode}`
-      : 'https://ascendus.store'
-    const text = `I use Ascendus to track my glow-up, check it out 🔥 ${link}`
-    if (navigator.share) {
-      try { await navigator.share({ text, url: link }) } catch {}
-    } else {
-      try {
-        await navigator.clipboard.writeText(text)
-        setCopyFailed(false)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      } catch {
-        // Clipboard API unavailable or denied — try legacy execCommand
-        const el = document.createElement('input')
-        el.value = text
-        el.style.cssText = 'position:fixed;top:-9999px;opacity:0'
-        document.body.appendChild(el)
-        el.focus()
-        el.select()
-        const ok = document.execCommand('copy')
-        document.body.removeChild(el)
-        if (ok) {
-          setCopyFailed(false)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        } else {
-          // Both methods failed — show the link so the user can copy manually
-          setCopyFailed(true)
-        }
-      }
-    }
+  function handleExitOfferClaim(result) {
+    if (!result?.success) return
+    useStore.getState().setUpgradeWelcomePending(true)
+    setShowExitOffer(false)
+    setIsPremium(true)
+    navigate('/dashboard', { replace: true })
   }
 
   if (isPremium) {
@@ -240,7 +166,7 @@ export default function Premium() {
           style={{ background: `radial-gradient(ellipse at 50% -20%, ${GOLD}12 0%, transparent 70%)` }}
         />
         <button
-          onClick={() => { triggerHaptic(); navigate(-1) }}
+          onClick={() => { triggerHaptic(); setShowExitOffer(true) }}
           aria-label="Go back"
           className="absolute left-4 top-14 w-9 h-9 rounded-full flex items-center justify-center z-20 active:scale-95 transition-transform"
           style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
@@ -295,96 +221,6 @@ export default function Premium() {
         {checkoutError && (
           <p className="text-center text-[11px] font-body mb-2" style={{ color: RED }}>{checkoutError}</p>
         )}
-
-        {/* ── Referral unlock section ──────────────────────────────────── */}
-        <div
-          className="rounded-2xl p-4 mb-5"
-          style={{ background: 'rgba(198,168,92,0.05)', border: '1px solid rgba(198,168,92,0.2)' }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Users size={15} style={{ color: GOLD }} />
-            <p className="font-heading font-bold text-[13px]" style={{ color: GOLD }}>
-              Share with 3 Friends: Get Pro Free
-            </p>
-          </div>
-          <p className="font-body text-[11px] mb-3" style={{ color: TEXT_DIM }}>
-            No credit card. Just share your referral link and unlock Pro when 3 friends join.
-          </p>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2 mb-3">
-            {[1, 2, 3].map(n => (
-              <div
-                key={n}
-                className="flex-1 h-1.5 rounded-full overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.06)' }}
-              >
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: referralCount >= n ? '100%' : '0%' }}
-                  transition={{ duration: 0.6, delay: n * 0.1, ease: EASE_STANDARD }}
-                  className="h-full rounded-full"
-                  style={{ background: `linear-gradient(90deg, #A8893A, ${GOLD})` }}
-                />
-              </div>
-            ))}
-            <span className="font-mono font-bold text-[12px]" style={{ color: GOLD }}>
-              {referralCount}/3
-            </span>
-          </div>
-
-          {/* Share button */}
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { triggerHaptic(); handleCopyReferral() }}
-            className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 mb-2.5"
-            style={{ background: 'rgba(198,168,92,0.12)', border: '1px solid rgba(198,168,92,0.25)', color: GOLD }}
-          >
-            <Share2 size={13} />
-            {copied ? 'Link copied!' : 'Share My Referral Link'}
-          </motion.button>
-
-          {copyFailed && (
-            <div className="mb-2.5 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <p className="font-body text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                Couldn't copy automatically. Press and hold to copy manually:
-              </p>
-              <p
-                className="font-mono text-[11px] break-all select-all"
-                style={{ color: GOLD, userSelect: 'all', WebkitUserSelect: 'all' }}
-              >
-                {referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'}
-              </p>
-            </div>
-          )}
-
-          {/* Claim button */}
-          <motion.button
-            whileTap={{ scale: referralCount >= 3 ? 0.97 : 1 }}
-            onClick={() => { triggerHaptic(); handleUnlockPro() }}
-            disabled={unlocking || referralCount < 3}
-            className="w-full py-2.5 rounded-xl font-heading font-bold text-[12px] flex items-center justify-center gap-1.5 disabled:opacity-40"
-            style={{
-              background: referralCount >= 3
-                ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`
-                : '#1C1C1C',
-              color: referralCount >= 3 ? '#0A0A0A' : TEXT_DIM,
-              border: referralCount >= 3 ? 'none' : `1px solid ${BORDER}`,
-            }}
-          >
-            {unlocking
-              ? <><Loader2 size={13} className="animate-spin" /> Claiming…</>
-              : referralCount >= 3
-                ? <><CheckCircle size={13} /> Claim Free Pro</>
-                : `Claim Free Pro (${3 - referralCount} more friend${3 - referralCount !== 1 ? 's' : ''} needed)`}
-          </motion.button>
-
-          {unlockMsg && (
-            <p className="text-center text-[11px] font-body mt-2" style={{ color: unlockMsg.startsWith('🎉') ? '#34D399' : '#EF4444' }}>
-              {unlockMsg}
-            </p>
-          )}
-        </div>
 
         {sessionExpired && (
           <div className="mb-3 rounded-xl p-4 text-center" style={{ background: '#1A1A1A', border: '1px solid rgba(198,168,92,0.2)' }}>
@@ -502,7 +338,7 @@ export default function Premium() {
         <motion.button
           whileTap={{ scale: subscribingNow ? 1 : 0.97 }}
           onClick={() => { triggerHaptic(); handleSubscribe() }}
-          disabled={subscribingNow || restoring}
+          disabled={subscribingNow}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] mt-2 mb-1 transition-all duration-200 disabled:opacity-60"
           style={{
             background: GOLD_GRADIENT,
@@ -528,18 +364,6 @@ export default function Premium() {
           </p>
         </div>
 
-        {/* Restore Purchases — required by Apple */}
-        {isNative() && (
-          <button
-            onClick={() => { triggerHaptic(); handleRestore() }}
-            disabled={restoring || subscribingNow}
-            className="w-full mb-3 font-body text-[12px] text-center transition-opacity hover:opacity-70 disabled:opacity-40"
-            style={{ color: 'rgba(198,168,92,0.6)' }}
-          >
-            {restoring ? 'Restoring…' : 'Restore Purchases'}
-          </button>
-        )}
-
         <p className="text-center text-[10px] font-body pb-10" style={{ color: TEXT_DIM }}>
           By subscribing you agree to our{' '}
           <button onClick={() => window.location.href = isNative() ? 'https://ascendus.store/terms' : '/terms'} className="underline" style={{ color: 'rgba(198,168,92,0.7)' }}>Terms of Use</button>
@@ -548,6 +372,15 @@ export default function Premium() {
         </p>
       </div>
 
+      <AnimatePresence>
+        {showExitOffer && <FreeTrialOfferModal
+          productId={EXIT_THREE_DAY_PRODUCT_ID}
+          onClaim={handleExitOfferClaim}
+          onDecline={() => { setShowExitOffer(false); navigate(-1) }}
+          loading={subscribingNow}
+          error={checkoutError}
+        />}
+      </AnimatePresence>
     </MotionPage>
   )
 }

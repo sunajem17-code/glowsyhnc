@@ -49,10 +49,18 @@ test('provider outage preserves uncertainty instead of converting it to inactive
   await assert.rejects(resolveSubscription('owner', { user: { is_pro: true }, verify: async () => { throw new Error('unavailable') } }), /unavailable/)
   await assert.rejects(verifyCoachSubscription('owner', { apiKey: '' }), /unavailable/)
 })
-test('web subscriptions and dated trials retain their independent server authorization', async () => {
-  const verify = () => assert.fail('unexpected native lookup')
-  assert.equal((await resolveSubscription('owner', {user:{stripe_subscription_id:'sub-fixture',subscription_tier:'premium'},verify})).source,'stripe')
+test('web subscription flags never grant access without a live Stripe verification; dated server trials still work', async () => {
+  const verify = async () => false
+  assert.equal((await resolveSubscription('owner', {user:{stripe_subscription_id:'sub-fixture',subscription_tier:'premium'},verify,verifyStripe:async id=>{assert.equal(id,'sub-fixture');return true}})).source,'stripe')
+  assert.equal((await resolveSubscription('owner', {user:{stripe_subscription_id:'sub-fixture',subscription_tier:'premium',is_pro:true},verify,verifyStripe:async()=>false})).isPro,false)
   assert.equal((await resolveSubscription('owner', {user:{subscription_tier:'trial',pro_trial_expires_at:new Date(Date.now()+60000).toISOString()},verify})).source,'trial')
+})
+test('Stripe verification outage does not fall through to an unverified database flag', async () => {
+  await assert.rejects(resolveSubscription('owner', {
+    user: { stripe_subscription_id: 'sub-fixture', subscription_tier: 'premium', is_pro: true },
+    verify: async () => false,
+    verifyStripe: async () => { throw new Error('stripe unavailable') },
+  }), /stripe unavailable/)
 })
 test('malformed provider response is unavailable, not an expiry', async () => {
   await assert.rejects(verifyCoachSubscription('owner',{apiKey:'fixture',fetcher:async()=>({ok:true,json:async()=>({})})}),/unavailable/)

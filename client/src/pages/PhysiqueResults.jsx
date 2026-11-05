@@ -163,12 +163,10 @@ function PhysiquePaywall({ photo, scan, savedScans, activeView, showView, onClos
   )
 }
 
-// Invite sheet for referral unlock (mirrors InviteSheet in ScanUnlockGate)
-function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
+// Referral sharing only. Referrals must not grant Pro or unlock paid results.
+function PhysiqueInviteSheet({ referralCode, referralCount, onClose }) {
   const [count, setCount] = useState(referralCount)
   const [sharing, setSharing] = useState(false)
-  const { setIsPremium } = useStore()
-  const navigate = useNavigate()
 
   const link = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
   const shareText = `I'm using Ascendus to track my glow-up. It gives you an AI Glow Score and a custom plan. Try it free 👇 ${link}`
@@ -182,18 +180,7 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
     try {
       if (navigator.share) await navigator.share({ title: 'Ascendus', text: shareText, url: link })
       else await navigator.clipboard?.writeText(shareText)
-      setTimeout(async () => {
-        const fresh = await pollCount()
-        if (fresh >= REQUIRED) {
-          try {
-            const { ok, isPremium: granted } = await api.referral.unlockPro()
-            if (ok && granted) {
-              setIsPremium(true)
-              onUnlocked?.()
-            }
-          } catch {}
-        }
-      }, 1500)
+      await pollCount()
     } catch {}
     finally { setSharing(false) }
   }
@@ -212,7 +199,7 @@ function PhysiqueInviteSheet({ referralCode, referralCount, onClose, onUnlocked 
       >
         <p className="font-heading font-bold text-[20px] text-center mb-1" style={{ color: '#fff' }}>Invite 3 Friends</p>
         <p className="font-body text-[13px] text-center mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {count}/{REQUIRED} friends signed up · Share your link to unlock results free
+          {count} friends joined · Share your Ascendus invite link
         </p>
         <button onClick={handleShare} disabled={sharing}
           className="w-full py-5 rounded-2xl font-heading font-bold text-[17px] disabled:opacity-60"
@@ -235,7 +222,6 @@ export default function PhysiqueResults() {
   const setScans = useStore(s => s.setScans)
   const isPremium = usePremiumUiAccess()
   const setIsPremium = useStore(s => s.setIsPremium)
-  const updateUser = useStore(s => s.updateUser)
   const setShowUnlockSlideshow = useStore(s => s.setShowUnlockSlideshow)
   const [storedPhoto, setStoredPhoto] = useState(null)
   const [activeView, setActiveView] = useState('results')
@@ -413,7 +399,6 @@ export default function PhysiqueResults() {
   function handleUnlockSuccess() {
     purchaseLockRef.current = false
     setIsPremium(true)
-    updateUser?.({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
     setShowUnlockSlideshow?.(true)
   }
 
@@ -476,7 +461,6 @@ export default function PhysiqueResults() {
               referralCode={referralCode}
               referralCount={referralCount}
               onClose={() => setShowInvite(false)}
-              onUnlocked={() => setShowInvite(false)}
             />
           )}
         </AnimatePresence>

@@ -237,7 +237,7 @@ function OverallCard({ scan }) {
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
-// ── Exit-intent: seven-day free trial, preserving the original offer shell ──
+// ── Exit-intent: yearly 3-day free trial, preserving the offer shell ──
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
 // is deliberately no "only show once, skip straight through afterward" path.
 // An earlier version gated this behind a persisted flag so only the first-
@@ -246,8 +246,7 @@ function OverallCard({ scan }) {
 // Same backdrop and gold-bordered card style as the other overlay on this
 // screen.
 //
-// Apple eligibility and the store product determine availability and renewal
-// terms. Never fall back to a paid discount under free-trial wording.
+// Apple eligibility determines whether this product starts with a trial.
 export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error = '', productId }) {
   const [trial, setTrial] = useState(null)
   const [checking, setChecking] = useState(true)
@@ -276,24 +275,21 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
     })(), 20000, 'Subscription check timed out. Please try again.').then(pkg => {
       if (!active) return
       if (pkg.existingPro) return
-      if (!pkg.pkg) {
-        setTrialError('This Apple account is not eligible for a free trial. You can still close this offer.')
-        return
-      }
       setTrial(pkg.pkg)
     })
       .catch(err => { if (active) setTrialError(err?.message || 'Unable to check trial eligibility. Please try again.') })
       .finally(() => { if (active) setChecking(false) })
     return () => { active = false }
   }, [eligibilityAttempt, productId])
-  const trialDays = trial ? (isThreeDayFreeTrial(trial.product) ? 3 : isSevenDayFreeTrial(trial.product) ? 7 : null) : null
+  const trialEligible = Boolean(trial && trial.ascendusTrialEligible !== false)
+  const trialDays = trialEligible && trial ? (isThreeDayFreeTrial(trial.product) ? 3 : isSevenDayFreeTrial(trial.product) ? 7 : null) : null
   async function startTrial() {
     if (!trial || purchaseLock.current || loading) return
     purchaseLock.current = true
     setPurchasing(true)
     setTrialError('')
     try {
-      const result = completedPurchase.current || await purchaseScanTrial(trial.product.identifier)
+      const result = completedPurchase.current || await purchaseScanTrial(trial.product.identifier, { allowIneligible: !trialEligible })
       if (result?.success) {
         completedPurchase.current = result
         await onClaim(result)
@@ -349,21 +345,21 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </div>
 
         <p className="font-heading font-bold text-[20px] text-white leading-tight tracking-[-0.025em] whitespace-nowrap mb-2.5">
-          {!checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
+          {trial && !trialEligible ? 'Continue with Ascendus Pro' : !checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trialDays ? `${trialDays} DAYS FREE` : 'CHECK AVAILABILITY'}
+          {trialDays ? `${trialDays} DAYS FREE` : trial && !trialEligible ? 'ANNUAL MEMBERSHIP' : 'CHECK AVAILABILITY'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking free trial eligibility…' : trial ? `${trialDays} days on us • No payment today • Cancel anytime` : 'Apple determines trial eligibility for your account.'}
+          {checking ? 'Checking free trial eligibility…' : trialEligible && trial ? `${trialDays} days on us • No payment today • Cancel anytime` : trial && !trialEligible ? 'This Apple account is not eligible for a free trial. You can still subscribe; Apple will show the charge before you confirm.' : 'Apple determines trial eligibility for your account.'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trial.product.introPrice.priceString || '$0.00'}</span>
+          <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
         </div>}
         {trial && <p className="font-body text-[12px] leading-relaxed mb-5" style={{ color: TEXT }}>
-          {trialRenewalText(trial.product)}
+          {trialEligible ? trialRenewalText(trial.product) : `Charged today, then ${trialRenewalText(trial.product)?.replace(/^Then /, '')}`}
         </p>}
 
         {(error || trialError) && (
@@ -384,7 +380,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trialDays ? `Start ${trialDays} days free` : 'Check availability again'}
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trialDays ? `Start ${trialDays} days free` : trial && !trialEligible ? `Continue for ${trial.product.priceString}` : 'Check availability again'}
         </button>
       </motion.div>
     </motion.div>
@@ -425,9 +421,8 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
   const setIsPremium = useStore(s => s.setIsPremium)
 
   // Every tap of the X shows the discount offer — no persisted "already seen
-  // it, skip straight through" state. There is intentionally no way to exit
-  // this screen into any free/limited-access view; the only forward paths
-  // are purchase or referral.
+  // it, skip straight through" state. The only way to claim access is a
+  // completed purchase that has passed server verification.
   function handleCloseAttempt() {
     triggerHaptic()
     setClaimError('')
@@ -601,6 +596,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
           <FreeTrialOfferModal
             onClaim={handleClaimOffer}
             onDecline={handleDeclineOffer}
+            productId={EXIT_THREE_DAY_PRODUCT_ID}
             loading={isPurchasing}
             error={claimError}
           />

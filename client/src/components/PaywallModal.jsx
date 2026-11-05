@@ -2,7 +2,7 @@ import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import { useState, useEffect, useRef } from 'react'
 import { motion, useMotionValue, useAnimation, AnimatePresence } from 'framer-motion'
 import { X, Loader2 } from 'lucide-react'
-import { purchasePro, purchaseScanTrial, restorePurchases } from '../utils/iap'
+import { purchasePro, purchaseScanTrial } from '../utils/iap'
 import useStore from '../store/useStore'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { useNavigate } from 'react-router-dom'
@@ -305,32 +305,11 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
         setIsPremium(true)
         onPurchaseSuccess?.()
       } else if (result?.reason !== 'cancelled') {
-        setPurchaseError('Your purchase could not be verified. Please use Restore Purchase before buying again.')
+        setPurchaseError('Your purchase is awaiting server verification. Check your membership in Settings or try again shortly.')
       }
     } catch (err) {
       setPurchaseError(err?.message || 'Unable to complete purchase. Please try again.')
       console.error('[PaywallModal] purchase error', err)
-    } finally {
-      setLoading(false)
-      purchaseLock.current = false
-    }
-  }
-
-  const handleRestore = async () => {
-    if (purchaseLock.current) return
-    purchaseLock.current = true
-    triggerHaptic()
-    setLoading(true)
-    setPurchaseError('')
-    try {
-      await restorePurchases()
-      if (useStore.getState().subscriptionStatus === 'active') {
-        useStore.getState().setUpgradeWelcomePending(true)
-        onPurchaseSuccess?.()
-      } else setPurchaseError('No active purchase was found to restore.')
-    } catch (err) {
-      setPurchaseError(err?.message || 'Restore failed. Please try again.')
-      console.error('[PaywallModal] restore error', err)
     } finally {
       setLoading(false)
       purchaseLock.current = false
@@ -579,8 +558,6 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
         >
           {[
             { label: 'Terms of Use', action: () => navigate('/terms') },
-            { label: '·', action: null },
-            { label: 'Restore Purchase', action: handleRestore },
             { label: '·', action: null },
             { label: 'Privacy Policy', action: () => navigate('/privacy') },
           ].map((item, i) =>

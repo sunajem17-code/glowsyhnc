@@ -902,14 +902,10 @@ function SwipeableResultCards({ scan, onAscend, onInvite, onContinue, isPurchasi
 
 const REQUIRED = 3
 
-function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
+function InviteSheet({ referralCode, referralCount, onClose }) {
   const [count, setCount]           = useState(referralCount)
   const [sharing, setSharing]       = useState(false)
-  const [unlocking, setUnlocking]   = useState(false)
-  const [unlockErr, setUnlockErr]   = useState('')
   const [shareCount, setShareCount] = useState(0)
-  const { setIsPremium }            = useStore()
-  const navigate                    = useNavigate()
 
   const link      = referralCode ? `https://ascendus.store/r/${referralCode}` : 'https://ascendus.store'
   const shareText = `I'm using Ascendus to track my glow-up. It gives you an AI Glow Score and a custom plan. Try it free 👇 ${link}`
@@ -925,27 +921,13 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
       if (navigator.share) await navigator.share({ title: 'Ascendus', text: shareText, url: link })
       else await navigator.clipboard?.writeText(shareText)
       setShareCount(n => n + 1)
-      setTimeout(async () => { const fresh = await pollCount(); if (fresh >= REQUIRED) handleUnlock(fresh) }, 1500)
+      await pollCount()
     } catch (err) {
       // navigator.share throws on user cancel — expected, not an error
       if (!err?.message?.toLowerCase().includes('cancel') && err?.name !== 'AbortError') {
         console.warn('[ScanUnlockGate] handleShare failed:', err.message)
       }
     } finally { setSharing(false) }
-  }
-
-  async function handleUnlock(freshCount) {
-    const c = freshCount ?? count
-    if (c < REQUIRED) { setUnlockErr(`Need ${REQUIRED - c} more friend${REQUIRED - c !== 1 ? 's' : ''} to sign up first.`); return }
-    setUnlocking(true); setUnlockErr('')
-    try {
-      const { ok, isPremium: granted } = await api.referral.unlockPro()
-      if (ok && granted) { setIsPremium(true); navigate('/results', { replace: true }) }
-    } catch (err) {
-      const msg = err?.message || ''
-      if (msg.toLowerCase().includes('need')) { const fresh = await pollCount(); setUnlockErr(`${fresh}/${REQUIRED} friends signed up so far.`) }
-      else setUnlockErr(msg || 'Something went wrong. Try again.')
-    } finally { setUnlocking(false) }
   }
 
   const done = count >= REQUIRED
@@ -961,12 +943,12 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
         <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
       </div>
       <div className="px-6 pb-10 pt-3 overflow-y-auto">
-        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>INVITE & UNLOCK</p>
+        <p className="font-heading font-bold text-[11px] tracking-[0.18em] mb-1" style={{ color: G }}>INVITE FRIENDS</p>
         <h2 className="font-heading font-bold text-[24px] leading-tight mb-1" style={{ color: TEXT, letterSpacing: '-0.02em' }}>
-          Get Pro free.<br />Invite {REQUIRED} friends.
+          Share Ascendus with friends.
         </h2>
         <p className="font-body text-[13px] mb-6" style={{ color: DIM }}>
-          Each friend must sign up using your link. Once {REQUIRED} join, your full results unlock permanently.
+          Pro membership and full results require a verified subscription.
         </p>
         {/* Progress bar */}
         <div className="mb-6">
@@ -995,23 +977,15 @@ function InviteSheet({ referralCode, referralCount, onClose, onUnlocked }) {
             <span className="font-bold">How it counts:</span> a friend registers with your link. Only real sign-ups count.
           </p>
         </div>
-        {!done && (
-          <motion.button whileTap={{ scale: sharing ? 1 : 0.97 }} onClick={handleShare} disabled={sharing}
-            className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3 disabled:opacity-60"
-            style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.35)' }}>
-            {sharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
-            {sharing ? 'Opening share…' : shareCount > 0 ? 'Share Again' : 'Share Your Link'}
-          </motion.button>
-        )}
-        <motion.button whileTap={{ scale: (done && !unlocking) ? 0.97 : 1 }} onClick={() => handleUnlock()} disabled={!done || unlocking}
-          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-2 disabled:opacity-40"
-          style={{ background: done ? GRAD : SURF, border: done ? 'none' : '1px solid rgba(255,255,255,0.1)', color: done ? '#0A0A0A' : DIM, boxShadow: done ? '0 4px 20px rgba(198,168,92,0.35)' : 'none' }}>
-          {unlocking ? <Loader2 size={16} className="animate-spin" /> : <Users size={16} />}
-          {unlocking ? 'Unlocking…' : done ? 'Unlock My Results Now' : `${REQUIRED - count} more friend${REQUIRED - count !== 1 ? 's' : ''} needed`}
+        <motion.button whileTap={{ scale: sharing ? 1 : 0.97 }} onClick={handleShare} disabled={sharing}
+          className="w-full py-4 rounded-2xl font-heading font-bold text-[15px] flex items-center justify-center gap-2 mb-3 disabled:opacity-60"
+          style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 20px rgba(198,168,92,0.35)' }}>
+          {sharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+          {sharing ? 'Opening share…' : shareCount > 0 ? 'Share Again' : 'Share Your Link'}
         </motion.button>
-        {unlockErr && <p className="text-center text-[11px] font-body mt-1" style={{ color: '#EF4444' }}>{unlockErr}</p>}
+        <p className="font-body text-[12px] text-center" style={{ color: DIM }}>{count} friends joined via your invite.</p>
         {shareCount > 0 && !done && (
-          <button onClick={async () => { const fresh = await pollCount(); if (fresh >= REQUIRED) handleUnlock(fresh) }}
+          <button onClick={pollCount}
             className="w-full mt-2 py-2 font-body text-[12px] text-center flex items-center justify-center gap-1" style={{ color: DIM }}>
             Check if friends joined <ChevronRight size={12} />
           </button>
@@ -1377,7 +1351,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
             Share your invite code
           </h2>
           <p className="font-body text-[13px] mb-5" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            Invite {REQUIRED} friends to unlock results
+            Share your invite with friends
           </p>
 
           {/* Code box — tap to copy */}
@@ -1400,7 +1374,7 @@ function InvitePopup({ referralCode, referralCount, onClose }) {
           {/* Friends progress */}
           <div className="flex items-center justify-between">
             <p className="font-body text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              {referralCount}/{REQUIRED} friends joined{done ? ' — ready to unlock!' : ''}
+              {referralCount} friends joined
             </p>
             {done && <Check size={16} style={{ color: '#34C759' }} />}
           </div>
@@ -1801,7 +1775,7 @@ function LockedRevealScreen({ scan, referralCode, onAscend, onInvite, onClose, s
 function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, pendingScan = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentScan, scans, pendingFacePhoto, isPremium, isLocalProPreview, setIsPremium, updateUser, setShowUnlockSlideshow } = useStore()
+  const { currentScan, scans, pendingFacePhoto, isPremium, isLocalProPreview, setIsPremium, setShowUnlockSlideshow } = useStore()
   const [searchParams] = useSearchParams()
 
   const [showInvite, setShowInvite]         = useState(false)
@@ -1878,7 +1852,6 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     setShowPaywall(false)
     setShowUnlockSlideshow(false)
     setIsPremium(true)
-    updateUser({ is_pro: true, subscriptionTier: 'premium', subscription_tier: 'premium' })
   }
 
   async function handleAscend() {

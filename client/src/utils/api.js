@@ -190,7 +190,6 @@ export const api = {
   },
   referral: {
     count:     () => request('/referral/count'),
-    unlockPro: () => request('/referral/unlock-pro', { method: 'POST' }),
   },
   swipemaxx: {
     rank: (data) => request('/swipemaxx/rank', { method: 'POST', body: JSON.stringify(data) }),

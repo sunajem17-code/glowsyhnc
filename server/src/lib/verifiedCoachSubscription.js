@@ -23,15 +23,29 @@ async function verifyCoachSubscription(userId, { apiKey = process.env.REVENUECAT
   }
   return false
 }
+async function verifyStripeSubscription(subscriptionId, { stripeClient } = {}) {
+  if (!subscriptionId) return false
+  const Stripe = require('stripe')
+  const stripe = stripeClient || (process.env.STRIPE_SECRET_KEY
+    ? new Stripe(process.env.STRIPE_SECRET_KEY, { httpClient: Stripe.createFetchHttpClient(), maxNetworkRetries: 1 })
+    : null)
+  if (!stripe) throw new Error('Subscription verification unavailable')
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const active = subscription?.status === 'active' || subscription?.status === 'trialing'
+  const periodEndsInFuture = Number(subscription?.current_period_end) * 1000 > Date.now()
+  return Boolean(active && periodEndsInFuture)
+}
 // Persisted iOS flags are a mirror, not proof: a missed expiry webhook must
-// not authorize a subscription forever. Web billing and dated trials retain
-// their existing server-managed authorization.
-async function resolveSubscription(userId, { user, verify = verifyCoachSubscription } = {}) {
+// not authorize a subscription forever. Stripe subscriptions are rechecked
+// live; dated trials are issued and expire on the server.
+async function resolveSubscription(userId, { user, verify = verifyCoachSubscription, verifyStripe = verifyStripeSubscription } = {}) {
   const trial = user?.subscription_tier === 'trial' && Date.parse(user.pro_trial_expires_at) > Date.now()
-  const web = user?.stripe_subscription_id && (user.subscription_tier === 'premium' || user.is_pro === true || user.is_pro === 1)
-  if (trial || web) return { isPro: true, status: 'active', source: trial ? 'trial' : 'stripe' }
+  if (trial) return { isPro: true, status: 'active', source: 'trial' }
+  if (user?.stripe_subscription_id && await verifyStripe(user.stripe_subscription_id)) {
+    return { isPro: true, status: 'active', source: 'stripe' }
+  }
   const isPro = await verify(userId)
   if (process.env.NODE_ENV !== 'production') console.debug('[premium]', { account: `…${String(userId).slice(-4)}`, source: 'revenuecat', serverActive: isPro, reason: isPro ? 'active-entitlement' : 'missing-or-expired-entitlement' })
   return { isPro, status: isPro ? 'active' : 'inactive', source: 'revenuecat' }
 }
-module.exports = { ENTITLEMENT_ID, hasProEntitlement, verifyCoachSubscription, resolveSubscription }
+module.exports = { ENTITLEMENT_ID, hasProEntitlement, verifyCoachSubscription, verifyStripeSubscription, resolveSubscription }
