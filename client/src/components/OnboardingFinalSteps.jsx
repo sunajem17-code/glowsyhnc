@@ -1,4 +1,3 @@
-import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 import { Star, Check, Loader2, X, Tag } from 'lucide-react'
@@ -388,7 +387,6 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
 }
 
 export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchasing = false, error = '' }) {
-  const monthlyTrial = useMonthlyTrialOffer()
   const [cardIdx, setCardIdx] = useState(0)
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
@@ -537,7 +535,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={() => monthlyTrial ? setShowDiscountOffer(true) : onAscend()}
+          onClick={onAscend}
           disabled={isPurchasing}
           className="btn-primary flex items-center justify-center gap-2.5 disabled:opacity-70"
           style={{ background: GOLD_GRAD, fontSize: 19, letterSpacing: '0.02em', color: 'white', paddingTop: 19, paddingBottom: 19 }}
@@ -573,7 +571,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
               className="flex items-center justify-center gap-2.5"
             >
               {isPurchasing && <Loader2 size={20} className="animate-spin" />}
-              {isPurchasing ? 'Processing…' : monthlyTrial ? 'Start 7 days free' : 'Ready to Transform'}
+              {isPurchasing ? 'Processing…' : 'Ready to Transform'}
             </motion.span>
           </AnimatePresence>
         </motion.button>

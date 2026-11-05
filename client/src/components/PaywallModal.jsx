@@ -1,8 +1,7 @@
-import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import { useState, useEffect, useRef } from 'react'
 import { motion, useMotionValue, useAnimation, AnimatePresence } from 'framer-motion'
 import { X, Loader2 } from 'lucide-react'
-import { purchasePro, purchaseScanTrial } from '../utils/iap'
+import { purchasePro } from '../utils/iap'
 import useStore from '../store/useStore'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { useNavigate } from 'react-router-dom'
@@ -228,7 +227,6 @@ function Card3() {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function PaywallModal({ onClose, scan, gender = 'male', onPurchaseSuccess }) {
-  const monthlyTrial = useMonthlyTrialOffer()
   const navigate = useNavigate()
   const setIsPremium = useStore((s) => s.setIsPremium)
 
@@ -299,7 +297,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
     setLoading(true)
     setPurchaseError('')
     try {
-      const result = monthlyTrial ? await purchaseScanTrial(monthlyTrial.product.identifier) : await purchasePro('monthly')
+      const result = await purchasePro('monthly')
       if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
         setIsPremium(true)
@@ -537,13 +535,13 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
           {loading ? (
             <Loader2 size={22} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
           ) : (
-            monthlyTrial ? 'Start 7 days free' : 'Unlock now 🙌'
+            'Unlock now 🙌'
           )}
         </button>
 
         {/* Price below button */}
         <p style={{ textAlign: 'center', fontSize: 13, color: DIM, fontFamily: 'var(--font-body, inherit)', marginBottom: 12 }}>
-          {monthlyTrial ? `7 days free, then ${monthlyTrial.product.priceString}/month. Auto-renews unless cancelled.` : '$9.99 USD per month'}
+          $9.99 USD per month
         </p>
 
         {/* Legal links */}

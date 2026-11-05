@@ -41,15 +41,14 @@ test('unknown eligibility and paid intro offers never become a free trial', () =
   assert.equal(eligibleThreeDayTrial([{ product: { ...pkg.product, introPrice: { ...pkg.product.introPrice, price: 1 } } }], { weekly: { status: 2 } }), null)
 })
 
-test('the optional local fixture contains the trial while the app scheme uses Apple sandbox', () => {
+test('the local fixture charges the main monthly plan immediately and keeps annual 3-day trials', () => {
   const config = JSON.parse(readFileSync(new URL('../../ios/App/App/Ascendus.storekit', import.meta.url), 'utf8'))
   const subscriptions = config.subscriptionGroups.flatMap(group => group.subscriptions)
   const yearly = subscriptions.find(product => product.productID === 'com.ascendus.app.yearly')
   const monthly = subscriptions.find(product => product.productID === EXIT_TRIAL_PRODUCT_ID)
   const discountedAnnual = subscriptions.find(product => product.productID === EXIT_THREE_DAY_PRODUCT_ID)
   assert.equal(monthly.recurringSubscriptionPeriod, 'P1M')
-  assert.equal(monthly.introductoryOffer.paymentMode, 'free')
-  assert.equal(monthly.introductoryOffer.subscriptionPeriod, 'P1W')
+  assert.equal(monthly.introductoryOffer, undefined)
   assert.equal(monthly.displayPrice, '9.99')
   assert.equal(discountedAnnual.recurringSubscriptionPeriod, 'P1Y')
   assert.equal(discountedAnnual.introductoryOffer.paymentMode, 'free')
@@ -61,6 +60,22 @@ test('the optional local fixture contains the trial while the app scheme uses Ap
   const scheme = readFileSync(new URL('../../ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme', import.meta.url), 'utf8')
   assert.match(scheme, /<StoreKitConfigurationFileReference/)
   assert.match(scheme, /Ascendus\.storekit/)
+})
+
+test('main paywalls use the paid monthly product and keep the exit offer separate', () => {
+  const modalPaywall = readFileSync(new URL('../components/PaywallModal.jsx', import.meta.url), 'utf8')
+  const premiumPaywall = readFileSync(new URL('../pages/Premium.jsx', import.meta.url), 'utf8')
+  const onboarding = readFileSync(new URL('../components/OnboardingFinalSteps.jsx', import.meta.url), 'utf8')
+  const scanGate = readFileSync(new URL('../pages/ScanUnlockGate.jsx', import.meta.url), 'utf8')
+  assert.match(modalPaywall, /await purchasePro\('monthly'\)/)
+  assert.match(modalPaywall, /\$9\.99 USD per month/)
+  assert.doesNotMatch(modalPaywall, /Start 7 days free|useMonthlyTrialOffer/)
+  assert.match(premiumPaywall, /await purchasePro\('monthly'\)/)
+  assert.doesNotMatch(premiumPaywall, /Start 7 days free|useMonthlyTrialOffer/)
+  assert.doesNotMatch(onboarding, /Start 7 days free|useMonthlyTrialOffer/)
+  assert.doesNotMatch(scanGate, /Start 7 days free|useMonthlyTrialOffer/)
+  assert.match(onboarding, /productId=\{EXIT_THREE_DAY_PRODUCT_ID\}/)
+  assert.match(scanGate, /setShowDiscount\(true\)/)
 })
 
 test('the X exit offer explicitly checks the discounted annual trial SKU', () => {

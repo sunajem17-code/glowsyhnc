@@ -1,4 +1,3 @@
-import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import AppearanceAssessmentResults from '../components/AppearanceAssessmentResults'
 import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
@@ -1133,7 +1132,6 @@ const PAYWALL_CARDS = [
 ]
 
 function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
-  const monthlyTrial = useMonthlyTrialOffer()
   const [restoring, setRestoring] = useState(false)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -1282,13 +1280,13 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
       <div className="px-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))', paddingTop: 4 }}>
         <motion.button
           whileTap={{ scale: isPurchasing ? 1 : 0.97 }}
-          onClick={() => { triggerHaptic(); monthlyTrial ? setShowDiscount(true) : onPurchase() }}
+          onClick={() => { triggerHaptic(); onPurchase() }}
           disabled={isPurchasing}
           className="w-full py-4 rounded-2xl font-heading font-bold text-[16px] flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ background: GRAD, color: '#0A0A0A', boxShadow: '0 4px 28px rgba(198,168,92,0.4)' }}
         >
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
-          {isPurchasing ? 'Processing…' : monthlyTrial ? 'Start 7 days free' : 'Unlock Now'}
+          {isPurchasing ? 'Processing…' : 'Unlock Now'}
         </motion.button>
         {discountError && !showDiscount && <p role="alert" className="mt-2 text-center text-xs" style={{ color: '#EF4444' }}>{discountError}</p>}
         <div className="flex items-center justify-center gap-5" style={{ marginTop: 18 }}>

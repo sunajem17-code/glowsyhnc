@@ -1,4 +1,3 @@
-import { useMonthlyTrialOffer } from '../hooks/useMonthlyTrialOffer'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
@@ -6,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronLeft, Lock, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import { api } from '../utils/api'
-import { isNative, purchasePro, purchaseScanTrial, initRevenueCat } from '../utils/iap'
+import { isNative, purchasePro, initRevenueCat } from '../utils/iap'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
 import { EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
@@ -39,7 +38,6 @@ const TESTIMONIALS = [
 ]
 
 export default function Premium() {
-  const monthlyTrial = useMonthlyTrialOffer()
   const navigate = useNavigate()
   const { setIsPremium, isPremium, logout } = useStore()
   const [subscribingNow, setSubscribingNow] = useState(false)
@@ -72,7 +70,7 @@ export default function Premium() {
     setCheckoutError('')
     try {
       if (isNative()) {
-        const result = monthlyTrial ? await purchaseScanTrial(monthlyTrial.product.identifier) : await purchasePro('monthly')
+        const result = await purchasePro('monthly')
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
@@ -212,7 +210,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : monthlyTrial ? 'Start 7 days free' : 'Get Ascendus Max ($9.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
           Billed monthly · Cancel anytime
@@ -346,7 +344,7 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : monthlyTrial ? 'Start 7 days free' : 'Get Ascendus Max ($9.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($9.99/mo)'}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
           Billed monthly · Cancel anytime
