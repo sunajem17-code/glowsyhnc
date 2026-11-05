@@ -5,8 +5,8 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { getEligibleScanTrial, purchaseScanTrial, restorePurchases } from '../utils/iap'
-import { trialRenewalText } from '../utils/scanTrial'
+import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { trialRenewalText, isThreeDayFreeTrial, isSevenDayFreeTrial, EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
@@ -248,7 +248,7 @@ function OverallCard({ scan }) {
 //
 // Apple eligibility and the store product determine availability and renewal
 // terms. Never fall back to a paid discount under free-trial wording.
-export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error = '' }) {
+export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error = '', productId }) {
   const [trial, setTrial] = useState(null)
   const [checking, setChecking] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
@@ -263,17 +263,21 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
     setTrialError('')
     setTrial(null)
     withDeadline((async () => {
-      const pkg = await getEligibleScanTrial()
-      if (active && !pkg) setTrialError('Your Apple account is not eligible for this free trial. You can close this offer or restore an existing purchase.')
+      const pkg = await getEligibleScanTrial(productId)
       return pkg
     })(), 20000, 'Subscription check timed out. Please try again.').then(pkg => {
       if (!active) return
+      if (!pkg) {
+        setTrialError('This Apple account is not eligible for a free trial. You can still close this offer.')
+        return
+      }
       setTrial(pkg)
     })
       .catch(err => { if (active) setTrialError(err?.message || 'Unable to check trial eligibility. Please try again.') })
       .finally(() => { if (active) setChecking(false) })
     return () => { active = false }
-  }, [eligibilityAttempt])
+  }, [eligibilityAttempt, productId])
+  const trialDays = trial ? (isThreeDayFreeTrial(trial.product) ? 3 : isSevenDayFreeTrial(trial.product) ? 7 : null) : null
   async function startTrial() {
     if (!trial || purchaseLock.current || loading) return
     purchaseLock.current = true
@@ -289,22 +293,6 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
       }
     } catch (err) {
       setTrialError(err?.message || 'Unable to start your trial Please try again')
-    } finally {
-      purchaseLock.current = false
-      setPurchasing(false)
-    }
-  }
-  async function restoreTrialPurchase() {
-    if (purchaseLock.current || loading) return
-    purchaseLock.current = true
-    setPurchasing(true)
-    setTrialError('')
-    try {
-      const customerInfo = await restorePurchases()
-      if (!customerInfo) throw new Error('Restore purchases from the iPhone app.')
-      await onClaim({ success: true, customerInfo })
-    } catch (err) {
-      setTrialError(err?.message || 'Restore failed. Please try again.')
     } finally {
       purchaseLock.current = false
       setPurchasing(false)
@@ -356,10 +344,10 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trial ? '7 DAYS FREE' : 'CHECK AVAILABILITY'}
+          {trialDays ? `${trialDays} DAYS FREE` : 'CHECK AVAILABILITY'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
-          {checking ? 'Checking free trial eligibility…' : trial ? '7 days on us • No payment today • Cancel anytime' : 'Apple determines trial eligibility for your account.'}
+          {checking ? 'Checking free trial eligibility…' : trial ? `${trialDays} days on us • No payment today • Cancel anytime` : 'Apple determines trial eligibility for your account.'}
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
@@ -387,10 +375,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           style={{ background: GOLD_GRAD, boxShadow: '0 4px 16px rgba(198,168,92,0.3)' }}
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trial ? 'Start 7 days free' : 'Check availability again'}
-        </button>
-        <button onClick={restoreTrialPurchase} disabled={busy} className="font-body text-[12px] underline disabled:opacity-50" style={{ color: DIM }}>
-          Restore Purchases
+          {busy ? 'Processing…' : checking ? 'Checking eligibility…' : trialDays ? `Start ${trialDays} days free` : 'Check availability again'}
         </button>
       </motion.div>
     </motion.div>

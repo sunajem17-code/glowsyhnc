@@ -1,7 +1,7 @@
 import { premiumDiagnostic } from './premiumDiagnostics'
 import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor'
 import { Capacitor } from '@capacitor/core'
-import { isMonthlyExitTrial, eligibleExitTrial, EXIT_TRIAL_PRODUCT_ID } from './scanTrial'
+import { isMonthlyExitTrial, eligibleExitTrial, eligibleThreeDayTrial, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID } from './scanTrial'
 import { createRevenueCatInitializer, createProCustomerInfoReader, validRevenueCatUserId, finishAccountPurchase } from './revenueCatIdentity'
 
 // RevenueCat iOS public key — rotate in RevenueCat dashboard if compromised
@@ -56,7 +56,7 @@ export const isNative = () => Capacitor.isNativePlatform()
 
 export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
   if (!isNative()) throw new Error('Start your free trial from the iPhone app.')
-  if (productId !== EXIT_TRIAL_PRODUCT_ID) throw new Error('This exit offer is no longer available.')
+  if (![EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID].includes(productId)) throw new Error('This exit offer is no longer available.')
   await initRevenueCat()
   const offerings = await Purchases.getOfferings()
   const availableOfferings = [offerings.current, ...Object.values(offerings.all || {})].filter(Boolean)
@@ -65,12 +65,14 @@ export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
       .map(pkg => [pkg.product?.identifier, pkg])
       .filter(([identifier]) => identifier)
   ).values()]
-  const candidates = packages.filter(p => p.product?.identifier === productId && isMonthlyExitTrial(p.product))
-  if (!candidates.length) throw new Error('The monthly plan with a 7-day free trial is not configured in the store yet. Please try again later.')
+  const candidates = packages.filter(p => p.product?.identifier === productId && (productId === EXIT_THREE_DAY_PRODUCT_ID || isMonthlyExitTrial(p.product)))
+  if (!candidates.length) throw new Error(productId === EXIT_THREE_DAY_PRODUCT_ID ? 'The yearly plan with a 3-day free trial is not configured in the store yet. Please try again later.' : 'The monthly plan with a 7-day free trial is not configured in the store yet. Please try again later.')
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })
-  const eligible = eligibleExitTrial(candidates, eligibility)
+  const eligible = productId === EXIT_THREE_DAY_PRODUCT_ID
+    ? eligibleThreeDayTrial(candidates, eligibility, productId)
+    : eligibleExitTrial(candidates, eligibility)
   if (eligible) return eligible
   const selected = productId ? candidates.filter(pkg => pkg.product.identifier === productId) : candidates
   if (!selected.length) throw new Error('This trial offer is no longer available.')

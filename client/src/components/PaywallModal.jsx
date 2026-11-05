@@ -7,6 +7,7 @@ import useStore from '../store/useStore'
 import { triggerHaptic, triggerPageHaptic } from '../utils/haptics'
 import { useNavigate } from 'react-router-dom'
 import { FreeTrialOfferModal } from './OnboardingFinalSteps'
+import { EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 
 const GOLD = '#C6A85C'
 const BG = '#080808'
@@ -616,6 +617,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
       {purchaseError && <p role="alert" style={{ color: '#EF4444', textAlign: 'center', padding: '8px 24px' }}>{purchaseError}</p>}
       <AnimatePresence>
         {showTrialOffer && <FreeTrialOfferModal
+          productId={EXIT_THREE_DAY_PRODUCT_ID}
           loading={loading}
           onDecline={() => { setShowTrialOffer(false); onClose?.() }}
           onClaim={() => {

@@ -4,7 +4,7 @@ import { isCurrentAssessment } from '../utils/assessment'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, animate, useReducedMotion } from 'framer-motion'
-import { isNative, purchasePro, restorePurchases } from '../utils/iap'
+import { isNative, purchasePro } from '../utils/iap'
 import {
   UserPlus, Share2, Check, Loader2, Users, ChevronRight, ChevronLeft, X,
   Lock, Sparkles, Eye, Zap, BarChart2, Smile, Brain, Activity, Sun, Moon, Droplets,
@@ -20,6 +20,7 @@ import ProcessingOverlay from '../components/ProcessingOverlay'
 import { triggerHaptic, triggerPageHaptic, triggerStrongHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
 import { FreeTrialOfferModal } from '../components/OnboardingFinalSteps'
+import { EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { completeDemoRevealRatings, recoverMissingRevealRatings, getRatingColor, getRevealRatings, getResultsHeading, getRevealView } from '../utils/revealRatings'
 import { getRevealMetricTextStyles, getRevealRatingAnimation, getUnlockedResultsHeadingStyle, getResultsNavigationDotButtonStyle, getRevealRatingsPanelHeight } from '../utils/revealAnimation'
 import { REVEAL_RATINGS_LAYOUT } from '../utils/revealRatingsLayout'
@@ -1315,14 +1316,6 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
           {isPurchasing ? <Loader2 size={17} className="animate-spin" /> : null}
           {isPurchasing ? 'Processing…' : monthlyTrial ? 'Start 7 days free' : 'Unlock Now'}
         </motion.button>
-        {isNative() && <button type="button" disabled={restoring || isPurchasing} className="mt-3 w-full text-center text-xs" style={{ color: G }} onClick={async () => {
-          if (restoring) return
-          setRestoring(true)
-          setDiscountError('')
-          try { await restorePurchases(); onUnlock() }
-          catch (error) { setDiscountError(error.message || 'Restore failed. Please retry.') }
-          finally { setRestoring(false) }
-        }}>{restoring ? 'Restoring…' : 'Restore Purchases'}</button>}
         {discountError && !showDiscount && <p role="alert" className="mt-2 text-center text-xs" style={{ color: '#EF4444' }}>{discountError}</p>}
         <div className="flex items-center justify-center gap-5" style={{ marginTop: 18 }}>
           <button type="button" onClick={() => navigate('/terms')} className="font-body text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Terms of Use</button>
@@ -1332,7 +1325,7 @@ function ProPaywall({ scan, onClose, onPurchase, onUnlock, isPurchasing }) {
       </div>
 
       <AnimatePresence>
-        {showDiscount && <FreeTrialOfferModal onClaim={handleClaimDiscount} onDecline={handleDeclineDiscount} loading={isPurchasing} error={discountError} />}
+        {showDiscount && <FreeTrialOfferModal productId={EXIT_THREE_DAY_PRODUCT_ID} onClaim={handleClaimDiscount} onDecline={handleDeclineDiscount} loading={isPurchasing} error={discountError} />}
       </AnimatePresence>
     </motion.div>
   )
