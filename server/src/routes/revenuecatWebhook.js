@@ -14,6 +14,7 @@ const crypto = require('crypto')
 const { getUserById, updateUserById, isWebhookProcessed, markWebhookProcessed } = require('../supabase')
 
 const router = express.Router()
+const { transferredAppUserIds } = require('../lib/revenuecatTransfer')
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 // RevenueCat webhooks don't support HMAC request signing the way Stripe's do
@@ -68,6 +69,38 @@ router.post('/revenuecat', async (req, res) => {
   // Idempotency — RevenueCat, like Stripe, delivers at-least-once and can redeliver
   if (event.id && await isWebhookProcessed(event.id)) {
     console.log('[RC Webhook] ⏭️  Already processed event id:', event.id, '— skipping')
+    return res.json({ received: true })
+  }
+
+  // A TRANSFER is the event RevenueCat sends when a purchase moves between
+  // app-user IDs. It has no event.app_user_id; silently treating it like a
+  // normal purchase leaves the destination account's server entitlement stale.
+  if (event.type === 'TRANSFER') {
+    const userIds = transferredAppUserIds(event)
+    if (!userIds.length) {
+      console.warn('[RC Webhook] TRANSFER had no mappable app user IDs')
+      if (event.id) await markWebhookProcessed(event.id, event.type)
+      return res.json({ received: true })
+    }
+    try {
+      for (const userId of userIds) {
+        const user = await getUserById(userId).catch(() => null)
+        if (!user) {
+          console.warn('[RC Webhook] TRANSFER app user ID has no Supabase account:', userId)
+          continue
+        }
+        const isEntitled = await fetchIsEntitled(userId)
+        await updateUserById(userId, {
+          subscription_tier: isEntitled ? 'premium' : 'free',
+          is_pro: isEntitled,
+        })
+        console.log(`[RC Webhook] TRANSFER synced userId=${userId} → is_pro=${isEntitled}`)
+      }
+    } catch (err) {
+      console.error('[RC Webhook] TRANSFER entitlement sync failed:', err.message)
+      return res.status(500).json({ error: 'internal_error' })
+    }
+    if (event.id) await markWebhookProcessed(event.id, event.type)
     return res.json({ received: true })
   }
 

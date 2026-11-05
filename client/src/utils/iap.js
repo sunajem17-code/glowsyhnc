@@ -273,6 +273,34 @@ export async function getProCustomerInfo(userId) {
   return info
 }
 
+// A tester who has already started an introductory offer is correctly marked
+// ineligible by Apple's trial check. Before showing that result, reconcile any
+// active RevenueCat entitlement to the signed-in Ascendus account and require
+// the server to confirm it. This never grants access from eligibility alone.
+export async function getVerifiedExistingProCustomerInfo() {
+  if (!isNative()) return null
+  const { default: useStore } = await import('../store/useStore')
+  const { api } = await import('./api')
+  const session = useStore.getState()
+  const userId = session.user?.id
+  if (!session.isAuthenticated || !session.token || !userId || session.token === 'demo-token') return null
+
+  // Ask the authenticated server first: its status endpoint validates this
+  // account directly against RevenueCat, including Sandbox. This also covers
+  // StoreKit transfers where the SDK's just-switched identity has not yet
+  // refreshed its local CustomerInfo cache.
+  const serverStatus = await api.payments.status()
+  const latest = useStore.getState()
+  if (latest.user?.id !== userId || latest.token !== session.token) throw new Error('Your account changed. Please retry.')
+  if (serverStatus?.isPremium === true) {
+    return { customerInfo: await getProCustomerInfo(userId).catch(() => null), verifiedBy: 'server' }
+  }
+
+  const customerInfo = await getProCustomerInfo(userId)
+  if (!customerInfo) return null
+  return await confirmAccountPurchase(customerInfo, userId) ? { customerInfo, verifiedBy: 'revenuecat' } : null
+}
+
 export async function checkProStatus(userId) {
   if (!isNative()) return false
   return Boolean(await getProCustomerInfo(userId))

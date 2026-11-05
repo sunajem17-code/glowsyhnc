@@ -5,7 +5,7 @@ import { Star, Check, Loader2, X, Tag } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { InAppReview } from '@capacitor-community/in-app-review'
 import useStore from '../store/useStore'
-import { getEligibleScanTrial, purchaseScanTrial } from '../utils/iap'
+import { getEligibleScanTrial, getVerifiedExistingProCustomerInfo, purchaseScanTrial } from '../utils/iap'
 import { trialRenewalText, isThreeDayFreeTrial, isSevenDayFreeTrial, EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { withDeadline } from '../utils/requestTimeout'
 import { api } from '../utils/api'
@@ -257,21 +257,30 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
   const purchaseLock = useRef(false)
   const completedPurchase = useRef(null)
   const busy = loading || purchasing
+  const onClaimRef = useRef(onClaim)
+  onClaimRef.current = onClaim
   useEffect(() => {
     let active = true
     setChecking(true)
     setTrialError('')
     setTrial(null)
     withDeadline((async () => {
+      const existingPro = await getVerifiedExistingProCustomerInfo()
+      if (!active) return { existingPro: false }
+      if (existingPro) {
+        await onClaimRef.current({ success: true, customerInfo: existingPro.customerInfo, alreadyActive: true, verifiedBy: existingPro.verifiedBy })
+        return { existingPro: true }
+      }
       const pkg = await getEligibleScanTrial(productId)
-      return pkg
+      return { existingPro: false, pkg }
     })(), 20000, 'Subscription check timed out. Please try again.').then(pkg => {
       if (!active) return
-      if (!pkg) {
+      if (pkg.existingPro) return
+      if (!pkg.pkg) {
         setTrialError('This Apple account is not eligible for a free trial. You can still close this offer.')
         return
       }
-      setTrial(pkg)
+      setTrial(pkg.pkg)
     })
       .catch(err => { if (active) setTrialError(err?.message || 'Unable to check trial eligibility. Please try again.') })
       .finally(() => { if (active) setChecking(false) })
