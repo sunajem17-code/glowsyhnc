@@ -33,7 +33,7 @@
     {
       "id": "com.ascendus.pro.monthly",
       "type": "auto_renewable_subscription",
-      "price": 9.99,
+      "price": 7.99,
       "period": "monthly"
     },
     {

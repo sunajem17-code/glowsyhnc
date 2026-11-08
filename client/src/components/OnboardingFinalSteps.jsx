@@ -236,7 +236,7 @@ function OverallCard({ scan }) {
 // Y" counter) match ScanUnlockGate's SwipeableResultCards exactly — the
 // "Ready to Transform" CTA below is untouched, still a flat call to onAscend.
 
-// ── Exit-intent: yearly 3-day free trial, preserving the offer shell ──
+// ── Exit-intent: monthly 3-day free trial, preserving the offer shell ──
 // Shown every time the user taps the close (X) on StepScoresWaiting — there
 // is deliberately no "only show once, skip straight through afterward" path.
 // An earlier version gated this behind a persisted flag so only the first-
@@ -348,7 +348,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </p>
         <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
-          {trialDays ? `${trialDays} DAYS FREE` : trial && !trialEligible ? 'ANNUAL MEMBERSHIP' : 'CHECK AVAILABILITY'}
+          {trialDays ? `${trialDays} DAYS FREE` : trial && !trialEligible ? 'MONTHLY MEMBERSHIP' : 'CHECK AVAILABILITY'}
         </p>
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
           {checking ? 'Checking free trial eligibility…' : trialEligible && trial ? `${trialDays} days on us • No payment today • Cancel anytime` : trial && !trialEligible ? 'This Apple account is not eligible for a free trial. You can still subscribe; Apple will show the charge before you confirm.' : 'Apple determines trial eligibility for your account.'}
@@ -580,7 +580,7 @@ export function StepScoresWaiting({ onAscend, onUpgradeComplete, scan, isPurchas
         )}
 
         <p className="text-center font-body mt-2" style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, lineHeight: 1.5 }}>
-          Pro: $9.99/month or $49.99/year · Auto-renews unless cancelled 24h before renewal · Cancel anytime in Settings
+          Pro: $7.99/month or $49.99/year · Auto-renews unless cancelled 24h before renewal · Cancel anytime in Settings
           {' · '}
           <a href="https://ascendus.store/privacy" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'underline' }}>Privacy Policy</a>
           {' · '}

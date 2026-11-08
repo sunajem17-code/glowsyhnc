@@ -66,7 +66,7 @@ export async function getEligibleScanTrial(productId = EXIT_TRIAL_PRODUCT_ID) {
       .filter(([identifier]) => identifier)
   ).values()]
   const candidates = packages.filter(p => p.product?.identifier === productId && (productId === EXIT_THREE_DAY_PRODUCT_ID || isMonthlyExitTrial(p.product)))
-  if (!candidates.length) throw new Error(productId === EXIT_THREE_DAY_PRODUCT_ID ? 'The yearly plan with a 3-day free trial is not configured in the store yet. Please try again later.' : 'The monthly plan with a 7-day free trial is not configured in the store yet. Please try again later.')
+  if (!candidates.length) throw new Error(productId === EXIT_THREE_DAY_PRODUCT_ID ? 'The monthly plan with a 3-day free trial is not configured in the store yet. Please try again later.' : 'The monthly plan with a 7-day free trial is not configured in the store yet. Please try again later.')
   const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
     productIdentifiers: candidates.map(p => p.product.identifier),
   })

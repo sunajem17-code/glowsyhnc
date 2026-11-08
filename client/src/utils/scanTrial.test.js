@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { isSevenDayFreeTrial, trialRenewalText, isMonthlyExitTrial, eligibleThreeDayTrial, eligibleExitTrial, trialPackageForIneligibleAccount, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID } from './scanTrial.js'
-const product = { priceString: '$9.99', subscriptionPeriod: 'P1M', introPrice: { price: 0, cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } }
+const product = { priceString: '$7.99', subscriptionPeriod: 'P1M', introPrice: { price: 0, cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } }
 test('only a zero-cost seven-day intro can be advertised as a week free', () => {
   assert.equal(isSevenDayFreeTrial(product), true)
   for (const introPrice of [null, { ...product.introPrice, price: 1 }, { ...product.introPrice, cycles: 2 }, { ...product.introPrice, periodUnit: 'MONTH' }]) {
@@ -13,14 +13,14 @@ test('only a zero-cost seven-day intro can be advertised as a week free', () => 
 test('trial cannot hide an unknown renewal price or billing period', () => {
   assert.equal(isSevenDayFreeTrial({ ...product, priceString: null }), false)
   assert.equal(isSevenDayFreeTrial({ ...product, subscriptionPeriod: null }), false)
-  assert.equal(trialRenewalText(product), 'Then $9.99 per month. Auto-renews unless canceled. Cancel anytime in Settings.')
+  assert.equal(trialRenewalText(product), 'Then $7.99 per month. Auto-renews unless canceled. Cancel anytime in Settings.')
 })
 
 test('exit trial accepts only the monthly product, never annual or another SKU', () => {
   const monthly = { ...product, identifier: 'com.ascendus.app.monthly' }
   assert.equal(isMonthlyExitTrial(monthly), true)
   assert.equal(isMonthlyExitTrial({ ...monthly, subscriptionPeriod: 'P1Y' }), false)
-  assert.equal(isMonthlyExitTrial({ ...monthly, identifier: 'com.ascendus.app.yearly.discount' }), false)
+  assert.equal(isMonthlyExitTrial({ ...monthly, identifier: 'com.ascendus.app.monthly.discount' }), false)
   assert.equal(isMonthlyExitTrial({ ...monthly, introPrice: null }), false)
 })
 
@@ -46,13 +46,14 @@ test('the local fixture charges the main monthly plan immediately and keeps annu
   const subscriptions = config.subscriptionGroups.flatMap(group => group.subscriptions)
   const yearly = subscriptions.find(product => product.productID === 'com.ascendus.app.yearly')
   const monthly = subscriptions.find(product => product.productID === EXIT_TRIAL_PRODUCT_ID)
-  const discountedAnnual = subscriptions.find(product => product.productID === EXIT_THREE_DAY_PRODUCT_ID)
+  const exitMonthly = subscriptions.find(product => product.productID === EXIT_THREE_DAY_PRODUCT_ID)
   assert.equal(monthly.recurringSubscriptionPeriod, 'P1M')
   assert.equal(monthly.introductoryOffer, undefined)
-  assert.equal(monthly.displayPrice, '9.99')
-  assert.equal(discountedAnnual.recurringSubscriptionPeriod, 'P1Y')
-  assert.equal(discountedAnnual.introductoryOffer.paymentMode, 'free')
-  assert.equal(discountedAnnual.introductoryOffer.subscriptionPeriod, 'P3D')
+  assert.equal(monthly.displayPrice, '7.99')
+  assert.equal(exitMonthly.recurringSubscriptionPeriod, 'P1M')
+  assert.equal(exitMonthly.displayPrice, '7.99')
+  assert.equal(exitMonthly.introductoryOffer.paymentMode, 'free')
+  assert.equal(exitMonthly.introductoryOffer.subscriptionPeriod, 'P3D')
   assert.equal(yearly.introductoryOffer.paymentMode, 'free')
   assert.equal(yearly.introductoryOffer.subscriptionPeriod, 'P3D')
   assert.equal(yearly.introductoryOffer.numberOfPeriods, 1)
@@ -68,7 +69,7 @@ test('main paywalls use the paid monthly product and keep the exit offer separat
   const onboarding = readFileSync(new URL('../components/OnboardingFinalSteps.jsx', import.meta.url), 'utf8')
   const scanGate = readFileSync(new URL('../pages/ScanUnlockGate.jsx', import.meta.url), 'utf8')
   assert.match(modalPaywall, /await purchasePro\('monthly'\)/)
-  assert.match(modalPaywall, /\$9\.99 USD per month/)
+  assert.match(modalPaywall, /\$7\.99 USD per month/)
   assert.doesNotMatch(modalPaywall, /Start 7 days free|useMonthlyTrialOffer/)
   assert.match(premiumPaywall, /await purchasePro\('monthly'\)/)
   assert.doesNotMatch(premiumPaywall, /Start 7 days free|useMonthlyTrialOffer/)
@@ -78,7 +79,7 @@ test('main paywalls use the paid monthly product and keep the exit offer separat
   assert.match(scanGate, /setShowDiscount\(true\)/)
 })
 
-test('the X exit offer explicitly checks the discounted annual trial SKU', () => {
+test('the X exit offer explicitly checks the exit-offer monthly trial SKU', () => {
   const component = readFileSync(new URL('../components/OnboardingFinalSteps.jsx', import.meta.url), 'utf8')
   assert.match(component, /<FreeTrialOfferModal[\s\S]*?productId=\{EXIT_THREE_DAY_PRODUCT_ID\}/)
 })
@@ -107,7 +108,7 @@ test('exit offer requires an eligible seven-day monthly intro and preserves rene
   for (const introPrice of [{...product.introPrice,price:1}, {...product.introPrice,periodUnit:'DAY',periodNumberOfUnits:3}, null]) {
     assert.equal(eligibleExitTrial([{ product: { ...monthly.product, introPrice } }], eligible), null)
   }
-  assert.equal(trialRenewalText(monthly.product), 'Then $9.99 per month. Auto-renews unless canceled. Cancel anytime in Settings.')
+  assert.equal(trialRenewalText(monthly.product), 'Then $7.99 per month. Auto-renews unless canceled. Cancel anytime in Settings.')
 })
 
 test('a known-ineligible tester can buy the listed product without being promised a trial', () => {

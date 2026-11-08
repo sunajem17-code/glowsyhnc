@@ -9,7 +9,7 @@
       "subscriptions": [
         {
           "debugDescription": "Monthly subscription",
-          "displayPrice": "9.99",
+          "displayPrice": "7.99",
           "groupNumber": 1,
           "internalID": "ascendus_monthly_001",
           "localizations": [
@@ -59,14 +59,14 @@
           "winbackOffers": []
         },
         {
-          "debugDescription": "Discounted annual offer",
-          "displayPrice": "29.99",
+          "debugDescription": "Exit offer monthly subscription",
+          "displayPrice": "7.99",
           "groupNumber": 3,
-          "internalID": "ascendus_yearly_discount_001",
+          "internalID": "ascendus_monthly_discount_001",
           "localizations": [
             {
-              "description": "Discounted annual access to Ascendus Pro",
-              "displayName": "Ascendus Pro Annual (Offer)",
+              "description": "Full access to Ascendus Pro",
+              "displayName": "Ascendus Pro Monthly (Offer)",
               "locale": "en_US"
             }
           ],
@@ -77,9 +77,9 @@
             "paymentMode": "free",
             "subscriptionPeriod": "P3D"
           },
-          "productID": "com.ascendus.app.yearly.discount",
-          "recurringSubscriptionPeriod": "P1Y",
-          "referenceName": "Ascendus Pro Annual Discount",
+          "productID": "com.ascendus.app.monthly.discount",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Ascendus Pro Monthly Exit Offer",
           "subscriptionGroupID": "AscendusPro",
           "type": "RecurringSubscription",
           "familyShareable": false,

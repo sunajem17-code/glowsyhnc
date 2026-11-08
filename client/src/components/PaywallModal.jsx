@@ -541,7 +541,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
 
         {/* Price below button */}
         <p style={{ textAlign: 'center', fontSize: 13, color: DIM, fontFamily: 'var(--font-body, inherit)', marginBottom: 12 }}>
-          $9.99 USD per month
+          $7.99 USD per month
         </p>
 
         {/* Legal links */}
