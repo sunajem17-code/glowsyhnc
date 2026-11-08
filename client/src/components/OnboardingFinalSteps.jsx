@@ -355,9 +355,9 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         </p>
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-heading font-bold text-[28px]" style={{ color: G, textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
+          <span className="font-heading font-extrabold text-[56px] leading-none" style={{ color: '#F1DC9A', textShadow: '0 0 14px rgba(198,168,92,0.95), 0 0 32px rgba(198,168,92,0.7), 0 0 60px rgba(198,168,92,0.45)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
         </div>}
-        {trial && <p className="font-body text-[12px] leading-relaxed mb-5" style={{ color: TEXT }}>
+        {trial && <p className="font-body text-[10px] leading-snug mb-5 px-2" style={{ color: DIM }}>
           {trialEligible ? trialRenewalText(trial.product) : `Charged today, then ${trialRenewalText(trial.product)?.replace(/^Then /, '')}`}
         </p>}
 
