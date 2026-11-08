@@ -297,7 +297,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
     setLoading(true)
     setPurchaseError('')
     try {
-      const result = await purchasePro('monthly')
+      const result = await purchasePro('weekly')
       if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
         setIsPremium(true)
@@ -541,7 +541,7 @@ export default function PaywallModal({ onClose, scan, gender = 'male', onPurchas
 
         {/* Price below button */}
         <p style={{ textAlign: 'center', fontSize: 13, color: DIM, fontFamily: 'var(--font-body, inherit)', marginBottom: 12 }}>
-          $7.99 USD per month
+          $4.99 USD per week
         </p>
 
         {/* Legal links */}

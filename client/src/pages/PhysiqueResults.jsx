@@ -408,7 +408,7 @@ export default function PhysiqueResults() {
     setIsPurchasing(true); setPurchaseError('')
     try {
       if (isNative()) {
-        const result = await purchasePro('monthly')
+        const result = await purchasePro('weekly')
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
           api.payments.syncRc(result.customerInfo?.originalAppUserId).catch(() => {})

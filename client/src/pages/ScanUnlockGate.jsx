@@ -1860,7 +1860,7 @@ function LegacyScanUnlockGate({ directPaywall = false, embeddedReveal = false, p
     setPurchaseError('')
     try {
       if (isNative()) {
-        const plan = 'monthly'
+        const plan = 'weekly'
         const result = await purchasePro(plan)
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)

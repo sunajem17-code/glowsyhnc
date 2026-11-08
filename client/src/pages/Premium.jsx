@@ -70,7 +70,7 @@ export default function Premium() {
     setCheckoutError('')
     try {
       if (isNative()) {
-        const result = await purchasePro('monthly')
+        const result = await purchasePro('weekly')
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
           const rcUserId = result.customerInfo?.originalAppUserId
@@ -210,10 +210,10 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3), 0 1px 4px rgba(198,168,92,0.15)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($7.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : (isNative() ? 'Get Ascendus Max ($4.99/wk)' : 'Get Ascendus Max ($7.99/mo)')}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-3" style={{ color: TEXT_DIM }}>
-          Billed monthly · Cancel anytime
+          {isNative() ? 'Billed weekly' : 'Billed monthly'} · Cancel anytime
         </p>
 
         {checkoutError && (
@@ -344,16 +344,16 @@ export default function Premium() {
             boxShadow: `0 4px 24px rgba(198,168,92,0.3)`,
           }}
         >
-          {subscribingNow ? 'Opening checkout…' : 'Get Ascendus Max ($7.99/mo)'}
+          {subscribingNow ? 'Opening checkout…' : (isNative() ? 'Get Ascendus Max ($4.99/wk)' : 'Get Ascendus Max ($7.99/mo)')}
         </motion.button>
         <p className="text-center text-[10px] font-body mb-1" style={{ color: TEXT_DIM }}>
-          Billed monthly · Cancel anytime
+          {isNative() ? 'Billed weekly' : 'Billed monthly'} · Cancel anytime
         </p>
 
         {/* Apple IAP required disclosure */}
         <div className="mt-2 mb-4 px-1 space-y-1">
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>
-            Ascendus Max is $7.99 USD/month or $49.99 USD/year.
+            Ascendus Max is {isNative() ? '$4.99 USD/week' : '$7.99 USD/month'} or $49.99 USD/year.
             {isNative() ? ' Payment will be charged to your Apple ID account.' : ''}
           </p>
           <p className="text-center text-[10px] font-body leading-relaxed" style={{ color: TEXT_DIM }}>

@@ -1,7 +1,8 @@
 export const EXIT_TRIAL_PRODUCT_ID = 'com.ascendus.app.monthly'
-// Exit-only monthly product: 3 days free, then $7.99/month. Kept separate from
-// com.ascendus.app.monthly so the main paywall's monthly plan stays trial-free.
-export const EXIT_THREE_DAY_PRODUCT_ID = 'com.ascendus.app.monthly.discount'
+// Exit-only weekly product: 3 days free, then $4.99/week. Kept separate from
+// com.ascendus.app.weekly so the main paywall's weekly plan stays trial-free.
+// (The product ID keeps its original "monthly.exit" name; Apple product IDs can't be renamed.)
+export const EXIT_THREE_DAY_PRODUCT_ID = 'com.ascendus.app.monthly.exit'
 
 export function trialRenewalText(product) {
   const periods = { P1W: 'week', P1M: 'month', P3M: '3 months', P6M: '6 months', P1Y: 'year' }

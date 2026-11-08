@@ -9,7 +9,29 @@
       "subscriptions": [
         {
           "debugDescription": "Monthly subscription",
-          "displayPrice": "7.99",
+          "displayPrice": "4.99",
+          "groupNumber": 1,
+          "internalID": "ascendus_weekly_001",
+          "localizations": [
+            {
+              "description": "Full access to Ascendus Pro",
+              "displayName": "Ascendus Pro Weekly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.ascendus.app.weekly",
+          "recurringSubscriptionPeriod": "P1W",
+          "referenceName": "Ascendus Pro Weekly",
+          "subscriptionGroupID": "AscendusPro",
+          "type": "RecurringSubscription",
+          "familyShareable": false,
+          "adHocOffers": [],
+          "codeOffers": [],
+          "winbackOffers": []
+        },
+        {
+          "debugDescription": "Monthly subscription",
+          "displayPrice": "9.99",
           "groupNumber": 1,
           "internalID": "ascendus_monthly_001",
           "localizations": [
@@ -60,13 +82,13 @@
         },
         {
           "debugDescription": "Exit offer monthly subscription",
-          "displayPrice": "7.99",
+          "displayPrice": "4.99",
           "groupNumber": 3,
-          "internalID": "ascendus_monthly_discount_001",
+          "internalID": "ascendus_weekly_exit_001",
           "localizations": [
             {
               "description": "Full access to Ascendus Pro",
-              "displayName": "Ascendus Pro Monthly (Offer)",
+              "displayName": "Ascendus Pro Weekly (Offer)",
               "locale": "en_US"
             }
           ],
@@ -77,9 +99,9 @@
             "paymentMode": "free",
             "subscriptionPeriod": "P3D"
           },
-          "productID": "com.ascendus.app.monthly.discount",
-          "recurringSubscriptionPeriod": "P1M",
-          "referenceName": "Ascendus Pro Monthly Exit Offer",
+          "productID": "com.ascendus.app.monthly.exit",
+          "recurringSubscriptionPeriod": "P1W",
+          "referenceName": "Ascendus Pro Weekly Exit Offer",
           "subscriptionGroupID": "AscendusPro",
           "type": "RecurringSubscription",
           "familyShareable": false,
