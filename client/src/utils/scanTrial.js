@@ -4,6 +4,9 @@ export const EXIT_TRIAL_PRODUCT_ID = 'com.ascendus.app.monthly'
 // (The product ID keeps its original "monthly.exit" name; Apple product IDs can't be renamed.)
 export const EXIT_THREE_DAY_PRODUCT_ID = 'com.ascendus.app.monthly.exit'
 
+// Android (Play) product identifiers from RevenueCat are '<productId>:<basePlanId>'.
+export const baseProductId = id => (typeof id === 'string' ? id.split(':')[0] : id)
+
 export function trialRenewalText(product) {
   const periods = { P1W: 'week', P1M: 'month', P3M: '3 months', P6M: '6 months', P1Y: 'year' }
   const period = periods[product?.subscriptionPeriod]
@@ -22,14 +25,14 @@ export const isSevenDayFreeTrial = product => isFreeTrialDuration(product, 7)
 export const isThreeDayFreeTrial = product => isFreeTrialDuration(product, 3)
 
 export function eligibleThreeDayTrial(packages, eligibility, productId = null) {
-  return packages.find(pkg => (!productId || pkg.product?.identifier === productId)
+  return packages.find(pkg => (!productId || baseProductId(pkg.product?.identifier) === productId)
     && isThreeDayFreeTrial(pkg.product)
     && eligibility[pkg.product.identifier]?.status === 2) || null
 }
 
 // Exit-intent trial renews on the existing monthly product only.
 export function isMonthlyExitTrial(product) {
-  return product?.identifier === 'com.ascendus.app.monthly'
+  return baseProductId(product?.identifier) === 'com.ascendus.app.monthly'
     && product.subscriptionPeriod === 'P1M'
     && isSevenDayFreeTrial(product)
 }

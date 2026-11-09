@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { isSevenDayFreeTrial, trialRenewalText, isMonthlyExitTrial, eligibleThreeDayTrial, eligibleExitTrial, trialPackageForIneligibleAccount, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID } from './scanTrial.js'
+import { isSevenDayFreeTrial, trialRenewalText, isMonthlyExitTrial, eligibleThreeDayTrial, eligibleExitTrial, trialPackageForIneligibleAccount, EXIT_TRIAL_PRODUCT_ID, EXIT_THREE_DAY_PRODUCT_ID, baseProductId } from './scanTrial.js'
 const product = { priceString: '$7.99', subscriptionPeriod: 'P1M', introPrice: { price: 0, cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } }
 test('only a zero-cost seven-day intro can be advertised as a week free', () => {
   assert.equal(isSevenDayFreeTrial(product), true)
@@ -126,4 +126,12 @@ test('a known-ineligible tester can buy the listed product without being promise
   assert.equal(trialPackageForIneligibleAccount([annual], { [EXIT_THREE_DAY_PRODUCT_ID]: { status: 1 } }), annual)
   assert.equal(trialPackageForIneligibleAccount([annual], { [EXIT_THREE_DAY_PRODUCT_ID]: { status: 2 } }), null)
   assert.equal(trialPackageForIneligibleAccount([annual], {}), null)
+})
+
+test('Play identifiers with a base-plan suffix match the same exit product', () => {
+  assert.equal(baseProductId('com.ascendus.app.monthly.exit:weekly'), EXIT_THREE_DAY_PRODUCT_ID)
+  assert.equal(baseProductId(EXIT_THREE_DAY_PRODUCT_ID), EXIT_THREE_DAY_PRODUCT_ID)
+  const play = { identifier: 'com.ascendus.app.monthly.exit:weekly', priceString: '$4.99', subscriptionPeriod: 'P1W', introPrice: { price: 0, cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 3 } }
+  const found = eligibleThreeDayTrial([{ product: play }], { [play.identifier]: { status: 2 } }, EXIT_THREE_DAY_PRODUCT_ID)
+  assert.equal(found?.product, play)
 })
