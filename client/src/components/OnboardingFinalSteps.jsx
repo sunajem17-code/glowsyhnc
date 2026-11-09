@@ -350,9 +350,11 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
           {trialDays ? `${trialDays} DAYS FREE` : trial && !trialEligible ? 'WEEKLY MEMBERSHIP' : 'CHECK AVAILABILITY'}
         </p>
+        {!(trialEligible && trial) && (
         <p className="font-body text-[12px] leading-relaxed tracking-[-0.025em] whitespace-nowrap mb-5" style={{ color: DIM }}>
           {checking ? 'Checking free trial eligibility…' : trialEligible && trial ? `${trialDays} days on us • No payment today • Cancel anytime` : trial && !trialEligible ? 'This Apple account is not eligible for a free trial. You can still subscribe; Apple will show the charge before you confirm.' : 'Apple determines trial eligibility for your account.'}
         </p>
+        )}
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
           <span className="font-heading font-extrabold text-[56px] leading-none" style={{ color: '#F1DC9A', textShadow: '0 0 14px rgba(198,168,92,0.95), 0 0 32px rgba(198,168,92,0.7), 0 0 60px rgba(198,168,92,0.45)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
