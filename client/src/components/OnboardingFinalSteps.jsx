@@ -324,17 +324,6 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
           boxShadow: '0 8px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(198,168,92,0.08)',
         }}
       >
-        <div className="flex justify-end mb-1">
-          <button
-            onClick={onDecline}
-            disabled={busy}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
-            style={{ background: 'rgba(255,255,255,0.07)' }}
-            aria-label="Close"
-          >
-            <X size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />
-          </button>
-        </div>
 
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
@@ -346,7 +335,7 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         <p className="font-heading font-bold text-[20px] text-white leading-tight tracking-[-0.025em] whitespace-nowrap mb-2.5">
           {trial && !trialEligible ? 'Continue with Ascendus Pro' : !checking && !trial ? 'Check Free Trial Availability' : "Try It First, We'll Impress You"}
         </p>
-        <p className="font-body text-[12px] font-semibold tracking-[0.16em] mb-3.5"
+        <p className="font-body text-[12px] font-bold tracking-[0.16em] mb-3.5"
            style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>
           {trialDays ? `${trialDays} DAYS FREE` : trial && !trialEligible ? 'WEEKLY MEMBERSHIP' : 'CHECK AVAILABILITY'}
         </p>
@@ -357,11 +346,17 @@ export function FreeTrialOfferModal({ onClaim, onDecline, loading = false, error
         )}
 
         {trial && <div className="flex items-center justify-center gap-2 mb-5">
-          <span className="font-heading font-extrabold text-[56px] leading-none" style={{ color: '#F1DC9A', textShadow: '0 0 14px rgba(198,168,92,0.95), 0 0 32px rgba(198,168,92,0.7), 0 0 60px rgba(198,168,92,0.45)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
+          <span className="font-heading font-extrabold text-[56px] leading-none" style={{ color: '#E5CE8B', textShadow: '0 0 12px rgba(198,168,92,0.75), 0 0 24px rgba(198,168,92,0.35)' }}>{trialEligible ? (trial.product.introPrice.priceString || '$0.00') : trial.product.priceString}</span>
         </div>}
-        {trial && <p className="font-body text-[10px] leading-snug mb-5 px-2" style={{ color: DIM }}>
-          {trialEligible ? trialRenewalText(trial.product) : `Charged today, then ${trialRenewalText(trial.product)?.replace(/^Then /, '')}`}
-        </p>}
+        {trial && (() => {
+          const terms = trialRenewalText(trial.product)?.match(/^Then (.+?)\. Auto-renews/)?.[1]
+          if (!terms) return null
+          return (
+            <p className="font-body text-[10px] leading-snug tracking-[-0.01em] mb-5" style={{ color: DIM }}>
+              {trialEligible ? `Then ${terms}, cancel anytime` : `Charged today, then ${terms}, cancel anytime`}
+            </p>
+          )
+        })()}
 
         {(error || trialError) && (
           <p role="alert" className="font-body text-[11px] mb-3" style={{ color: '#EF4444' }}>{error || trialError}</p>
