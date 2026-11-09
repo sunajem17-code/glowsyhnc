@@ -99,7 +99,7 @@ export default function Landing() {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
-      description: 'Free tier with 1 scan/month. Pro plan at $4.99/week.',
+      description: 'Free tier with 1 scan/month. Pro plan from $4.99/week ($7.99/month on web).',
     },
     aggregateRating: {
       '@type': 'AggregateRating',
