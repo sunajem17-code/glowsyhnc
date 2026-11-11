@@ -169,6 +169,37 @@ db.exec(`
   );
 `)
 
+// Community safety (App Store Guideline 1.2): comment reports, user blocks,
+// guideline acceptance and bans. Kept in their own tables so they don't depend
+// on which store the users table lives in.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS community_comment_reports (
+    id TEXT PRIMARY KEY,
+    comment_id TEXT NOT NULL,
+    reporter_id TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT 'inappropriate',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(comment_id, reporter_id)
+  );
+  CREATE TABLE IF NOT EXISTS community_blocks (
+    id TEXT PRIMARY KEY,
+    blocker_id TEXT NOT NULL,
+    blocked_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(blocker_id, blocked_id)
+  );
+  CREATE TABLE IF NOT EXISTS community_terms_acceptances (
+    user_id TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    accepted_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS community_bans (
+    user_id TEXT PRIMARY KEY,
+    reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`)
+
 // Idempotent migrations — ignore if columns already exist
 const migrations = [
   "ALTER TABLE users ADD COLUMN referral_code TEXT",
@@ -181,6 +212,8 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN apple_sub TEXT",
   "ALTER TABLE community_posts ADD COLUMN before_photo_url TEXT",
   "ALTER TABLE community_posts ADD COLUMN post_type TEXT DEFAULT 'glow-up'",
+  "ALTER TABLE community_posts ADD COLUMN hidden INTEGER DEFAULT 0",
+  "ALTER TABLE community_comments ADD COLUMN hidden INTEGER DEFAULT 0",
   // promo redemption tracking
   "ALTER TABLE users ADD COLUMN promo_redeemed INTEGER DEFAULT 0",
   "ALTER TABLE users ADD COLUMN promo_expires_at TEXT",
