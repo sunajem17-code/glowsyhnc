@@ -1,0 +1,232 @@
+{
+  "overallScore": 5.1,
+  "potentialScore": 6.5,
+  "faceOnlyScore": 5.1,
+  "faceScore": 5.1,
+  "groomingScore": 4.8,
+  "tier": "Mid Tier Normie",
+  "facialStructure": "average",
+  "hairType": "wavy",
+  "visualObservations": [
+    {
+      "id": "visible_dark_circles",
+      "category": "skin",
+      "source": "visual_observation",
+      "confidence": "medium",
+      "imagesSupporting": [
+        "front"
+      ],
+      "limitations": [
+        "Under-eye darkness is visible, but lighting may affect intensity."
+      ]
+    },
+    {
+      "id": "facial_hair",
+      "category": "grooming",
+      "source": "visual_observation",
+      "confidence": "high",
+      "imagesSupporting": [
+        "front"
+      ],
+      "limitations": [
+        "Facial hair is sparse and uneven in density."
+      ]
+    },
+    {
+      "id": "grooming_issue",
+      "category": "grooming",
+      "source": "visual_observation",
+      "confidence": "high",
+      "imagesSupporting": [
+        "front"
+      ],
+      "limitations": [
+        "Hair and facial hair look unstructured and untidy."
+      ]
+    }
+  ],
+  "evidenceSummary": null,
+  "scoreClassification": {
+    "overall": "legacy_subjective_visual_assessment",
+    "objectiveReplacementStatus": "not_validated"
+  },
+  "faceSubScores": {
+    "symmetry": 5.6,
+    "jawlineDefinition": 4.7,
+    "skinClarity": 5.4,
+    "facialProportions": 5,
+    "eyeArea": 4.9,
+    "facialHarmony": 5.1
+  },
+  "pillars": {
+    "harmony": 5.1,
+    "angularity": 4.8,
+    "features": 5.4,
+    "dimorphism": 4.9
+  },
+  "keyStrengths": [
+    "Balanced overall face with fairly even left-right placement.",
+    "Hair has natural volume and suits the face shape."
+  ],
+  "keyWeaknesses": [
+    "Jawline and chin read soft from the front.",
+    "Under-eye area looks tired and the grooming is a bit messy."
+  ],
+  "topImprovement": "The biggest upgrade would be a cleaner haircut and beard outline. Your hair is loose and uneven, and the facial hair is patchy enough to blur the lower face, which makes the jaw look softer than it is. Ask for a neater medium-length cut with the sides cleaned up, and keep the beard either fully trimmed into a short even stubble or shaved clean every few days.",
+  "appearanceAnalysis": {
+    "version": 21,
+    "scanId": "6a1ac842-026c-4f6e-9beb-03b90bc009fe",
+    "strengths": [
+      {
+        "catalogId": "facial_symmetry",
+        "title": "Facial symmetry",
+        "observation": "Your eyes, nose, and mouth sit fairly evenly across the face.",
+        "significance": "This gives the face a steady, balanced look.",
+        "recommendation": "Keep the brows and beard line even so the balance stays clear."
+      },
+      {
+        "catalogId": "hairline_shape",
+        "title": "Hairline shape",
+        "observation": "The hairline is visible and fairly even across the forehead.",
+        "significance": "A balanced hairline helps the face read more orderly.",
+        "recommendation": "Keep the front edges tidy with a regular trim."
+      }
+    ],
+    "improvementOpportunities": [
+      {
+        "catalogId": "jawline_definition",
+        "title": "Jawline definition",
+        "observation": "The jaw edge is soft, especially around the chin and lower cheeks.",
+        "significance": "This reduces lower-face sharpness and makes the face look less structured.",
+        "recommendation": "Keep facial hair either very short and even or fully clean-shaven to show the jaw line better."
+      },
+      {
+        "catalogId": "eye_area",
+        "title": "Eye area",
+        "observation": "The under-eye area looks dark and slightly tired.",
+        "significance": "This pulls attention to the eyes and makes the face look less fresh.",
+        "recommendation": "Use a simple morning routine with cold water, moisturizer, and consistent sleep."
+      },
+      {
+        "catalogId": "facial_hair_grooming",
+        "title": "Facial-hair outline",
+        "observation": "The facial hair is patchy and the edges are not well defined.",
+        "significance": "Uneven facial hair makes the lower face look less clean and less sharp.",
+        "recommendation": "Trim it into short even stubble or shave it clean, then keep the neckline neat."
+      },
+      {
+        "catalogId": "hairstyle_shape",
+        "title": "Hair shape",
+        "observation": "The hair looks loose, messy, and uneven around the sides and top.",
+        "significance": "The shape adds visual clutter and hides the face instead of framing it.",
+        "recommendation": "Ask for a cleaner medium-length cut with textured top and tidier sides."
+      },
+      {
+        "catalogId": "skin_texture",
+        "title": "Skin texture",
+        "observation": "The cheeks and lower face show mild roughness and uneven texture.",
+        "significance": "This lowers the overall polish of the face.",
+        "recommendation": "Use a gentle cleanser and light moisturizer twice a day."
+      }
+    ],
+    "positiveObservations": []
+  },
+  "faceMetrics": {
+    "jawline": {
+      "score": 4.7,
+      "descriptor": "Soft jaw edge with limited chin definition"
+    },
+    "cheekbones": {
+      "score": 4.9,
+      "descriptor": "Cheekbones sit low with mild contour"
+    },
+    "symmetry": {
+      "score": 5.6,
+      "descriptor": "Features align fairly evenly left to right"
+    },
+    "skinQuality": {
+      "score": 5.4,
+      "descriptor": "Mild texture and uneven tone on cheeks"
+    },
+    "masculinityFemininity": {
+      "score": 4.9,
+      "descriptor": "Moderate masculine traits with a softer lower face"
+    },
+    "facialThirds": {
+      "score": 5,
+      "descriptor": "Forehead, midface, and lower face look balanced"
+    }
+  },
+  "extendedMetrics": null,
+  "extendedMetricsStatus": "unsupported_removed",
+  "hasSideProfile": false,
+  "profileScore": null,
+  "profileData": null,
+  "physiqueScore": null,
+  "bodyFatLevel": null,
+  "scanBenchmark": {
+    "version": 1,
+    "scanId": "6a1ac842-026c-4f6e-9beb-03b90bc009fe",
+    "scores": {
+      "overallScore": 5.1,
+      "faceScore": 5.1,
+      "groomingScore": 4.8,
+      "faceSubScores": {
+        "symmetry": 5.6,
+        "jawlineDefinition": 4.7,
+        "skinClarity": 5.4,
+        "facialProportions": 5,
+        "eyeArea": 4.9,
+        "facialHarmony": 5.1
+      },
+      "faceMetrics": {
+        "jawline": {
+          "score": 4.7,
+          "descriptor": "Soft jaw edge with limited chin definition"
+        },
+        "cheekbones": {
+          "score": 4.9,
+          "descriptor": "Cheekbones sit low with mild contour"
+        },
+        "symmetry": {
+          "score": 5.6,
+          "descriptor": "Features align fairly evenly left to right"
+        },
+        "skinQuality": {
+          "score": 5.4,
+          "descriptor": "Mild texture and uneven tone on cheeks"
+        },
+        "masculinityFemininity": {
+          "score": 4.9,
+          "descriptor": "Moderate masculine traits with a softer lower face"
+        },
+        "facialThirds": {
+          "score": 5,
+          "descriptor": "Forehead, midface, and lower face look balanced"
+        }
+      },
+      "pillars": {
+        "harmony": 5.1,
+        "angularity": 4.8,
+        "features": 5.4,
+        "dimorphism": 4.9
+      }
+    }
+  },
+  "scanId": "6a1ac842-026c-4f6e-9beb-03b90bc009fe",
+  "streak": {
+    "current": 1,
+    "longest": 1,
+    "lastDate": "2026-11-10",
+    "face": {
+      "current": 1,
+      "longest": 1,
+      "lastDate": "2026-11-10"
+    },
+    "physique": {
+      "current": 0,
+      "longest": 0,
+      "lastDate": null
+    }
+  }
+}

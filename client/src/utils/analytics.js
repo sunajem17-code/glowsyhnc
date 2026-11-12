@@ -1,3 +1,4 @@
+import { posthogAnalytics } from './posthogAnalytics'
 import { registerPlugin, Capacitor } from '@capacitor/core'
 
 const NativeAnalytics = registerPlugin('NativeAnalytics')
@@ -31,7 +32,9 @@ function safeScreenName(pathname) {
 }
 
 function sendEvent(name, parameters = {}) {
-  if (!nativeIos || !collectionEnabled) return Promise.resolve()
+  if (!collectionEnabled) return Promise.resolve()
+  posthogAnalytics.capture(name, parameters)
+  if (!nativeIos) return Promise.resolve()
   return NativeAnalytics.logEvent({ name, parameters }).catch(() => {})
 }
 
@@ -64,6 +67,7 @@ function rememberReachedScreen(screenName) {
 
 export function setAnalyticsCollectionEnabled(enabled) {
   collectionEnabled = Boolean(enabled)
+  posthogAnalytics.setEnabled(collectionEnabled)
   if (!collectionEnabled) {
     activeSession = false
     lastLoggedScreen = null

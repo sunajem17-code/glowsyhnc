@@ -1,0 +1,143 @@
+.opening-showcase{box-sizing:border-box;background:#0a0a0a;color:#f5f3ed;width:100%;height:100%;min-height:100%;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 24px calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;flex-direction:column;align-items:center;font-family:'Plus Jakarta Sans',sans-serif}
+.opening-showcase *{box-sizing:border-box}
+.opening-brand{display:flex;align-items:center;gap:8px;height:34px;flex-shrink:0;font-size:12px;font-weight:800;letter-spacing:.19em;color:#d4b96a}
+.opening-brand img{width:32px;height:32px;object-fit:contain}
+.opening-theater{width:100%;max-width:410px;flex:1;min-height:330px;display:flex;flex-direction:column;justify-content:center;padding:8px 0 0}
+.replica-stage{width:calc(100% + 48px);margin-left:-24px;height:clamp(350px,60dvh,540px);position:relative;display:grid;place-items:center;overflow:hidden;isolation:isolate;perspective:1100px;mask-image:linear-gradient(transparent,#000 3%,#000 97%,transparent)}
+.replica-camera{height:98%;aspect-ratio:1350/2760;position:relative;transform-origin:50% 46%;will-change:transform;transform-style:preserve-3d}
+.replica-device{width:100%;height:100%;position:relative}
+.replica-official-bezel{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:5;pointer-events:none;object-fit:contain}
+.replica-display{position:absolute;left:5.333333%;top:2.5%;width:89.333333%;height:95%;background:#0a0a0a;border-radius:13% / 6%;overflow:hidden;isolation:isolate}
+.replica-screen-scene{position:absolute;inset:0}
+.replica-native-host{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.replica-native-frame{display:block;border:0;transform-origin:0 0;background:#0a0a0a;pointer-events:none}
+.replica-ios-status{position:absolute;top:1.8%;left:7%;right:7%;display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:8px;font-weight:700;z-index:4;pointer-events:none}
+.replica-ios-status>div{display:flex;align-items:center;gap:3px}
+.replica-ios-status svg{width:10px;height:10px}.replica-ios-status svg:last-child{width:13px}
+.replica-home-indicator{position:absolute;left:35%;right:35%;height:2px;bottom:.9%;border-radius:4px;background:#f5f3ed;z-index:4;pointer-events:none}
+.opening-ad-transport{width:100%;max-width:320px;display:flex;align-items:center;gap:7px;align-self:center;position:relative;z-index:10;margin-top:6px}
+.opening-ad-transport>button{width:28px;height:28px;flex-shrink:0;background:transparent;border:0;color:#c3b69b;display:grid;place-items:center;cursor:pointer}
+.opening-ad-timeline{display:flex;gap:4px;flex:1}
+.opening-ad-timeline button{height:28px;padding:12px 0;border:0;flex:1;position:relative;background:transparent;cursor:pointer}
+.opening-ad-timeline button:before{content:'';position:absolute;inset:12px 0;background:#33302a;border-radius:2px}
+.opening-ad-timeline i{position:relative;display:block;width:100%;height:4px;background:#d4b96a;border-radius:2px;transform-origin:left}
+.opening-example{font-size:8px;color:#aaa394;text-align:center;margin:0 0 7px;line-height:1.4}
+.opening-copy{width:100%;max-width:390px;flex-shrink:0;text-align:center;padding-top:12px}
+.opening-copy h1{font-size:clamp(25px,7.2vw,32px);line-height:1.12;letter-spacing:-.035em;font-weight:800;margin:0 0 10px;text-wrap:balance;color:#f5f3ed;min-height:36px}
+.opening-copy p{font-size:12px;line-height:1.5;color:#b3afa7;margin:0 auto 20px;max-width:315px;min-height:18px}
+.opening-start{width:100%;min-height:54px;border:0;border-radius:16px;background:#d4b96a;color:#100e09;font:inherit;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:background .18s,transform .18s}
+.opening-start:hover{background:#e0c988}.opening-start:active{transform:scale(.98)}
+.opening-showcase button:focus-visible{outline:2px solid #f3dfaa;outline-offset:4px}
+.opening-showcase ::selection{background:#d4b96a;color:#0a0a0a}
+@media(max-height:720px){.replica-stage{width:calc(100% + 48px);margin-left:-24px;height:clamp(315px,55dvh,390px)}.opening-theater{min-height:310px;padding-top:4px}.opening-copy{padding-top:8px}.opening-copy h1{font-size:25px;min-height:28px}.opening-copy p{font-size:11px;margin-bottom:16px}}
+@media(prefers-reduced-motion:reduce){.opening-showcase *{animation:none!important;transition:none!important}.replica-camera{transform:none!important}}
+
+/* Reference composition: edge-to-edge film above a stationary action panel. */
+.opening-showcase{padding:0 0 env(safe-area-inset-bottom,0px);overflow:hidden;position:relative}
+.opening-brand{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:18px;z-index:20;height:26px;font-size:10px;gap:5px;pointer-events:none}
+.opening-brand img{width:25px;height:25px}
+.opening-theater{width:100%;max-width:560px;min-height:0;flex:1;padding:0;position:relative;overflow:hidden}
+.replica-stage{width:100%;margin:0;height:100%;min-height:320px;background:#0a0a0a;mask-image:none;transition:background .6s ease}
+.replica-stage--light{background:#f7f7f5}
+.replica-camera{height:89%;max-height:620px;margin-top:35px}
+.opening-copy{position:relative;z-index:12;max-width:560px;width:100%;padding:24px 24px 20px;background:#0a0a0a}
+.opening-copy h1{font-size:clamp(27px,7.5vw,34px);font-weight:700;line-height:1.14;min-height:0;margin-bottom:12px}
+.opening-copy p{min-height:0;margin-bottom:24px;font-size:12px}
+.opening-start{min-height:52px;border-radius:14px}
+.opening-ad-transport{position:absolute;bottom:15px;right:12px;width:60px;margin:0;opacity:.7}
+.opening-ad-timeline{display:none}
+.opening-example{position:absolute;bottom:4px;left:12px;right:80px;text-align:left;font-size:7px;margin:0;color:#a29a87;pointer-events:none}
+@media(max-height:720px){.opening-theater{min-height:0;padding:0}.replica-stage{height:100%;width:100%;margin:0;min-height:250px}.opening-copy{padding:20px 22px 16px}.opening-copy h1{font-size:27px}.opening-copy p{margin-bottom:18px}}
+
+.opening-transformation{position:absolute;inset:0;z-index:3;overflow:hidden;background:#252523}
+.transformation-portraits{position:absolute;inset:0;transform-origin:50% 43%}
+.transformation-portraits img{width:100%;height:100%;object-fit:cover;object-position:50% 38%;display:block;image-rendering:auto}
+.transformation-before{position:absolute;inset:0}
+.transformation-after{position:absolute;inset:0}
+.transformation-wipe-edge{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,245,213,.9);transform:translateX(-1px)}
+.transformation-labels{position:absolute;inset:auto 12px 32px;z-index:3;display:flex;flex-direction:column;gap:7px;color:#fff;text-shadow:0 2px 8px #000}
+.transformation-labels span{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.transformation-labels small{font-size:7px;line-height:1.4}
+
+.finale-native-camera{position:absolute;z-index:6;contain:layout style;pointer-events:none}
+
+.opening-capture-flash{position:absolute;inset:0;z-index:8;background:#fff;pointer-events:none}
+
+.replica-device--flip{transform-style:preserve-3d}
+.replica-device--flip>.replica-display,.replica-device--flip>.replica-official-bezel{backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.replica-device-back{position:absolute;inset:1% 2%;border-radius:16% / 7%;background:linear-gradient(115deg,#585653,#242423 35%,#454440 80%,#20201f);border:2px solid #76746f;transform:rotateY(180deg) translateZ(2px);backface-visibility:hidden;box-shadow:inset 0 0 0 2px #292928}
+.replica-rear-camera{position:absolute;left:7%;top:4%;width:46%;aspect-ratio:1;background:#363633;border-radius:23%;box-shadow:1px 2px 4px #111}
+.replica-rear-camera i{position:absolute;width:40%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 45% 40%,#253447 0 8%,#090c12 12% 30%,#151515 34% 55%,#73736d 59% 65%,#151515 69%);border:1px solid #88877c}
+.replica-rear-camera i:nth-child(1){left:6%;top:6%}.replica-rear-camera i:nth-child(2){right:6%;top:30%}.replica-rear-camera i:nth-child(3){left:6%;bottom:6%}
+.replica-rear-camera b{position:absolute;right:18%;top:8%;width:16%;aspect-ratio:1;border-radius:50%;background:#dbd6bd}.replica-rear-camera em{position:absolute;right:18%;bottom:10%;width:14%;aspect-ratio:1;border-radius:50%;background:#121212}
+
+/* The film is framed as a rounded box; app UI inside the phone is unchanged. */
+.opening-theater{width:calc(100% - 24px);margin:12px 12px 0;border-radius:28px;overflow:hidden}
+.replica-stage{border-radius:28px;transition:background .8s cubic-bezier(.22,1,.36,1)}
+.opening-ad-transport{opacity:0;transition:opacity .2s ease}
+.opening-theater:hover .opening-ad-transport,.opening-theater:focus-within .opening-ad-transport{opacity:.8}
+@media(hover:none){.opening-ad-transport{opacity:.6}}
+@media(max-height:720px){.opening-theater,.replica-stage{border-radius:24px}}
+
+.opening-copy{font-family:Inter,sans-serif;-webkit-font-smoothing:antialiased}
+.opening-copy h1{font-family:Inter,sans-serif;font-weight:600;font-size:clamp(27px,7.4vw,33px);line-height:1.17;letter-spacing:-.03em}
+.opening-copy p{font-size:13px;line-height:1.55;letter-spacing:0;color:#bab6ae}
+.opening-start{font-family:Inter,sans-serif;font-weight:600;letter-spacing:-.01em}
+.replica-stage--light{background:#e9e7e2}
+
+.opening-selfie-full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 42%;transform-origin:50% 42%;display:block}
+
+.replica-device--detail>.replica-official-bezel,.replica-device--detail .replica-ios-status,.replica-device--detail .replica-home-indicator{opacity:0}
+
+.replica-device--detail>.replica-official-bezel{opacity:var(--device-detail-frame,0)}
+
+/* Demo-only completion motion; the real routine components stay unchanged. */
+.showcase-routine-content button[aria-pressed]{transition:background-color .28s ease,border-color .28s ease,box-shadow .28s ease,color .24s ease}
+.showcase-routine-content button[aria-pressed="true"]>span:first-child svg{animation:showcase-check-in .24s cubic-bezier(.22,1,.36,1) both;transform-origin:center}
+.showcase-routine-content button[aria-pressed="true"]>span:first-child svg path{stroke-dasharray:24;stroke-dashoffset:0;animation:showcase-check-draw .24s ease-out both}
+@keyframes showcase-check-in{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}
+@keyframes showcase-check-draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){.showcase-routine-content button[aria-pressed] svg,.showcase-routine-content button[aria-pressed] svg path{animation:none!important}}
+
+.showcase-routine-content button[aria-pressed]{position:relative}
+.showcase-routine-content button[data-showcase-tap]::after{content:'';position:absolute;left:22px;top:50%;width:22px;height:22px;border:2px solid #f5e2a4;border-radius:50%;pointer-events:none;animation:showcase-tap .2s ease-out both}
+.showcase-routine-content button[data-showcase-tap][aria-label*="water"]::after{left:50%}
+@keyframes showcase-tap{from{opacity:.9;transform:translate(-50%,-50%) scale(.7)}to{opacity:0;transform:translate(-50%,-50%) scale(1.8)}}
+
+
+.showcase-plan-countdown{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:#0a0a0a}
+.plan-countdown-dial{position:relative;width:min(92%,350px);aspect-ratio:1}
+.plan-countdown-dial svg{display:block;width:100%;height:100%}
+.plan-countdown-type{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;font-family:Inter,sans-serif}
+.plan-countdown-type strong{font-size:clamp(68px,21vw,94px);line-height:1;font-weight:700;letter-spacing:-.035em;color:#f5f5f3;font-variant-numeric:tabular-nums}
+.plan-countdown-type span{font-size:16px;line-height:1.6;color:#b6b8b7;margin-top:8px}
+.plan-countdown-type b{font-size:15px;font-weight:700;letter-spacing:.12em;margin-top:8px;color:var(--countdown-color)}
+
+.showcase-routine-fullscreen{position:absolute;inset:0;z-index:6;background:#0a0a0a;overflow:hidden}
+
+/* Reference look: edge-to-edge film on a white stage above the stationary action panel. */
+.opening-theater{width:100%;margin:0;border-radius:0}
+.replica-stage,.replica-stage--light{border-radius:0;background:#fff;transition:none}
+.opening-copy{background:#0a0a0a}
+.showcase-plan-countdown{background:radial-gradient(120% 70% at 50% 0%,#17292b 0%,#0c1011 55%,#090b0c 100%)}
+.plan-countdown-type strong{font-weight:700}
+.plan-countdown-type span{letter-spacing:.02em}
+.plan-countdown-type b{letter-spacing:.2em;font-size:14px}
+.showcase-glitch{position:absolute;inset:0;z-index:2;pointer-events:none;mix-blend-mode:screen;background:repeating-linear-gradient(0deg,rgba(200,205,205,.55) 0 1px,rgba(0,0,0,0) 1px 4px),repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 2px,rgba(0,0,0,0) 2px 9px)}
+
+/* Reference proportions: media about 61% of the screen, action panel about 39%. */
+.opening-theater{flex:0 0 61%;min-height:0}
+.opening-copy{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 22px calc(env(safe-area-inset-bottom,0px) + 18px)}
+.opening-copy h1{font-size:clamp(28px,8vw,34px);margin-bottom:14px}
+.opening-copy p{margin-bottom:26px}
+.plan-countdown-dial{width:min(98%,400px)}
+.plan-countdown-type strong{font-size:clamp(78px,25vw,108px)}
+
+/* "This is your glow up" sign over the after portrait */
+.opening-glowup{position:absolute;inset:0;z-index:20;pointer-events:none;display:flex;align-items:flex-end;justify-content:center}
+.opening-glowup-scrim{position:absolute;left:0;right:0;bottom:0;height:46%;background:linear-gradient(to top,rgba(5,5,5,.92) 0%,rgba(5,5,5,.62) 50%,rgba(5,5,5,0) 100%)}
+.opening-glowup-text{position:relative;display:flex;flex-direction:column;align-items:center;gap:.3em;padding-bottom:5.5%;white-space:nowrap;text-align:center;font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif}
+.opening-glowup-brand{color:#e6cc85;text-shadow:0 1px 6px rgba(0,0,0,.8);font-weight:700;letter-spacing:.42em;margin-right:-.42em}
+.opening-glowup-line{color:#fff;font-weight:700;letter-spacing:.16em;margin-right:-.16em;line-height:1}
+.opening-glowup-hero{font-weight:800;line-height:.95;letter-spacing:.04em;margin-right:-.04em;background:linear-gradient(180deg,#f5e2a4 0%,#d9bb6a 48%,#b08d3f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px rgba(198,168,92,.55)) drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+.opening-glowup-rule{display:block;width:46%;height:2px;margin-top:.6em;background:linear-gradient(90deg,transparent,#c6a85c,transparent);transform-origin:50% 50%}
