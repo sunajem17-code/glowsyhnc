@@ -14,6 +14,7 @@ import { triggerHaptic } from '../utils/haptics'
 import { UPGRADE_WELCOME } from '../utils/coachWelcome'
 import { prepareCoachPhoto } from '../utils/coachPhoto'
 import { scaleCoachHeaderSize } from '../utils/coachHeaderSizing'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 
 const STARTER_PROMPTS = [
   "What's my #1 area to improve?",
@@ -299,6 +300,7 @@ export default function AICoach() {
       })
       if (generation !== requestGenerationRef.current) return
       conversationRef.current = data.conversationId
+      if (isPostHogConfigured) posthog.capture('coach_reply_received', { scan_photo_included: includeScanPhoto })
       const aiMsg = { role: 'assistant', content: data.message, reveal: true }
       setMessages(prev => {
         const updated = [...prev, aiMsg]

@@ -4,6 +4,8 @@ import { getRequestTimeoutMs } from './requestTimeout'
 import { API_BASE as BASE } from './backend'
 import { apiErrorMessage } from './apiError'
 import { shouldExpireSession } from './sessionExpiry'
+import { captureAiGeneration } from './aiObservability'
+import { logPostHog } from './posthogLogger'
 
 // Set to true while an AI scan is actively in-flight. Background polls that
 // get a 401 during this window won't wipe the token — the scan has its own
@@ -29,6 +31,15 @@ function friendlyError(raw, fallback) {
   return raw || fallback
 }
 
+function getApiRouteGroup(path) {
+  if (path.startsWith('/ai/')) return 'ai'
+  if (path.startsWith('/auth/')) return 'auth'
+  if (path.startsWith('/coach/')) return 'coach'
+  if (path.startsWith('/payments/')) return 'payments'
+  if (path.startsWith('/scan/')) return 'scan'
+  return 'other'
+}
+
 function getToken() {
   // Read from in-memory Zustand store — always current, no localStorage
   // flush-timing issues. Falls back to localStorage only if the store hasn't
@@ -41,12 +52,24 @@ function getToken() {
 }
 
 async function request(path, options = {}) {
+  const { aiObservability, ...requestOptions } = options
+  const startedAt = typeof performance === 'undefined' ? Date.now() : performance.now()
   const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...requestOptions.headers,
   }
+  const captureGeneration = ({ response, httpStatus, failed = false } = {}) =>
+    captureAiGeneration({
+      path,
+      requestBody: requestOptions.body,
+      response,
+      traceId: aiObservability?.traceId,
+      startedAt,
+      httpStatus,
+      failed,
+    })
 
   // Generated AI and coach responses can take longer than ordinary API calls.
   const timeoutMs = getRequestTimeoutMs(path)
@@ -55,21 +78,35 @@ async function request(path, options = {}) {
 
   let res
   try {
-    res = await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal })
+    res = await fetch(`${BASE}${path}`, { ...requestOptions, headers, signal: controller.signal })
   } catch (networkErr) {
     clearTimeout(timeoutId)
+    captureGeneration({ failed: true })
     // fetch() itself threw — server is unreachable, timed out, or blocked before
     // a response was ever received (DNS failure, TLS error, offline, a CORS
     // rejection by the WebView, etc). The user-facing message is intentionally
     // generic ("Server unavailable"), but that used to also discard the real
     // reason — logging the actual error name/message here is the only way to
     // tell those apart after the fact instead of guessing.
+    logPostHog('error', 'api_request_unreachable', {
+      api_route_group: getApiRouteGroup(path),
+      request_method: options.method || 'GET',
+      request_aborted: networkErr.name === 'AbortError',
+    })
     console.error(`[api] fetch failed for ${options.method || 'GET'} ${path}:`, networkErr.name, networkErr.message)
     if (networkErr.name === 'AbortError') throw new Error('Request timed out. Please check your connection.')
     throw new Error('Server unavailable')
   }
   clearTimeout(timeoutId)
   if (!res.ok) {
+    captureGeneration({ httpStatus: res.status, failed: true })
+    if (res.status >= 500) {
+      logPostHog('error', 'api_request_server_error', {
+        api_route_group: getApiRouteGroup(path),
+        request_method: options.method || 'GET',
+        http_status: res.status,
+      })
+    }
     // If the proxy returns HTML (Vite can't reach the backend), treat as unavailable
     const contentType = res.headers.get('content-type') || ''
     // Gateway HTML and 504s are unavailable; our assessment route uses JSON 502s
@@ -117,7 +154,20 @@ async function request(path, options = {}) {
     if (errBody.plan)       err.plan       = errBody.plan
     throw err
   }
-  return res.json()
+  let response
+  try {
+    response = await res.json()
+  } catch (error) {
+    captureGeneration({ httpStatus: res.status, failed: true })
+    logPostHog('error', 'api_response_invalid', {
+      api_route_group: getApiRouteGroup(path),
+      request_method: options.method || 'GET',
+      http_status: res.status,
+    })
+    throw error
+  }
+  captureGeneration({ response, httpStatus: res.status })
+  return response
 }
 
 export const api = {
@@ -173,11 +223,11 @@ export const api = {
   },
   ai: {
     validateScan: (imageB64) => request('/ai/validate-scan', { method: 'POST', body: JSON.stringify({ imageB64 }) }),
-    score: (data) => request('/ai/score', { method: 'POST', body: JSON.stringify(data) }),
-    scorePresentation: (data) => request('/ai/score/presentation', { method: 'POST', body: JSON.stringify(data) }),
+    score: (data, aiObservability) => request('/ai/score', { method: 'POST', body: JSON.stringify(data), aiObservability }),
+    scorePresentation: (data, aiObservability) => request('/ai/score/presentation', { method: 'POST', body: JSON.stringify(data), aiObservability }),
     scorePhysique: (data) => request('/ai/score/physique', { method: 'POST', body: JSON.stringify(data) }),
     scoreExtendedMetrics: (data) => request('/ai/score/extended-metrics', { method: 'POST', body: JSON.stringify(data) }),
-    workoutPlan: (data) => request('/ai/workout-plan', { method: 'POST', body: JSON.stringify(data) }),
+    workoutPlan: (data, aiObservability) => request('/ai/workout-plan', { method: 'POST', body: JSON.stringify(data), aiObservability }),
   },
   coach: {
     appearance: (scanId, options = {}) => request('/coach/appearance', { method: 'POST', body: JSON.stringify({ scanId, ...options }) }),

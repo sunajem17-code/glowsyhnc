@@ -10,6 +10,7 @@ import MotionPage from '../components/MotionPage'
 // TrainingPlanIntro removed — physique scan now handled by /physique-scan page
 import { GOLD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import { createAiTraceId } from '../utils/aiObservability'
 
 // Resize + JPEG-compress a raw File before sending to the server, same
 // approach used in Scan.jsx's toBase64 — keeps payloads small and fast.
@@ -42,10 +43,11 @@ export function fileToResizedBase64(file, maxPx = 1024) {
 // (bad request), since an immediate retry can't fix either of those and would
 // just waste the demo/free-tier's already-scarce Claude call budget.
 async function callWorkoutPlanWithRetry(payload, maxAttempts = 3) {
+  const traceId = createAiTraceId()
   let lastErr
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await api.ai.workoutPlan(payload)
+      return await api.ai.workoutPlan(payload, { traceId })
     } catch (err) {
       lastErr = err
       const isRateLimited = err.status === 429 || err.errorCode === 'claude_rate_limited' || err.errorCode === 'rate_limited'

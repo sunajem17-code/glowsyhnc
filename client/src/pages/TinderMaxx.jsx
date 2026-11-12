@@ -11,6 +11,7 @@ import MotionPage from '../components/MotionPage'
 import { isNative as checkNative } from '../utils/iap'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 
 const SURFACE = '#141414'
 const BORDER  = 'rgba(255,255,255,0.07)'
@@ -92,6 +93,7 @@ export default function TinderMaxx() {
         gender: gender || 'male',
       })
       setResult(data)
+      if (isPostHogConfigured) posthog.capture('tindermaxx_analysis_completed', { photo_count: photos.length })
     } catch (err) {
       if (err.plan === 'premium') {
         navigate('/premium?from=tindermaxx')

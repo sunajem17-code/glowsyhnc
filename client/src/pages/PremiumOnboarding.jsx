@@ -33,6 +33,7 @@ import { nextOnboardingStep } from '../utils/onboardingProgress'
 import ProcessingOverlay from '../components/ProcessingOverlay'
 import { openAppStoreReview } from '../components/OnboardingFinalSteps'
 import { buildProductionEvidence, requestProductionAnalysis } from '../utils/productionAnalysis'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 import { trackOnboardingScreen } from '../utils/analytics'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -2310,6 +2311,7 @@ export default function PremiumOnboarding() {
     setLegalConsented()
     setAgeConfirmed()
     setHasOnboarded(FINAL_ONBOARDING_STEP)
+    if (isPostHogConfigured) posthog.capture('onboarding_completed')
   }
 
 
