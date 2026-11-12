@@ -33,6 +33,11 @@ test('outbound filter strips URLs, identities and scan data and rejects automati
   assert.deepEqual(clean.properties, { distinct_id: 'anonymous-id', screen_name: '/scan' })
   assert.equal(sanitizePostHogEvent({ event: '$autocapture', properties: {} }), null)
 })
+test('outbound filter keeps the project token so PostHog accepts the event', () => {
+  const clean = sanitizePostHogEvent({ event: 'screen_view', properties: { token: 'phc_test', distinct_id: 'a', screen_name: '/scan' } })
+  assert.equal(clean.properties.token, 'phc_test')
+})
+
 test('SDK failures do not break application flow', () => {
   const adapter = createPostHogAnalytics({ init() { throw new Error('offline') } }, { token: 'test', host: 'https://us.i.posthog.com' })
   assert.doesNotThrow(() => { adapter.setEnabled(true); adapter.capture('screen_view') })

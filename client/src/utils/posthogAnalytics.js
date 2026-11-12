@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core'
 
 const events = new Set(['screen_view', 'screen_reached', 'app_session_start', 'app_session_end'])
 const allowedProperties = new Set([
-  'distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version',
+  'token', 'distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version',
   '$process_person_profile', '$is_identified', 'screen_name', 'screen_class', 'platform',
 ])
 
