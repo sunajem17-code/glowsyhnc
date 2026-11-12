@@ -5,7 +5,7 @@ import { loadScreen } from './utils/screenLoader'
 import { hasCompletedOnboarding, hasCompletedScan, onboardingStartup } from './utils/onboardingStartup.js'
 import { StartupCheck, DevelopmentOnboardingReset } from './components/OnboardingStartup'
 import NotificationPrompt from './components/NotificationPrompt'
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { captureEmailUTM } from './utils/affiliate-tracker'
 import { initRevenueCat } from './utils/iap'
@@ -20,6 +20,7 @@ import PremiumOnboarding from './pages/PremiumOnboarding'
 import UnlockRevealSlideshow from './components/UnlockRevealSlideshow'
 import { getStartupSplash } from './utils/splashFlow'
 import AnalyticsTracker from './components/AnalyticsTracker'
+import posthog, { isPostHogConfigured } from './posthog.js'
 
 const lazyScreen = loader => lazy(() => loadScreen(loader))
 
@@ -125,6 +126,11 @@ export default function App() {
   const isAuthenticated     = useStore(s => s.isAuthenticated)
   const currentScan         = useStore(s => s.currentScan)
   const userId              = useStore(s => s.user?.id)
+  const userEmail           = useStore(s => s.user?.email)
+  const userName            = useStore(s => s.user?.name)
+  const isGuest             = useStore(s => s.isGuest)
+  const isPremium           = useStore(s => s.isPremium)
+  const identifiedUserIdRef = useRef(null)
   const refreshProStatus        = useStore(s => s.refreshProStatus)
   const expireSession           = useStore(s => s.expireSession)
   const showUnlockSlideshow     = useStore(s => s.showUnlockSlideshow)
@@ -141,6 +147,34 @@ export default function App() {
 
   // Capture email UTM params on every load (for email click attribution)
   useEffect(() => { captureEmailUTM() }, [])
+
+  // Identify when an authenticated session becomes available (including a
+  // persisted session after refresh). Reset first if the active account changes
+  // so events and automatically captured errors cannot inherit the prior user.
+  useEffect(() => {
+    if (!isPostHogConfigured) return
+
+    if (!isAuthenticated || !userId) {
+      if (identifiedUserIdRef.current) {
+        posthog.reset()
+        identifiedUserIdRef.current = null
+      }
+      return
+    }
+
+    if (identifiedUserIdRef.current && identifiedUserIdRef.current !== userId) {
+      posthog.reset()
+    }
+
+    const personProperties = {
+      account_type: isGuest ? 'guest' : 'member',
+      plan: isPremium ? 'premium' : 'free',
+    }
+    if (userEmail) personProperties.email = userEmail
+    if (userName) personProperties.name = userName
+    posthog.identify(userId, personProperties)
+    identifiedUserIdRef.current = userId
+  }, [isAuthenticated, userEmail, userId, userName, isGuest, isPremium])
 
   // Initialize RevenueCat — pass user ID when logged in so purchases are linked
   useEffect(() => {

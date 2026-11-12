@@ -11,6 +11,7 @@ import { EXIT_THREE_DAY_PRODUCT_ID } from '../utils/scanTrial'
 import { GOLD, GOLD_GRADIENT, EASE_STANDARD, RED } from '../utils/theme'
 import { triggerHaptic } from '../utils/haptics'
 import MotionPage from '../components/MotionPage'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 
 // ─── Gold tokens ───────────────────────────────────────────────────────────────
 const SURFACE = '#0D0D0D'
@@ -57,7 +58,7 @@ export default function Premium() {
   useEffect(() => {
     if (searchParams.get('success') === '1') {
       api.payments.status()
-        .then(({ isPremium: active }) => { if (active) { useStore.getState().setUpgradeWelcomePending(true); setIsPremium(true) } })
+        .then(({ isPremium: active }) => { if (active) { useStore.getState().setUpgradeWelcomePending(true); setIsPremium(true); if (isPostHogConfigured) posthog.capture('subscription_completed', { checkout_platform: 'web' }) } })
         .catch(() => {})
     }
   }, [searchParams, setIsPremium])
@@ -70,9 +71,11 @@ export default function Premium() {
     setCheckoutError('')
     try {
       if (isNative()) {
+        if (isPostHogConfigured) posthog.capture('subscription_checkout_started', { checkout_platform: 'native', billing_interval: 'weekly' })
         const result = await purchasePro('weekly')
         if (result?.success) {
           useStore.getState().setUpgradeWelcomePending(true)
+          if (isPostHogConfigured) posthog.capture('subscription_completed', { checkout_platform: 'native', billing_interval: 'weekly' })
           const rcUserId = result.customerInfo?.originalAppUserId
           setIsPremium(true)
           api.payments.syncRc(rcUserId).catch(() => {})
@@ -86,6 +89,7 @@ export default function Premium() {
           return
         }
         const { url } = await api.payments.createCheckout('monthly')
+        if (isPostHogConfigured) posthog.capture('subscription_checkout_started', { checkout_platform: 'web', billing_interval: 'monthly' })
         window.location.href = url
       }
     } catch (err) {
@@ -114,6 +118,7 @@ export default function Premium() {
     useStore.getState().setUpgradeWelcomePending(true)
     setShowExitOffer(false)
     setIsPremium(true)
+    if (isPostHogConfigured) posthog.capture('subscription_completed', { checkout_platform: 'exit_offer' })
     navigate('/dashboard', { replace: true })
   }
 

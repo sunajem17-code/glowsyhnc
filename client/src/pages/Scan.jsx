@@ -36,6 +36,7 @@ import { advanceScanClock, scanFrame, SCAN_FEATURES } from '../utils/scanPresent
 import { validationFailure } from '../utils/validationFailure'
 import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
 import { trackScanScreen } from '../utils/analytics'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 
 const nativeCameraSession = import.meta.hot?.data.nativeCameraSession || createNativeCameraSession(CameraPreview)
 if (import.meta.hot) import.meta.hot.dispose(data => { data.nativeCameraSession = nativeCameraSession })
@@ -2379,6 +2380,10 @@ export default function Scan() {
       setScanReady(true)
       setAssignedPhase(assignedPh)
       recordProScan()
+      if (isPostHogConfigured) posthog.capture('face_scan_completed', {
+        demo_mode: Boolean(aiResult.demoMode),
+        side_profile_included: Boolean(sideB64),
+      })
 
       // Mark calibration complete after first successful scan — subsequent
       // scans will use the fast local MediaPipe path instead of the AI API.

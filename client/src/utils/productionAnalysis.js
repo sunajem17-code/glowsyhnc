@@ -1,6 +1,7 @@
 import { analyzeLandmarkEvidence, buildProfileEvidence } from './evidenceAnalysis.js'
 import { ASSESSMENT_VERSION } from './assessment.js'
 import { withDeadline } from './requestTimeout.js'
+import { createAiTraceId } from './aiObservability.js'
 
 function imageDimensions(source) {
   return new Promise((resolve, reject) => {
@@ -65,7 +66,8 @@ export async function requestProductionAnalysis({
     analysisEvidence: portableEvidence(evidence),
     gender,
   }
-  const scoreCall = apiClient.ai.score(payload)
+  const aiTraceId = createAiTraceId()
+  const scoreCall = apiClient.ai.score(payload, { traceId: aiTraceId })
   const result = await withDeadline(scoreCall, timeoutMs, 'Analysis timed out. Please try again')
   if (result.assessment && result.assessment.rubricVersion !== ASSESSMENT_VERSION) {
     throw new Error('The scoring server returned an older rubric. Please update the server and try again.')
@@ -77,7 +79,7 @@ export async function requestProductionAnalysis({
       gender,
       knownMinor,
       ...(presentationGoals ? { presentationGoals } : {}),
-    }).catch(() => ({
+    }, { traceId: aiTraceId }).catch(() => ({
       presentation: { observations: {}, recommendations: [], unavailable: true },
       suggestions: [],
       unavailableDetail: 'Presentation feedback is unavailable; the assessment range is unchanged.',

@@ -24,6 +24,7 @@ import { GOLD, GOLD_GRADIENT, EASE_STANDARD, SPRING_STANDARD } from '../utils/th
 import { triggerHaptic } from '../utils/haptics'
 import { recordLocalScanStreak, syncScanStreak } from '../utils/scanStreak'
 import ProcessingOverlay from '../components/ProcessingOverlay'
+import posthog, { isPostHogConfigured } from '../posthog.js'
 
 export const ANALYSIS_STEPS = [
   { label: 'Finding your strengths...', Icon: Target },
@@ -1567,6 +1568,10 @@ export default function PhysiqueScan() {
       setCurrentScan(scanRecord)
       setAssignedPhase(assignedPh)
       recordProScan()
+      if (isPostHogConfigured) posthog.capture('physique_scan_completed', {
+        demo_mode: token === 'demo-token',
+        side_profile_included: Boolean(sideB64),
+      })
 
       // Fire-and-forget: run MediaPipe client-side to extract named landmarks
       // and explorer metrics for FaceMetricsExplorer on the Progress screen.
